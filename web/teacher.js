@@ -139,10 +139,45 @@ async function loadFullSchedule() {
 async function renderScheduleTable(schedule) {
   scheduleTableBody.innerHTML = "";
   const dayIndexes = Object.keys(schedule).map(Number).sort((a, b) => a - b);
-
-  // Find the highest day index to fill all rows, including gaps
   const maxDayIndex = dayIndexes.length > 0 ? Math.max(...dayIndexes) : 0;
+
+  // Helper to insert a new day at a given index
+  async function insertDayAt(index) {
+    const classId = classSelect.value;
+    // Shift all days >= index up by 1
+    for (let i = maxDayIndex; i >= index; i--) {
+      const fromRef = ref(db, `schedule/${classId}/${i}`);
+      const toRef = ref(db, `schedule/${classId}/${i + 1}`);
+      const snap = await get(fromRef);
+      if (snap.exists()) {
+        await set(toRef, snap.val());
+      } else {
+        await set(toRef, []);
+      }
+    }
+    // Set the new day to empty
+    await set(ref(db, `schedule/${classId}/${index}`), []);
+    loadFullSchedule();
+  }
+
   for (let dayIndex = 0; dayIndex <= maxDayIndex; dayIndex++) {
+    // --- Insert Day Button (before each row except the first) ---
+    if (dayIndex > 0) {
+      const insertRow = document.createElement("tr");
+      const insertTd = document.createElement("td");
+      insertTd.colSpan = 3;
+      insertTd.style.textAlign = "center";
+      insertTd.style.padding = "2px";
+      const insertBtn = document.createElement("button");
+      insertBtn.textContent = "+ Insert Day Here";
+      insertBtn.style.fontSize = "0.9em";
+      insertBtn.onclick = () => insertDayAt(dayIndex);
+      insertTd.appendChild(insertBtn);
+      insertRow.appendChild(insertTd);
+      scheduleTableBody.appendChild(insertRow);
+    }
+
+    // --- Normal Day Row ---
     const lessons = schedule[dayIndex] || [];
     const tr = document.createElement("tr");
 
@@ -443,9 +478,9 @@ async function renderScheduleTable(schedule) {
     scheduleTableBody.appendChild(tr);
   }
 
-  // Add extra row for the next day index with both "Link Lesson" and "+ New Lesson" buttons
-  const addRow = document.createElement("tr");
+  // --- Final row for the next day index ---
   const nextIndex = maxDayIndex + 1;
+  const addRow = document.createElement("tr");
 
   // Day Index column
   const tdDay = document.createElement("td");
@@ -459,7 +494,7 @@ async function renderScheduleTable(schedule) {
   tdLessons.style.alignItems = "center";
   tdLessons.style.gap = "4px";
 
-  // "Link Lesson" button for the extra row
+  // "Link Lesson" button
   const linkBtn = document.createElement("button");
   linkBtn.textContent = "Link Lesson";
   linkBtn.style.width = "110px";
@@ -568,7 +603,7 @@ async function renderScheduleTable(schedule) {
   };
   tdLessons.appendChild(linkBtn);
 
-  // "+ New Lesson" button for the extra row
+  // "+ New Lesson" button
   const plusBtn = document.createElement("button");
   plusBtn.textContent = "+ New Lesson";
   plusBtn.style.width = "110px";
