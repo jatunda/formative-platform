@@ -1,10 +1,11 @@
-@title Test Title
+@title Intro to Recursion
 
-@q This is a question
-@code 
-x = 4
-if x > 3:
-	print("hi")
-else:
-	print("bye")
-@tag
+@q What is a base case?
+
+@code
+def factorial(n):
+    if n == 0: return 1
+    return n * factorial(n-1)
+@endcode
+
+@q What would factorial(3) return?
