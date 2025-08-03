@@ -1,21 +1,59 @@
 // public/view.js
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-app.js";
 import { getDatabase, ref, get } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js";
+import { initializeDateUtils, getTodayDayIndex } from './date-utils.js';
 
 const app = initializeApp({ 
 	databaseURL: "https://formative-platform-default-rtdb.firebaseio.com/",
 });
 const db = getDatabase(app);
 
+// Initialize date utilities with database
+initializeDateUtils(db);
+
 const params = new URLSearchParams(window.location.search);
 const classId = params.get("class");
-const today = new Date();
-const dayIndex = Math.floor((today - new Date("2025-08-02")) / 86400000);
-console.log("view.js dayindex: %s", dayIndex);
+const dayFromUrl = params.get("day"); // Get day from URL if provided
 
+let dayIndex;
 let pageIds = [];
 let pageCache = {};
 const contentEl = document.getElementById("content");
+
+// Initialize the page
+async function initializePage() {
+  if (dayFromUrl !== null) {
+    // Use day index from URL (from landing page)
+    dayIndex = parseInt(dayFromUrl);
+    console.log("view.js using day index from URL: %s", dayIndex);
+  } else {
+    // Fallback: calculate today's day index for this class
+    dayIndex = await getTodayDayIndex(classId);
+    console.log("view.js calculated day index: %s", dayIndex);
+  }
+  
+  // Load and display the content
+  await loadContent();
+}
+
+async function loadContent() {
+  // Fetch today's schedule for this class
+  const scheduleSnap = await get(ref(db, `schedule/${classId}/${dayIndex}`));
+  pageIds = scheduleSnap.val() || [];
+  
+  if (pageIds.length === 0) {
+    contentEl.textContent = "No content for today.";
+    return;
+  }
+  
+  await cachePages();
+  
+  // Render all pages
+  pageIds.forEach(pageId => {
+    const data = pageCache[pageId];
+    renderContent(data);
+  });
+}
 
 async function cachePages() {
 	// Fetch all pages in parallel and cache them
@@ -69,16 +107,5 @@ function loadPage() {
 	}
 }
 
-async function init() {
-	const snap = await get(ref(db, `schedule/${classId}/${dayIndex}`));
-	const ids = snap.val();
-	if (!ids || ids.length === 0) {
-		contentEl.textContent = "No content for today.";
-		return;
-	}
-	pageIds = ids;
-	await cachePages();
-	loadPage();
-}
-
-init();
+// Start the application
+initializePage();

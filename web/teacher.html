@@ -10,11 +10,18 @@
 
   <p><a href="editor.html">Go to Content Editor</a></p>
 
-
-  <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 1em; flex-direction: row;"></div>
+  <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 1em; flex-direction: row;">
     <label for="classSelect" style="margin: 0;">Class:</label>
     <select id="classSelect" style="width:auto;"></select>
     <button id="loadSchedule">Load Schedule</button>
+  </div>
+
+  <!-- Elements needed by JavaScript but not currently displayed -->
+  <div style="display: none;">
+    <input id="dayInput" type="number" value="0">
+    <div id="scheduleList"></div>
+    <input id="newPageId" type="text">
+    <input id="insertPosition" type="number">
   </div>
 
   <h2>Schedule</h2>
@@ -31,6 +38,16 @@
         <!-- Rows will be filled by JS -->
       </tbody>
     </table>
+  </div>
+
+  <!-- Date Offset Control -->
+  <div id="dateOffsetContainer" style="margin-top: 1rem; padding: 1rem; border: 1px solid #ddd; border-radius: 8px; background-color: #f9f9f9;">
+    <h3 style="margin-top: 0; margin-bottom: 0.5rem; font-size: 1.1rem; color: #333;">Schedule Date Offset</h3>
+    <p style="margin: 0 0 0.75rem 0; font-size: 0.9rem; color: #666;">
+      Adjust the date offset to shift the entire schedule forward (+) or backward (-) in time. 
+      The indicator shows what day index today would be with the current offset.
+    </p>
+    <!-- Date offset control will be inserted here by JavaScript -->
   </div>
 </body>
 </html>

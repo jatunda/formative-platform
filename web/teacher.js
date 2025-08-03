@@ -8,11 +8,20 @@ import {
   set,
   update
 } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js";
+import { 
+  initializeDateUtils, 
+  getDateForDayIndex as sharedGetDateForDayIndex,
+  getTodayDayIndex,
+  DEFAULT_CLASS_START_DATE
+} from './date-utils.js';
 
 const app = initializeApp({
   databaseURL: "https://formative-platform-default-rtdb.firebaseio.com/",
 });
 const db = getDatabase(app);
+
+// Initialize date utilities
+initializeDateUtils(db);
 
 // Constants
 const BUTTON_CONFIG = {
@@ -21,7 +30,6 @@ const BUTTON_CONFIG = {
   maxWidth: "110px"
 };
 
-const DEFAULT_CLASS_START_DATE = "2024-08-19";
 const DEFAULT_LESSON_TITLE = "Empty Lesson";
 const POPUP_MAX_HEIGHT = "50vh";
 
@@ -34,9 +42,34 @@ const scheduleList = document.getElementById("scheduleList");
 const newPageIdInput = document.getElementById("newPageId");
 const insertPosInput = document.getElementById("insertPosition");
 const scheduleTableBody = document.querySelector("#scheduleTable tbody");
+const dateOffsetContainer = document.getElementById("dateOffsetContainer");
 
 let currentClassId = "";
 let currentSchedule = [];
+let currentDateOffset = 0;
+let dateOffsetControl = null;
+
+// Date offset functions
+async function getClassDateOffset(classId) {
+  try {
+    const snap = await get(ref(db, `classes/${classId}/dateOffset`));
+    return snap.exists() ? snap.val() : 0;
+  } catch (error) {
+    console.error(`Failed to get date offset for class ${classId}:`, error);
+    return 0;
+  }
+}
+
+async function setClassDateOffset(classId, offset) {
+  try {
+    await set(ref(db, `classes/${classId}/dateOffset`), Number(offset));
+    currentDateOffset = Number(offset);
+    return true;
+  } catch (error) {
+    console.error(`Failed to set date offset for class ${classId}:`, error);
+    return false;
+  }
+}
 
 async function loadClasses() {
   const snap = await get(ref(db, "classes"));
@@ -121,19 +154,145 @@ function deleteItem(index) {
 
 loadBtn.onclick = loadSchedule;
 
-function getDateForDayIndex(dayIndex, classStartDate = DEFAULT_CLASS_START_DATE) {
-  // Example: classStartDate is a Monday in ISO format
-  const start = new Date(classStartDate);
-  const date = new Date(start);
-  date.setDate(start.getDate() + Number(dayIndex));
-  const weekday = date.toLocaleDateString(undefined, {
-    weekday: "long"
-  });
-  return `${date.toLocaleDateString()} (${weekday})`;
+// Use the shared date calculation function
+async function getDateForDayIndex(dayIndex, classStartDate = DEFAULT_CLASS_START_DATE) {
+  return await sharedGetDateForDayIndex(dayIndex, currentClassId, classStartDate);
+}
+
+// Create date offset control UI
+function createDateOffsetControl() {
+  const container = document.createElement("div");
+  container.className = "date-offset-control";
+  container.style.display = "flex";
+  container.style.alignItems = "center";
+  container.style.gap = "8px";
+  
+  const label = document.createElement("label");
+  label.textContent = "Date Offset (days): ";
+  
+  // Current offset display
+  const currentDisplay = document.createElement("span");
+  currentDisplay.className = "current-offset-display";
+  currentDisplay.textContent = `Current: ${currentDateOffset}`;
+  currentDisplay.style.fontWeight = "bold";
+  currentDisplay.style.color = "#007cba";
+  currentDisplay.style.backgroundColor = "#e8f4fd";
+  currentDisplay.style.padding = "4px 8px";
+  currentDisplay.style.borderRadius = "4px";
+  currentDisplay.style.border = "1px solid #b3d9f7";
+  currentDisplay.style.fontSize = "0.9rem";
+  
+  // Today's day index display
+  const exampleDisplay = document.createElement("span");
+  exampleDisplay.className = "today-dayindex-display";
+  exampleDisplay.style.fontSize = "0.85rem";
+  exampleDisplay.style.color = "#666";
+  exampleDisplay.style.fontStyle = "italic";
+  
+  async function updateTodayDayIndex(offset) {
+    // Use the shared utility function to get today's day index
+    const todayDayIndex = await getTodayDayIndex(currentClassId);
+    exampleDisplay.textContent = `(Today is Day ${todayDayIndex})`;
+  }
+  
+  updateTodayDayIndex(currentDateOffset);
+  
+  const input = document.createElement("input");
+  input.type = "number";
+  input.value = currentDateOffset;
+  input.style.width = "80px";
+  input.placeholder = "New offset";
+  
+  const applyBtn = document.createElement("button");
+  applyBtn.textContent = "Apply";
+  applyBtn.style.padding = "4px 12px";
+  applyBtn.style.fontSize = "0.9rem";
+  
+  applyBtn.onclick = async () => {
+    const newOffset = parseInt(input.value) || 0;
+    const success = await setClassDateOffset(currentClassId, newOffset);
+    if (success) {
+      // Update the current display
+      currentDisplay.textContent = `Current: ${newOffset}`;
+      await updateTodayDayIndex(newOffset);
+      // Update the display immediately
+      if (currentClassId) {
+        await loadFullSchedule();
+      }
+      // Show success message
+      showNotification("Date offset updated successfully!", "success");
+    } else {
+      showNotification("Failed to update date offset", "error");
+    }
+  };
+  
+  container.appendChild(label);
+  container.appendChild(currentDisplay);
+  container.appendChild(exampleDisplay);
+  container.appendChild(input);
+  container.appendChild(applyBtn);
+  
+  // Method to update the displayed offset
+  container.updateOffset = async (newOffset) => {
+    input.value = newOffset;
+    currentDisplay.textContent = `Current: ${newOffset}`;
+    await updateTodayDayIndex(newOffset);
+  };
+  
+  return container;
+}
+
+// Show notification messages
+function showNotification(message, type = "info") {
+  // Remove any existing notification
+  const existing = document.querySelector('.notification');
+  if (existing) {
+    existing.remove();
+  }
+  
+  const notification = document.createElement('div');
+  notification.className = `notification ${type}`;
+  notification.textContent = message;
+  notification.style.position = 'fixed';
+  notification.style.top = '20px';
+  notification.style.right = '20px';
+  notification.style.padding = '12px 16px';
+  notification.style.borderRadius = '8px';
+  notification.style.zIndex = '1000';
+  notification.style.maxWidth = '300px';
+  
+  if (type === 'success') {
+    notification.style.backgroundColor = '#d4edda';
+    notification.style.color = '#155724';
+    notification.style.border = '1px solid #c3e6cb';
+  } else if (type === 'error') {
+    notification.style.backgroundColor = '#f8d7da';
+    notification.style.color = '#721c24';
+    notification.style.border = '1px solid #f5c6cb';
+  }
+  
+  document.body.appendChild(notification);
+  
+  // Auto-remove after 3 seconds
+  setTimeout(() => {
+    if (notification.parentNode) {
+      notification.parentNode.removeChild(notification);
+    }
+  }, 3000);
 }
 
 async function loadFullSchedule() {
   const classId = classSelect.value;
+  currentClassId = classId;
+  
+  // Load the date offset for this class
+  currentDateOffset = await getClassDateOffset(classId);
+  
+  // Update the date offset control if it exists
+  if (dateOffsetControl) {
+    await dateOffsetControl.updateOffset(currentDateOffset);
+  }
+  
   // Fetch all days for this class
   const snap = await get(ref(db, `schedule/${classId}`));
   const schedule = snap.val() || {};
@@ -247,7 +406,7 @@ async function renderScheduleTable(schedule) {
 
     // Date column
     const tdDate = document.createElement("td");
-    tdDate.textContent = getDateForDayIndex(dayIndex);
+    tdDate.textContent = await getDateForDayIndex(dayIndex);
     tr.appendChild(tdDate);
 
     scheduleTableBody.appendChild(tr);
@@ -276,7 +435,7 @@ async function renderScheduleTable(schedule) {
 
   // Date column
   const tdDate = document.createElement("td");
-  tdDate.textContent = getDateForDayIndex(nextIndex);
+  tdDate.textContent = await getDateForDayIndex(nextIndex);
   addRow.appendChild(tdDate);
 
   scheduleTableBody.appendChild(addRow);
@@ -319,8 +478,18 @@ async function addLessonToDay(dayIndex) {
 
 classSelect.onchange = loadFullSchedule;
 
+// Initialize date offset control
+function initializeDateOffsetControl() {
+  dateOffsetControl = createDateOffsetControl();
+  dateOffsetContainer.innerHTML = '';
+  dateOffsetContainer.appendChild(dateOffsetControl);
+}
+
 // Initial load
-loadClasses().then(loadFullSchedule);
+loadClasses().then(() => {
+  initializeDateOffsetControl();
+  loadFullSchedule();
+});
 
 function showLessonLinkPopup({ onSelect }) {
   (async () => {
