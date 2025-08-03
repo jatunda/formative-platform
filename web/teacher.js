@@ -244,6 +244,117 @@ async function renderScheduleTable(schedule) {
       tdLessons.appendChild(cluster);
     }
 
+    // "Link Lesson" button
+    const linkBtn = document.createElement("button");
+    linkBtn.textContent = "Link Lesson";
+    linkBtn.style.width = "110px";
+    linkBtn.style.minWidth = "110px";
+    linkBtn.style.maxWidth = "110px";
+    linkBtn.style.boxSizing = "border-box";
+    linkBtn.onclick = async () => {
+      // Fetch all lessons
+      const snap = await get(ref(db, "content"));
+      if (!snap.exists()) {
+        alert("No lessons found.");
+        return;
+      }
+      const contentMap = snap.val();
+      // Create popup
+      const popup = document.createElement("div");
+      popup.style.position = "fixed";
+      popup.style.top = "0";
+      popup.style.left = "0";
+      popup.style.width = "100vw";
+      popup.style.height = "100vh";
+      popup.style.background = "rgba(0,0,0,0.3)";
+      popup.style.display = "flex";
+      popup.style.alignItems = "center";
+      popup.style.justifyContent = "center";
+      popup.style.zIndex = "1000";
+
+      const box = document.createElement("div");
+      box.style.background = "#fff";
+      box.style.padding = "24px";
+      box.style.borderRadius = "8px";
+      box.style.boxShadow = "0 2px 12px #0002";
+      box.style.minWidth = "320px";
+      box.style.maxWidth = "90vw";
+      box.style.maxHeight = "80vh";
+      box.style.overflowY = "auto";
+      box.style.display = "flex";
+      box.style.flexDirection = "column";
+      box.style.gap = "8px";
+
+      const closeBtn = document.createElement("button");
+      closeBtn.textContent = "Close";
+      closeBtn.style.alignSelf = "flex-end";
+      closeBtn.onclick = () => document.body.removeChild(popup);
+
+      const searchInput = document.createElement("input");
+      searchInput.type = "text";
+      searchInput.placeholder = "Search lessons by name...";
+      searchInput.style.marginBottom = "8px";
+      searchInput.style.padding = "4px";
+      searchInput.style.fontSize = "1em";
+
+      const resultsDiv = document.createElement("div");
+      resultsDiv.style.display = "flex";
+      resultsDiv.style.flexDirection = "column";
+      resultsDiv.style.gap = "4px";
+      resultsDiv.style.maxHeight = "50vh";
+      resultsDiv.style.overflowY = "auto";
+
+      // Helper: render results
+      function renderResults(filter) {
+        resultsDiv.innerHTML = "";
+        const filterLower = filter.trim().toLowerCase();
+        const items = Object.entries(contentMap)
+          .map(([id, data]) => ({
+            id,
+            title: (data.title || "(Untitled)").toString()
+          }))
+          .filter(item => item.title.toLowerCase().includes(filterLower) || item.id.includes(filterLower))
+          .sort((a, b) => a.title.localeCompare(b.title));
+        if (items.length === 0) {
+          const noRes = document.createElement("div");
+          noRes.textContent = "No results.";
+          resultsDiv.appendChild(noRes);
+          return;
+        }
+        for (const item of items) {
+          const btn = document.createElement("button");
+          btn.textContent = `${item.title} (${item.id})`;
+          btn.style.textAlign = "left";
+          btn.style.whiteSpace = "normal";
+          btn.style.width = "100%";
+          btn.onclick = async () => {
+            // Add to schedule
+            const classId = classSelect.value;
+            const dayRef = ref(db, `schedule/${classId}/${dayIndex}`);
+            const snap = await get(dayRef);
+            const lessons = snap.exists() ? snap.val() : [];
+            lessons.push(item.id);
+            await set(dayRef, lessons);
+            document.body.removeChild(popup);
+            loadFullSchedule();
+          };
+          resultsDiv.appendChild(btn);
+        }
+      }
+
+      searchInput.oninput = () => renderResults(searchInput.value);
+      renderResults("");
+
+      box.appendChild(closeBtn);
+      box.appendChild(searchInput);
+      box.appendChild(resultsDiv);
+      popup.appendChild(box);
+      document.body.appendChild(popup);
+    };
+
+    // Insert the "Link Lesson" button before the "+ New Lesson" button
+    tdLessons.appendChild(linkBtn);
+
     // Always add the "+ New Lesson" button
     const plusBtn = document.createElement("button");
     plusBtn.textContent = "+ New Lesson";
@@ -264,7 +375,7 @@ async function renderScheduleTable(schedule) {
     scheduleTableBody.appendChild(tr);
   }
 
-  // Add extra row for the next day index with only a plus button in the lessons column
+  // Add extra row for the next day index with both "Link Lesson" and "+ New Lesson" buttons
   const addRow = document.createElement("tr");
   const nextIndex = maxDayIndex + 1;
 
@@ -273,16 +384,132 @@ async function renderScheduleTable(schedule) {
   tdDay.textContent = nextIndex;
   addRow.appendChild(tdDay);
 
-  // Lessons column with only a plus button
+  // Lessons column with "Link Lesson" and "+ New Lesson" buttons
   const tdLessons = document.createElement("td");
   tdLessons.style.display = "flex";
   tdLessons.style.flexWrap = "nowrap";
   tdLessons.style.alignItems = "center";
   tdLessons.style.gap = "4px";
+
+  // "Link Lesson" button for the extra row
+  const linkBtn = document.createElement("button");
+  linkBtn.textContent = "Link Lesson";
+  linkBtn.style.width = "110px";
+  linkBtn.style.minWidth = "110px";
+  linkBtn.style.maxWidth = "110px";
+  linkBtn.style.boxSizing = "border-box";
+  linkBtn.onclick = async () => {
+    // Fetch all lessons
+    const snap = await get(ref(db, "content"));
+    if (!snap.exists()) {
+      alert("No lessons found.");
+      return;
+    }
+    const contentMap = snap.val();
+    // Create popup
+    const popup = document.createElement("div");
+    popup.style.position = "fixed";
+    popup.style.top = "0";
+    popup.style.left = "0";
+    popup.style.width = "100vw";
+    popup.style.height = "100vh";
+    popup.style.background = "rgba(0,0,0,0.3)";
+    popup.style.display = "flex";
+    popup.style.alignItems = "center";
+    popup.style.justifyContent = "center";
+    popup.style.zIndex = "1000";
+
+    const box = document.createElement("div");
+    box.style.background = "#fff";
+    box.style.padding = "24px";
+    box.style.borderRadius = "8px";
+    box.style.boxShadow = "0 2px 12px #0002";
+    box.style.minWidth = "320px";
+    box.style.maxWidth = "90vw";
+    box.style.maxHeight = "80vh";
+    box.style.overflowY = "auto";
+    box.style.display = "flex";
+    box.style.flexDirection = "column";
+    box.style.gap = "8px";
+
+    const closeBtn = document.createElement("button");
+    closeBtn.textContent = "Close";
+    closeBtn.style.alignSelf = "flex-end";
+    closeBtn.onclick = () => document.body.removeChild(popup);
+
+    const searchInput = document.createElement("input");
+    searchInput.type = "text";
+    searchInput.placeholder = "Search lessons by name...";
+    searchInput.style.marginBottom = "8px";
+    searchInput.style.padding = "4px";
+    searchInput.style.fontSize = "1em";
+
+    const resultsDiv = document.createElement("div");
+    resultsDiv.style.display = "flex";
+    resultsDiv.style.flexDirection = "column";
+    resultsDiv.style.gap = "4px";
+    resultsDiv.style.maxHeight = "50vh";
+    resultsDiv.style.overflowY = "auto";
+
+    // Helper: render results
+    function renderResults(filter) {
+      resultsDiv.innerHTML = "";
+      const filterLower = filter.trim().toLowerCase();
+      const items = Object.entries(contentMap)
+        .map(([id, data]) => ({
+          id,
+          title: (data.title || "(Untitled)").toString()
+        }))
+        .filter(item => item.title.toLowerCase().includes(filterLower) || item.id.includes(filterLower))
+        .sort((a, b) => a.title.localeCompare(b.title));
+      if (items.length === 0) {
+        const noRes = document.createElement("div");
+        noRes.textContent = "No results.";
+        resultsDiv.appendChild(noRes);
+        return;
+      }
+      for (const item of items) {
+        const btn = document.createElement("button");
+        btn.textContent = `${item.title} (${item.id})`;
+        btn.style.textAlign = "left";
+        btn.style.whiteSpace = "normal";
+        btn.style.width = "100%";
+        btn.onclick = async () => {
+          // Add to schedule
+          const classId = classSelect.value;
+          const dayRef = ref(db, `schedule/${classId}/${nextIndex}`);
+          const snap = await get(dayRef);
+          const lessons = snap.exists() ? snap.val() : [];
+          lessons.push(item.id);
+          await set(dayRef, lessons);
+          document.body.removeChild(popup);
+          loadFullSchedule();
+        };
+        resultsDiv.appendChild(btn);
+      }
+    }
+
+    searchInput.oninput = () => renderResults(searchInput.value);
+    renderResults("");
+
+    box.appendChild(closeBtn);
+    box.appendChild(searchInput);
+    box.appendChild(resultsDiv);
+    popup.appendChild(box);
+    document.body.appendChild(popup);
+  };
+  tdLessons.appendChild(linkBtn);
+
+  // "+ New Lesson" button for the extra row
   const plusBtn = document.createElement("button");
   plusBtn.textContent = "+ New Lesson";
+  plusBtn.style.width = "110px";
+  plusBtn.style.minWidth = "110px";
+  plusBtn.style.maxWidth = "110px";
+  plusBtn.style.boxSizing = "border-box";
   plusBtn.onclick = () => addLessonToDay(nextIndex);
   tdLessons.appendChild(plusBtn);
+
   addRow.appendChild(tdLessons);
 
   // Date column
