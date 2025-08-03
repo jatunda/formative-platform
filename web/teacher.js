@@ -174,6 +174,27 @@ async function renderScheduleTable(schedule) {
       cluster.style.background = "#f8f8f8";
       cluster.style.boxShadow = "1px 1px 3px #ddd";
 
+      // Make cluster draggable
+      cluster.draggable = true;
+      cluster.style.cursor = "grab";
+      cluster.dataset.lessonHash = lessonHash;
+      cluster.dataset.dayIndex = dayIndex;
+      cluster.dataset.lessonIndex = i;
+
+      // Drag events
+      cluster.addEventListener("dragstart", (e) => {
+        e.dataTransfer.setData("text/plain", JSON.stringify({
+          lessonHash,
+          fromDayIndex: dayIndex,
+          fromLessonIndex: i
+        }));
+        // Optional: style for dragging
+        cluster.style.opacity = "0.5";
+      });
+      cluster.addEventListener("dragend", () => {
+        cluster.style.opacity = "1";
+      });
+
       // Top row: Main lesson button
       const topRow = document.createElement("div");
       topRow.style.display = "flex";
@@ -364,6 +385,53 @@ async function renderScheduleTable(schedule) {
     plusBtn.style.boxSizing = "border-box";
     plusBtn.onclick = () => addLessonToDay(dayIndex);
     tdLessons.appendChild(plusBtn);
+
+    tdLessons.style.minHeight = "48px";
+    tdLessons.style.flex = "1 1 auto";
+    tdLessons.style.position = "relative";
+
+    // Drop target events
+    tdLessons.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      tdLessons.style.background = "#e0f7fa";
+    });
+    tdLessons.addEventListener("dragleave", (e) => {
+      tdLessons.style.background = "";
+    });
+    tdLessons.addEventListener("drop", async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      tdLessons.style.background = "";
+      let data;
+      try {
+        data = JSON.parse(e.dataTransfer.getData("text/plain"));
+      } catch {
+        return;
+      }
+      const { lessonHash, fromDayIndex, fromLessonIndex } = data;
+      const toDayIndex = dayIndex;
+
+      // Prevent dropping into the same day and position
+      if (Number(fromDayIndex) === Number(toDayIndex)) return;
+
+      // Remove from old day
+      const classId = classSelect.value;
+      const fromDayRef = ref(db, `schedule/${classId}/${fromDayIndex}`);
+      const fromSnap = await get(fromDayRef);
+      const fromLessons = fromSnap.exists() ? fromSnap.val() : [];
+      fromLessons.splice(fromLessonIndex, 1);
+      await set(fromDayRef, fromLessons);
+
+      // Add to new day
+      const toDayRef = ref(db, `schedule/${classId}/${toDayIndex}`);
+      const toSnap = await get(toDayRef);
+      const toLessons = toSnap.exists() ? toSnap.val() : [];
+      toLessons.push(lessonHash);
+      await set(toDayRef, toLessons);
+
+      loadFullSchedule();
+    });
 
     tr.appendChild(tdLessons);
 
