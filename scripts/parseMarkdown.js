@@ -1,3 +1,7 @@
+// This file is provides a function that takes in our markdown files which are written
+// in a domain specific language (DSL) for our lessons, and parses them for our database. 
+// To see the spec for our DSL, see the README
+
 const fs = require("fs");
 
 function parseDSL(filePath) {

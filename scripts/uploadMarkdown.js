@@ -1,3 +1,8 @@
+// This class uploads all the markdown files in content. 
+// To use: `npm path_to_this_file` 
+// To write more lessons: See the README for how. 
+// It loops through all files, but because we have indexing on, it does not repeat uploads
+
 const parseDSL = require("./parseMarkdown");
 const admin = require("firebase-admin");
 const crypto = require("crypto");
