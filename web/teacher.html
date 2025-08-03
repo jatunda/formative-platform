@@ -11,20 +11,26 @@
   <p><a href="editor.html">Go to Content Editor</a></p>
 
 
-  <label for="classSelect">Class:</label>
-  <select id="classSelect"></select>
+  <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 1em; flex-direction: row;"></div>
+    <label for="classSelect" style="margin: 0;">Class:</label>
+    <select id="classSelect" style="width:auto;"></select>
+    <button id="loadSchedule">Load Schedule</button>
+  </div>
 
-  <label for="dayInput">Day Index:</label>
-  <input type="number" id="dayInput" value="0" min="0" />
-
-  <button id="loadSchedule">Load Schedule</button>
-
-  <h2>Schedule for selected day</h2>
-  <ul id="scheduleList"></ul>
-
-  <h3>Add a new page</h3>
-  <input type="text" id="newPageId" placeholder="Page ID" />
-  <input type="number" id="insertPosition" placeholder="Position (optional)" min="0" />
-  <button id="insertBtn">Insert</button>
+  <h2>Schedule</h2>
+  <div id="schedulePane" style="max-height: 70vh; overflow-y: auto; width: 100%; box-sizing: border-box;">
+    <table id="scheduleTable" border="1" style="width:100%; min-width:600px; border-collapse:collapse;">
+      <thead>
+        <tr>
+          <th>Day Index</th>
+          <th>Lessons</th>
+          <th>Date</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- Rows will be filled by JS -->
+      </tbody>
+    </table>
+  </div>
 </body>
 </html>

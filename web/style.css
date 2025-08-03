@@ -60,3 +60,14 @@ ul {
 li button {
   margin-left: 0.5rem;
 }
+
+#schedulePane {
+  width: 100%;
+  max-width: 1600px;
+  margin: 0 auto;
+  transition: width 0.2s;
+}
+#scheduleTable {
+  width: 100%;
+  min-width: 600px;
+}

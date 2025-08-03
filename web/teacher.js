@@ -1,14 +1,20 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-app.js";
 import {
-  getDatabase, ref, get, set, update
+  initializeApp
+} from "https://www.gstatic.com/firebasejs/10.4.0/firebase-app.js";
+import {
+  getDatabase,
+  ref,
+  get,
+  set,
+  update
 } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js";
 
-const app = initializeApp({ 
+const app = initializeApp({
   databaseURL: "https://formative-platform-default-rtdb.firebaseio.com/",
 });
 const db = getDatabase(app);
 
-const pageTitles = {};  // id → title
+const pageTitles = {}; // id → title
 
 const classSelect = document.getElementById("classSelect");
 const dayInput = document.getElementById("dayInput");
@@ -16,7 +22,7 @@ const loadBtn = document.getElementById("loadSchedule");
 const scheduleList = document.getElementById("scheduleList");
 const newPageIdInput = document.getElementById("newPageId");
 const insertPosInput = document.getElementById("insertPosition");
-const insertBtn = document.getElementById("insertBtn");
+const scheduleTableBody = document.querySelector("#scheduleTable tbody");
 
 let currentClassId = "";
 let currentSchedule = [];
@@ -55,7 +61,16 @@ async function renderScheduleList() {
     }
 
     const li = document.createElement("li");
-    li.textContent = `#${i}: ${pageTitles[pageId]} (Hash:${pageId})`;
+    li.style.display = "flex";
+    li.style.alignItems = "center";
+    li.style.justifyContent = "space-between";
+
+    const textSpan = document.createElement("span");
+    textSpan.textContent = `#${i}: ${pageTitles[pageId]} (Hash:${pageId})`;
+
+    const btnSpan = document.createElement("span");
+    btnSpan.style.display = "flex";
+    btnSpan.style.gap = "4px";
 
     const upBtn = document.createElement("button");
     upBtn.textContent = "↑";
@@ -69,9 +84,12 @@ async function renderScheduleList() {
     delBtn.textContent = "🗑️";
     delBtn.onclick = () => deleteItem(i);
 
-    li.appendChild(upBtn);
-    li.appendChild(downBtn);
-    li.appendChild(delBtn);
+    btnSpan.appendChild(upBtn);
+    btnSpan.appendChild(downBtn);
+    btnSpan.appendChild(delBtn);
+
+    li.appendChild(textSpan);
+    li.appendChild(btnSpan);
     scheduleList.appendChild(li);
   }
 }
@@ -97,25 +115,220 @@ function deleteItem(index) {
   updateScheduleInDB();
 }
 
-insertBtn.onclick = async () => {
-  const newId = newPageIdInput.value.trim();
-  if (!newId) return alert("Enter a valid page ID.");
-
-  const contentSnap = await get(ref(db, `content/${newId}`));
-  if (!contentSnap.exists()) {
-    alert(`Page "${newId}" does not exist.`);
-    return;
-  }
-
-  const pos = insertPosInput.value ? parseInt(insertPosInput.value) : currentSchedule.length;
-  const safePos = Math.max(0, Math.min(pos, currentSchedule.length));
-  currentSchedule.splice(safePos, 0, newId);
-
-  renderScheduleList();
-  updateScheduleInDB();
-};
-
-
 loadBtn.onclick = loadSchedule;
 
-loadClasses();
+function getDateForDayIndex(dayIndex, classStartDate = "2024-08-19") {
+  // Example: classStartDate is a Monday in ISO format
+  const start = new Date(classStartDate);
+  const date = new Date(start);
+  date.setDate(start.getDate() + Number(dayIndex));
+  const weekday = date.toLocaleDateString(undefined, {
+    weekday: "long"
+  });
+  return `${date.toLocaleDateString()} (${weekday})`;
+}
+
+async function loadFullSchedule() {
+  const classId = classSelect.value;
+  // Fetch all days for this class
+  const snap = await get(ref(db, `schedule/${classId}`));
+  const schedule = snap.val() || {};
+  renderScheduleTable(schedule);
+}
+
+async function renderScheduleTable(schedule) {
+  scheduleTableBody.innerHTML = "";
+  const dayIndexes = Object.keys(schedule).map(Number).sort((a, b) => a - b);
+
+  // Find the highest day index to fill all rows, including gaps
+  const maxDayIndex = dayIndexes.length > 0 ? Math.max(...dayIndexes) : 0;
+  for (let dayIndex = 0; dayIndex <= maxDayIndex; dayIndex++) {
+    const lessons = schedule[dayIndex] || [];
+    const tr = document.createElement("tr");
+
+    // Day Index
+    const tdDay = document.createElement("td");
+    tdDay.textContent = dayIndex;
+    tr.appendChild(tdDay);
+
+    // Lessons (horizontal buttons or just a plus if empty)
+    const tdLessons = document.createElement("td");
+    tdLessons.style.display = "flex";
+    tdLessons.style.flexWrap = "nowrap";
+    tdLessons.style.alignItems = "center";
+    tdLessons.style.gap = "4px";
+
+    for (let i = 0; i < lessons.length; i++) {
+      const lessonHash = lessons[i];
+
+      // Cluster container (outer box)
+      const cluster = document.createElement("span");
+      cluster.style.display = "inline-flex";
+      cluster.style.flexDirection = "column";
+      cluster.style.alignItems = "center";
+      cluster.style.justifyContent = "center";
+      cluster.style.border = "2px solid #888";
+      cluster.style.borderRadius = "8px";
+      cluster.style.padding = "4px 6px";
+      cluster.style.marginRight = "6px";
+      cluster.style.background = "#f8f8f8";
+      cluster.style.boxShadow = "1px 1px 3px #ddd";
+
+      // Top row: Main lesson button
+      const topRow = document.createElement("div");
+      topRow.style.display = "flex";
+      topRow.style.justifyContent = "center";
+      const mainBtn = document.createElement("button");
+      mainBtn.textContent = await getLessonTitle(lessonHash);
+      mainBtn.style.fontWeight = "bold";
+      mainBtn.onclick = () => {
+        window.location.href = `editor.html?page=${lessonHash}`;
+      };
+      topRow.appendChild(mainBtn);
+
+      // Bottom row: left, right, delete
+      const bottomRow = document.createElement("div");
+      bottomRow.style.display = "flex";
+      bottomRow.style.justifyContent = "center";
+      bottomRow.style.gap = "2px";
+      bottomRow.style.marginTop = "2px";
+
+      // Left arrow
+      const leftBtn = document.createElement("button");
+      leftBtn.textContent = "←";
+      leftBtn.disabled = i === 0;
+      leftBtn.onclick = async () => {
+        if (i > 0) {
+          const classId = classSelect.value;
+          const dayRef = ref(db, `schedule/${classId}/${dayIndex}`);
+          const newLessons = [...lessons];
+          [newLessons[i - 1], newLessons[i]] = [newLessons[i], newLessons[i - 1]];
+          await set(dayRef, newLessons);
+          loadFullSchedule();
+        }
+      };
+      bottomRow.appendChild(leftBtn);
+
+      // Right arrow
+      const rightBtn = document.createElement("button");
+      rightBtn.textContent = "→";
+      rightBtn.disabled = i === lessons.length - 1;
+      rightBtn.onclick = async () => {
+        if (i < lessons.length - 1) {
+          const classId = classSelect.value;
+          const dayRef = ref(db, `schedule/${classId}/${dayIndex}`);
+          const newLessons = [...lessons];
+          [newLessons[i], newLessons[i + 1]] = [newLessons[i + 1], newLessons[i]];
+          await set(dayRef, newLessons);
+          loadFullSchedule();
+        }
+      };
+      bottomRow.appendChild(rightBtn);
+
+      // Delete button
+      const delBtn = document.createElement("button");
+      delBtn.textContent = "🗑️";
+      delBtn.onclick = async () => {
+        const classId = classSelect.value;
+        const dayRef = ref(db, `schedule/${classId}/${dayIndex}`);
+        const newLessons = lessons.filter((_, idx) => idx !== i);
+        await set(dayRef, newLessons);
+        loadFullSchedule();
+      };
+      bottomRow.appendChild(delBtn);
+
+      // Assemble cluster
+      cluster.appendChild(topRow);
+      cluster.appendChild(bottomRow);
+
+      tdLessons.appendChild(cluster);
+    }
+
+    // Always add the "+ New Lesson" button
+    const plusBtn = document.createElement("button");
+    plusBtn.textContent = "+ New Lesson";
+    plusBtn.style.width = "110px"; // Fixed width
+    plusBtn.style.minWidth = "110px";
+    plusBtn.style.maxWidth = "110px";
+    plusBtn.style.boxSizing = "border-box";
+    plusBtn.onclick = () => addLessonToDay(dayIndex);
+    tdLessons.appendChild(plusBtn);
+
+    tr.appendChild(tdLessons);
+
+    // Date column
+    const tdDate = document.createElement("td");
+    tdDate.textContent = getDateForDayIndex(dayIndex);
+    tr.appendChild(tdDate);
+
+    scheduleTableBody.appendChild(tr);
+  }
+
+  // Add extra row for the next day index with only a plus button in the lessons column
+  const addRow = document.createElement("tr");
+  const nextIndex = maxDayIndex + 1;
+
+  // Day Index column
+  const tdDay = document.createElement("td");
+  tdDay.textContent = nextIndex;
+  addRow.appendChild(tdDay);
+
+  // Lessons column with only a plus button
+  const tdLessons = document.createElement("td");
+  tdLessons.style.display = "flex";
+  tdLessons.style.flexWrap = "nowrap";
+  tdLessons.style.alignItems = "center";
+  tdLessons.style.gap = "4px";
+  const plusBtn = document.createElement("button");
+  plusBtn.textContent = "+ New Lesson";
+  plusBtn.onclick = () => addLessonToDay(nextIndex);
+  tdLessons.appendChild(plusBtn);
+  addRow.appendChild(tdLessons);
+
+  // Date column
+  const tdDate = document.createElement("td");
+  tdDate.textContent = getDateForDayIndex(nextIndex);
+  addRow.appendChild(tdDate);
+
+  scheduleTableBody.appendChild(addRow);
+}
+
+async function getLessonTitle(hash) {
+  if (pageTitles[hash]) return pageTitles[hash];
+  const snap = await get(ref(db, `content/${hash}/title`));
+  pageTitles[hash] = snap.exists() ? snap.val() : "(Untitled)";
+  return pageTitles[hash];
+}
+
+async function addLessonToDay(dayIndex) {
+  // 1. Generate a unique hash for the new lesson
+  let hash;
+  let exists = true;
+  while (exists) {
+    hash = Array.from(crypto.getRandomValues(new Uint8Array(16)))
+      .map(b => b.toString(16).padStart(2, "0")).join("");
+    const snap = await get(ref(db, `content/${hash}`));
+    exists = snap.exists();
+  }
+
+  // 2. Create a blank lesson in the database
+  await set(ref(db, `content/${hash}`), {
+    title: "Empty Lesson"
+  });
+
+  // 3. Add the new lesson hash to the schedule for the given day
+  const classId = classSelect.value;
+  const dayRef = ref(db, `schedule/${classId}/${dayIndex}`);
+  const snap = await get(dayRef);
+  const lessons = snap.exists() ? snap.val() : [];
+  lessons.push(hash);
+  await set(dayRef, lessons);
+
+  // 4. Reload the table to show the new lesson
+  loadFullSchedule();
+}
+
+classSelect.onchange = loadFullSchedule;
+
+// Initial load
+loadClasses().then(loadFullSchedule);
