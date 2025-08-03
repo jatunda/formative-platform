@@ -47,32 +47,69 @@ export function clearDateOffsetCache(classId = null) {
   }
 }
 
-// Calculate day index for today with offset applied
+// Helper function to add business days (skipping weekends)
+function addBusinessDays(startDate, businessDaysToAdd) {
+  const date = new Date(startDate);
+  let daysAdded = 0;
+  
+  while (daysAdded < businessDaysToAdd) {
+    date.setDate(date.getDate() + 1);
+    const dayOfWeek = date.getDay(); // 0 = Sunday, 6 = Saturday
+    
+    // Only count weekdays (Monday = 1, Friday = 5)
+    if (dayOfWeek >= 1 && dayOfWeek <= 5) {
+      daysAdded++;
+    }
+  }
+  
+  return date;
+}
+
+// Helper function to calculate business days between two dates
+function getBusinessDaysBetween(startDate, endDate) {
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  let businessDays = 0;
+  
+  const current = new Date(start);
+  while (current <= end) {
+    const dayOfWeek = current.getDay();
+    // Count weekdays only (Monday = 1, Friday = 5)
+    if (dayOfWeek >= 1 && dayOfWeek <= 5) {
+      businessDays++;
+    }
+    current.setDate(current.getDate() + 1);
+  }
+  
+  // Subtract 1 because we don't want to count the start date itself
+  return Math.max(0, businessDays - 1);
+}
+
+// Calculate day index for today with offset applied (business days only)
 export async function getTodayDayIndex(classId, classStartDate = DEFAULT_CLASS_START_DATE) {
   const today = new Date();
   const startDate = new Date(classStartDate);
   
-  // Calculate raw days difference from start date to today
-  const timeDiff = today.getTime() - startDate.getTime();
-  const daysDiff = Math.floor(timeDiff / (1000 * 3600 * 24));
+  // Calculate business days difference from start date to today
+  const businessDaysDiff = getBusinessDaysBetween(startDate, today);
   
   // Get the date offset for this class
   const dateOffset = await getClassDateOffset(classId);
   
   // Apply offset: positive offset moves start date forward, so today appears earlier in schedule
-  const effectiveDayIndex = daysDiff - dateOffset;
+  const effectiveDayIndex = businessDaysDiff - dateOffset;
   
   return effectiveDayIndex;
 }
 
-// Calculate actual date for a given day index with offset applied
+// Calculate actual date for a given day index with offset applied (business days only)
 export async function getDateForDayIndex(dayIndex, classId, classStartDate = DEFAULT_CLASS_START_DATE) {
   const dateOffset = await getClassDateOffset(classId);
   
   const start = new Date(classStartDate);
-  const date = new Date(start);
-  // Apply both day index and date offset
-  date.setDate(start.getDate() + Number(dayIndex) + Number(dateOffset));
+  // Apply both day index and date offset using business days
+  const totalBusinessDays = Number(dayIndex) + Number(dateOffset);
+  const date = addBusinessDays(start, totalBusinessDays);
   
   const weekday = date.toLocaleDateString(undefined, {
     weekday: "long"
@@ -80,13 +117,14 @@ export async function getDateForDayIndex(dayIndex, classId, classStartDate = DEF
   return `${date.toLocaleDateString()} (${weekday})`;
 }
 
-// Get just the Date object for a day index with offset
+// Get just the Date object for a day index with offset (business days only)
 export async function getDateObjectForDayIndex(dayIndex, classId, classStartDate = DEFAULT_CLASS_START_DATE) {
   const dateOffset = await getClassDateOffset(classId);
   
   const start = new Date(classStartDate);
-  const date = new Date(start);
-  date.setDate(start.getDate() + Number(dayIndex) + Number(dateOffset));
+  // Apply both day index and date offset using business days
+  const totalBusinessDays = Number(dayIndex) + Number(dateOffset);
+  const date = addBusinessDays(start, totalBusinessDays);
   
   return date;
 }
