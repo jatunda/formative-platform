@@ -14,6 +14,17 @@ const app = initializeApp({
 });
 const db = getDatabase(app);
 
+// Constants
+const BUTTON_CONFIG = {
+  width: "110px",
+  minWidth: "110px",
+  maxWidth: "110px"
+};
+
+const DEFAULT_CLASS_START_DATE = "2024-08-19";
+const DEFAULT_LESSON_TITLE = "Empty Lesson";
+const POPUP_MAX_HEIGHT = "50vh";
+
 const pageTitles = {}; // id → title
 
 const classSelect = document.getElementById("classSelect");
@@ -61,28 +72,21 @@ async function renderScheduleList() {
     }
 
     const li = document.createElement("li");
-    li.style.display = "flex";
-    li.style.alignItems = "center";
-    li.style.justifyContent = "space-between";
+    li.className = "schedule-list-item";
 
     const textSpan = document.createElement("span");
     textSpan.textContent = `#${i}: ${pageTitles[pageId]} (Hash:${pageId})`;
 
     const btnSpan = document.createElement("span");
-    btnSpan.style.display = "flex";
-    btnSpan.style.gap = "4px";
+    btnSpan.className = "flex-row-buttons";
 
-    const upBtn = document.createElement("button");
+    const upBtn = createArrowButton("up", false, () => moveItem(i, i - 1));
     upBtn.textContent = "↑";
-    upBtn.onclick = () => moveItem(i, i - 1);
-
-    const downBtn = document.createElement("button");
+    
+    const downBtn = createArrowButton("down", false, () => moveItem(i, i + 1));
     downBtn.textContent = "↓";
-    downBtn.onclick = () => moveItem(i, i + 1);
-
-    const delBtn = document.createElement("button");
-    delBtn.textContent = "🗑️";
-    delBtn.onclick = () => deleteItem(i);
+    
+    const delBtn = createDeleteButton(() => deleteItem(i));
 
     btnSpan.appendChild(upBtn);
     btnSpan.appendChild(downBtn);
@@ -117,7 +121,7 @@ function deleteItem(index) {
 
 loadBtn.onclick = loadSchedule;
 
-function getDateForDayIndex(dayIndex, classStartDate = "2024-08-19") {
+function getDateForDayIndex(dayIndex, classStartDate = DEFAULT_CLASS_START_DATE) {
   // Example: classStartDate is a Monday in ISO format
   const start = new Date(classStartDate);
   const date = new Date(start);
@@ -166,13 +170,8 @@ async function renderScheduleTable(schedule) {
       const insertRow = document.createElement("tr");
       const insertTd = document.createElement("td");
       insertTd.colSpan = 3;
-      insertTd.style.textAlign = "center";
-      insertTd.style.padding = "2px";
-      const insertBtn = document.createElement("button");
-      insertBtn.textContent = "+ Insert Day Here";
-      insertBtn.style.fontSize = "0.9em";
-      insertBtn.onclick = () => insertDayAt(dayIndex);
-      insertTd.appendChild(insertBtn);
+      insertTd.className = "insert-day-cell";
+      insertTd.appendChild(createInsertDayButton(dayIndex, insertDayAt));
       insertRow.appendChild(insertTd);
       scheduleTableBody.appendChild(insertRow);
     }
@@ -188,256 +187,32 @@ async function renderScheduleTable(schedule) {
 
     // Lessons (horizontal buttons or just a plus if empty)
     const tdLessons = document.createElement("td");
-    tdLessons.style.display = "flex";
-    tdLessons.style.flexWrap = "nowrap";
-    tdLessons.style.alignItems = "center";
-    tdLessons.style.gap = "4px";
+    tdLessons.className = "lessons-cell";
 
     for (let i = 0; i < lessons.length; i++) {
       const lessonHash = lessons[i];
-
-      // Cluster container (outer box)
-      const cluster = document.createElement("span");
-      cluster.style.display = "inline-flex";
-      cluster.style.flexDirection = "column";
-      cluster.style.alignItems = "center";
-      cluster.style.justifyContent = "center";
-      cluster.style.border = "2px solid #888";
-      cluster.style.borderRadius = "8px";
-      cluster.style.padding = "4px 6px";
-      cluster.style.marginRight = "6px";
-      cluster.style.background = "#f8f8f8";
-      cluster.style.boxShadow = "1px 1px 3px #ddd";
-
-      // Make cluster draggable
-      cluster.draggable = true;
-      cluster.style.cursor = "grab";
-      cluster.dataset.lessonHash = lessonHash;
-      cluster.dataset.dayIndex = dayIndex;
-      cluster.dataset.lessonIndex = i;
-
-      // Drag events
-      cluster.addEventListener("dragstart", (e) => {
-        e.dataTransfer.setData("text/plain", JSON.stringify({
-          lessonHash,
-          fromDayIndex: dayIndex,
-          fromLessonIndex: i
-        }));
-        // Optional: style for dragging
-        cluster.style.opacity = "0.5";
-      });
-      cluster.addEventListener("dragend", () => {
-        cluster.style.opacity = "1";
-      });
-
-      // Top row: Main lesson button
-      const topRow = document.createElement("div");
-      topRow.style.display = "flex";
-      topRow.style.justifyContent = "center";
-      const mainBtn = document.createElement("button");
-      mainBtn.textContent = await getLessonTitle(lessonHash);
-      mainBtn.style.fontWeight = "bold";
-      mainBtn.onclick = () => {
-        window.location.href = `editor.html?page=${lessonHash}`;
-      };
-      topRow.appendChild(mainBtn);
-
-      // Bottom row: left, right, delete
-      const bottomRow = document.createElement("div");
-      bottomRow.style.display = "flex";
-      bottomRow.style.justifyContent = "center";
-      bottomRow.style.gap = "2px";
-      bottomRow.style.marginTop = "2px";
-
-      // Left arrow
-      const leftBtn = document.createElement("button");
-      leftBtn.textContent = "←";
-      leftBtn.disabled = i === 0;
-      leftBtn.onclick = async () => {
-        if (i > 0) {
-          const classId = classSelect.value;
-          const dayRef = ref(db, `schedule/${classId}/${dayIndex}`);
-          const newLessons = [...lessons];
-          [newLessons[i - 1], newLessons[i]] = [newLessons[i], newLessons[i - 1]];
-          await set(dayRef, newLessons);
-          loadFullSchedule();
-        }
-      };
-      bottomRow.appendChild(leftBtn);
-
-      // Right arrow
-      const rightBtn = document.createElement("button");
-      rightBtn.textContent = "→";
-      rightBtn.disabled = i === lessons.length - 1;
-      rightBtn.onclick = async () => {
-        if (i < lessons.length - 1) {
-          const classId = classSelect.value;
-          const dayRef = ref(db, `schedule/${classId}/${dayIndex}`);
-          const newLessons = [...lessons];
-          [newLessons[i], newLessons[i + 1]] = [newLessons[i + 1], newLessons[i]];
-          await set(dayRef, newLessons);
-          loadFullSchedule();
-        }
-      };
-      bottomRow.appendChild(rightBtn);
-
-      // Delete button
-      const delBtn = document.createElement("button");
-      delBtn.textContent = "🗑️";
-      delBtn.onclick = async () => {
-        const classId = classSelect.value;
-        const dayRef = ref(db, `schedule/${classId}/${dayIndex}`);
-        const newLessons = lessons.filter((_, idx) => idx !== i);
-        await set(dayRef, newLessons);
-        loadFullSchedule();
-      };
-      bottomRow.appendChild(delBtn);
-
-      // Assemble cluster
-      cluster.appendChild(topRow);
-      cluster.appendChild(bottomRow);
-
-      tdLessons.appendChild(cluster);
+      tdLessons.appendChild(await createLessonCluster(lessonHash, dayIndex, i, lessons));
     }
 
-    // "Link Lesson" button
-    const linkBtn = document.createElement("button");
-    linkBtn.textContent = "Link Lesson";
-    linkBtn.style.width = "110px";
-    linkBtn.style.minWidth = "110px";
-    linkBtn.style.maxWidth = "110px";
-    linkBtn.style.boxSizing = "border-box";
-    linkBtn.onclick = async () => {
-      // Fetch all lessons
-      const snap = await get(ref(db, "content"));
-      if (!snap.exists()) {
-        alert("No lessons found.");
-        return;
-      }
-      const contentMap = snap.val();
-      // Create popup
-      const popup = document.createElement("div");
-      popup.style.position = "fixed";
-      popup.style.top = "0";
-      popup.style.left = "0";
-      popup.style.width = "100vw";
-      popup.style.height = "100vh";
-      popup.style.background = "rgba(0,0,0,0.3)";
-      popup.style.display = "flex";
-      popup.style.alignItems = "center";
-      popup.style.justifyContent = "center";
-      popup.style.zIndex = "1000";
-
-      const box = document.createElement("div");
-      box.style.background = "#fff";
-      box.style.padding = "24px";
-      box.style.borderRadius = "8px";
-      box.style.boxShadow = "0 2px 12px #0002";
-      box.style.minWidth = "320px";
-      box.style.maxWidth = "90vw";
-      box.style.maxHeight = "80vh";
-      box.style.overflowY = "auto";
-      box.style.display = "flex";
-      box.style.flexDirection = "column";
-      box.style.gap = "8px";
-
-      const closeBtn = document.createElement("button");
-      closeBtn.textContent = "Close";
-      closeBtn.style.alignSelf = "flex-end";
-      closeBtn.onclick = () => document.body.removeChild(popup);
-
-      const searchInput = document.createElement("input");
-      searchInput.type = "text";
-      searchInput.placeholder = "Search lessons by name...";
-      searchInput.style.marginBottom = "8px";
-      searchInput.style.padding = "4px";
-      searchInput.style.fontSize = "1em";
-
-      const resultsDiv = document.createElement("div");
-      resultsDiv.style.display = "flex";
-      resultsDiv.style.flexDirection = "column";
-      resultsDiv.style.gap = "4px";
-      resultsDiv.style.maxHeight = "50vh";
-      resultsDiv.style.overflowY = "auto";
-
-      // Helper: render results
-      function renderResults(filter) {
-        resultsDiv.innerHTML = "";
-        const filterLower = filter.trim().toLowerCase();
-        const items = Object.entries(contentMap)
-          .map(([id, data]) => ({
-            id,
-            title: (data.title || "(Untitled)").toString()
-          }))
-          .filter(item => item.title.toLowerCase().includes(filterLower) || item.id.includes(filterLower))
-          .sort((a, b) => a.title.localeCompare(b.title));
-        if (items.length === 0) {
-          const noRes = document.createElement("div");
-          noRes.textContent = "No results.";
-          resultsDiv.appendChild(noRes);
-          return;
-        }
-        for (const item of items) {
-          const btn = document.createElement("button");
-          btn.textContent = `${item.title} (${item.id})`;
-          btn.style.textAlign = "left";
-          btn.style.whiteSpace = "normal";
-          btn.style.width = "100%";
-          btn.onclick = async () => {
-            // Add to schedule
-            const classId = classSelect.value;
-            const dayRef = ref(db, `schedule/${classId}/${dayIndex}`);
-            const snap = await get(dayRef);
-            const lessons = snap.exists() ? snap.val() : [];
-            lessons.push(item.id);
-            await set(dayRef, lessons);
-            document.body.removeChild(popup);
-            loadFullSchedule();
-          };
-          resultsDiv.appendChild(btn);
-        }
-      }
-
-      searchInput.oninput = () => renderResults(searchInput.value);
-      renderResults("");
-
-      box.appendChild(closeBtn);
-      box.appendChild(searchInput);
-      box.appendChild(resultsDiv);
-      popup.appendChild(box);
-      document.body.appendChild(popup);
-    };
-
     // Insert the "Link Lesson" button before the "+ New Lesson" button
-    tdLessons.appendChild(linkBtn);
+    appendLinkLessonButton(tdLessons, dayIndex);
 
     // Always add the "+ New Lesson" button
-    const plusBtn = document.createElement("button");
-    plusBtn.textContent = "+ New Lesson";
-    plusBtn.style.width = "110px"; // Fixed width
-    plusBtn.style.minWidth = "110px";
-    plusBtn.style.maxWidth = "110px";
-    plusBtn.style.boxSizing = "border-box";
-    plusBtn.onclick = () => addLessonToDay(dayIndex);
-    tdLessons.appendChild(plusBtn);
-
-    tdLessons.style.minHeight = "48px";
-    tdLessons.style.flex = "1 1 auto";
-    tdLessons.style.position = "relative";
+    tdLessons.appendChild(createNewLessonButton(dayIndex));
 
     // Drop target events
     tdLessons.addEventListener("dragover", (e) => {
       e.preventDefault();
       e.dataTransfer.dropEffect = "move";
-      tdLessons.style.background = "#e0f7fa";
+      tdLessons.classList.add("td-drop-hover");
     });
     tdLessons.addEventListener("dragleave", (e) => {
-      tdLessons.style.background = "";
+      tdLessons.classList.remove("td-drop-hover");
     });
     tdLessons.addEventListener("drop", async (e) => {
       e.preventDefault();
       e.stopPropagation();
-      tdLessons.style.background = "";
+      tdLessons.classList.remove("td-drop-hover");
       let data;
       try {
         data = JSON.parse(e.dataTransfer.getData("text/plain"));
@@ -489,129 +264,13 @@ async function renderScheduleTable(schedule) {
 
   // Lessons column with "Link Lesson" and "+ New Lesson" buttons
   const tdLessons = document.createElement("td");
-  tdLessons.style.display = "flex";
-  tdLessons.style.flexWrap = "nowrap";
-  tdLessons.style.alignItems = "center";
-  tdLessons.style.gap = "4px";
+  tdLessons.className = "lessons-cell";
 
   // "Link Lesson" button
-  const linkBtn = document.createElement("button");
-  linkBtn.textContent = "Link Lesson";
-  linkBtn.style.width = "110px";
-  linkBtn.style.minWidth = "110px";
-  linkBtn.style.maxWidth = "110px";
-  linkBtn.style.boxSizing = "border-box";
-  linkBtn.onclick = async () => {
-    // Fetch all lessons
-    const snap = await get(ref(db, "content"));
-    if (!snap.exists()) {
-      alert("No lessons found.");
-      return;
-    }
-    const contentMap = snap.val();
-    // Create popup
-    const popup = document.createElement("div");
-    popup.style.position = "fixed";
-    popup.style.top = "0";
-    popup.style.left = "0";
-    popup.style.width = "100vw";
-    popup.style.height = "100vh";
-    popup.style.background = "rgba(0,0,0,0.3)";
-    popup.style.display = "flex";
-    popup.style.alignItems = "center";
-    popup.style.justifyContent = "center";
-    popup.style.zIndex = "1000";
-
-    const box = document.createElement("div");
-    box.style.background = "#fff";
-    box.style.padding = "24px";
-    box.style.borderRadius = "8px";
-    box.style.boxShadow = "0 2px 12px #0002";
-    box.style.minWidth = "320px";
-    box.style.maxWidth = "90vw";
-    box.style.maxHeight = "80vh";
-    box.style.overflowY = "auto";
-    box.style.display = "flex";
-    box.style.flexDirection = "column";
-    box.style.gap = "8px";
-
-    const closeBtn = document.createElement("button");
-    closeBtn.textContent = "Close";
-    closeBtn.style.alignSelf = "flex-end";
-    closeBtn.onclick = () => document.body.removeChild(popup);
-
-    const searchInput = document.createElement("input");
-    searchInput.type = "text";
-    searchInput.placeholder = "Search lessons by name...";
-    searchInput.style.marginBottom = "8px";
-    searchInput.style.padding = "4px";
-    searchInput.style.fontSize = "1em";
-
-    const resultsDiv = document.createElement("div");
-    resultsDiv.style.display = "flex";
-    resultsDiv.style.flexDirection = "column";
-    resultsDiv.style.gap = "4px";
-    resultsDiv.style.maxHeight = "50vh";
-    resultsDiv.style.overflowY = "auto";
-
-    // Helper: render results
-    function renderResults(filter) {
-      resultsDiv.innerHTML = "";
-      const filterLower = filter.trim().toLowerCase();
-      const items = Object.entries(contentMap)
-        .map(([id, data]) => ({
-          id,
-          title: (data.title || "(Untitled)").toString()
-        }))
-        .filter(item => item.title.toLowerCase().includes(filterLower) || item.id.includes(filterLower))
-        .sort((a, b) => a.title.localeCompare(b.title));
-      if (items.length === 0) {
-        const noRes = document.createElement("div");
-        noRes.textContent = "No results.";
-        resultsDiv.appendChild(noRes);
-        return;
-      }
-      for (const item of items) {
-        const btn = document.createElement("button");
-        btn.textContent = `${item.title} (${item.id})`;
-        btn.style.textAlign = "left";
-        btn.style.whiteSpace = "normal";
-        btn.style.width = "100%";
-        btn.onclick = async () => {
-          // Add to schedule
-          const classId = classSelect.value;
-          const dayRef = ref(db, `schedule/${classId}/${nextIndex}`);
-          const snap = await get(dayRef);
-          const lessons = snap.exists() ? snap.val() : [];
-          lessons.push(item.id);
-          await set(dayRef, lessons);
-          document.body.removeChild(popup);
-          loadFullSchedule();
-        };
-        resultsDiv.appendChild(btn);
-      }
-    }
-
-    searchInput.oninput = () => renderResults(searchInput.value);
-    renderResults("");
-
-    box.appendChild(closeBtn);
-    box.appendChild(searchInput);
-    box.appendChild(resultsDiv);
-    popup.appendChild(box);
-    document.body.appendChild(popup);
-  };
-  tdLessons.appendChild(linkBtn);
+  appendLinkLessonButton(tdLessons, nextIndex);
 
   // "+ New Lesson" button
-  const plusBtn = document.createElement("button");
-  plusBtn.textContent = "+ New Lesson";
-  plusBtn.style.width = "110px";
-  plusBtn.style.minWidth = "110px";
-  plusBtn.style.maxWidth = "110px";
-  plusBtn.style.boxSizing = "border-box";
-  plusBtn.onclick = () => addLessonToDay(nextIndex);
-  tdLessons.appendChild(plusBtn);
+  tdLessons.appendChild(createNewLessonButton(nextIndex));
 
   addRow.appendChild(tdLessons);
 
@@ -643,7 +302,7 @@ async function addLessonToDay(dayIndex) {
 
   // 2. Create a blank lesson in the database
   await set(ref(db, `content/${hash}`), {
-    title: "Empty Lesson"
+    title: DEFAULT_LESSON_TITLE
   });
 
   // 3. Add the new lesson hash to the schedule for the given day
@@ -662,3 +321,210 @@ classSelect.onchange = loadFullSchedule;
 
 // Initial load
 loadClasses().then(loadFullSchedule);
+
+function showLessonLinkPopup({ onSelect }) {
+  (async () => {
+    const snap = await get(ref(db, "content"));
+    if (!snap.exists()) {
+      alert("No lessons found.");
+      return;
+    }
+    const contentMap = snap.val();
+    // Create popup
+    const popup = document.createElement("div");
+    popup.className = "lesson-popup";
+
+    const box = document.createElement("div");
+    box.className = "lesson-popup-box";
+
+    const closeBtn = createCloseButton(popup);
+    closeBtn.className = "popup-close-btn";
+
+    const searchInput = document.createElement("input");
+    searchInput.type = "text";
+    searchInput.placeholder = "Search lessons by name...";
+    searchInput.className = "lesson-popup-search";
+
+    const resultsDiv = document.createElement("div");
+    resultsDiv.className = "lesson-popup-results";
+
+    function renderResults(filter) {
+      resultsDiv.innerHTML = "";
+      const filterLower = filter.trim().toLowerCase();
+      const items = Object.entries(contentMap)
+        .map(([id, data]) => ({
+          id,
+          title: (data.title || "(Untitled)").toString()
+        }))
+        .filter(item => item.title.toLowerCase().includes(filterLower) || item.id.includes(filterLower))
+        .sort((a, b) => a.title.localeCompare(b.title));
+      if (items.length === 0) {
+        const noRes = document.createElement("div");
+        noRes.textContent = "No results.";
+        resultsDiv.appendChild(noRes);
+        return;
+      }
+      for (const item of items) {
+        const btn = document.createElement("button");
+        btn.textContent = `${item.title} (${item.id})`;
+        btn.className = "lesson-popup-result-btn";
+        btn.onclick = async () => {
+          document.body.removeChild(popup);
+          onSelect(item.id);
+        };
+        resultsDiv.appendChild(btn);
+      }
+    }
+
+    searchInput.oninput = () => renderResults(searchInput.value);
+    renderResults("");
+
+    box.appendChild(closeBtn);
+    box.appendChild(searchInput);
+    box.appendChild(resultsDiv);
+    popup.appendChild(box);
+    document.body.appendChild(popup);
+  })();
+}
+
+// Use CSS classes for styled buttons
+function createStyledButton(text, onClick) {
+  const btn = document.createElement("button");
+  btn.textContent = text;
+  btn.className = "schedule-action-btn";
+  btn.onclick = onClick;
+  return btn;
+}
+
+// Button helper functions
+function createNewLessonButton(dayIndex) {
+  const btn = document.createElement("button");
+  btn.textContent = "+ New Lesson";
+  btn.className = "new-lesson-btn";
+  btn.onclick = () => addLessonToDay(dayIndex);
+  return btn;
+}
+
+function createCloseButton(popup) {
+  const btn = document.createElement("button");
+  btn.textContent = "Close";
+  btn.onclick = () => document.body.removeChild(popup);
+  return btn;
+}
+
+function createArrowButton(direction, isDisabled, onClick) {
+  const btn = document.createElement("button");
+  btn.textContent = direction === "left" ? "←" : "→";
+  btn.disabled = isDisabled;
+  btn.onclick = onClick;
+  return btn;
+}
+
+function createDeleteButton(onClick) {
+  const btn = document.createElement("button");
+  btn.textContent = "🗑️";
+  btn.onclick = onClick;
+  return btn;
+}
+
+function createInsertDayButton(dayIndex, insertFunction) {
+  const btn = document.createElement("button");
+  btn.textContent = "+ Insert Day Here";
+  btn.className = "insert-day-btn";
+  btn.onclick = () => insertFunction(dayIndex);
+  return btn;
+}
+
+// Use CSS classes for lesson clusters
+async function createLessonCluster(lessonHash, dayIndex, i, lessons) {
+  const cluster = document.createElement("span");
+  cluster.className = "lesson-cluster";
+  cluster.draggable = true;
+  cluster.dataset.lessonHash = lessonHash;
+  cluster.dataset.dayIndex = dayIndex;
+  cluster.dataset.lessonIndex = i;
+
+  cluster.addEventListener("dragstart", (e) => {
+    e.dataTransfer.setData("text/plain", JSON.stringify({
+      lessonHash,
+      fromDayIndex: dayIndex,
+      fromLessonIndex: i
+    }));
+    cluster.style.opacity = "0.5";
+  });
+  cluster.addEventListener("dragend", () => {
+    cluster.style.opacity = "1";
+  });
+
+  // Top row: Main lesson button
+  const topRow = document.createElement("div");
+  topRow.className = "lesson-cluster-top";
+  const mainBtn = document.createElement("button");
+  mainBtn.textContent = await getLessonTitle(lessonHash);
+  mainBtn.className = "lesson-main-btn";
+  mainBtn.onclick = () => {
+    window.location.href = `editor.html?page=${lessonHash}`;
+  };
+  topRow.appendChild(mainBtn);
+
+  // Bottom row: left, right, delete
+  const bottomRow = document.createElement("div");
+  bottomRow.className = "lesson-cluster-bottom";
+
+  // Left arrow
+  const leftBtn = createArrowButton("left", i === 0, async () => {
+    if (i > 0) {
+      const classId = classSelect.value;
+      const dayRef = ref(db, `schedule/${classId}/${dayIndex}`);
+      const newLessons = [...lessons];
+      [newLessons[i - 1], newLessons[i]] = [newLessons[i], newLessons[i - 1]];
+      await set(dayRef, newLessons);
+      loadFullSchedule();
+    }
+  });
+  bottomRow.appendChild(leftBtn);
+
+  // Right arrow
+  const rightBtn = createArrowButton("right", i === lessons.length - 1, async () => {
+    if (i < lessons.length - 1) {
+      const classId = classSelect.value;
+      const dayRef = ref(db, `schedule/${classId}/${dayIndex}`);
+      const newLessons = [...lessons];
+      [newLessons[i], newLessons[i + 1]] = [newLessons[i + 1], newLessons[i]];
+      await set(dayRef, newLessons);
+      loadFullSchedule();
+    }
+  });
+  bottomRow.appendChild(rightBtn);
+
+  // Delete button
+  const delBtn = createDeleteButton(async () => {
+    const classId = classSelect.value;
+    const dayRef = ref(db, `schedule/${classId}/${dayIndex}`);
+    const newLessons = lessons.filter((_, idx) => idx !== i);
+    await set(dayRef, newLessons);
+    loadFullSchedule();
+  });
+  bottomRow.appendChild(delBtn);
+
+  cluster.appendChild(topRow);
+  cluster.appendChild(bottomRow);
+
+  return cluster;
+}
+
+function appendLinkLessonButton(td, dayIndex) {
+  td.appendChild(createStyledButton("Link Lesson", () => {
+    showLessonLinkPopup({
+      onSelect: async (lessonId) => {
+        const classId = classSelect.value;
+        const dayRef = ref(db, `schedule/${classId}/${dayIndex}`);
+        const snap = await get(dayRef);
+        const lessons = snap.exists() ? snap.val() : [];
+        lessons.push(lessonId);
+        await set(dayRef, lessons);
+        loadFullSchedule();
+      }
+    });
+  }));
+}
