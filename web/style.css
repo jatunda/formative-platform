@@ -51,3 +51,12 @@ pre {
     padding: 0.8rem;
   }
 }
+
+ul {
+  list-style: none;
+  padding-left: 0;
+}
+
+li button {
+  margin-left: 0.5rem;
+}

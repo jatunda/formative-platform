@@ -12,3 +12,7 @@ A web app for students to see daily formative assignments.
 - `\`inline code\``: Wrap inline code in backticks
 - `@text`: optional static text block (paragraph, note, etc.)
 
+## SOPs
+
+to run a dev version: CLI navigate to '/web' then run 'npm run dev'
+to deploy: in root, 'firebase deploy'

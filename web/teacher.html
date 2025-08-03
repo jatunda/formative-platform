@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Teacher Schedule Editor</title>
+  <link rel="stylesheet" href="style.css">
+  <script type="module" src="teacher.js"></script>
+</head>
+<body>
+  <h1>Teacher Schedule Editor</h1>
+
+  <p><a href="editor.html">Go to Content Editor</a></p>
+
+
+  <label for="classSelect">Class:</label>
+  <select id="classSelect"></select>
+
+  <label for="dayInput">Day Index:</label>
+  <input type="number" id="dayInput" value="0" min="0" />
+
+  <button id="loadSchedule">Load Schedule</button>
+
+  <h2>Schedule for selected day</h2>
+  <ul id="scheduleList"></ul>
+
+  <h3>Add a new page</h3>
+  <input type="text" id="newPageId" placeholder="Page ID" />
+  <input type="number" id="insertPosition" placeholder="Position (optional)" min="0" />
+  <button id="insertBtn">Insert</button>
+</body>
+</html>

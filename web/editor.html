@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<title>Content Editor</title>
+	<link rel="stylesheet" href="style.css">
+	<script type="module" src="editor.js"></script>
+</head>
+
+<body>
+	<h1>Lesson Content Editor</h1>
+
+	<p><a href="teacher.html">Go to Schedule Editor</a></p>
+
+	<label for="contentId">Content ID:</label>
+	<input type="text" id="contentId" placeholder="e.g., csa_loops" />
+
+	<label for="existingContent">Or select existing lesson:</label>
+	<select id="existingContent">
+		<option value="">-- Select a lesson --</option>
+	</select>
+
+
+	<button id="loadBtn">Load</button>
+	<button id="saveBtn">Save</button>
+
+	<h3>Markdown DSL:</h3>
+	<textarea id="dslInput" rows="15" cols="80" placeholder="Write your content here..."></textarea>
+
+	<h3>Parsed Output (Preview):</h3>
+	<pre id="parsedOutput"></pre>
+</body>
+
+</html>
