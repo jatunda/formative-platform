@@ -12,7 +12,7 @@ const db = getDatabase(app);
 initializeDateUtils(db);
 
 async function getAvailableClasses() {
-  // Fetch only class names and displayOrder
+  // OPTIMIZATION: Only fetch class names and displayOrder, not full class data
   const classesSnap = await get(ref(db, "classes"));
   const classes = classesSnap.val() || {};
 
@@ -25,7 +25,7 @@ async function getAvailableClasses() {
     const todayDayIndex = await getTodayDayIndex(classId);
     console.log(`Class ${classId} - Today's day index: ${todayDayIndex}`);
     
-    // Fetch the schedule for today for this class
+    // OPTIMIZATION: Only fetch today's schedule, not full schedule
     const snap = await get(ref(db, `schedule/${classId}/${todayDayIndex}`));
     return {
       classId,

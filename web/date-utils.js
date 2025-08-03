@@ -6,23 +6,44 @@ export const DEFAULT_CLASS_START_DATE = "2024-08-19";
 
 let db; // Database reference
 
+// Cache for date offsets to avoid redundant queries
+const dateOffsetCache = new Map();
+
 // Initialize database reference
 export function initializeDateUtils(database) {
   db = database;
 }
 
-// Get date offset for a class
+// Get date offset for a class (with caching)
 export async function getClassDateOffset(classId) {
+  // Check cache first
+  if (dateOffsetCache.has(classId)) {
+    return dateOffsetCache.get(classId);
+  }
+  
   if (!db) {
     console.warn("Database not initialized in date utils");
     return 0;
   }
   try {
     const snap = await get(ref(db, `classes/${classId}/dateOffset`));
-    return snap.exists() ? snap.val() : 0;
+    const offset = snap.exists() ? snap.val() : 0;
+    
+    // Cache the result
+    dateOffsetCache.set(classId, offset);
+    return offset;
   } catch (error) {
     console.error(`Failed to get date offset for class ${classId}:`, error);
     return 0;
+  }
+}
+
+// Clear cache when offset is updated
+export function clearDateOffsetCache(classId = null) {
+  if (classId) {
+    dateOffsetCache.delete(classId);
+  } else {
+    dateOffsetCache.clear();
   }
 }
 

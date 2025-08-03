@@ -12,7 +12,8 @@ import {
   initializeDateUtils, 
   getDateForDayIndex as sharedGetDateForDayIndex,
   getTodayDayIndex,
-  DEFAULT_CLASS_START_DATE
+  DEFAULT_CLASS_START_DATE,
+  clearDateOffsetCache
 } from './date-utils.js';
 
 const app = initializeApp({
@@ -64,6 +65,8 @@ async function setClassDateOffset(classId, offset) {
   try {
     await set(ref(db, `classes/${classId}/dateOffset`), Number(offset));
     currentDateOffset = Number(offset);
+    // Clear cache so next query gets fresh data
+    clearDateOffsetCache(classId);
     return true;
   } catch (error) {
     console.error(`Failed to set date offset for class ${classId}:`, error);
@@ -441,11 +444,30 @@ async function renderScheduleTable(schedule) {
   scheduleTableBody.appendChild(addRow);
 }
 
+// Optimize title fetching with batching
+async function getLessonTitles(hashes) {
+  const missingHashes = hashes.filter(hash => !pageTitles[hash]);
+  
+  if (missingHashes.length > 0) {
+    // Batch fetch missing titles
+    const titlePromises = missingHashes.map(async (hash) => {
+      const snap = await get(ref(db, `content/${hash}/title`));
+      return { hash, title: snap.exists() ? snap.val() : "(Untitled)" };
+    });
+    
+    const results = await Promise.all(titlePromises);
+    results.forEach(({ hash, title }) => {
+      pageTitles[hash] = title;
+    });
+  }
+  
+  return hashes.map(hash => pageTitles[hash]);
+}
+
 async function getLessonTitle(hash) {
   if (pageTitles[hash]) return pageTitles[hash];
-  const snap = await get(ref(db, `content/${hash}/title`));
-  pageTitles[hash] = snap.exists() ? snap.val() : "(Untitled)";
-  return pageTitles[hash];
+  const titles = await getLessonTitles([hash]);
+  return titles[0];
 }
 
 async function addLessonToDay(dayIndex) {
@@ -493,12 +515,41 @@ loadClasses().then(() => {
 
 function showLessonLinkPopup({ onSelect }) {
   (async () => {
-    const snap = await get(ref(db, "content"));
-    if (!snap.exists()) {
-      alert("No lessons found.");
+    try {
+      // OPTIMIZATION: First get shallow list of IDs to minimize data transfer
+      const shallowSnap = await get(ref(db, "content"));
+      if (!shallowSnap.exists()) {
+        alert("No lessons found.");
+        return;
+      }
+      
+      const allIds = Object.keys(shallowSnap.val());
+      
+      // OPTIMIZATION: Batch fetch only titles for existing lessons
+      const titlePromises = allIds.map(async (id) => {
+        // Check cache first
+        if (pageTitles[id]) {
+          return { id, title: pageTitles[id] };
+        }
+        
+        const titleSnap = await get(ref(db, `content/${id}/title`));
+        const title = titleSnap.exists() ? titleSnap.val() : "(Untitled)";
+        pageTitles[id] = title; // Cache it
+        return { id, title };
+      });
+      
+      const titleResults = await Promise.all(titlePromises);
+      const contentMap = {};
+      titleResults.forEach(({ id, title }) => {
+        contentMap[id] = { title };
+      });
+      
+      console.log(`Loaded ${Object.keys(contentMap).length} lesson titles`);
+    } catch (error) {
+      console.error("Error loading lessons:", error);
+      alert("Error loading lessons. Please try again.");
       return;
     }
-    const contentMap = snap.val();
     // Create popup
     const popup = document.createElement("div");
     popup.className = "lesson-popup";
