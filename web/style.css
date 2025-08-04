@@ -664,6 +664,7 @@ code:not(.lesson-content code) {
   line-height: 1.4;
   margin-bottom: 12px;
   position: relative;
+  box-shadow: none !important;
 }
 
 /* Prism.js syntax highlighting overrides */
@@ -701,6 +702,8 @@ pre[class*="language-"].lesson-code,
 code[class*="language-"],
 pre[class*="language-"] {
   background: #2b2b2b !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
 }
 
 /* Make sure our lesson-code takes precedence */
@@ -708,6 +711,8 @@ pre[class*="language-"] {
 .lesson-preview pre.lesson-code {
   background-color: #2b2b2b !important;
   border-color: #3d3d3d !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
 }
 
 /* Prism.js token colors for Godot dark theme */
