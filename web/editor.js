@@ -40,6 +40,92 @@ const searchLessonBtn = document.getElementById("searchLessonBtn");
 // Content ID is now a div, no need for readOnly property
 
 dslInput.addEventListener("input", updatePreview);
+
+// Handle Tab key in DSL input to insert 4 spaces instead of changing focus
+dslInput.addEventListener("keydown", (event) => {
+  if (event.key === "Tab") {
+    event.preventDefault(); // Prevent default tab behavior
+    
+    const start = dslInput.selectionStart;
+    const end = dslInput.selectionEnd;
+    const value = dslInput.value;
+    
+    // Insert 4 spaces at cursor position
+    const newValue = value.substring(0, start) + "    " + value.substring(end);
+    dslInput.value = newValue;
+    
+    // Move cursor to after the inserted spaces
+    dslInput.selectionStart = dslInput.selectionEnd = start + 4;
+    
+    // Trigger input event to update preview
+    dslInput.dispatchEvent(new Event('input'));
+  }
+  
+  // Handle smart backspace for indentation
+  if (event.key === "Backspace") {
+    const start = dslInput.selectionStart;
+    const end = dslInput.selectionEnd;
+    const value = dslInput.value;
+    
+    // Only do smart backspace if nothing is selected
+    if (start === end && start > 0) {
+      // Find the start of the current line
+      const lineStart = value.lastIndexOf('\n', start - 1) + 1;
+      const lineBeforeCursor = value.substring(lineStart, start);
+      
+      // Check if we're at the beginning of the line's text (only spaces before cursor)
+      if (/^ +$/.test(lineBeforeCursor) && lineBeforeCursor.length >= 4) {
+        event.preventDefault();
+        
+        // Calculate how many spaces to delete to reach the next multiple of 4
+        const spacesToDelete = lineBeforeCursor.length % 4 || 4;
+        
+        // Delete the spaces
+        const newValue = value.substring(0, start - spacesToDelete) + value.substring(start);
+        dslInput.value = newValue;
+        
+        // Move cursor back
+        dslInput.selectionStart = dslInput.selectionEnd = start - spacesToDelete;
+        
+        // Trigger input event to update preview
+        dslInput.dispatchEvent(new Event('input'));
+      }
+    }
+  }
+  
+  // Handle auto-indentation on Enter
+  if (event.key === "Enter") {
+    const start = dslInput.selectionStart;
+    const end = dslInput.selectionEnd;
+    const value = dslInput.value;
+    
+    // Only do auto-indent if nothing is selected
+    if (start === end) {
+      // Find the start of the current line
+      const lineStart = value.lastIndexOf('\n', start - 1) + 1;
+      const currentLine = value.substring(lineStart, start);
+      
+      // Extract the leading whitespace from the current line
+      const indentMatch = currentLine.match(/^( *)/);
+      const indent = indentMatch ? indentMatch[1] : '';
+      
+      if (indent.length > 0) {
+        event.preventDefault();
+        
+        // Insert newline followed by the same indentation
+        const newValue = value.substring(0, start) + '\n' + indent + value.substring(end);
+        dslInput.value = newValue;
+        
+        // Move cursor to after the inserted indentation
+        dslInput.selectionStart = dslInput.selectionEnd = start + 1 + indent.length;
+        
+        // Trigger input event to update preview
+        dslInput.dispatchEvent(new Event('input'));
+      }
+    }
+  }
+});
+
 const existingContentSelect = document.getElementById("existingContent");
 
 // Add keyboard shortcut for save (Ctrl+S on Windows, Cmd+S on Mac)

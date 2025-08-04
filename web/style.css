@@ -527,6 +527,21 @@ textarea {
   font-size: 14px;
   resize: vertical;
   transition: border-color 0.2s ease;
+  white-space: pre;
+  tab-size: 4;
+}
+
+/* Enhanced editor with better whitespace visibility */
+#dslInput {
+  font-family: 'Fira Code', 'Cascadia Code', 'JetBrains Mono', 'SF Mono', Consolas, 'Liberation Mono', monospace;
+  font-variant-ligatures: none;
+  letter-spacing: 0.3px;
+  line-height: 1.5;
+}
+
+/* Optional: Add a subtle visual cue for indentation levels when focused */
+#dslInput:focus {
+  background-color: #374151;
 }
 
 textarea:focus {
