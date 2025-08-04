@@ -218,6 +218,7 @@ function createDateOffsetControl() {
   
   const applyBtn = document.createElement("button");
   applyBtn.textContent = "Apply";
+  applyBtn.className = "schedule-action-btn";
   applyBtn.style.padding = "4px 12px";
   applyBtn.style.fontSize = "0.9rem";
   
@@ -336,17 +337,40 @@ async function renderScheduleTable(schedule) {
     loadFullSchedule();
   }
 
-  for (let dayIndex = 0; dayIndex <= maxDayIndex; dayIndex++) {
-    // --- Insert Day Button (before each row except the first) ---
-    if (dayIndex > 0) {
-      const insertRow = document.createElement("tr");
-      const insertTd = document.createElement("td");
-      insertTd.colSpan = 3;
-      insertTd.className = "insert-day-cell";
-      insertTd.appendChild(createInsertDayButton(dayIndex, insertDayAt));
-      insertRow.appendChild(insertTd);
-      scheduleTableBody.appendChild(insertRow);
+  // Helper to delete a day at a given index
+  async function deleteDayAt(index) {
+    const classId = classSelect.value;
+    
+    // Confirm deletion
+    if (!confirm(`Are you sure you want to delete day ${index}? This will shift all future days back by one.`)) {
+      return;
     }
+    
+    // Shift all days > index down by 1
+    for (let i = index; i < maxDayIndex; i++) {
+      const fromRef = ref(db, `schedule/${classId}/${i + 1}`);
+      const toRef = ref(db, `schedule/${classId}/${i}`);
+      const snap = await get(fromRef);
+      if (snap.exists()) {
+        await set(toRef, snap.val());
+      } else {
+        await set(toRef, []);
+      }
+    }
+    // Remove the last day
+    await set(ref(db, `schedule/${classId}/${maxDayIndex}`), null);
+    loadFullSchedule();
+  }
+
+  for (let dayIndex = 0; dayIndex <= maxDayIndex; dayIndex++) {
+    // --- Insert Day Button (before each row) ---
+    const insertRow = document.createElement("tr");
+    const insertTd = document.createElement("td");
+    insertTd.colSpan = 4;
+    insertTd.className = "insert-day-cell";
+    insertTd.appendChild(createInsertDayButton(dayIndex, insertDayAt));
+    insertRow.appendChild(insertTd);
+    scheduleTableBody.appendChild(insertRow);
 
     // --- Normal Day Row ---
     const lessons = schedule[dayIndex] || [];
@@ -356,6 +380,11 @@ async function renderScheduleTable(schedule) {
     const tdDay = document.createElement("td");
     tdDay.textContent = dayIndex;
     tr.appendChild(tdDay);
+
+    // Date column
+    const tdDate = document.createElement("td");
+    tdDate.textContent = await getDateForDayIndex(dayIndex);
+    tr.appendChild(tdDate);
 
     // Lessons (horizontal buttons or just a plus if empty)
     const tdLessons = document.createElement("td");
@@ -417,10 +446,20 @@ async function renderScheduleTable(schedule) {
 
     tr.appendChild(tdLessons);
 
-    // Date column
-    const tdDate = document.createElement("td");
-    tdDate.textContent = await getDateForDayIndex(dayIndex);
-    tr.appendChild(tdDate);
+    // Actions column (delete button)
+    const tdActions = document.createElement("td");
+    tdActions.style.textAlign = "center";
+    tdActions.style.verticalAlign = "middle";
+    tdActions.style.padding = "4px";
+    
+    const deleteButton = document.createElement("button");
+    deleteButton.textContent = "🗑️";
+    deleteButton.className = "delete-day-btn";
+    deleteButton.title = `Delete day ${dayIndex}`;
+    deleteButton.onclick = () => deleteDayAt(dayIndex);
+    tdActions.appendChild(deleteButton);
+    
+    tr.appendChild(tdActions);
 
     scheduleTableBody.appendChild(tr);
   }
@@ -434,6 +473,11 @@ async function renderScheduleTable(schedule) {
   tdDay.textContent = nextIndex;
   addRow.appendChild(tdDay);
 
+  // Date column
+  const tdDate = document.createElement("td");
+  tdDate.textContent = await getDateForDayIndex(nextIndex);
+  addRow.appendChild(tdDate);
+
   // Lessons column with "Link Lesson" and "+ New Lesson" buttons
   const tdLessons = document.createElement("td");
   tdLessons.className = "lessons-cell";
@@ -446,10 +490,9 @@ async function renderScheduleTable(schedule) {
 
   addRow.appendChild(tdLessons);
 
-  // Date column
-  const tdDate = document.createElement("td");
-  tdDate.textContent = await getDateForDayIndex(nextIndex);
-  addRow.appendChild(tdDate);
+  // Empty actions column for the final row
+  const tdActions = document.createElement("td");
+  addRow.appendChild(tdActions);
 
   scheduleTableBody.appendChild(addRow);
 }
@@ -541,7 +584,7 @@ function createStyledButton(text, onClick) {
 function createNewLessonButton(dayIndex) {
   const btn = document.createElement("button");
   btn.textContent = "+ New Lesson";
-  btn.className = "new-lesson-btn";
+  btn.className = "schedule-action-btn new-lesson-btn";
   btn.onclick = () => addLessonToDay(dayIndex);
   return btn;
 }
@@ -549,6 +592,7 @@ function createNewLessonButton(dayIndex) {
 function createCloseButton(popup) {
   const btn = document.createElement("button");
   btn.textContent = "Close";
+  btn.className = "schedule-action-btn";
   btn.onclick = () => document.body.removeChild(popup);
   return btn;
 }
@@ -564,6 +608,7 @@ function createArrowButton(direction, isDisabled, onClick) {
 function createDeleteButton(onClick) {
   const btn = document.createElement("button");
   btn.textContent = "🗑️";
+  btn.className = "schedule-action-btn delete-btn";
   btn.onclick = onClick;
   return btn;
 }
@@ -571,7 +616,7 @@ function createDeleteButton(onClick) {
 function createInsertDayButton(dayIndex, insertFunction) {
   const btn = document.createElement("button");
   btn.textContent = "+ Insert Day Here";
-  btn.className = "insert-day-btn";
+  btn.className = "schedule-action-btn insert-day-btn";
   btn.onclick = () => insertFunction(dayIndex);
   return btn;
 }
@@ -602,7 +647,7 @@ async function createLessonCluster(lessonHash, dayIndex, i, lessons) {
   topRow.className = "lesson-cluster-top";
   const mainBtn = document.createElement("button");
   mainBtn.textContent = await getLessonTitle(lessonHash);
-  mainBtn.className = "lesson-main-btn";
+  mainBtn.className = "schedule-action-btn lesson-main-btn";
   mainBtn.onclick = () => {
     window.location.href = `editor.html?page=${lessonHash}`;
   };

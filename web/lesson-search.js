@@ -59,7 +59,7 @@ export function showLessonSearchPopup({ onSelect }) {
       box.className = "lesson-popup-box";
 
       const closeBtn = createCloseButton(popup);
-      closeBtn.className = "popup-close-btn";
+      closeBtn.className = "schedule-action-btn popup-close-btn";
 
       const searchInput = document.createElement("input");
       searchInput.type = "text";
@@ -94,7 +94,7 @@ export function showLessonSearchPopup({ onSelect }) {
         for (const item of items) {
           const btn = document.createElement("button");
           btn.textContent = item.title;
-          btn.className = "lesson-popup-result-btn";
+          btn.className = "schedule-action-btn lesson-popup-result-btn";
           btn.onclick = async () => {
             document.body.removeChild(popup);
             onSelect(item.id);
@@ -127,6 +127,7 @@ export function showLessonSearchPopup({ onSelect }) {
 function createCloseButton(popup) {
   const btn = document.createElement("button");
   btn.textContent = "Close";
+  btn.className = "schedule-action-btn";
   btn.onclick = () => document.body.removeChild(popup);
   return btn;
 }

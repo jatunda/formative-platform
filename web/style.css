@@ -29,9 +29,9 @@ button:hover {
 }
 
 #class-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-  gap: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
 }
 
 #content {
@@ -86,6 +86,54 @@ td > * {
   box-sizing: border-box;
 }
 
+/* Make links with schedule-action-btn class look like buttons */
+a.schedule-action-btn {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  padding: 0.3rem;
+  margin: 0.01rem 0;
+  font-size: 1rem;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background-color: #f0f0f0;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  text-align: center;
+}
+
+a.schedule-action-btn:hover {
+  background-color: #e0e0e0;
+}
+
+/* Class selection links for landing page */
+.class-link {
+  display: block;
+  text-decoration: none;
+  color: #007cba;
+  padding: 0.5rem 0;
+  margin: 0.25rem 0;
+  font-size: 1.1rem;
+  border-bottom: 1px solid #eee;
+  transition: color 0.2s ease;
+}
+
+.class-link:hover {
+  color: #005a8b;
+  text-decoration: underline;
+}
+
+/* Inactive class items (no lessons today) */
+.class-link-inactive {
+  display: block;
+  color: #666;
+  padding: 0.5rem 0;
+  margin: 0.25rem 0;
+  font-size: 1.1rem;
+  border-bottom: 1px solid #eee;
+  font-style: italic;
+}
+
 /* New lesson button */
 .new-lesson-btn {
   width: 110px;
@@ -97,6 +145,11 @@ td > * {
 /* Insert day button */
 .insert-day-btn {
   font-size: 0.9em;
+  width: auto !important;
+  min-width: auto !important;
+  max-width: none !important;
+  white-space: nowrap;
+  padding: 4px 8px !important;
 }
 
 /* Flex container utilities */
@@ -149,6 +202,10 @@ td > * {
 /* Main lesson button styling */
 .lesson-main-btn {
   font-weight: bold;
+  min-width: 200px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Lesson cluster box */
@@ -164,6 +221,7 @@ td > * {
   background: #f8f8f8;
   box-shadow: 1px 1px 3px #ddd;
   cursor: grab;
+  min-width: 140px;
 }
 
 /* Top row of lesson cluster */
@@ -226,8 +284,17 @@ td > * {
 }
 .lesson-popup-result-btn {
   text-align: left;
-  white-space: normal;
-  width: 100%;
+  white-space: nowrap;
+  width: 100% !important;
+  min-width: 100% !important;
+  max-width: 100% !important;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-sizing: border-box;
+  display: block !important;
+  margin: 2px 0 !important;
+  padding: 8px 12px !important;
+  min-height: 36px;
 }
 
 /* Date Offset Control */
@@ -286,6 +353,42 @@ td > * {
   border-radius: 4px;
   cursor: pointer;
   font-size: 14px;
+}
+
+/* Delete buttons in lesson clusters should be compact */
+.lesson-cluster-bottom .delete-btn {
+  width: auto !important;
+  min-width: auto !important;
+  max-width: none !important;
+  padding: 2px 6px !important;
+  font-size: 11px !important;
+  height: auto !important;
+  min-height: auto !important;
+  line-height: 1.2 !important;
+}
+
+/* Delete day buttons in Actions column should fill cell height */
+.delete-day-btn {
+  width: auto !important;
+  min-width: auto !important;
+  max-width: none !important;
+  padding: 8px 12px !important;
+  font-size: 14px !important;
+  height: 100% !important;
+  min-height: 60px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background-color: #dc3545;
+  color: white;
+  border: 1px solid #dc3545;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.delete-day-btn:hover {
+  background-color: #c82333;
+  border-color: #bd2130;
 }
 
 .delete-btn:hover {

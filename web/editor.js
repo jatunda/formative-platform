@@ -42,6 +42,19 @@ const searchLessonBtn = document.getElementById("searchLessonBtn");
 dslInput.addEventListener("input", updatePreview);
 const existingContentSelect = document.getElementById("existingContent");
 
+// Add keyboard shortcut for save (Ctrl+S on Windows, Cmd+S on Mac)
+document.addEventListener("keydown", (event) => {
+  // Check for Ctrl+S (Windows/Linux) or Cmd+S (Mac)
+  if ((event.ctrlKey || event.metaKey) && event.key === 's') {
+    event.preventDefault(); // Prevent browser's default save dialog
+    
+    // Only trigger save if editing is enabled (content is loaded)
+    if (!saveBtn.disabled) {
+      saveBtn.click(); // Trigger the existing save functionality
+    }
+  }
+});
+
 
 function updatePreview() {
 	const dslText = dslInput.value;

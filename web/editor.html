@@ -12,21 +12,22 @@
 
 	<p><a href="teacher.html">Go to Schedule Editor</a></p>
 
-	<label for="contentId">Content ID:</label>
-	<div id="contentId" style="font-family: monospace; background-color: #f0f0f0; padding: 8px; border: 1px solid #ccc; border-radius: 4px; min-height: 20px; display: inline-block; min-width: 200px;">(No content selected)</div>
-
-	<label for="existingContent">Or select existing lesson:</label>
-	<div style="display: flex; gap: 10px; align-items: center;">
-		<select id="existingContent" style="flex: 1;">
+		<div style="display: flex; gap: 10px; align-items: center;">
+		<label for="existingContent">Lesson:</label>
+		<select id="existingContent" style="flex: 1; max-width: 300px; overflow: hidden; text-overflow: ellipsis;">
 			<option value="">-- Select a lesson --</option>
 		</select>
+		<label for="contentId">Content ID:</label>
+		<div id="contentId" style="font-family: monospace; background-color: #f0f0f0; padding: 8px; border: 1px solid #ccc; border-radius: 4px; min-height: 20px; display: inline-block; min-width: 200px;">(No content selected)</div>
+
 		<button id="searchLessonBtn" class="schedule-action-btn">Search</button>
 	</div>
 
-
-	<button id="saveBtn">Save</button>
-	<button id="duplicateBtn" class="schedule-action-btn">Duplicate</button>
-	<button id="deleteBtn" class="delete-btn">Delete</button>
+	<div style="display: flex; gap: 10px; align-items: center; margin: 20px 0;">
+		<button id="saveBtn" class="schedule-action-btn">Save</button>
+		<button id="duplicateBtn" class="schedule-action-btn">Duplicate</button>
+		<button id="deleteBtn" class="schedule-action-btn delete-btn">Delete</button>
+	</div>
 
 	<h3>Markdown DSL:</h3>
 	<textarea id="dslInput" rows="15" cols="80" placeholder="Write your content here..."></textarea>

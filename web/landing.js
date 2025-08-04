@@ -40,15 +40,21 @@ async function getAvailableClasses() {
   container.innerHTML = ""; // Clear previous content
 
   schedules.forEach(({ classId, dayIndex, schedule }) => {
+    const classData = classes[classId];
+    
     if (Array.isArray(schedule) && schedule.length > 0) {
-      const classData = classes[classId];
-      const pageCount = schedule.length;
-      const btn = document.createElement("button");
-      btn.textContent = `${classData.name} (${pageCount} page${pageCount > 1 ? "s" : ""})`;
-      btn.onclick = () => {
-        window.location.href = `view.html?class=${classId}&day=${dayIndex}`;
-      };
-      container.appendChild(btn);
+      // Class has lessons today - show as clickable link
+      const link = document.createElement("a");
+      link.textContent = classData.name;
+      link.className = "class-link";
+      link.href = `view.html?class=${classId}&day=${dayIndex}`;
+      container.appendChild(link);
+    } else {
+      // Class exists but has no lessons today - show as inactive text
+      const item = document.createElement("div");
+      item.textContent = `${classData.name} - nothing today`;
+      item.className = "class-link-inactive";
+      container.appendChild(item);
     }
   });
 }

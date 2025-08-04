@@ -13,7 +13,7 @@ export function createStyledButton(text, onClick) {
 export function createNewLessonButton(dayIndex, addLessonCallback) {
   const btn = document.createElement("button");
   btn.textContent = "+ New Lesson";
-  btn.className = "new-lesson-btn";
+  btn.className = "schedule-action-btn new-lesson-btn";
   btn.onclick = () => addLessonCallback(dayIndex);
   return btn;
 }
@@ -21,6 +21,7 @@ export function createNewLessonButton(dayIndex, addLessonCallback) {
 export function createCloseButton(popup) {
   const btn = document.createElement("button");
   btn.textContent = "Close";
+  btn.className = "schedule-action-btn";
   btn.onclick = () => document.body.removeChild(popup);
   return btn;
 }
@@ -28,6 +29,7 @@ export function createCloseButton(popup) {
 export function createArrowButton(direction, isDisabled, onClick) {
   const btn = document.createElement("button");
   btn.textContent = direction === "left" ? "←" : "→";
+  btn.className = "schedule-action-btn";
   btn.disabled = isDisabled;
   btn.onclick = onClick;
   return btn;
@@ -36,6 +38,7 @@ export function createArrowButton(direction, isDisabled, onClick) {
 export function createDeleteButton(onClick) {
   const btn = document.createElement("button");
   btn.textContent = "🗑️";
+  btn.className = "schedule-action-btn delete-btn";
   btn.onclick = onClick;
   return btn;
 }
@@ -43,7 +46,7 @@ export function createDeleteButton(onClick) {
 export function createInsertDayButton(dayIndex, insertFunction) {
   const btn = document.createElement("button");
   btn.textContent = "+ Insert Day Here";
-  btn.className = "insert-day-btn";
+  btn.className = "schedule-action-btn insert-day-btn";
   btn.onclick = () => insertFunction(dayIndex);
   return btn;
 }
