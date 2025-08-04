@@ -13,7 +13,7 @@ export function parseDSL(dslText) {
 
   for (let raw of lines) {
     const line = raw.trim();
-    if (line === "") continue;
+    if (line === "" && !inCode) continue; // Allow empty lines in code blocks
 
     if (line.startsWith("@title")) {
       result.title = line.replace("@title", "").trim();
@@ -57,7 +57,8 @@ export function parseDSL(dslText) {
 
     // Code lines
     else if (inCode) {
-      codeBuffer.push(line);
+      // Use raw line to preserve indentation in code blocks
+      codeBuffer.push(raw);
     }
 
     else {

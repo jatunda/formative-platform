@@ -49,6 +49,10 @@ pre {
   border-radius: 6px;
   border: 1px solid #4a5568;
   overflow-x: auto;
+  white-space: pre;
+  font-family: monospace;
+  tab-size: 4;
+  line-height: 1.4;
 }
 
 @media (max-width: 600px) {
