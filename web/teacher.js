@@ -15,6 +15,10 @@ import {
   DEFAULT_CLASS_START_DATE,
   clearDateOffsetCache
 } from './date-utils.js';
+import {
+  initializeLessonSearch,
+  showLessonSearchPopup
+} from "./lesson-search.js";
 
 const app = initializeApp({
   databaseURL: "https://formative-platform-default-rtdb.firebaseio.com/",
@@ -23,6 +27,17 @@ const db = getDatabase(app);
 
 // Initialize date utilities
 initializeDateUtils(db);
+
+// Import shared lesson search functionality
+import {
+  getCachedTitle
+} from "./lesson-search.js";
+
+// Keep local pageTitles cache for existing functionality until fully refactored
+const pageTitles = {}; // id → title
+
+// Initialize lesson search module
+initializeLessonSearch(db);
 
 // Constants
 const BUTTON_CONFIG = {
@@ -34,11 +49,8 @@ const BUTTON_CONFIG = {
 const DEFAULT_LESSON_TITLE = "Empty Lesson";
 const POPUP_MAX_HEIGHT = "50vh";
 
-const pageTitles = {}; // id → title
-
 const classSelect = document.getElementById("classSelect");
 const dayInput = document.getElementById("dayInput");
-const loadBtn = document.getElementById("loadSchedule");
 const scheduleList = document.getElementById("scheduleList");
 const newPageIdInput = document.getElementById("newPageId");
 const insertPosInput = document.getElementById("insertPosition");
@@ -154,8 +166,6 @@ function deleteItem(index) {
   renderScheduleList();
   updateScheduleInDB();
 }
-
-loadBtn.onclick = loadSchedule;
 
 // Use the shared date calculation function
 async function getDateForDayIndex(dayIndex, classStartDate = DEFAULT_CLASS_START_DATE) {
@@ -513,98 +523,9 @@ loadClasses().then(() => {
   loadFullSchedule();
 });
 
+// Use the shared lesson search popup
 function showLessonLinkPopup({ onSelect }) {
-  (async () => {
-    try {
-      // OPTIMIZATION: First get shallow list of IDs to minimize data transfer
-      const shallowSnap = await get(ref(db, "content"));
-      if (!shallowSnap.exists()) {
-        alert("No lessons found.");
-        return;
-      }
-      
-      const allIds = Object.keys(shallowSnap.val());
-      
-      // OPTIMIZATION: Batch fetch only titles for existing lessons
-      const titlePromises = allIds.map(async (id) => {
-        // Check cache first
-        if (pageTitles[id]) {
-          return { id, title: pageTitles[id] };
-        }
-        
-        const titleSnap = await get(ref(db, `content/${id}/title`));
-        const title = titleSnap.exists() ? titleSnap.val() : "(Untitled)";
-        pageTitles[id] = title; // Cache it
-        return { id, title };
-      });
-      
-      const titleResults = await Promise.all(titlePromises);
-      const contentMap = {};
-      titleResults.forEach(({ id, title }) => {
-        contentMap[id] = { title };
-      });
-      
-      console.log(`Loaded ${Object.keys(contentMap).length} lesson titles`);
-    } catch (error) {
-      console.error("Error loading lessons:", error);
-      alert("Error loading lessons. Please try again.");
-      return;
-    }
-    // Create popup
-    const popup = document.createElement("div");
-    popup.className = "lesson-popup";
-
-    const box = document.createElement("div");
-    box.className = "lesson-popup-box";
-
-    const closeBtn = createCloseButton(popup);
-    closeBtn.className = "popup-close-btn";
-
-    const searchInput = document.createElement("input");
-    searchInput.type = "text";
-    searchInput.placeholder = "Search lessons by name...";
-    searchInput.className = "lesson-popup-search";
-
-    const resultsDiv = document.createElement("div");
-    resultsDiv.className = "lesson-popup-results";
-
-    function renderResults(filter) {
-      resultsDiv.innerHTML = "";
-      const filterLower = filter.trim().toLowerCase();
-      const items = Object.entries(contentMap)
-        .map(([id, data]) => ({
-          id,
-          title: (data.title || "(Untitled)").toString()
-        }))
-        .filter(item => item.title.toLowerCase().includes(filterLower) || item.id.includes(filterLower))
-        .sort((a, b) => a.title.localeCompare(b.title));
-      if (items.length === 0) {
-        const noRes = document.createElement("div");
-        noRes.textContent = "No results.";
-        resultsDiv.appendChild(noRes);
-        return;
-      }
-      for (const item of items) {
-        const btn = document.createElement("button");
-        btn.textContent = `${item.title} (${item.id})`;
-        btn.className = "lesson-popup-result-btn";
-        btn.onclick = async () => {
-          document.body.removeChild(popup);
-          onSelect(item.id);
-        };
-        resultsDiv.appendChild(btn);
-      }
-    }
-
-    searchInput.oninput = () => renderResults(searchInput.value);
-    renderResults("");
-
-    box.appendChild(closeBtn);
-    box.appendChild(searchInput);
-    box.appendChild(resultsDiv);
-    popup.appendChild(box);
-    document.body.appendChild(popup);
-  })();
+  showLessonSearchPopup({ onSelect });
 }
 
 // Use CSS classes for styled buttons
