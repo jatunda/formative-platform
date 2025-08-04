@@ -561,7 +561,7 @@ deleteBtn.onclick = async () => {
 	}
 };
 
-async function loadExistingContentList() {
+async function loadExistingContentList(selectLessonId = null) {
 	// Clear existing options except the first one
 	existingContentSelect.innerHTML = '<option value="">-- Select a lesson --</option>';
 	
@@ -578,9 +578,24 @@ async function loadExistingContentList() {
 		option.textContent = title;
 		existingContentSelect.appendChild(option);
 	}
+	
+	// If a specific lesson ID was provided, select it in the dropdown
+	if (selectLessonId) {
+		for (let i = 0; i < existingContentSelect.options.length; i++) {
+			if (existingContentSelect.options[i].value === selectLessonId) {
+				existingContentSelect.selectedIndex = i;
+				break;
+			}
+		}
+	}
 }
 
-loadExistingContentList();
+// Check for URL parameters first to see if we need to select a specific lesson
+const params = getQueryParams();
+const initialLessonId = params.page || null;
+
+// Load the content list and potentially select a specific lesson
+loadExistingContentList(initialLessonId);
 
 existingContentSelect.onchange = async () => {
   const selectedId = existingContentSelect.value;
@@ -655,17 +670,8 @@ async function generateUniqueHash() {
 (async function handleExistingPageContext() {
   const params = getQueryParams();
   if (params.page) {
-    // Set the contentId display and select the option in the dropdown
+    // Set the contentId display (dropdown selection is handled by loadExistingContentList)
     contentIdEl.textContent = params.page;
-    // If the dropdown is already populated, select the correct option
-    if (existingContentSelect) {
-      for (let i = 0; i < existingContentSelect.options.length; i++) {
-        if (existingContentSelect.options[i].value === params.page) {
-          existingContentSelect.selectedIndex = i;
-          break;
-        }
-      }
-    }
     // Load the content into the editor
     await loadContent(params.page);
   } else {
