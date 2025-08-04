@@ -162,8 +162,8 @@ function getErrorExplanation(error, dslText) {
 		},
 		'code': {
 			issue: 'Unmatched code block markers',
-			solution: 'Each code block must start and end with exactly three backticks "```" on their own lines',
-			example: '```\nconsole.log("Hello");\n```'
+			solution: 'Each code block must start and end with exactly three backticks. Language specification is optional on opening block only.',
+			example: 'Plain code:\n```\nconsole.log("Hello");\n```\n\nWith language:\n```javascript\nconsole.log("Hello");\n```'
 		},
 		'empty': {
 			issue: 'Empty or invalid content',
@@ -185,21 +185,51 @@ function getErrorExplanation(error, dslText) {
 	} else if (!dslText.includes('# ') || errorMessage.includes('Missing title')) {
 		detectedIssue = explanations.title;
 	} else if (dslText.includes('```')) {
-		// Check for unmatched code blocks - DSL parser expects exactly "```" on its own line
+		// Check for unmatched code blocks and invalid language specifications
 		const lines = dslText.split('\n');
-		const codeBlockMarkers = lines.filter(line => line.trim() === '```');
-		const invalidCodeMarkers = lines.filter(line => 
-			line.trim().startsWith('```') && line.trim() !== '```'
+		const codeBlockMarkers = lines.filter(line => 
+			line.trim() === '```' || line.trim().match(/^```\s*\w+$/)
 		);
+		const invalidCodeMarkers = lines.filter(line => 
+			line.trim().startsWith('```') && 
+			line.trim() !== '```' && 
+			!line.trim().match(/^```\s*\w+$/)
+		);
+		
+		// Check for language specifications on closing code blocks
+		const linesWithNumbers = lines.map((line, index) => ({line: line.trim(), number: index + 1}));
+		let inCodeBlock = false;
+		const invalidClosingLanguages = [];
+		
+		for (const {line, number} of linesWithNumbers) {
+			if (line === '```' || line.match(/^```\s*\w+$/)) {
+				if (inCodeBlock) {
+					// This is a closing block - check if it has language specification
+					if (line.match(/^```\s*\w+$/)) {
+						invalidClosingLanguages.push(number);
+					}
+					inCodeBlock = false;
+				} else {
+					// This is an opening block
+					inCodeBlock = true;
+				}
+			}
+		}
 		
 		if (codeBlockMarkers.length % 2 !== 0) {
 			detectedIssue = explanations.code;
+		} else if (invalidClosingLanguages.length > 0) {
+			detectedIssue = {
+				issue: 'Language specification on closing code block',
+				solution: 'Language can only be specified on the opening ``` line, not the closing one',
+				example: `Correct:\n\`\`\`java\nSystem.out.println("Hello");\n\`\`\`\n\nIncorrect:\n\`\`\`java\nSystem.out.println("Hello");\n\`\`\`java`
+			};
 		} else if (invalidCodeMarkers.length > 0) {
-			// Special case: code blocks with content on the same line
+			// Special case: code blocks with invalid format
 			detectedIssue = {
 				issue: 'Invalid code block format',
-				solution: 'Code block markers must be exactly "```" on their own line, with no other content',
-				example: 'Correct:\n```\nconsole.log("Hello");\n```\n\nIncorrect:\n```javascript\nconsole.log("Hello");\n```'
+				solution: 'Code block language can be specified as "```language" or "``` language"',
+				example: 'Correct:\n```java\nSystem.out.println("Hello");\n```\n\nAlso correct:\n``` python\nprint("Hello")\n```'
 			};
 		}
 	} else if (dslText.includes('---')) {
@@ -276,9 +306,11 @@ function updatePreview() {
 		} else if (!parsed.blocks || parsed.blocks.length === 0) {
 			validationError = 'No content blocks found - add some text or questions after the title';
 		} else {
-			// Check for unmatched code blocks specifically
+			// Check for unmatched code blocks with language support
 			const lines = dslText.split('\n');
-			const codeBlockMarkers = lines.filter(line => line.trim() === '```');
+			const codeBlockMarkers = lines.filter(line => 
+				line.trim() === '```' || line.trim().match(/^```\s*\w+$/)
+			);
 			if (codeBlockMarkers.length % 2 !== 0) {
 				validationError = 'Unmatched code block - every ``` opening must have a closing ```';
 			} else {

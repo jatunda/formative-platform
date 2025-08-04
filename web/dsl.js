@@ -9,6 +9,7 @@ export function parseDSL(dslText) {
   let currentBlock = null;
   let inCode = false;
   let codeBuffer = [];
+  let currentCodeLanguage = undefined;
   let inQuestion = false;
   let hasEncounteredSeparator = false;
 
@@ -33,8 +34,8 @@ export function parseDSL(dslText) {
       currentBlock = { type: "question", content: [] };
     }
 
-    // Code block toggle (```)
-    else if (line === "```") {
+    // Code block toggle (``` or ```language)
+    else if (line === "```" || line.startsWith("```")) {
       // If we haven't started a question yet and no separator encountered, start one
       if (!inQuestion && !hasEncounteredSeparator) {
         inQuestion = true;
@@ -42,16 +43,25 @@ export function parseDSL(dslText) {
       }
       
       if (inCode) {
-        // End code block
+        // End code block (language specification on closing ``` is ignored/invalid)
         if (currentBlock && inQuestion) {
-          currentBlock.content.push({ type: "code", value: codeBuffer.join("\n") });
+          currentBlock.content.push({ type: "code", value: codeBuffer.join("\n"), language: currentCodeLanguage });
         }
         inCode = false;
         codeBuffer = [];
+        currentCodeLanguage = undefined;
       } else {
-        // Start code block
+        // Start code block, extract optional language
         inCode = true;
         codeBuffer = [];
+        // Extract language from "```language" format (with or without space)
+        if (line.length > 3) {
+          // Remove the ``` prefix and any leading whitespace
+          const languagePart = line.substring(3).trim();
+          currentCodeLanguage = languagePart || undefined;
+        } else {
+          currentCodeLanguage = undefined;
+        }
       }
     }
 
@@ -107,7 +117,12 @@ export function generateDSLFromContent(content) {
         if (item.type === "text") {
           lines.push(item.value);
         } else if (item.type === "code") {
-          lines.push("```");
+          // Include language specification if present
+          if (item.language) {
+            lines.push(`\`\`\`${item.language}`);
+          } else {
+            lines.push("```");
+          }
           lines.push(item.value);
           lines.push("```");
         }

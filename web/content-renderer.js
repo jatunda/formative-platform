@@ -49,12 +49,35 @@ function renderContent(data, containerEl) {
 					if (item.type === "code") {
 						const pre = document.createElement("pre");
 						pre.className = "lesson-code";
-						pre.textContent = item.value;
+						
+						// Add language class if specified
+						if (item.language) {
+							pre.classList.add(`language-${item.language}`);
+							pre.setAttribute('data-language', item.language);
+						}
+						
+						const code = document.createElement("code");
+						if (item.language) {
+							code.className = `language-${item.language}`;
+						}
+						code.textContent = item.value;
+						
+						pre.appendChild(code);
 						containerEl.appendChild(pre);
+						
+						// Trigger Prism.js highlighting if available
+						if (typeof Prism !== 'undefined') {
+							Prism.highlightElement(code);
+						}
 					}
 				});
 			}
 		});
+	}
+	
+	// Trigger Prism.js highlighting for all code blocks if available
+	if (typeof Prism !== 'undefined') {
+		Prism.highlightAllUnder(containerEl);
 	}
 }
 
@@ -82,6 +105,11 @@ function renderMultipleContent(dataArray, containerEl) {
 			containerEl.appendChild(contentWrapper.firstChild);
 		}
 	});
+	
+	// Trigger Prism.js highlighting for all code blocks if available
+	if (typeof Prism !== 'undefined') {
+		Prism.highlightAllUnder(containerEl);
+	}
 }
 
 // Export functions for ES modules

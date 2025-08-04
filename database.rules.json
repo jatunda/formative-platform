@@ -10,7 +10,25 @@
           ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 200"
         },
         "blocks": {
-          ".validate": "newData.exists()"
+          ".validate": "newData.exists()",
+          "$blockIndex": {
+            "type": {
+              ".validate": "newData.isString() && (newData.val() == 'question')"
+            },
+            "content": {
+              "$contentIndex": {
+                "type": {
+                  ".validate": "newData.isString() && (newData.val() == 'text' || newData.val() == 'code')"
+                },
+                "value": {
+                  ".validate": "newData.isString()"
+                },
+                "language": {
+                  ".validate": "newData.isString() && newData.val().length <= 50"
+                }
+              }
+            }
+          }
         }
       }
     },

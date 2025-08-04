@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>DSL Language Fix Test</title>
+</head>
+<body>
+    <h1>DSL Language Fix Test</h1>
+    <p>Check browser console for test results.</p>
+    
+    <script type="module">
+        import { parseDSL } from './dsl.js';
+
+        // Test both formats
+        const testDSL1 = `# Test 1
+
+\`\`\`javascript
+console.log("No space format");
+\`\`\``;
+
+        const testDSL2 = `# Test 2
+
+\`\`\` python
+print("With space format")
+\`\`\``;
+
+        console.log('Testing format 1 (no space):');
+        console.log(testDSL1);
+        const parsed1 = parseDSL(testDSL1);
+        console.log('Parsed:', JSON.stringify(parsed1, null, 2));
+        
+        console.log('\\n=================\\n');
+        
+        console.log('Testing format 2 (with space):');
+        console.log(testDSL2);
+        const parsed2 = parseDSL(testDSL2);
+        console.log('Parsed:', JSON.stringify(parsed2, null, 2));
+    </script>
+</body>
+</html>

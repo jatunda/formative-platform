@@ -44,11 +44,11 @@ button:hover {
 
 /* Global pre styling (fallback for non-lesson content) */
 pre:not(.lesson-code) {
-  background-color: #1a202c;
-  color: #e2e8f0;
+  background-color: #2b2b2b;
+  color: #cccccc;
   padding: 0.75rem;
   border-radius: 6px;
-  border: 1px solid #4a5568;
+  border: 1px solid #3d3d3d;
   overflow-x: auto;
   white-space: pre;
   font-family: monospace;
@@ -651,11 +651,11 @@ code:not(.lesson-content code) {
 }
 
 .lesson-code {
-  background-color: #1a202c;
-  color: #e2e8f0;
+  background-color: #2b2b2b !important;
+  color: #cccccc !important;
   padding: 0.75rem;
   border-radius: 6px;
-  border: 1px solid #4a5568;
+  border: 1px solid #3d3d3d !important;
   overflow-x: auto;
   white-space: pre;
   font-family: 'Fira Code', 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
@@ -663,6 +663,142 @@ code:not(.lesson-content code) {
   tab-size: 4;
   line-height: 1.4;
   margin-bottom: 12px;
+  position: relative;
+}
+
+/* Prism.js syntax highlighting overrides */
+.lesson-code code[class*="language-"] {
+  background: transparent !important;
+  color: inherit;
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  padding: 0 !important;
+  border: none !important;
+  border-radius: 0 !important;
+}
+
+.lesson-code pre[class*="language-"] {
+  background: transparent !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border-radius: 0 !important;
+  border: none !important;
+  overflow: visible !important;
+}
+
+/* Override Prism.js default theme backgrounds */
+.lesson-content .lesson-code,
+.lesson-preview .lesson-code,
+pre.lesson-code,
+pre[class*="language-"].lesson-code,
+.lesson-code pre[class*="language-"] {
+  background-color: #2b2b2b !important;
+  border: 1px solid #3d3d3d !important;
+}
+
+/* Override any Prism theme that might be setting background colors */
+code[class*="language-"],
+pre[class*="language-"] {
+  background: #2b2b2b !important;
+}
+
+/* Make sure our lesson-code takes precedence */
+.lesson-content pre.lesson-code,
+.lesson-preview pre.lesson-code {
+  background-color: #2b2b2b !important;
+  border-color: #3d3d3d !important;
+}
+
+/* Prism.js token colors for Godot dark theme */
+.lesson-code .token.comment,
+.lesson-code .token.prolog,
+.lesson-code .token.doctype,
+.lesson-code .token.cdata {
+  color: #676767;
+  font-style: italic;
+}
+
+.lesson-code .token.punctuation {
+  color: #cccccc;
+}
+
+.lesson-code .token.property,
+.lesson-code .token.tag,
+.lesson-code .token.boolean,
+.lesson-code .token.number,
+.lesson-code .token.constant,
+.lesson-code .token.symbol,
+.lesson-code .token.deleted {
+  color: #42ffc2;
+}
+
+.lesson-code .token.selector,
+.lesson-code .token.attr-name,
+.lesson-code .token.string,
+.lesson-code .token.char,
+.lesson-code .token.builtin,
+.lesson-code .token.inserted {
+  color: #ffd942;
+}
+
+.lesson-code .token.operator,
+.lesson-code .token.entity,
+.lesson-code .token.url,
+.lesson-code .language-css .token.string,
+.lesson-code .style .token.string {
+  color: #cccccc;
+}
+
+.lesson-code .token.atrule,
+.lesson-code .token.attr-value,
+.lesson-code .token.keyword {
+  color: #ff7085;
+}
+
+.lesson-code .token.function,
+.lesson-code .token.class-name {
+  color: #57b3ff;
+}
+
+.lesson-code .token.regex,
+.lesson-code .token.important,
+.lesson-code .token.variable {
+  color: #ff8142;
+}
+
+/* Additional Godot-specific tokens */
+.lesson-code .token.annotation,
+.lesson-code .token.decorator {
+  color: #ff7085;
+}
+
+.lesson-code .token.namespace {
+  color: #57b3ff;
+}
+
+.lesson-code .token.type-hint,
+.lesson-code .token.builtin-type {
+  color: #42ffc2;
+}
+
+/* Language label for code blocks */
+.lesson-code[data-language]::before {
+  content: attr(data-language);
+  position: absolute;
+  top: 4px;
+  right: 8px;
+  background-color: #3d3d3d;
+  color: #cccccc;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-family: sans-serif;
+  text-transform: uppercase;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  opacity: 0.9;
+  z-index: 1;
 }
 
 /* Inline code styling (applies to code tags within lesson-content) */
