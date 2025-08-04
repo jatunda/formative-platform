@@ -82,7 +82,8 @@ function renderContent(data) {
 			block.content.forEach(item => {
 				if (item.type === "text") {
 					const p = document.createElement("p");
-					p.textContent = item.value;
+					// Process inline code formatting with backticks
+					p.innerHTML = processInlineCode(item.value);
 					contentEl.appendChild(p);
 				}
 				if (item.type === "code") {
@@ -93,6 +94,20 @@ function renderContent(data) {
 			});
 		}
 	});
+}
+
+// Function to process inline code formatting with backticks
+function processInlineCode(text) {
+	// Escape HTML to prevent XSS, then process backticks
+	const escaped = text
+		.replace(/&/g, '&amp;')
+		.replace(/</g, '&lt;')
+		.replace(/>/g, '&gt;')
+		.replace(/"/g, '&quot;')
+		.replace(/'/g, '&#39;');
+	
+	// Replace backtick-enclosed text with <code> tags
+	return escaped.replace(/`([^`]+)`/g, '<code>$1</code>');
 }
 
 function loadPage() {

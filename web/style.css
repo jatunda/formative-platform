@@ -530,6 +530,17 @@ textarea:focus {
   border-color: #63b3ed;
 }
 
+/* Inline code styling */
+code {
+  background-color: #374151;
+  color: #90cdf4;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 0.9em;
+  border: 1px solid #4a5568;
+}
+
 /* Loading state styles */
 #loading-state {
   display: flex;
