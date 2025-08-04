@@ -144,15 +144,167 @@ document.addEventListener("keydown", (event) => {
   }
 });
 
+// Function to provide detailed error explanations
+function getErrorExplanation(error, dslText) {
+	const errorMessage = error.message || error.toString();
+	
+	// Common DSL formatting issues and their explanations
+	const explanations = {
+		'title': {
+			issue: 'Missing or invalid title',
+			solution: 'Start your content with a title line beginning with "# " (hash and space)',
+			example: '# My Lesson Title'
+		},
+		'separator': {
+			issue: 'Question separator format',
+			solution: 'Use exactly three dashes "---" on their own line to separate questions',
+			example: '---'
+		},
+		'code': {
+			issue: 'Unmatched code block markers',
+			solution: 'Each code block must start and end with exactly three backticks "```" on their own lines',
+			example: '```\nconsole.log("Hello");\n```'
+		},
+		'empty': {
+			issue: 'Empty or invalid content',
+			solution: 'Make sure you have a title and at least one question with content',
+			example: '# Title\n\nSome content here...'
+		},
+		'structure': {
+			issue: 'Invalid content structure',
+			solution: 'Content should have a title, followed by text or code blocks, separated by "---" for multiple questions',
+			example: '# Title\n\nText content\n\n```\ncode here\n```\n\n---\n\nNext question'
+		}
+	};
+	
+	// Try to detect the specific issue by analyzing the DSL content
+	let detectedIssue = null;
+	
+	if (!dslText.trim()) {
+		detectedIssue = explanations.empty;
+	} else if (!dslText.includes('# ') || errorMessage.includes('Missing title')) {
+		detectedIssue = explanations.title;
+	} else if (dslText.includes('```')) {
+		// Check for unmatched code blocks - DSL parser expects exactly "```" on its own line
+		const lines = dslText.split('\n');
+		const codeBlockMarkers = lines.filter(line => line.trim() === '```');
+		const invalidCodeMarkers = lines.filter(line => 
+			line.trim().startsWith('```') && line.trim() !== '```'
+		);
+		
+		if (codeBlockMarkers.length % 2 !== 0) {
+			detectedIssue = explanations.code;
+		} else if (invalidCodeMarkers.length > 0) {
+			// Special case: code blocks with content on the same line
+			detectedIssue = {
+				issue: 'Invalid code block format',
+				solution: 'Code block markers must be exactly "```" on their own line, with no other content',
+				example: 'Correct:\n```\nconsole.log("Hello");\n```\n\nIncorrect:\n```javascript\nconsole.log("Hello");\n```'
+			};
+		}
+	} else if (dslText.includes('---')) {
+		// Check for separator issues (like spaces around dashes)
+		const lines = dslText.split('\n');
+		const invalidSeparators = lines.filter(line => 
+			line.trim().includes('-') && 
+			line.trim() !== '---' && 
+			line.trim().match(/^-+$/)
+		);
+		if (invalidSeparators.length > 0) {
+			detectedIssue = explanations.separator;
+		}
+	} else if (errorMessage.includes('empty') || errorMessage.includes('No content')) {
+		detectedIssue = explanations.structure;
+	}
+	
+	// If no specific issue detected but there's still an error, use general structure advice
+	if (!detectedIssue) {
+		detectedIssue = explanations.structure;
+	}
+	
+	// Build the error display
+	let errorHtml = `
+		<div class="error-container">
+			<h3 class="error-title">⚠️ Parsing Error</h3>
+			<p class="error-message"><strong>Error:</strong> ${errorMessage}</p>
+			<div class="error-explanation">
+				<p><strong>Likely Issue:</strong> ${detectedIssue.issue}</p>
+				<p><strong>Solution:</strong> ${detectedIssue.solution}</p>
+				<div class="error-example">
+					<strong>Example:</strong>
+					<pre><code>${detectedIssue.example}</code></pre>
+				</div>
+			</div>
+			<div class="error-help">
+				<p><strong>DSL Format Reminder:</strong></p>
+				<ul>
+					<li>Start with a title: <code># Your Title</code></li>
+					<li>Write content as regular text</li>
+					<li>Use inline code: <code>\`code\`</code></li>
+					<li>Use code blocks: <code>\`\`\`</code> on separate lines</li>
+					<li>Separate questions with: <code>---</code> on its own line</li>
+				</ul>
+			</div>
+		</div>
+	`;
+	
+	return errorHtml;
+}
 
 function updatePreview() {
 	const dslText = dslInput.value;
+	
+	// Debug logging
+	console.log('updatePreview called with text:', dslText);
+	
 	try {
 		const parsed = parseDSL(dslText);
-		// Use the shared content renderer instead of showing JSON
-		renderContent(parsed, preview);
+		console.log('Parsed result:', parsed);
+		
+		// Check if the parsed result is valid and complete
+		if (!parsed || typeof parsed !== 'object') {
+			throw new Error('Parser returned invalid data');
+		}
+		
+		// Check for common issues even if parsing didn't throw an error
+		let validationError = null;
+		
+		if (!dslText.trim()) {
+			validationError = 'Content is empty';
+		} else if (!parsed.title || parsed.title.trim() === '') {
+			validationError = 'Missing title - content should start with "# Title"';
+		} else if (!parsed.blocks || parsed.blocks.length === 0) {
+			validationError = 'No content blocks found - add some text or questions after the title';
+		} else {
+			// Check for unmatched code blocks specifically
+			const lines = dslText.split('\n');
+			const codeBlockMarkers = lines.filter(line => line.trim() === '```');
+			if (codeBlockMarkers.length % 2 !== 0) {
+				validationError = 'Unmatched code block - every ``` opening must have a closing ```';
+			} else {
+				// Check if blocks have content
+				const hasContent = parsed.blocks.some(block => 
+					block.content && block.content.length > 0
+				);
+				if (!hasContent) {
+					validationError = 'Content blocks are empty - add text or code to your questions';
+				}
+			}
+		}
+		
+		if (validationError) {
+			console.log('Validation error detected:', validationError);
+			// Create a fake error object for consistent error display
+			const fakeError = new Error(validationError);
+			preview.innerHTML = getErrorExplanation(fakeError, dslText);
+		} else {
+			console.log('Content is valid, rendering...');
+			// Use the shared content renderer for valid content
+			renderContent(parsed, preview);
+		}
 	} catch (err) {
-		preview.innerHTML = `<p style="color: red;">Error parsing DSL: ${err.message}</p>`;
+		console.log('Caught error:', err);
+		preview.innerHTML = getErrorExplanation(err, dslText);
 	}
 }
 
