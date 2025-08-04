@@ -1,6 +1,50 @@
 {
   "rules": {
-    ".read": false,
-    ".write": false
+    "content": {
+      "$contentId": {
+        ".read": true,
+        ".write": true,
+        ".validate": "newData.hasChildren(['title']) && newData.child('title').isString()",
+        
+        "title": {
+          ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 200"
+        },
+        "blocks": {
+          ".validate": "newData.exists()"
+        }
+      }
+    },
+    
+    "schedule": {
+      "$classId": {
+        "$dayIndex": {
+          ".read": true,
+          ".write": true,
+          "$dayIndex": {
+            ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 6"
+          }
+        }
+      }
+    },
+    
+    "classes": {
+      "$classId": {
+        ".read": true,
+        ".write": true,
+        
+        "dateOffset": {
+          ".validate": "newData.isNumber()"
+        },
+        
+        "name": {
+          ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 100"
+        }
+      }
+    },
+    
+    "$other": {
+      ".read": false,
+      ".write": false
+    }
   }
 }
