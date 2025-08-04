@@ -8,8 +8,7 @@ import {
   getDatabase,
   ref,
   get,
-  set,
-  update
+  set
 } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js";
 import { 
   initializeDateUtils, 
@@ -523,24 +522,28 @@ async function renderScheduleTable(schedule) {
     const scheduleSnap = await get(ref(db, `schedule/${classId}`));
     const scheduleData = scheduleSnap.exists() ? scheduleSnap.val() : {};
     
-    // Prepare batch update object
-    const updates = {};
-    
     // Shift all days >= index up by 1 in memory
     const dayIndices = Object.keys(scheduleData).map(Number).sort((a, b) => b - a); // Sort descending for shifting
+    
+    // Build array of all updates needed
+    const writeOperations = [];
     
     for (const dayIdx of dayIndices) {
       if (dayIdx >= index) {
         // Move this day's data to the next index
-        updates[`schedule/${classId}/${dayIdx + 1}`] = scheduleData[dayIdx];
+        writeOperations.push(
+          set(ref(db, `schedule/${classId}/${dayIdx + 1}`), scheduleData[dayIdx])
+        );
       }
     }
     
     // Set the new day to empty
-    updates[`schedule/${classId}/${index}`] = [];
+    writeOperations.push(
+      set(ref(db, `schedule/${classId}/${index}`), [])
+    );
     
-    // Perform all updates in a single batch
-    await update(ref(db), updates);
+    // Perform all updates
+    await Promise.all(writeOperations);
     loadFullSchedule();
   }
 
@@ -557,26 +560,30 @@ async function renderScheduleTable(schedule) {
     const scheduleSnap = await get(ref(db, `schedule/${classId}`));
     const scheduleData = scheduleSnap.exists() ? scheduleSnap.val() : {};
     
-    // Prepare batch update object
-    const updates = {};
-    
     // Get all day indices and find max
     const dayIndices = Object.keys(scheduleData).map(Number).sort((a, b) => a - b);
     const maxDayIndex = dayIndices.length > 0 ? Math.max(...dayIndices) : 0;
+    
+    // Build array of all updates needed
+    const writeOperations = [];
     
     // Shift all days > index down by 1 in memory
     for (const dayIdx of dayIndices) {
       if (dayIdx > index) {
         // Move this day's data to the previous index
-        updates[`schedule/${classId}/${dayIdx - 1}`] = scheduleData[dayIdx];
+        writeOperations.push(
+          set(ref(db, `schedule/${classId}/${dayIdx - 1}`), scheduleData[dayIdx])
+        );
       }
     }
     
     // Remove the last day (set to null to delete it)
-    updates[`schedule/${classId}/${maxDayIndex}`] = null;
+    writeOperations.push(
+      set(ref(db, `schedule/${classId}/${maxDayIndex}`), null)
+    );
     
-    // Perform all updates in a single batch
-    await update(ref(db), updates);
+    // Perform all updates
+    await Promise.all(writeOperations);
     loadFullSchedule();
   }
 
@@ -662,12 +669,11 @@ async function renderScheduleTable(schedule) {
       fromLessons.splice(fromLessonIndex, 1);
       toLessons.push(lessonHash);
       
-      // Write both changes in a single batch
-      const updates = {};
-      updates[`schedule/${classId}/${fromDayIndex}`] = fromLessons;
-      updates[`schedule/${classId}/${toDayIndex}`] = toLessons;
-      
-      await update(ref(db), updates);
+      // Write both changes as individual operations
+      await Promise.all([
+        set(ref(db, `schedule/${classId}/${fromDayIndex}`), fromLessons),
+        set(ref(db, `schedule/${classId}/${toDayIndex}`), toLessons)
+      ]);
       loadFullSchedule();
     });
 
@@ -766,12 +772,11 @@ async function addLessonToDay(dayIndex) {
   const lessons = snap.exists() ? snap.val() : [];
   lessons.push(hash);
 
-  // 3. Batch create lesson content and update schedule
-  const updates = {};
-  updates[`content/${hash}`] = { title: DEFAULT_LESSON_TITLE };
-  updates[`schedule/${classId}/${dayIndex}`] = lessons;
-  
-  await update(ref(db), updates);
+  // 3. Create lesson content and update schedule as separate operations
+  await Promise.all([
+    set(ref(db, `content/${hash}`), { title: DEFAULT_LESSON_TITLE }),
+    set(ref(db, `schedule/${classId}/${dayIndex}`), lessons)
+  ]);
 
   // 4. Reload the table to show the new lesson
   loadFullSchedule();

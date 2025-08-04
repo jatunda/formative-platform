@@ -1,68 +1,37 @@
 {
   "rules": {
-    "content": {
-      "$contentId": {
-        ".read": true,
-        ".write": true,
-        ".validate": "newData.hasChildren(['title']) && newData.child('title').isString()",
-        
-        "title": {
-          ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 200"
+    ".read": true,
+    
+    "classes": {
+      ".write": true,
+      "$classId": {
+        ".validate": "newData.hasChildren(['name'])",
+        "name": {
+          ".validate": "newData.isString() && newData.val().length > 0"
         },
-        "blocks": {
-          ".validate": "newData.exists()",
-          "$blockIndex": {
-            "type": {
-              ".validate": "newData.isString() && (newData.val() == 'question')"
-            },
-            "content": {
-              "$contentIndex": {
-                "type": {
-                  ".validate": "newData.isString() && (newData.val() == 'text' || newData.val() == 'code')"
-                },
-                "value": {
-                  ".validate": "newData.isString()"
-                },
-                "language": {
-                  ".validate": "newData.isString() && newData.val().length <= 50"
-                }
-              }
-            }
-          }
+        "startDate": {
+          ".validate": "!newData.exists() || (newData.isString() && newData.val().matches(/^\\d{4}-\\d{2}-\\d{2}$/))"
+        },
+        "displayOrder": {
+          ".validate": "!newData.exists() || newData.isNumber()"
+        },
+        "dateOffset": {
+          ".validate": "!newData.exists() || newData.isNumber()"
         }
       }
     },
     
     "schedule": {
+      ".write": true,
       "$classId": {
         "$dayIndex": {
-          ".read": true,
-          ".write": true,
-          "$dayIndex": {
-            ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 6"
-          }
+          ".validate": "!newData.exists() || newData.val() === null || newData.hasChildren()"
         }
       }
     },
     
-    "classes": {
-      "$classId": {
-        ".read": true,
-        ".write": true,
-        
-        "dateOffset": {
-          ".validate": "newData.isNumber()"
-        },
-        
-        "name": {
-          ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 100"
-        }
-      }
-    },
-    
-    "$other": {
-      ".read": false,
-      ".write": false
+    "content": {
+      ".write": true
     }
   }
 }

@@ -303,12 +303,8 @@ function getErrorExplanation(error, dslText) {
 function updatePreview() {
 	const dslText = dslInput.value;
 	
-	// Debug logging
-	console.log('updatePreview called with text:', dslText);
-	
 	try {
 		const parsed = parseDSL(dslText);
-		console.log('Parsed result:', parsed);
 		
 		// Check if the parsed result is valid and complete
 		if (!parsed || typeof parsed !== 'object') {
@@ -344,17 +340,14 @@ function updatePreview() {
 		}
 		
 		if (validationError) {
-			console.log('Validation error detected:', validationError);
 			// Create a fake error object for consistent error display
 			const fakeError = new Error(validationError);
 			preview.innerHTML = getErrorExplanation(fakeError, dslText);
 		} else {
-			console.log('Content is valid, rendering...');
 			// Use the shared content renderer for valid content
 			renderContent(parsed, preview);
 		}
 	} catch (err) {
-		console.log('Caught error:', err);
 		preview.innerHTML = getErrorExplanation(err, dslText);
 	}
 }

@@ -45,7 +45,11 @@ export function parseDSL(dslText) {
       if (inCode) {
         // End code block (language specification on closing ``` is ignored/invalid)
         if (currentBlock && inQuestion) {
-          currentBlock.content.push({ type: "code", value: codeBuffer.join("\n"), language: currentCodeLanguage });
+          const codeBlock = { type: "code", value: codeBuffer.join("\n") };
+          if (currentCodeLanguage !== undefined && currentCodeLanguage !== "") {
+            codeBlock.language = currentCodeLanguage;
+          }
+          currentBlock.content.push(codeBlock);
         }
         inCode = false;
         codeBuffer = [];
@@ -102,8 +106,6 @@ export function generateDSLFromContent(content) {
   if (content.title) {
     lines.push(`# ${content.title}`, "");
   }
-
-  console.log(content.blocks)
 
   for (let i = 0; i < (content.blocks || []).length; i++) {
     const block = content.blocks[i];

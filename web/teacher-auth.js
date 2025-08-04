@@ -22,7 +22,7 @@ class TeacherAuth {
       .join('');
   }
 
-  // Check if current session is valid
+  // Check if current session is valid (without extending)
   isSessionValid() {
     const sessionTime = localStorage.getItem(this.timeoutKey);
     if (!sessionTime) return false;
@@ -35,14 +35,25 @@ class TeacherAuth {
       return false;
     }
     
-    // Extend session on activity
-    this.extendSession();
     return localStorage.getItem(this.sessionKey) === 'authenticated';
   }
 
   // Extend session timeout
   extendSession() {
-    const newTimeout = Date.now() + this.sessionDuration;
+    const currentTime = Date.now();
+    const existingTimeout = localStorage.getItem(this.timeoutKey);
+    
+    if (existingTimeout) {
+      const lastUpdateTime = parseInt(existingTimeout) - this.sessionDuration;
+      const timeSinceLastUpdate = currentTime - lastUpdateTime;
+      
+      // Only update if it's been at least 1 minute (60000ms) since last update
+      if (timeSinceLastUpdate < 60000) {
+        return; // Skip update if less than 1 minute has passed
+      }
+    }
+    
+    const newTimeout = currentTime + this.sessionDuration;
     localStorage.setItem(this.timeoutKey, newTimeout.toString());
   }
 
@@ -236,7 +247,7 @@ class TeacherAuth {
 
     // Check session validity every minute
     setInterval(() => {
-      if (!this.isSessionValid() && window.location.pathname.includes('teacher') || window.location.pathname.includes('editor')) {
+      if (!this.isSessionValid() && (window.location.pathname.includes('teacher') || window.location.pathname.includes('editor'))) {
         alert('Session expired. Please log in again.');
         window.location.href = 'index.html';
       }

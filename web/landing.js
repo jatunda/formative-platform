@@ -3,27 +3,58 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.4.0/firebas
 import { getDatabase, ref, get, child } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js";
 import { initializeDateUtils, getTodayDayIndex } from './date-utils.js';
 
+console.log("Landing.js loaded - initializing Firebase...");
+
+// Test with a more permissive configuration
 const app = initializeApp({
   databaseURL: "https://formative-platform-default-rtdb.firebaseio.com/",
 });
 const db = getDatabase(app);
 
+console.log("Firebase initialized, database:", db);
+console.log("Database URL:", app.options.databaseURL);
+
 // Initialize date utilities with database
 initializeDateUtils(db);
 
 async function getAvailableClasses() {
-  // OPTIMIZATION: Fetch classes and calculate today's day indices first
-  const classesSnap = await get(ref(db, "classes"));
-  const classes = classesSnap.val() || {};
+  try {
+    // Check if database is properly initialized
+    if (!db) {
+      throw new Error("Database not initialized");
+    }
+    
+    // OPTIMIZATION: Fetch classes and calculate today's day indices first
+    console.log("Fetching classes from database...");
+    const classesSnap = await get(ref(db, "classes"));
+    
+    if (!classesSnap.exists()) {
+      console.warn("Classes node does not exist in database");
+      return [];
+    }
+    
+    const classes = classesSnap.val() || {};
+    console.log("Classes data:", classes);
 
-  const classEntries = Object.entries(classes)
-    .sort(([, a], [, b]) => a.displayOrder - b.displayOrder);
+    if (Object.keys(classes).length === 0) {
+      console.warn("No classes found in database");
+      return [];
+    }
 
-  // Calculate today's day index for each class in parallel
-  const dayIndexPromises = classEntries.map(async ([classId]) => {
-    const todayDayIndex = await getTodayDayIndex(classId);
-    return { classId, todayDayIndex };
-  });
+    const classEntries = Object.entries(classes)
+      .sort(([, a], [, b]) => (a.displayOrder || 0) - (b.displayOrder || 0));
+
+    // Calculate today's day index for each class in parallel
+    console.log("Calculating day indices for", classEntries.length, "classes");
+    const dayIndexPromises = classEntries.map(async ([classId]) => {
+      try {
+        const todayDayIndex = await getTodayDayIndex(classId);
+        return { classId, todayDayIndex };
+      } catch (error) {
+        console.error(`Error getting day index for class ${classId}:`, error);
+        return { classId, todayDayIndex: 0 };
+      }
+    });
 
   const dayIndexResults = await Promise.all(dayIndexPromises);
 
@@ -72,6 +103,10 @@ async function getAvailableClasses() {
       container.appendChild(item);
     }
   });
+  } catch (error) {
+    console.error("Error in getAvailableClasses:", error);
+    throw error; // Re-throw to be handled by loadWithErrorHandling
+  }
 }
 
 async function loadWithErrorHandling() {

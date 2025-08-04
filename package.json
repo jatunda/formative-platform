@@ -1,5 +1,17 @@
 {
+  "name": "formative-platform",
+  "version": "1.0.0",
+  "description": "Educational platform for lesson content and scheduling",
+  "scripts": {
+    "build": "node build.js",
+    "clean": "rimraf dist",
+    "deploy": "npm run build && firebase deploy"
+  },
   "dependencies": {
     "firebase-admin": "^13.4.0"
+  },
+  "devDependencies": {
+    "fs-extra": "^11.1.1",
+    "rimraf": "^5.0.5"
   }
 }
