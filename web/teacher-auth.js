@@ -58,14 +58,130 @@ class TeacherAuth {
     localStorage.removeItem(this.timeoutKey);
   }
 
+  // Create a secure password input modal
+  createPasswordModal() {
+    return new Promise((resolve) => {
+      // Create modal overlay
+      const overlay = document.createElement('div');
+      overlay.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: rgba(0, 0, 0, 0.7);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10000;
+        font-family: sans-serif;
+      `;
+
+      // Create modal box
+      const modal = document.createElement('div');
+      modal.style.cssText = `
+        background: #2d3748;
+        color: #e2e8f0;
+        padding: 30px;
+        border-radius: 12px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        min-width: 320px;
+        max-width: 400px;
+        border: 1px solid #4a5568;
+      `;
+
+      modal.innerHTML = `
+        <h2 style="margin: 0 0 20px 0; color: #63b3ed; font-size: 1.3em;">Teacher Authentication</h2>
+        <p style="margin: 0 0 15px 0; color: #a0aec0;">Enter your teacher password to access this page:</p>
+        <input type="password" id="teacherPasswordInput" placeholder="Password" style="
+          width: 100%;
+          padding: 12px;
+          border: 1px solid #4a5568;
+          border-radius: 8px;
+          background-color: #374151;
+          color: #e2e8f0;
+          font-size: 16px;
+          box-sizing: border-box;
+          margin-bottom: 20px;
+        ">
+        <div style="display: flex; gap: 10px; justify-content: flex-end;">
+          <button id="cancelBtn" style="
+            padding: 10px 20px;
+            border: 1px solid #4a5568;
+            border-radius: 8px;
+            background-color: #374151;
+            color: #e2e8f0;
+            cursor: pointer;
+            font-size: 16px;
+          ">Cancel</button>
+          <button id="loginBtn" style="
+            padding: 10px 20px;
+            border: 1px solid #63b3ed;
+            border-radius: 8px;
+            background-color: #63b3ed;
+            color: #1a202c;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+          ">Login</button>
+        </div>
+      `;
+
+      overlay.appendChild(modal);
+      document.body.appendChild(overlay);
+
+      const passwordInput = modal.querySelector('#teacherPasswordInput');
+      const loginBtn = modal.querySelector('#loginBtn');
+      const cancelBtn = modal.querySelector('#cancelBtn');
+
+      // Focus the password input
+      setTimeout(() => passwordInput.focus(), 100);
+
+      // Handle login
+      const handleLogin = () => {
+        const password = passwordInput.value;
+        document.body.removeChild(overlay);
+        resolve(password || null);
+      };
+
+      // Handle cancel
+      const handleCancel = () => {
+        document.body.removeChild(overlay);
+        resolve(null);
+      };
+
+      // Event listeners
+      loginBtn.addEventListener('click', handleLogin);
+      cancelBtn.addEventListener('click', handleCancel);
+      
+      // Enter key submits, Escape cancels
+      passwordInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          handleLogin();
+        } else if (e.key === 'Escape') {
+          e.preventDefault();
+          handleCancel();
+        }
+      });
+
+      // Click outside to cancel
+      overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) {
+          handleCancel();
+        }
+      });
+    });
+  }
+
   // Prompt for password and authenticate
   async authenticate() {
     if (this.isSessionValid()) {
       return true;
     }
 
-    // Show password prompt
-    const password = prompt('Enter teacher password:');
+    // Show secure password modal
+    const password = await this.createPasswordModal();
     if (!password) {
       return false;
     }
