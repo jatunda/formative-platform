@@ -1,9 +1,7 @@
-@title CSA - Intro to Java
+# CSA - Intro to Java
 
-@beginq
-@text What is a compiler?
-@endq
+---
+What is a compiler?
 
-@beginq
-@text What does `public static void main` do?
-@endq
+---
+What does `public static void main` do?

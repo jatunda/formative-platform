@@ -6,11 +6,11 @@ A web app for students to see daily formative assignments.
 
 ## DSL Design
 
-- `@title`: lesson title
-- `@beginq` and `@endq`: marks the start/end of a question block
-- `@code`: start of code block (terminated by `@endcode`)
+- `# Title`: lesson title (starts with # and space)
+- `---`: question separator (three dashes mark question boundaries)
+- `\`\`\``: code block markers (three backticks to start/end code blocks)
 - `\`inline code\``: Wrap inline code in backticks
-- `@text`: optional static text block (paragraph, note, etc.)
+- Raw text: Any line of text becomes content (no special prefix needed)
 
 ## SOPs
 

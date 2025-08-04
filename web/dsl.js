@@ -10,60 +10,77 @@ export function parseDSL(dslText) {
   let inCode = false;
   let codeBuffer = [];
   let inQuestion = false;
+  let hasEncounteredSeparator = false;
 
   for (let raw of lines) {
     const line = raw.trim();
     if (line === "" && !inCode) continue; // Allow empty lines in code blocks
 
-    if (line.startsWith("@title")) {
-      result.title = line.replace("@title", "").trim();
+    // Title line starts with #
+    if (line.startsWith("# ")) {
+      result.title = line.replace("# ", "").trim();
     }
 
-    // Start of question block
-    else if (line === "@beginq") {
-      if (inQuestion) throw new Error("Nested @beginq found");
+    // Question separator (---)
+    else if (line === "---") {
+      hasEncounteredSeparator = true;
+      if (inQuestion && currentBlock) {
+        // End current question and push it
+        result.blocks.push(currentBlock);
+      }
+      // Always start a new question after ---
       inQuestion = true;
       currentBlock = { type: "question", content: [] };
     }
 
-    // End of question block
-    else if (line === "@endq") {
-      if (!inQuestion || !currentBlock) throw new Error("Unexpected @endq");
-      result.blocks.push(currentBlock);
-      currentBlock = null;
-      inQuestion = false;
+    // Code block toggle (```)
+    else if (line === "```") {
+      // If we haven't started a question yet and no separator encountered, start one
+      if (!inQuestion && !hasEncounteredSeparator) {
+        inQuestion = true;
+        currentBlock = { type: "question", content: [] };
+      }
+      
+      if (inCode) {
+        // End code block
+        if (currentBlock && inQuestion) {
+          currentBlock.content.push({ type: "code", value: codeBuffer.join("\n") });
+        }
+        inCode = false;
+        codeBuffer = [];
+      } else {
+        // Start code block
+        inCode = true;
+        codeBuffer = [];
+      }
     }
 
-    // Code block toggles
-    else if (line === "@code") {
-      if (!inQuestion || !currentBlock) throw new Error("Code must be inside a question");
-      if (inCode) throw new Error("Nested @code block");
-      inCode = true;
-      codeBuffer = [];
-    }
-
-    else if (line === "@endcode") {
-      if (!inCode) throw new Error("Unexpected @endcode");
-      currentBlock.content.push({ type: "code", value: codeBuffer.join("\n") });
-      inCode = false;
-    }
-
-    // Text lines
-    else if (line.startsWith("@text")) {
-      if (!inQuestion || !currentBlock) throw new Error("@text must be inside a question");
-      const value = line.replace("@text", "").trim();
-      currentBlock.content.push({ type: "text", value });
-    }
-
-    // Code lines
+    // Collect code lines
     else if (inCode) {
       // Use raw line to preserve indentation in code blocks
       codeBuffer.push(raw);
     }
 
-    else {
-      throw new Error("Unexpected line: " + line);
+    // Regular text lines
+    else if (line.length > 0) {
+      // If we haven't started a question yet and no separator encountered, start one
+      if (!inQuestion && !hasEncounteredSeparator) {
+        inQuestion = true;
+        currentBlock = { type: "question", content: [] };
+      }
+      
+      // Add text to current question if we're in one
+      if (inQuestion && currentBlock) {
+        currentBlock.content.push({ type: "text", value: line });
+      }
     }
+
+    // Ignore lines outside questions (except title and separators)
+  }
+
+  // Close any remaining question block
+  if (inQuestion && currentBlock) {
+    result.blocks.push(currentBlock);
   }
 
   return result;
@@ -73,22 +90,29 @@ export function generateDSLFromContent(content) {
   const lines = [];
 
   if (content.title) {
-    lines.push(`@title ${content.title}`, "");
+    lines.push(`# ${content.title}`, "");
   }
 
   console.log(content.blocks)
 
-  for (const block of content.blocks || []) {
+  for (let i = 0; i < (content.blocks || []).length; i++) {
+    const block = content.blocks[i];
     if (block.type === "question") {
-      lines.push("@beginq");
+      // Only add separator if this is NOT the first question
+      if (i > 0) {
+        lines.push("---");
+      }
+      
       for (const item of block.content) {
         if (item.type === "text") {
-          lines.push(`@text ${item.value}`);
+          lines.push(item.value);
         } else if (item.type === "code") {
-          lines.push("@code", ...item.value.split("\n"), "@endcode");
+          lines.push("```");
+          lines.push(item.value);
+          lines.push("```");
         }
       }
-      lines.push("@endq", "");
+      lines.push(""); // Add blank line after each question
     }
   }
 

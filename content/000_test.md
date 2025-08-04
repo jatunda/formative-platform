@@ -1,16 +1,14 @@
-@title Recursion Practice
+# Recursion Practice
 
-@beginq
-@text What is a base case?
-@text Hint: You can often find it by looking at the `if` condition.
-@endq
+---
+What is a base case?
+Hint: You can often find it by looking at the `if` condition.
 
-@beginq
-@text What does this function return?
+---
+What does this function return?
 
-@code
+```
 def add(n):
     if n == 0: return 0
     return n + add(n-1)
-@endcode
-@endq
+```

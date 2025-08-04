@@ -16,47 +16,49 @@ function parseDSL(filePath) {
   let inCode = false;
   let codeBuffer = [];
   let inQuestion = false;
+  let hasEncounteredSeparator = false;
 
   for (let raw of lines) {
     const line = raw.trim();
     if (line === "" && !inCode) continue; // Allow empty lines in code blocks
 
-    if (line.startsWith("@title")) {
-      result.title = line.replace("@title", "").trim();
+    // Title line starts with #
+    if (line.startsWith("# ")) {
+      result.title = line.replace("# ", "").trim();
     }
 
-    // Start of question block
-    else if (line === "@beginq") {
+    // Question separator (---)
+    else if (line === "---") {
+      hasEncounteredSeparator = true;
+      if (inQuestion && currentBlock) {
+        // End current question and push it
+        result.blocks.push(currentBlock);
+      }
+      // Always start a new question after ---
       inQuestion = true;
       currentBlock = { type: "question", content: [] };
     }
 
-    // End of question block
-    else if (line === "@endq") {
-      result.blocks.push(currentBlock);
-      currentBlock = null;
-      inQuestion = false;
-    }
-
-    // Start/End of code
-    else if (line === "@code") {
-      inCode = true;
-      codeBuffer = [];
-    } else if (line === "@endcode") {
-      if (!inCode) throw new Error("Unexpected @endcode");
-      currentBlock.content.push({ type: "code", value: codeBuffer.join("\n") });
-      inCode = false;
-    }
-
-    // Text or reuse inside questions
-    else if (line.startsWith("@text")) {
-      const value = line.replace("@text", "").trim();
-      currentBlock.content.push({ type: "text", value });
-    }
-
-    // While in a snippet, treat lines as text
-    else if (currentBlock?.type === "snippet") {
-      result.snippets[currentBlock.id] += line + " ";
+    // Code block toggle (```)
+    else if (line === "```") {
+      // If we haven't started a question yet and no separator encountered, start one
+      if (!inQuestion && !hasEncounteredSeparator) {
+        inQuestion = true;
+        currentBlock = { type: "question", content: [] };
+      }
+      
+      if (inCode) {
+        // End code block
+        if (currentBlock && inQuestion) {
+          currentBlock.content.push({ type: "code", value: codeBuffer.join("\n") });
+        }
+        inCode = false;
+        codeBuffer = [];
+      } else {
+        // Start code block
+        inCode = true;
+        codeBuffer = [];
+      }
     }
 
     // Collect code lines
@@ -65,12 +67,31 @@ function parseDSL(filePath) {
       codeBuffer.push(raw);
     }
 
-    else {
-      throw new Error("Unexpected line outside any block: " + line);
+    // Regular text lines
+    else if (line.length > 0) {
+      // If we haven't started a question yet and no separator encountered, start one
+      if (!inQuestion && !hasEncounteredSeparator) {
+        inQuestion = true;
+        currentBlock = { type: "question", content: [] };
+      }
+      
+      // Add text to current question if we're in one
+      if (inQuestion && currentBlock) {
+        currentBlock.content.push({ type: "text", value: line });
+      }
     }
+
+    // Ignore lines outside questions (except title and separators)
+  }
+
+  // Close any remaining question block
+  if (inQuestion && currentBlock) {
+    result.blocks.push(currentBlock);
   }
 
   return result;
 }
+
+module.exports = parseDSL;
 
 module.exports = parseDSL;
