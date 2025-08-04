@@ -12,32 +12,47 @@ const db = getDatabase(app);
 initializeDateUtils(db);
 
 async function getAvailableClasses() {
-  // OPTIMIZATION: Only fetch class names and displayOrder, not full class data
+  // OPTIMIZATION: Fetch classes and calculate today's day indices first
   const classesSnap = await get(ref(db, "classes"));
   const classes = classesSnap.val() || {};
 
-  // Prepare promises to fetch today's schedule for each class (with proper offset calculation)
   const classEntries = Object.entries(classes)
     .sort(([, a], [, b]) => a.displayOrder - b.displayOrder);
 
-  const schedulePromises = classEntries.map(async ([classId]) => {
-    // Calculate today's day index for this specific class (accounting for its offset)
+  // Calculate today's day index for each class in parallel
+  const dayIndexPromises = classEntries.map(async ([classId]) => {
     const todayDayIndex = await getTodayDayIndex(classId);
-    console.log(`Class ${classId} - Today's day index: ${todayDayIndex}`);
-    
-    // OPTIMIZATION: Only fetch today's schedule, not full schedule
-    const snap = await get(ref(db, `schedule/${classId}/${todayDayIndex}`));
-    return {
-      classId,
-      dayIndex: todayDayIndex,
-      schedule: snap.val() || []
-    };
+    return { classId, todayDayIndex };
   });
 
-  const schedules = await Promise.all(schedulePromises);
+  const dayIndexResults = await Promise.all(dayIndexPromises);
+
+  // Build paths for batch fetch of all today's schedules
+  const schedulePaths = dayIndexResults.map(({ classId, todayDayIndex }) => 
+    `schedule/${classId}/${todayDayIndex}`
+  );
+
+  // OPTIMIZATION: Batch fetch all schedules at once
+  const schedulePromises = schedulePaths.map(path => get(ref(db, path)));
+  const scheduleSnaps = await Promise.all(schedulePromises);
+
+  // Combine results
+  const schedules = dayIndexResults.map(({ classId, todayDayIndex }, index) => ({
+    classId,
+    dayIndex: todayDayIndex,
+    schedule: scheduleSnaps[index].val() || []
+  }));
 
   const container = document.getElementById("class-list");
-  container.innerHTML = ""; // Clear previous content
+  
+  // Hide loading state
+  const loadingState = document.getElementById("loading-state");
+  if (loadingState) {
+    loadingState.style.display = "none";
+  }
+  
+  // Clear any existing content and add the actual class list
+  container.innerHTML = "";
 
   schedules.forEach(({ classId, dayIndex, schedule }) => {
     const classData = classes[classId];
@@ -59,4 +74,30 @@ async function getAvailableClasses() {
   });
 }
 
-getAvailableClasses();
+async function loadWithErrorHandling() {
+  try {
+    await getAvailableClasses();
+  } catch (error) {
+    console.error("Error loading classes:", error);
+    
+    // Show error state
+    const container = document.getElementById("class-list");
+    const loadingState = document.getElementById("loading-state");
+    
+    if (loadingState) {
+      loadingState.style.display = "none";
+    }
+    
+    container.innerHTML = `
+      <div style="text-align: center; padding: 2rem; color: #e53e3e;">
+        <h3>Unable to load lessons</h3>
+        <p style="color: #a0aec0; margin-bottom: 1rem;">There was a problem connecting to the server.</p>
+        <button onclick="location.reload()" style="width: auto; padding: 0.5rem 1rem;">
+          Try Again
+        </button>
+      </div>
+    `;
+  }
+}
+
+loadWithErrorHandling();
