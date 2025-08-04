@@ -93,7 +93,7 @@ export function showLessonSearchPopup({ onSelect }) {
         
         for (const item of items) {
           const btn = document.createElement("button");
-          btn.textContent = `${item.title} (${item.id})`;
+          btn.textContent = item.title;
           btn.className = "lesson-popup-result-btn";
           btn.onclick = async () => {
             document.body.removeChild(popup);

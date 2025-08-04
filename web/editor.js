@@ -5,7 +5,8 @@ import {
 	getDatabase,
 	ref,
 	get,
-	set
+	set,
+	remove
 } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js";
 import {
 	child
@@ -31,8 +32,9 @@ initializeLessonSearch(db);
 const contentIdEl = document.getElementById("contentId");
 const dslInput = document.getElementById("dslInput");
 const parsedOutput = document.getElementById("parsedOutput");
-const loadBtn = document.getElementById("loadBtn");
 const saveBtn = document.getElementById("saveBtn");
+const duplicateBtn = document.getElementById("duplicateBtn");
+const deleteBtn = document.getElementById("deleteBtn");
 const searchLessonBtn = document.getElementById("searchLessonBtn");
 
 // Content ID is now a div, no need for readOnly property
@@ -53,16 +55,12 @@ function updatePreview() {
 	parsedOutput.textContent = JSON.stringify(parsed, null, 2);
 }
 
-loadBtn.onclick = async () => {
-  const id = contentIdEl.textContent.trim();
-  if (!id || id === "(No content selected)") return alert("No content ID available.");
-  loadContent(id);
-};
-
 // Function to enable/disable the DSL input and save button
 function setEditingEnabled(enabled) {
   dslInput.disabled = !enabled;
   saveBtn.disabled = !enabled;
+  duplicateBtn.disabled = !enabled;
+  deleteBtn.disabled = !enabled;
   if (!enabled) {
     dslInput.placeholder = "Select a file from the dropdown or use a URL parameter to edit content";
   } else {
@@ -103,7 +101,119 @@ saveBtn.onclick = async () => {
 	alert("Saved to Firebase!");
 };
 
+duplicateBtn.onclick = async () => {
+	const currentId = contentIdEl.textContent.trim();
+	if (!currentId || currentId === "(No content selected)") return alert("No content ID available.");
+
+	// Check if current content is valid
+	let parsed;
+	try {
+		parsed = parseDSL(dslInput.value);
+		if (!parsed.title || !parsed.blocks) {
+			alert("Cannot duplicate: Current content is malformed or empty.");
+			return;
+		}
+	} catch (err) {
+		alert("Cannot duplicate: Failed to parse current content.");
+		return;
+	}
+
+	try {
+		// Generate a new unique hash
+		const newHash = await generateUniqueHash();
+		
+		// Create a copy with modified title to indicate it's a duplicate
+		const duplicatedContent = { ...parsed };
+		duplicatedContent.title = `${parsed.title} (Copy)`;
+		
+		// Save the duplicated content to Firebase
+		await set(ref(db, `content/${newHash}`), duplicatedContent);
+		
+		// Update the editor to show the duplicated content
+		contentIdEl.textContent = newHash;
+		
+		// Update the DSL input to reflect the new title
+		const newDslText = generateDSLFromContent(duplicatedContent);
+		dslInput.value = newDslText;
+		updatePreview();
+		
+		// Clear dropdown selection since this is a new item
+		existingContentSelect.value = "";
+		
+		// Reload the content list to include the new item
+		await loadExistingContentList();
+		
+		// Try to select the new item in the dropdown
+		for (let i = 0; i < existingContentSelect.options.length; i++) {
+			if (existingContentSelect.options[i].value === newHash) {
+				existingContentSelect.selectedIndex = i;
+				break;
+			}
+		}
+		
+		alert(`Content duplicated successfully!\nNew ID: ${newHash}`);
+	} catch (error) {
+		console.error("Error duplicating content:", error);
+		alert("Failed to duplicate content. Please try again.");
+	}
+};
+
+deleteBtn.onclick = async () => {
+	const id = contentIdEl.textContent.trim();
+	if (!id || id === "(No content selected)") return alert("No content ID available.");
+
+	// Get the title from the current content
+	let title = "(Untitled)";
+	try {
+		const parsed = parseDSL(dslInput.value);
+		if (parsed && parsed.title) {
+			title = parsed.title;
+		}
+	} catch (err) {
+		// If parsing fails, try to get title from database
+		try {
+			const snap = await get(ref(db, `content/${id}/title`));
+			if (snap.exists()) {
+				title = snap.val();
+			}
+		} catch (dbErr) {
+			// Keep default title if both methods fail
+		}
+	}
+
+	// Show confirmation dialog with title
+	const confirmed = confirm(`Are you sure you want to delete the lesson "${title}"?\n\nContent ID: ${id}\nThis action cannot be undone.`);
+	if (!confirmed) return;
+
+	try {
+		// Delete the content from Firebase
+		await remove(ref(db, `content/${id}`));
+		
+		// Clear the editor
+		contentIdEl.textContent = "(No content selected)";
+		dslInput.value = "";
+		parsedOutput.textContent = "";
+		
+		// Clear the dropdown selection
+		existingContentSelect.value = "";
+		
+		// Disable editing
+		setEditingEnabled(false);
+		
+		// Reload the content list to remove the deleted item
+		await loadExistingContentList();
+		
+		alert("Content deleted successfully!");
+	} catch (error) {
+		console.error("Error deleting content:", error);
+		alert("Failed to delete content. Please try again.");
+	}
+};
+
 async function loadExistingContentList() {
+	// Clear existing options except the first one
+	existingContentSelect.innerHTML = '<option value="">-- Select a lesson --</option>';
+	
 	const snap = await get(child(ref(db), "content"));
 	if (!snap.exists()) return;
 
@@ -114,7 +224,7 @@ async function loadExistingContentList() {
 		const title = contentMap[id]?.title || "(untitled)";
 		const option = document.createElement("option");
 		option.value = id;
-		option.textContent = `${id} — ${title}`;
+		option.textContent = title;
 		existingContentSelect.appendChild(option);
 	}
 }
