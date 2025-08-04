@@ -1,3 +1,6 @@
+// Initialize teacher authentication
+window.teacherAuth = new TeacherAuth();
+
 import {
   initializeApp
 } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-app.js";
@@ -17,7 +20,8 @@ import {
 } from './date-utils.js';
 import {
   initializeLessonSearch,
-  showLessonSearchPopup
+  showLessonSearchPopup,
+  getCachedTitle
 } from "./lesson-search.js";
 
 const app = initializeApp({
@@ -28,10 +32,21 @@ const db = getDatabase(app);
 // Initialize date utilities
 initializeDateUtils(db);
 
-// Import shared lesson search functionality
-import {
-  getCachedTitle
-} from "./lesson-search.js";
+// Check authentication before proceeding
+(async () => {
+  const isAuthenticated = await window.teacherAuth.requireAuth();
+  if (!isAuthenticated) {
+    return; // Stop execution if not authenticated
+  }
+  
+  // Setup activity listeners for session management
+  window.teacherAuth.setupActivityListeners();
+  
+  // Continue with normal teacher.js execution
+  main();
+})();
+
+async function main() {
 
 // Keep local pageTitles cache for existing functionality until fully refactored
 const pageTitles = {}; // id → title
@@ -976,3 +991,5 @@ function createEndButtonsContainer(dayIndex) {
   
   return container;
 }
+
+} // End of main function

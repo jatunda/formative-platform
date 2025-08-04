@@ -3,10 +3,14 @@
 <head>
   <title>Teacher Schedule Editor</title>
   <link rel="stylesheet" href="style.css">
+  <script src="teacher-auth.js"></script>
   <script type="module" src="teacher.js"></script>
 </head>
 <body>
-  <h1>Teacher Schedule Editor</h1>
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+    <h1>Teacher Schedule Editor</h1>
+    <button onclick="window.teacherAuth.logout()" style="width: auto; padding: 0.3rem 1rem; background-color: #e53e3e; border-color: #e53e3e; color: white;">Logout</button>
+  </div>
 
   <p><a href="editor.html">Go to Content Editor</a></p>
 

@@ -1,3 +1,6 @@
+// Initialize teacher authentication
+window.teacherAuth = new TeacherAuth();
+
 import {
 	initializeApp
 } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-app.js";
@@ -28,6 +31,22 @@ const app = initializeApp({
 	databaseURL: "https://formative-platform-default-rtdb.firebaseio.com/",
 });
 const db = getDatabase(app);
+
+// Check authentication before proceeding
+(async () => {
+  const isAuthenticated = await window.teacherAuth.requireAuth();
+  if (!isAuthenticated) {
+    return; // Stop execution if not authenticated
+  }
+  
+  // Setup activity listeners for session management
+  window.teacherAuth.setupActivityListeners();
+  
+  // Continue with normal editor.js execution
+  main();
+})();
+
+async function main() {
 
 // Initialize the lesson search module with database reference
 initializeLessonSearch(db);
@@ -661,3 +680,5 @@ async function generateUniqueHash() {
     setEditingEnabled(false);
   }
 })();
+
+} // End of main function
