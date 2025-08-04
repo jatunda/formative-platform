@@ -62,6 +62,55 @@ let currentSchedule = [];
 let currentDateOffset = 0;
 let dateOffsetControl = null;
 
+// Scroll position management
+const SCROLL_STORAGE_KEY = 'teacher-schedule-scroll';
+const LAST_VISIT_KEY = 'teacher-schedule-last-visit';
+const VISIT_TIMEOUT = 10 * 60 * 1000; // 10 minutes
+
+function saveScrollPosition() {
+  const schedulePane = document.getElementById('schedulePane');
+  if (schedulePane && currentClassId) {
+    const scrollData = {
+      classId: currentClassId,
+      scrollTop: schedulePane.scrollTop,
+      timestamp: Date.now()
+    };
+    localStorage.setItem(SCROLL_STORAGE_KEY, JSON.stringify(scrollData));
+  }
+}
+
+function getSavedScrollPosition() {
+  try {
+    const saved = localStorage.getItem(SCROLL_STORAGE_KEY);
+    if (saved) {
+      const data = JSON.parse(saved);
+      if (data.classId === currentClassId) {
+        return data;
+      }
+    }
+  } catch (e) {
+    console.warn('Failed to parse saved scroll position:', e);
+  }
+  return null;
+}
+
+function isFirstVisitInAWhile() {
+  try {
+    const lastVisit = localStorage.getItem(LAST_VISIT_KEY);
+    if (!lastVisit) return true;
+    
+    const lastVisitTime = parseInt(lastVisit);
+    const now = Date.now();
+    return (now - lastVisitTime) > VISIT_TIMEOUT;
+  } catch (e) {
+    return true;
+  }
+}
+
+function markVisit() {
+  localStorage.setItem(LAST_VISIT_KEY, Date.now().toString());
+}
+
 // Date offset functions
 async function getClassDateOffset(classId) {
   try {
@@ -240,11 +289,20 @@ function createDateOffsetControl() {
     }
   };
   
+  // Go to Today button
+  const goToTodayBtn = document.createElement("button");
+  goToTodayBtn.textContent = "Go to Today";
+  goToTodayBtn.className = "schedule-action-btn go-to-today-btn";
+  goToTodayBtn.style.padding = "4px 12px";
+  goToTodayBtn.style.fontSize = "0.9rem";
+  goToTodayBtn.onclick = () => scrollToToday();
+  
   container.appendChild(label);
   container.appendChild(currentDisplay);
   container.appendChild(exampleDisplay);
   container.appendChild(input);
   container.appendChild(applyBtn);
+  container.appendChild(goToTodayBtn);
   
   // Method to update the displayed offset
   container.updateOffset = async (newOffset) => {
@@ -310,13 +368,87 @@ async function loadFullSchedule() {
   // Fetch all days for this class
   const snap = await get(ref(db, `schedule/${classId}`));
   const schedule = snap.val() || {};
-  renderScheduleTable(schedule);
+  await renderScheduleTable(schedule);
+  
+  // Handle scrolling after table is rendered
+  await handleScrollPositioning();
+}
+
+async function handleScrollPositioning() {
+  const schedulePane = document.getElementById('schedulePane');
+  if (!schedulePane) return;
+  
+  // Get today's day index
+  let todayDayIndex;
+  try {
+    todayDayIndex = await getTodayDayIndex(currentClassId);
+  } catch (e) {
+    console.warn('Could not determine today\'s day index:', e);
+  }
+  
+  const isFirstVisit = isFirstVisitInAWhile();
+  const savedScrollData = getSavedScrollPosition();
+  
+  // Determine scrolling behavior
+  if (isFirstVisit && todayDayIndex !== undefined) {
+    // First visit in a while - scroll to today
+    setTimeout(() => scrollToToday(), 100);
+  } else if (savedScrollData && !isFirstVisit) {
+    // Recent visit - restore scroll position
+    setTimeout(() => {
+      schedulePane.scrollTop = savedScrollData.scrollTop;
+    }, 100);
+  }
+  
+  // Mark this visit and set up scroll saving
+  markVisit();
+  
+  // Save scroll position on scroll
+  schedulePane.addEventListener('scroll', debounce(saveScrollPosition, 500));
+}
+
+function scrollToToday() {
+  const todayRow = document.querySelector('.today-row');
+  if (todayRow) {
+    const schedulePane = document.getElementById('schedulePane');
+    if (schedulePane) {
+      const rowRect = todayRow.getBoundingClientRect();
+      const paneRect = schedulePane.getBoundingClientRect();
+      const scrollTop = schedulePane.scrollTop + rowRect.top - paneRect.top - 50; // 50px offset from top
+      
+      schedulePane.scrollTo({
+        top: Math.max(0, scrollTop),
+        behavior: 'smooth'
+      });
+    }
+  }
+}
+
+// Debounce utility function
+function debounce(func, wait) {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
 }
 
 async function renderScheduleTable(schedule) {
   scheduleTableBody.innerHTML = "";
   const dayIndexes = Object.keys(schedule).map(Number).sort((a, b) => a - b);
   const maxDayIndex = dayIndexes.length > 0 ? Math.max(...dayIndexes) : 0;
+
+  // Get today's day index for highlighting
+  let todayDayIndex;
+  try {
+    todayDayIndex = await getTodayDayIndex(currentClassId);
+  } catch (e) {
+    console.warn('Could not determine today\'s day index:', e);
+  }
 
   // Helper to insert a new day at a given index
   async function insertDayAt(index) {
@@ -396,6 +528,11 @@ async function renderScheduleTable(schedule) {
     // --- Normal Day Row ---
     const lessons = schedule[dayIndex] || [];
     const tr = document.createElement("tr");
+    
+    // Highlight today's row
+    if (todayDayIndex !== undefined && dayIndex === todayDayIndex) {
+      tr.className = "today-row";
+    }
 
     // Day Index
     const tdDay = document.createElement("td");
@@ -589,6 +726,9 @@ loadClasses().then(() => {
   initializeDateOffsetControl();
   loadFullSchedule();
 });
+
+// Global function for scrolling to today
+window.scrollToToday = scrollToToday;
 
 // Use the shared lesson search popup
 function showLessonLinkPopup({ onSelect }) {

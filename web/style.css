@@ -191,6 +191,11 @@ a.schedule-action-btn:hover {
   flex-shrink: 0;
 }
 
+/* Today's row highlighting */
+.today-row {
+  background-color: #e3f2fd !important;
+}
+
 .insert-day-cell {
   text-align: center;
   padding: 2px;
@@ -351,6 +356,18 @@ a.schedule-action-btn:hover {
 .date-offset-control button:hover {
   background-color: #005a8b;
   border-color: #005a8b;
+}
+
+/* Go to Today button */
+.go-to-today-btn {
+  background-color: #28a745 !important;
+  border-color: #28a745 !important;
+  color: white !important;
+}
+
+.go-to-today-btn:hover {
+  background-color: #218838 !important;
+  border-color: #1e7e34 !important;
 }
 
 /* Delete button styling */
