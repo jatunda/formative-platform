@@ -47,6 +47,12 @@ export function clearDateOffsetCache(classId = null) {
   }
 }
 
+// Helper function to create a proper local date from YYYY-MM-DD string
+function createLocalDate(dateString) {
+  const [year, month, day] = dateString.split('-').map(Number);
+  return new Date(year, month - 1, day); // month is 0-indexed
+}
+
 // Helper function to add business days (skipping weekends)
 function addBusinessDays(startDate, businessDaysToAdd) {
   const date = new Date(startDate);
@@ -67,7 +73,7 @@ function addBusinessDays(startDate, businessDaysToAdd) {
 
 // Helper function to calculate business days between two dates
 function getBusinessDaysBetween(startDate, endDate) {
-  const start = new Date(startDate);
+  const start = createLocalDate(startDate);
   const end = new Date(endDate);
   let businessDays = 0;
   
@@ -88,10 +94,10 @@ function getBusinessDaysBetween(startDate, endDate) {
 // Calculate day index for today with offset applied (business days only)
 export async function getTodayDayIndex(classId, classStartDate = DEFAULT_CLASS_START_DATE) {
   const today = new Date();
-  const startDate = new Date(classStartDate);
+  const startDate = createLocalDate(classStartDate);
   
   // Calculate business days difference from start date to today
-  const businessDaysDiff = getBusinessDaysBetween(startDate, today);
+  const businessDaysDiff = getBusinessDaysBetween(classStartDate, today);
   
   // Get the date offset for this class
   const dateOffset = await getClassDateOffset(classId);
@@ -106,7 +112,7 @@ export async function getTodayDayIndex(classId, classStartDate = DEFAULT_CLASS_S
 export async function getDateForDayIndex(dayIndex, classId, classStartDate = DEFAULT_CLASS_START_DATE) {
   const dateOffset = await getClassDateOffset(classId);
   
-  const start = new Date(classStartDate);
+  const start = createLocalDate(classStartDate);
   // Apply both day index and date offset using business days
   const totalBusinessDays = Number(dayIndex) + Number(dateOffset);
   const date = addBusinessDays(start, totalBusinessDays);
@@ -121,7 +127,7 @@ export async function getDateForDayIndex(dayIndex, classId, classStartDate = DEF
 export async function getDateObjectForDayIndex(dayIndex, classId, classStartDate = DEFAULT_CLASS_START_DATE) {
   const dateOffset = await getClassDateOffset(classId);
   
-  const start = new Date(classStartDate);
+  const start = createLocalDate(classStartDate);
   // Apply both day index and date offset using business days
   const totalBusinessDays = Number(dayIndex) + Number(dateOffset);
   const date = addBusinessDays(start, totalBusinessDays);

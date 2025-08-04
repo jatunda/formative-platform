@@ -321,19 +321,29 @@ async function renderScheduleTable(schedule) {
   // Helper to insert a new day at a given index
   async function insertDayAt(index) {
     const classId = classSelect.value;
-    // Shift all days >= index up by 1
-    for (let i = maxDayIndex; i >= index; i--) {
-      const fromRef = ref(db, `schedule/${classId}/${i}`);
-      const toRef = ref(db, `schedule/${classId}/${i + 1}`);
-      const snap = await get(fromRef);
-      if (snap.exists()) {
-        await set(toRef, snap.val());
-      } else {
-        await set(toRef, []);
+    
+    // Read all schedule data at once
+    const scheduleSnap = await get(ref(db, `schedule/${classId}`));
+    const scheduleData = scheduleSnap.exists() ? scheduleSnap.val() : {};
+    
+    // Prepare batch update object
+    const updates = {};
+    
+    // Shift all days >= index up by 1 in memory
+    const dayIndices = Object.keys(scheduleData).map(Number).sort((a, b) => b - a); // Sort descending for shifting
+    
+    for (const dayIdx of dayIndices) {
+      if (dayIdx >= index) {
+        // Move this day's data to the next index
+        updates[`schedule/${classId}/${dayIdx + 1}`] = scheduleData[dayIdx];
       }
     }
+    
     // Set the new day to empty
-    await set(ref(db, `schedule/${classId}/${index}`), []);
+    updates[`schedule/${classId}/${index}`] = [];
+    
+    // Perform all updates in a single batch
+    await update(ref(db), updates);
     loadFullSchedule();
   }
 
@@ -346,19 +356,30 @@ async function renderScheduleTable(schedule) {
       return;
     }
     
-    // Shift all days > index down by 1
-    for (let i = index; i < maxDayIndex; i++) {
-      const fromRef = ref(db, `schedule/${classId}/${i + 1}`);
-      const toRef = ref(db, `schedule/${classId}/${i}`);
-      const snap = await get(fromRef);
-      if (snap.exists()) {
-        await set(toRef, snap.val());
-      } else {
-        await set(toRef, []);
+    // Read all schedule data at once
+    const scheduleSnap = await get(ref(db, `schedule/${classId}`));
+    const scheduleData = scheduleSnap.exists() ? scheduleSnap.val() : {};
+    
+    // Prepare batch update object
+    const updates = {};
+    
+    // Get all day indices and find max
+    const dayIndices = Object.keys(scheduleData).map(Number).sort((a, b) => a - b);
+    const maxDayIndex = dayIndices.length > 0 ? Math.max(...dayIndices) : 0;
+    
+    // Shift all days > index down by 1 in memory
+    for (const dayIdx of dayIndices) {
+      if (dayIdx > index) {
+        // Move this day's data to the previous index
+        updates[`schedule/${classId}/${dayIdx - 1}`] = scheduleData[dayIdx];
       }
     }
-    // Remove the last day
-    await set(ref(db, `schedule/${classId}/${maxDayIndex}`), null);
+    
+    // Remove the last day (set to null to delete it)
+    updates[`schedule/${classId}/${maxDayIndex}`] = null;
+    
+    // Perform all updates in a single batch
+    await update(ref(db), updates);
     loadFullSchedule();
   }
 
@@ -395,11 +416,8 @@ async function renderScheduleTable(schedule) {
       tdLessons.appendChild(await createLessonCluster(lessonHash, dayIndex, i, lessons));
     }
 
-    // Insert the "Link Lesson" button before the "+ New Lesson" button
-    appendLinkLessonButton(tdLessons, dayIndex);
-
-    // Always add the "+ New Lesson" button
-    tdLessons.appendChild(createNewLessonButton(dayIndex));
+    // Add the stacked Link Lesson and New Lesson buttons
+    tdLessons.appendChild(createEndButtonsContainer(dayIndex));
 
     // Drop target events
     tdLessons.addEventListener("dragover", (e) => {
@@ -426,21 +444,28 @@ async function renderScheduleTable(schedule) {
       // Prevent dropping into the same day and position
       if (Number(fromDayIndex) === Number(toDayIndex)) return;
 
-      // Remove from old day
+      // Batch the drag and drop operation
       const classId = classSelect.value;
-      const fromDayRef = ref(db, `schedule/${classId}/${fromDayIndex}`);
-      const fromSnap = await get(fromDayRef);
+      
+      // Read both days at once
+      const [fromSnap, toSnap] = await Promise.all([
+        get(ref(db, `schedule/${classId}/${fromDayIndex}`)),
+        get(ref(db, `schedule/${classId}/${toDayIndex}`))
+      ]);
+      
       const fromLessons = fromSnap.exists() ? fromSnap.val() : [];
-      fromLessons.splice(fromLessonIndex, 1);
-      await set(fromDayRef, fromLessons);
-
-      // Add to new day
-      const toDayRef = ref(db, `schedule/${classId}/${toDayIndex}`);
-      const toSnap = await get(toDayRef);
       const toLessons = toSnap.exists() ? toSnap.val() : [];
+      
+      // Modify arrays in memory
+      fromLessons.splice(fromLessonIndex, 1);
       toLessons.push(lessonHash);
-      await set(toDayRef, toLessons);
-
+      
+      // Write both changes in a single batch
+      const updates = {};
+      updates[`schedule/${classId}/${fromDayIndex}`] = fromLessons;
+      updates[`schedule/${classId}/${toDayIndex}`] = toLessons;
+      
+      await update(ref(db), updates);
       loadFullSchedule();
     });
 
@@ -478,15 +503,12 @@ async function renderScheduleTable(schedule) {
   tdDate.textContent = await getDateForDayIndex(nextIndex);
   addRow.appendChild(tdDate);
 
-  // Lessons column with "Link Lesson" and "+ New Lesson" buttons
+  // Lessons column with "Link Lesson" and "New Lesson" buttons
   const tdLessons = document.createElement("td");
   tdLessons.className = "lessons-cell";
 
-  // "Link Lesson" button
-  appendLinkLessonButton(tdLessons, nextIndex);
-
-  // "+ New Lesson" button
-  tdLessons.appendChild(createNewLessonButton(nextIndex));
+  // Add the stacked Link Lesson and New Lesson buttons
+  tdLessons.appendChild(createEndButtonsContainer(nextIndex));
 
   addRow.appendChild(tdLessons);
 
@@ -534,18 +556,20 @@ async function addLessonToDay(dayIndex) {
     exists = snap.exists();
   }
 
-  // 2. Create a blank lesson in the database
-  await set(ref(db, `content/${hash}`), {
-    title: DEFAULT_LESSON_TITLE
-  });
-
-  // 3. Add the new lesson hash to the schedule for the given day
   const classId = classSelect.value;
+  
+  // 2. Read current schedule for the day
   const dayRef = ref(db, `schedule/${classId}/${dayIndex}`);
   const snap = await get(dayRef);
   const lessons = snap.exists() ? snap.val() : [];
   lessons.push(hash);
-  await set(dayRef, lessons);
+
+  // 3. Batch create lesson content and update schedule
+  const updates = {};
+  updates[`content/${hash}`] = { title: DEFAULT_LESSON_TITLE };
+  updates[`schedule/${classId}/${dayIndex}`] = lessons;
+  
+  await update(ref(db), updates);
 
   // 4. Reload the table to show the new lesson
   loadFullSchedule();
@@ -583,7 +607,7 @@ function createStyledButton(text, onClick) {
 // Button helper functions
 function createNewLessonButton(dayIndex) {
   const btn = document.createElement("button");
-  btn.textContent = "+ New Lesson";
+  btn.textContent = "New Lesson";
   btn.className = "schedule-action-btn new-lesson-btn";
   btn.onclick = () => addLessonToDay(dayIndex);
   return btn;
@@ -708,9 +732,42 @@ function appendLinkLessonButton(td, dayIndex) {
         const snap = await get(dayRef);
         const lessons = snap.exists() ? snap.val() : [];
         lessons.push(lessonId);
+        
+        // Single database write operation
         await set(dayRef, lessons);
         loadFullSchedule();
       }
     });
   }));
+}
+
+// Helper function to create the stacked button container
+function createEndButtonsContainer(dayIndex) {
+  const container = document.createElement("div");
+  container.className = "lessons-end-buttons";
+  
+  // Link Lesson button
+  const linkBtn = createStyledButton("Link Lesson", () => {
+    showLessonLinkPopup({
+      onSelect: async (lessonId) => {
+        const classId = classSelect.value;
+        const dayRef = ref(db, `schedule/${classId}/${dayIndex}`);
+        const snap = await get(dayRef);
+        const lessons = snap.exists() ? snap.val() : [];
+        lessons.push(lessonId);
+        
+        // Single database write operation
+        await set(dayRef, lessons);
+        loadFullSchedule();
+      }
+    });
+  });
+  
+  // New Lesson button
+  const newBtn = createNewLessonButton(dayIndex);
+  
+  container.appendChild(linkBtn);
+  container.appendChild(newBtn);
+  
+  return container;
 }

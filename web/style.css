@@ -182,6 +182,15 @@ a.schedule-action-btn:hover {
   position: relative;
 }
 
+/* Container for stacked buttons at end of lessons cell */
+.lessons-end-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: stretch;
+  flex-shrink: 0;
+}
+
 .insert-day-cell {
   text-align: center;
   padding: 2px;
