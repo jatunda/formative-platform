@@ -138,6 +138,10 @@ async function setClassDateOffset(classId, offset) {
 async function loadClasses() {
   const snap = await get(ref(db, "classes"));
   const classes = snap.val();
+  
+  // Clear loading option
+  classSelect.innerHTML = "";
+  
   Object.entries(classes)
     .sort(([, a], [, b]) => a.displayOrder - b.displayOrder)
     .forEach(([id, data]) => {
@@ -355,23 +359,57 @@ function showNotification(message, type = "info") {
 
 async function loadFullSchedule() {
   const classId = classSelect.value;
+  if (!classId) return;
+  
   currentClassId = classId;
   
-  // Load the date offset for this class
-  currentDateOffset = await getClassDateOffset(classId);
+  // Show loading state
+  const loadingState = document.getElementById('schedule-loading-state');
+  const scheduleTable = document.getElementById('scheduleTable');
   
-  // Update the date offset control if it exists
-  if (dateOffsetControl) {
-    await dateOffsetControl.updateOffset(currentDateOffset);
+  if (loadingState) loadingState.style.display = 'flex';
+  if (scheduleTable) scheduleTable.style.display = 'none';
+  
+  try {
+    // Load the date offset for this class
+    currentDateOffset = await getClassDateOffset(classId);
+    
+    // Update the date offset control if it exists
+    if (dateOffsetControl) {
+      await dateOffsetControl.updateOffset(currentDateOffset);
+    }
+    
+    // Fetch all days for this class
+    const snap = await get(ref(db, `schedule/${classId}`));
+    const schedule = snap.val() || {};
+    await renderScheduleTable(schedule);
+    
+    // Hide loading state and show table
+    if (loadingState) loadingState.style.display = 'none';
+    if (scheduleTable) scheduleTable.style.display = 'table';
+    
+    // Handle scrolling after table is rendered
+    await handleScrollPositioning();
+    
+  } catch (error) {
+    console.error('Error loading schedule:', error);
+    showScheduleError();
   }
-  
-  // Fetch all days for this class
-  const snap = await get(ref(db, `schedule/${classId}`));
-  const schedule = snap.val() || {};
-  await renderScheduleTable(schedule);
-  
-  // Handle scrolling after table is rendered
-  await handleScrollPositioning();
+}
+
+function showScheduleError() {
+  const loadingState = document.getElementById('schedule-loading-state');
+  if (loadingState) {
+    loadingState.innerHTML = `
+      <div style="text-align: center; color: #e53e3e;">
+        <h3>Unable to load schedule</h3>
+        <p style="color: #a0aec0; margin-bottom: 1rem;">There was a problem connecting to the server.</p>
+        <button onclick="location.reload()" style="width: auto; padding: 0.5rem 1rem;">
+          Try Again
+        </button>
+      </div>
+    `;
+  }
 }
 
 async function handleScrollPositioning() {
@@ -448,6 +486,18 @@ async function renderScheduleTable(schedule) {
     todayDayIndex = await getTodayDayIndex(currentClassId);
   } catch (e) {
     console.warn('Could not determine today\'s day index:', e);
+  }
+
+  // OPTIMIZATION: Pre-load all lesson titles in batch for better performance
+  const allLessonHashes = [];
+  for (const dayIndex of dayIndexes) {
+    const lessons = schedule[dayIndex] || [];
+    allLessonHashes.push(...lessons);
+  }
+  // Remove duplicates and load titles in batch
+  const uniqueHashes = [...new Set(allLessonHashes)];
+  if (uniqueHashes.length > 0) {
+    await getLessonTitles(uniqueHashes);
   }
 
   // Helper to insert a new day at a given index
@@ -550,7 +600,7 @@ async function renderScheduleTable(schedule) {
 
     for (let i = 0; i < lessons.length; i++) {
       const lessonHash = lessons[i];
-      tdLessons.appendChild(await createLessonCluster(lessonHash, dayIndex, i, lessons));
+      tdLessons.appendChild(createLessonCluster(lessonHash, dayIndex, i, lessons));
     }
 
     // Add the stacked Link Lesson and New Lesson buttons
@@ -721,11 +771,25 @@ function initializeDateOffsetControl() {
   dateOffsetContainer.appendChild(dateOffsetControl);
 }
 
-// Initial load
-loadClasses().then(() => {
-  initializeDateOffsetControl();
-  loadFullSchedule();
-});
+// Initial load with optimized parallel loading
+async function initializeTeacherApp() {
+  try {
+    // Start loading classes immediately
+    await loadClasses();
+    
+    // Initialize date offset control
+    initializeDateOffsetControl();
+    
+    // Load the schedule for the first class
+    await loadFullSchedule();
+    
+  } catch (error) {
+    console.error('Failed to initialize app:', error);
+    showScheduleError();
+  }
+}
+
+initializeTeacherApp();
 
 // Global function for scrolling to today
 window.scrollToToday = scrollToToday;
@@ -786,7 +850,7 @@ function createInsertDayButton(dayIndex, insertFunction) {
 }
 
 // Use CSS classes for lesson clusters
-async function createLessonCluster(lessonHash, dayIndex, i, lessons) {
+function createLessonCluster(lessonHash, dayIndex, i, lessons) {
   const cluster = document.createElement("span");
   cluster.className = "lesson-cluster";
   cluster.draggable = true;
@@ -810,7 +874,8 @@ async function createLessonCluster(lessonHash, dayIndex, i, lessons) {
   const topRow = document.createElement("div");
   topRow.className = "lesson-cluster-top";
   const mainBtn = document.createElement("button");
-  mainBtn.textContent = await getLessonTitle(lessonHash);
+  // Use cached title instead of async loading for better performance
+  mainBtn.textContent = pageTitles[lessonHash] || DEFAULT_LESSON_TITLE;
   mainBtn.className = "schedule-action-btn lesson-main-btn";
   mainBtn.onclick = () => {
     window.location.href = `editor.html?page=${lessonHash}`;
