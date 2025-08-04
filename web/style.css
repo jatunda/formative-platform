@@ -271,6 +271,12 @@ a:not(.class-link):not(.schedule-action-btn):hover {
   box-shadow: 1px 1px 3px #1a202c;
   cursor: grab;
   min-width: 140px;
+  font-weight: normal;
+}
+
+/* Text inside lesson clusters should not be bold */
+.lesson-cluster * {
+  font-weight: normal;
 }
 
 /* Top row of lesson cluster */
