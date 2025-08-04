@@ -2,6 +2,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-app.js";
 import { getDatabase, ref, get } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js";
 import { initializeDateUtils, getTodayDayIndex } from './date-utils.js';
+import { renderContent, renderMultipleContent } from './content-renderer.js';
 
 const app = initializeApp({ 
 	databaseURL: "https://formative-platform-default-rtdb.firebaseio.com/",
@@ -48,11 +49,11 @@ async function loadContent() {
   
   await cachePages();
   
-  // Render all pages
-  pageIds.forEach(pageId => {
-    const data = pageCache[pageId];
-    renderContent(data);
-  });
+  // Prepare all content data for rendering
+  const contentData = pageIds.map(pageId => pageCache[pageId]).filter(data => data);
+  
+  // Render all content using the shared renderer
+  renderMultipleContent(contentData, contentEl);
 }
 
 async function cachePages() {
@@ -63,63 +64,6 @@ async function cachePages() {
 		})
 	);
 	await Promise.all(fetches);
-}
-
-function renderContent(data) {
-	if (!data) {
-		contentEl.textContent = "Content not found.";
-		return;
-	}
-
-	if(data.title){
-		const title = document.createElement("h2");
-		title.textContent = data.title;
-		contentEl.appendChild(title);
-	}
-
-	data.blocks.forEach(block => {
-		if (block.type === "question" && Array.isArray(block.content)) {
-			block.content.forEach(item => {
-				if (item.type === "text") {
-					const p = document.createElement("p");
-					// Process inline code formatting with backticks
-					p.innerHTML = processInlineCode(item.value);
-					contentEl.appendChild(p);
-				}
-				if (item.type === "code") {
-					const pre = document.createElement("pre");
-					pre.textContent = item.value;
-					contentEl.appendChild(pre);
-				}
-			});
-		}
-	});
-}
-
-// Function to process inline code formatting with backticks
-function processInlineCode(text) {
-	// Escape HTML to prevent XSS, then process backticks
-	const escaped = text
-		.replace(/&/g, '&amp;')
-		.replace(/</g, '&lt;')
-		.replace(/>/g, '&gt;')
-		.replace(/"/g, '&quot;')
-		.replace(/'/g, '&#39;');
-	
-	// Replace backtick-enclosed text with <code> tags
-	return escaped.replace(/`([^`]+)`/g, '<code>$1</code>');
-}
-
-function loadPage() {
-	for (let idx = 0; idx < pageIds.length; idx++) {
-		const page = pageIds[idx];
-		if (idx !== 0) {
-			const hr = document.createElement("hr");
-			contentEl.appendChild(hr);
-		}
-		const data = pageCache[page];
-		renderContent(data);
-	}
 }
 
 // Start the application

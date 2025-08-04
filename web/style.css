@@ -42,7 +42,8 @@ button:hover {
   padding: 1rem;
 }
 
-pre {
+/* Global pre styling (fallback for non-lesson content) */
+pre:not(.lesson-code) {
   background-color: #1a202c;
   color: #e2e8f0;
   padding: 0.75rem;
@@ -549,8 +550,8 @@ textarea:focus {
   border-color: #63b3ed;
 }
 
-/* Inline code styling */
-code {
+/* Global inline code styling (fallback for non-lesson content) */
+code:not(.lesson-content code) {
   background-color: #374151;
   color: #90cdf4;
   padding: 2px 6px;
@@ -608,4 +609,69 @@ code {
 @keyframes skeleton-loading {
   0% { background-position: 200% 0; }
   100% { background-position: -200% 0; }
+}
+
+/* Shared lesson content styling for both viewer and editor */
+.lesson-content {
+  color: #e2e8f0;
+  line-height: 1.6;
+}
+
+/* Editor preview specific container styling */
+.lesson-preview {
+  border: 1px solid #4a5568;
+  border-radius: 8px;
+  padding: 20px;
+  margin-top: 10px;
+  background-color: #2d3748;
+  min-height: 300px;
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+.lesson-title {
+  color: #e2e8f0;
+  margin-top: 0;
+  margin-bottom: 16px;
+  font-size: 1.5em;
+  border-bottom: 2px solid #4a5568;
+  padding-bottom: 8px;
+}
+
+.lesson-text {
+  color: #e2e8f0;
+  line-height: 1.6;
+  margin-bottom: 12px;
+}
+
+.lesson-code {
+  background-color: #1a202c;
+  color: #e2e8f0;
+  padding: 0.75rem;
+  border-radius: 6px;
+  border: 1px solid #4a5568;
+  overflow-x: auto;
+  white-space: pre;
+  font-family: 'Fira Code', 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 14px;
+  tab-size: 4;
+  line-height: 1.4;
+  margin-bottom: 12px;
+}
+
+/* Inline code styling (applies to code tags within lesson-content) */
+.lesson-content code {
+  background-color: #374151;
+  color: #90cdf4;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'Fira Code', 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 0.9em;
+  border: 1px solid #4a5568;
+}
+
+.lesson-separator {
+  border: none;
+  border-top: 2px solid #4a5568;
+  margin: 24px 0;
 }

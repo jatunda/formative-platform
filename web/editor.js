@@ -19,6 +19,9 @@ import {
 	initializeLessonSearch,
 	showLessonSearchPopup
 } from "./lesson-search.js";
+import {
+	renderContent
+} from "./content-renderer.js";
 
 
 const app = initializeApp({
@@ -31,7 +34,7 @@ initializeLessonSearch(db);
 
 const contentIdEl = document.getElementById("contentId");
 const dslInput = document.getElementById("dslInput");
-const parsedOutput = document.getElementById("parsedOutput");
+const preview = document.getElementById("preview");
 const saveBtn = document.getElementById("saveBtn");
 const duplicateBtn = document.getElementById("duplicateBtn");
 const deleteBtn = document.getElementById("deleteBtn");
@@ -144,14 +147,13 @@ document.addEventListener("keydown", (event) => {
 
 function updatePreview() {
 	const dslText = dslInput.value;
-	let parsed;
 	try {
-		parsed = parseDSL(dslText);
-		parsedOutput.textContent = JSON.stringify(parsed, null, 2);
+		const parsed = parseDSL(dslText);
+		// Use the shared content renderer instead of showing JSON
+		renderContent(parsed, preview);
 	} catch (err) {
-		parsedOutput.textContent = "Error parsing DSL: " + err.message;
+		preview.innerHTML = `<p style="color: red;">Error parsing DSL: ${err.message}</p>`;
 	}
-	parsedOutput.textContent = JSON.stringify(parsed, null, 2);
 }
 
 // Function to enable/disable the DSL input and save button
@@ -345,7 +347,7 @@ deleteBtn.onclick = async () => {
 		// Clear the editor
 		contentIdEl.textContent = "(No content selected)";
 		dslInput.value = "";
-		parsedOutput.textContent = "";
+		preview.innerHTML = "";
 		
 		// Clear the dropdown selection
 		existingContentSelect.value = "";
@@ -390,7 +392,7 @@ existingContentSelect.onchange = async () => {
     // If nothing is selected, disable editing
     contentIdEl.textContent = "(No content selected)";
     dslInput.value = "";
-    parsedOutput.textContent = "";
+    preview.innerHTML = "";
     setEditingEnabled(false);
     return;
   }
