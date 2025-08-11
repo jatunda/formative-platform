@@ -25,6 +25,53 @@ import {
 import {
 	renderContent
 } from "./content-renderer.js";
+import {
+	AIQuestionGenerator
+} from "./ai-generator.js";
+
+// Handle AI generation
+async function handleAIGeneration(event) {
+  event.preventDefault();
+  
+  const classId = document.getElementById('aiClassSelect').value;
+  const objectives = document.getElementById('learningObjectives').value;
+  
+  if (!classId || !objectives) {
+    alert('Please select a class and enter learning objectives');
+    return;
+  }
+  
+  try {
+    // Show loading state
+    const generateBtn = document.getElementById('generateBtn');
+    const originalText = generateBtn.textContent;
+    generateBtn.textContent = 'Generating...';
+    generateBtn.disabled = true;
+    
+    // Generate content
+    const content = await generateFormativeQuestions(classId, objectives);
+    
+    // Update editor
+    document.getElementById('dslInput').value = content;
+    
+    // Trigger preview update
+    document.getElementById('dslInput').dispatchEvent(new Event('input'));
+    
+    // Close modal
+    closeModal();
+  } catch (error) {
+    console.error('Error generating questions:', error);
+    alert('Error generating questions: ' + error.message);
+  } finally {
+    // Reset button state
+    generateBtn.textContent = originalText;
+    generateBtn.disabled = false;
+  }
+}
+import {
+	AI_CONFIG,
+	validateConfig
+} from "./ai-config.js";
 
 
 const app = initializeApp({
@@ -50,6 +97,21 @@ async function main() {
 
 // Initialize the lesson search module with database reference
 initializeLessonSearch(db);
+
+// Initialize AI Question Generator
+try {
+  validateConfig();
+  const aiGenerator = new AIQuestionGenerator(db, AI_CONFIG.OPENAI_API_KEY);
+} catch (error) {
+  console.warn('AI Generator not available:', error.message);
+  // Disable the AI button if configuration is missing
+  const aiBtn = document.getElementById('generateAIBtn');
+  if (aiBtn) {
+    aiBtn.disabled = true;
+    aiBtn.title = 'AI Generation requires OpenAI API key configuration';
+    aiBtn.textContent = '🤖 Generate Questions (Not Configured)';
+  }
+}
 
 const contentIdEl = document.getElementById("contentId");
 const dslInput = document.getElementById("dslInput");

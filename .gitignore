@@ -2,3 +2,4 @@ node_modules/
 dist/
 .env
 firebase-service-account.json
+web/ai-config.js

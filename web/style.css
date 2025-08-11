@@ -48,12 +48,122 @@ pre:not(.lesson-code) {
   color: #cccccc;
   padding: 0.75rem;
   border-radius: 6px;
-  border: 1px solid #3d3d3d;
-  overflow-x: auto;
-  white-space: pre;
-  font-family: monospace;
-  tab-size: 4;
-  line-height: 1.4;
+}
+
+/* Modal styles */
+.modal {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  margin: 0 !important;
+  max-width: none !important;
+  max-height: none !important;
+  left: 0 !important;
+  top: 0 !important;
+  z-index: 1000;
+  background-color: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Modal content: centered, fixed max-width, auto width, padding */
+.modal-content {
+  background-color: #2d3748;
+  padding: 2rem 1.5rem;
+  border: 1px solid #4a5568;
+  border-radius: 12px;
+  max-width: 400px;
+  width: auto;
+  box-sizing: border-box;
+  max-height: 85vh;
+  overflow-y: auto;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+
+.close-btn:hover {
+  color: #e2e8f0;
+}
+
+.modal-body {
+  padding: 1.5rem;
+}
+
+.modal-content {
+  background-color: #2d3748;
+  padding: 2rem 1.5rem;
+  border: 1px solid #4a5568;
+  border-radius: 12px;
+  max-width: 400px;
+  width: auto;
+  box-sizing: border-box;
+  max-height: 85vh;
+  overflow-y: auto;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  margin: 0;
+}
+
+.radio-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.radio-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  cursor: pointer;
+  padding: 0.75rem;
+  border: 1px solid #4a5568;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.radio-label:hover {
+  border-color: #63b3ed;
+  background-color: rgba(99, 179, 237, 0.1);
+}
+
+.radio-label input[type="radio"] {
+  margin: 0;
+  accent-color: #63b3ed;
+}
+
+.radio-label span {
+  font-weight: 600;
+  color: #63b3ed;
+}
+
+#aiClassSelect, #learningObjectives {
+  width: 100%;
+  padding: 0.75rem;
+  background-color: #374151;
+  border: 1px solid #4a5568;
+  border-radius: 6px;
+  color: #e2e8f0;
+  font-size: 1rem;
+}
+
+#aiClassSelect:focus, #learningObjectives:focus {
+  outline: none;
+  border-color: #63b3ed;
+  box-shadow: 0 0 0 2px rgba(99, 179, 237, 0.2);
+}
+
+#learningObjectives {
+  resize: vertical;
+  min-height: 100px;
+  font-family: inherit;
 }
 
 @media (max-width: 600px) {
@@ -97,6 +207,29 @@ td > * {
 }
 
 /* Styled button for schedule actions */
+
+/* Ensure modal overlays are not affected by body max-width/margin */
+.modal {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  margin: 0 !important;
+  max-width: none !important;
+  max-height: none !important;
+  left: 0 !important;
+  top: 0 !important;
+  z-index: 1000;
+  background-color: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-content {
+  margin: 0 !important;
+}
 .schedule-action-btn {
   width: 110px;
   min-width: 110px;

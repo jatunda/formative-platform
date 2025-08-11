@@ -7,6 +7,7 @@
 	<!-- Prism.js CSS for syntax highlighting -->
 	<link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-dark.min.css" rel="stylesheet">
 	<script src="teacher-auth.js"></script>
+	<script type="module" src="ai-generator.js"></script>
 	<script type="module" src="editor.js"></script>
 </head>
 
@@ -33,6 +34,7 @@
 		<button id="saveBtn" class="schedule-action-btn">Save</button>
 		<button id="duplicateBtn" class="schedule-action-btn">Duplicate</button>
 		<button id="deleteBtn" class="schedule-action-btn delete-btn">Delete</button>
+		<button id="generateAIBtn" class="schedule-action-btn">Generate Lesson with AI</button>
 	</div>
 
 	<h3>Markdown DSL:</h3>
@@ -40,6 +42,57 @@
 
 	<h3>Preview (as it will appear to students):</h3>
 	<div id="preview" class="lesson-preview"></div>
+
+	<!-- AI Generation Modal (uses lesson-popup styles for consistency) -->
+	<div id="aiGenerationModal" class="lesson-popup" style="display: none;">
+		<div class="lesson-popup-box">
+			<button id="closeModalBtn" class="schedule-action-btn popup-close-btn">&times;</button>
+			<h3 style="margin-top:0;">Generate Formative Questions</h3>
+			<div class="form-group">
+				<label>Question Type:</label>
+				<div class="radio-group">
+					<label class="radio-label">
+						<input type="radio" name="questionType" value="review" checked>
+						<span>Review</span> - Test knowledge from previous lessons to cement learning
+					</label>
+					<label class="radio-label">
+						<input type="radio" name="questionType" value="preview">
+						<span>Preview</span> - Activate prior knowledge and spark curiosity about upcoming content
+					</label>
+				</div>
+			</div>
+
+			<div class="form-group">
+				<label for="classSelect">Class:</label>
+				<select id="aiClassSelect">
+					<option value="">Select a class...</option>
+				</select>
+			</div>
+
+			<div class="form-group">
+				<label for="learningObjectives">Learning Objectives / Topic:</label>
+				<textarea id="learningObjectives" rows="4" placeholder="Enter the learning objectives or topic you want to focus on...
+
+Example: 
+- Understanding for loops in Java
+- Variables and data types
+- Basic algorithm design"></textarea>
+			</div>
+
+			<div id="loadingState" style="display: none;">
+				<p>🤖 Generating questions... This may take 10-30 seconds.</p>
+			</div>
+
+			<div id="errorState" style="display: none; color: #e53e3e;">
+				<p id="errorMessage"></p>
+			</div>
+
+			<div style="display: flex; gap: 10px; margin-top: 16px;">
+				<button id="generateBtn" class="schedule-action-btn">Generate Questions</button>
+				<button id="cancelBtn" class="schedule-action-btn">Cancel</button>
+			</div>
+		</div>
+	</div>
 	
 	<!-- Prism.js core and language components -->
 	<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
