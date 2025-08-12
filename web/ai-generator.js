@@ -4,14 +4,207 @@ import { AI_CONFIG } from "./ai-config.js";
 // Class metadata mapping (hard-coded for MVP)
 const CLASS_METADATA = {
   // Computer Science A classes
-  'csa': { subject: 'Computer Science A', gradeLevel: 11 },
+  'csa': { 
+    subject: 'Computer Science A', 
+    gradeLevel: 11,
+    exampleQuestions: {
+      review: 
+`# Loops Review
+
+Consider the following code segment.
+\`\`\`java
+for (int m = 16; m > 0; m -= 2) 
+{
+	if ((m % 3) == 1) 
+	{
+		System.out.print(m + " ");
+	}
+}
+\`\`\`
+What is printed as a result of executing this code segment?
+
+---
+
+Consider the following code segment. Assume that the \`int\` variable \`input\` has been properly declared and initialized.
+\`\`\`java
+int answer = 1;
+if (input !=0) 
+{
+	int count = 1;
+	while (count != input)
+	{
+		count++;
+		answer *= count;
+	}
+}
+System.out.println(answer);
+\`\`\`
+Under what conditions does the code segment always result in integer overflow?
+
+---
+
+Consider the following code segment.
+\`\`\`java
+String str = "qrstu";
+String result = "";
+for (int j = 0; j < str.length(); j++) 
+{
+	result += str.substring(0, j + 1);
+}
+System.out.println(result);
+\`\`\`
+What is printed as a result of executing this code segment? If nothing is printed, explain why.
+
+---
+
+Consider the following code segment.
+
+\`\`\`java
+for (int j = 1; j <= 4; j++) 
+{
+	for (int k = j + 1; k >= 1; k--) 
+	{
+		System.out.print(j + " ");
+	}
+	System.out.println();
+}
+\`\`\`
+The code segement is intended to produce the following output, but does not work as intended.
+\`\`\`
+1
+2 2
+3 3 3
+4 4 4 4
+\`\`\`
+What change should be made so that the code segment works as intended?
+
+
+# 
+
+A student wrote a program to calculate the average of several numeric scores. The program compiles without error but produces incorrect results when it runes. The student suspects there is a logic error in the code. 
+What strategies would you use to help you identify the logic error? 
+
+--- 
+
+Consider the following variable declaration.
+\`\`\`java
+int x;
+\`\`\`
+What are 3 very different values that can be stored in the variable \`x\`? What are 3 very different values that cannot be?  
+
+---
+
+The following code segment contains an error. 
+\`\`\`java
+double pi = 3.14;     // line 1
+pi = 3.14159;         // line 2
+double other = null;  // line 3
+double example;       // line 4
+example = pi;         // line 5
+\`\`\`
+Which line has the error? How would you describe the error? 
+
+`,
+      preview: 
+`# Introduction to Inheritance
+
+What might be some real-world examples where one thing "inherits" properties from another thing?
+
+---
+In a video game, if you were designing different types of characters that all need to move and take damage, what properties or behaviors would they share?`
+    }
+  },
   
   // Computer Science Principles classes  
-  'csp': { subject: 'Computer Science Principles', gradeLevel: 10 },
+  'csp': { 
+    subject: 'Computer Science Principles', 
+    gradeLevel: 10,
+    exampleQuestions: {
+      review: 
+ `# Binary Numbers Review
+
+How many different values can be represented with 3 bits? List them all.
+
+---
+What is the largest decimal number that can be represented with 4 bits?
+
+---
+
+What is 125 in binary?
+
+# Setting and Accessing Lists Review 
+
+Consider the following code segment. 
+\`\`\`APCSP
+firstList <- ["guitar", "drums", "bass"]
+secondList <- ["flute", "violin"]
+thirdList <- []
+thirdList <- firstList
+firstList <- secondList
+secondList <- thirdList
+\`\`\`
+
+What are the contents of each of the lists after the code segment is executed?
+
+---
+
+The list \`wordList\` contains a list of 3 string values. What are all the valid indexes for the list? 
+
+---
+
+Assume that both lists and strings are indexed starting with index \`1\`.
+The list \`wordList\` has the following contents.
+\`\`\`APCSP
+["abc", "def", "ghi", "jkl"]
+\`\`\`
+Let \`myWord\` be the element at index \`3\` of \`wordList\`. Let \`myChar\` be the character at index \`2\` of \`myWord\`. What is the value of \`myChar\`?
+`,
+      preview: `# Introduction to Algorithms
+
+In your daily life, what are some step-by-step instructions you follow? Think about making a sandwich or getting ready for school.
+
+---
+If you were explaining to a friend how to tie their shoes, how would you break it down into simple steps?`
+    }
+  },
   
   // Engineering classes
-  'engr7': { subject: 'Engineering', gradeLevel: 7 },
-  'engr8': { subject: 'Engineering', gradeLevel: 8 },
+  'engr7': { 
+    subject: 'Engineering', 
+    gradeLevel: 7,
+    exampleQuestions: {
+      review: `# Engineering Design Process Review
+
+What are the main steps of the engineering design process? List them in order.
+
+---
+Why is it important to test and iterate on your design?`,
+      preview: `# Introduction to 3D Printing
+
+What objects in your room might be difficult to make without 3D printing?
+
+---
+How do you think a 3D printer knows what shape to create?`
+    }
+  },
+  'engr8': { 
+    subject: 'Engineering', 
+    gradeLevel: 8,
+    exampleQuestions: {
+      review: `# Circuit Components Review
+
+What is the difference between a series and parallel circuit? Draw or describe each.
+
+---
+In a simple circuit with a battery and LED, what is the purpose of a resistor?`,
+      preview: `# Introduction to Robotics
+
+What tasks in your daily life would you want a robot to help with?
+
+---
+What sensors might a robot need to safely navigate around a room?`
+    }
+  },
 };
 
 // Abstract LLM interface for easy switching
@@ -253,6 +446,17 @@ export class AIQuestionGenerator {
     const questionStyle = isReview 
       ? 'recall and comprehension questions that test knowledge students should already have learned'
       : 'anticipatory questions that activate prior knowledge and spark curiosity about upcoming content';
+    
+    // Find the class metadata and examples based on the selected class
+    const classKey = Object.keys(CLASS_METADATA).find(key => 
+      CLASS_METADATA[key].subject === classMetadata.subject && 
+      CLASS_METADATA[key].gradeLevel === classMetadata.gradeLevel
+    );
+    
+    // Get example questions for this class and question type
+    const exampleQuestions = classKey ? 
+      CLASS_METADATA[classKey].exampleQuestions?.[questionType] : 
+      null;
 
     return `Create ${questionCount} formative assessment questions for a ${classMetadata.subject} class at Grade ${classMetadata.gradeLevel} level.
 
@@ -290,7 +494,16 @@ What does this code do?
 ---
 Third question text here?
 
-Generate the complete DSL content now:`;
+
+Example questions for this class and question type:
+${exampleQuestions || `# Example Title
+
+First example question that demonstrates good questioning style for ${classMetadata.subject}?
+
+---
+Second example question that shows appropriate depth for Grade ${classMetadata.gradeLevel}?`}
+
+Now generate new questions following this style for the learning objectives above:`;
   }
 
   insertIntoEditor(content) {
