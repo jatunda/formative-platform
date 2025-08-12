@@ -1,5 +1,6 @@
 import { getDatabase, ref, get, set } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js";
 import { AI_CONFIG } from "./ai-config.js";
+import { parseDSL } from "./dsl.js";
 
 // Class metadata mapping (hard-coded for MVP)
 const CLASS_METADATA = {
@@ -387,6 +388,26 @@ export class AIQuestionGenerator {
     document.getElementById('errorState').style.display = 'none';
   }
 
+  // Generate a unique hash that's not in the database
+  async generateUniqueHash() {
+    const hashLength = 8;
+    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    
+    while (true) {
+      // Generate a random hash
+      let hash = '';
+      for (let i = 0; i < hashLength; i++) {
+        hash += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      
+      // Check if this hash exists in the database
+      const snapshot = await get(ref(this.db, `content/${hash}`));
+      if (!snapshot.exists()) {
+        return hash;
+      }
+    }
+  }
+
   async generateQuestions() {
     try {
       // Validate inputs
@@ -409,6 +430,9 @@ export class AIQuestionGenerator {
         return;
       }
 
+      // Generate a unique content ID
+      const contentId = await this.generateUniqueHash();
+
       // Get class metadata
       const selectedOption = this.classSelect.selectedOptions[0];
       const classMetadata = {
@@ -426,8 +450,14 @@ export class AIQuestionGenerator {
       // Call LLM
       const generatedContent = await this.llmProvider.generateQuestions(prompt);
       
-      // Insert into editor
-      this.insertIntoEditor(generatedContent);
+      // Insert into editor with the unique content ID
+      this.insertIntoEditor(generatedContent, contentId);
+      
+      // Enable editing in the editor
+      setEditingEnabled(true);
+      
+      // Update dropdown list to include the new content
+      await this.updateContentList(contentId);
       
       // Close modal
       this.hideModal();
@@ -506,10 +536,30 @@ Second example question that shows appropriate depth for Grade ${classMetadata.g
 Now generate new questions following this style for the learning objectives above:`;
   }
 
-  insertIntoEditor(content) {
+  insertIntoEditor(content, contentId) {
     const dslInput = document.getElementById('dslInput');
+    const contentIdEl = document.getElementById('contentId');
+    
     if (dslInput) {
-      dslInput.value = content;
+      // Format the AI-generated content to ensure it follows DSL format
+      let formattedContent = content;
+      
+      // Ensure there's no extra whitespace between lines
+      formattedContent = formattedContent.trim().split(/\n\s*\n/).join('\n\n');
+      
+      // Make sure separator lines are exactly "---" with no extra whitespace
+      formattedContent = formattedContent.replace(/\n\s*-+\s*\n/g, '\n\n---\n\n');
+      
+      // Ensure code blocks are properly formatted
+      formattedContent = formattedContent.replace(/```(\w*)\s*\n/g, '```$1\n');
+      formattedContent = formattedContent.replace(/\n\s*```\s*\n/g, '\n```\n');
+      
+      dslInput.value = formattedContent;
+      
+      // Set the content ID
+      if (contentIdEl) {
+        contentIdEl.textContent = contentId;
+      }
       
       // Trigger the existing preview update
       const event = new Event('input', { bubbles: true });
@@ -517,6 +567,22 @@ Now generate new questions following this style for the learning objectives abov
       
       // Focus on the editor
       dslInput.focus();
+      
+      // Verify the content is parseable
+      try {
+        parseDSL(formattedContent);
+      } catch (error) {
+        console.error('Generated content may not be in correct DSL format:', error);
+      }
     }
+  }
+
+  async updateContentList(contentId) {
+    // Get the select element
+    const existingContentSelect = document.getElementById('existingContent');
+    if (!existingContentSelect) return;
+
+    // Clear the select value since this is unsaved content
+    existingContentSelect.value = "";
   }
 }

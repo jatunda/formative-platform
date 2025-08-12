@@ -415,7 +415,8 @@ function updatePreview() {
 }
 
 // Function to enable/disable the DSL input and save button
-function setEditingEnabled(enabled) {
+// Make setEditingEnabled available globally
+window.setEditingEnabled = function(enabled) {
   dslInput.disabled = !enabled;
   saveBtn.disabled = !enabled;
   duplicateBtn.disabled = !enabled;
