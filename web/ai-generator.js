@@ -8,10 +8,31 @@ const CLASS_METADATA = {
   'csa': { 
     subject: 'Computer Science A', 
     gradeLevel: 11,
+    promptInstructions: 
+`For AP Computer Science A questions: 
+- Create questions using the AP style and wording
+
+For Java programming questions:
+- Include a mix of code reading and code writing questions
+- Focus on syntax precision and common Java patterns
+- Reference the AP CSA course terminology where appropriate
+- Include at least one question about common errors or debugging
+
+When creating the titles for problem sets: 
+- If there is a provided topic, please include that topic in the title
+- if the topic number is not provided, please use the appropriate topic number from the CSAwesome2 textbook
+- The title format should be as follows: "CSA {topic number} - {lesson title} {question set type}". For example "CSA 3.4 - Writing Constructors Review"
+`,
     exampleQuestions: {
       review: 
-`# Loops Review
+`# CSA 2.8 For Loops Review
 
+## Mild
+What are the two types of loops in java? When would you use one over the other?
+
+---
+
+## Medium
 Consider the following code segment.
 \`\`\`java
 for (int m = 16; m > 0; m -= 2) 
@@ -26,6 +47,22 @@ What is printed as a result of executing this code segment?
 
 ---
 
+## Medium
+Consider the following code segment.
+\`\`\`java
+String str = "qrstu";
+String result = "";
+for (int j = 0; j < str.length(); j++) 
+{
+	result += str.substring(0, j + 1);
+}
+System.out.println(result);
+\`\`\`
+What is printed as a result of executing this code segment? If nothing is printed, explain why.
+
+---
+
+## Spicy
 Consider the following code segment. Assume that the \`int\` variable \`input\` has been properly declared and initialized.
 \`\`\`java
 int answer = 1;
@@ -44,20 +81,7 @@ Under what conditions does the code segment always result in integer overflow?
 
 ---
 
-Consider the following code segment.
-\`\`\`java
-String str = "qrstu";
-String result = "";
-for (int j = 0; j < str.length(); j++) 
-{
-	result += str.substring(0, j + 1);
-}
-System.out.println(result);
-\`\`\`
-What is printed as a result of executing this code segment? If nothing is printed, explain why.
-
----
-
+## Spicy
 Consider the following code segment.
 
 \`\`\`java
@@ -80,12 +104,16 @@ The code segement is intended to produce the following output, but does not work
 What change should be made so that the code segment works as intended?
 
 
-# 
+# CSA 1.1-1.4 Coding Introduction Review
+
+## Mild
 
 A student wrote a program to calculate the average of several numeric scores. The program compiles without error but produces incorrect results when it runes. The student suspects there is a logic error in the code. 
 What strategies would you use to help you identify the logic error? 
 
 --- 
+
+## Mild
 
 Consider the following variable declaration.
 \`\`\`java
@@ -94,6 +122,8 @@ int x;
 What are 3 very different values that can be stored in the variable \`x\`? What are 3 very different values that cannot be?  
 
 ---
+
+## Medium
 
 The following code segment contains an error. 
 \`\`\`java
@@ -120,6 +150,13 @@ In a video game, if you were designing different types of characters that all ne
   'csp': { 
     subject: 'Computer Science Principles', 
     gradeLevel: 10,
+    promptInstructions: `For CSP questions:
+- The title format should be as follows: "CSP {topic number} - {lesson title} {question set type}". For example "CSA 2.4 - DNS & HTTP Review". If a topic number is not given, do not include it.
+- Use pseudocode that follows the AP CSP exam format
+- Include questions about both coding and computing concepts
+- Focus on algorithmic thinking and problem decomposition
+- Reference real-world applications of computing concepts
+- Include visualization or flowchart questions where appropriate`,
     exampleQuestions: {
       review: 
  `# Binary Numbers Review
@@ -173,6 +210,12 @@ If you were explaining to a friend how to tie their shoes, how would you break i
   'engr7': { 
     subject: 'Engineering', 
     gradeLevel: 7,
+    promptInstructions: `For 7th grade Engineering questions:
+- Include hands-on design thinking scenarios
+- Focus on measurement and spatial reasoning
+- Include sketching and drawing interpretation questions
+- Reference real tools and materials students use in class
+- Include safety considerations where relevant`,
     exampleQuestions: {
       review: `# Engineering Design Process Review
 
@@ -191,6 +234,11 @@ How do you think a 3D printer knows what shape to create?`
   'engr8': { 
     subject: 'Engineering', 
     gradeLevel: 8,
+    promptInstructions: `For 8th grade Engineering questions:
+- Focus on systematic troubleshooting approaches
+- Include questions about proper tool usage and safety
+- Reference specific components students work with
+- Include documentation and technical communication skills`,
     exampleQuestions: {
       review: `# Circuit Components Review
 
@@ -506,13 +554,24 @@ Requirements:
 - Include code blocks using \`\`\` when relevant for ${classMetadata.subject}
 - Make questions appropriate for Grade ${classMetadata.gradeLevel} students
 - ${isReview ? 'Focus on testing understanding of concepts students have already learned' : 'Design questions that students can begin reasoning about even if they haven\'t learned the full topic yet'}
+- Questions should increase in difficulty. Easy questions should be under the heading "## Mild", medium questions should be under the heading "## Medium" and hard questions should be under the headding "## Spicy"'
+- There should be at least 1 question of each difficulty
+- Easy questions should focus on definitions, factual recall, identifying elements, and explaining basic concepts, with questions that are self-contained and use familiar examples.
+- Medium questions should focus on applying concepts to familiar situations, explaining relationships between ideas, or adapting known solutions, like reading or writing code similar to what they have seen before, with slight variations. 
+- Hard questions should involve novel contexts, combining multiple concepts, or designing from scratch, and should focus on adaptation, far transfer, and creative problem solving. 
+- Avoid repeating the same question at multiple difficulties—each should introduce new cognitive demands
+- Vary question formats—include direct questions, short coding tasks, “explain why” prompts, and design challenges
+- Cover the topic across all three difficulty levels, ensuring each higher level builds on skills from lower levels
+
 
 DSL Format Example:
 # Title Here
 
+## Mild
 First question text here?
 
 ---
+## Medium
 Second question with code:
 
 \`\`\`java
@@ -522,7 +581,12 @@ Second question with code:
 What does this code do?
 
 ---
+## Spicy
 Third question text here?
+
+${classKey && CLASS_METADATA[classKey].promptInstructions ? 
+  `\nClass-Specific Instructions:\n${CLASS_METADATA[classKey].promptInstructions}\n` : 
+  ''}
 
 
 Example questions for this class and question type:
