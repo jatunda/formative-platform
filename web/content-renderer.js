@@ -40,11 +40,28 @@ function renderContent(data, containerEl) {
 			if (block.type === "question" && Array.isArray(block.content)) {
 				block.content.forEach(item => {
 					if (item.type === "text") {
-						const p = document.createElement("p");
-						p.className = "lesson-text";
-						// Process inline code formatting with backticks
-						p.innerHTML = processInlineCode(item.value);
-						containerEl.appendChild(p);
+						// Split text into lines to process each separately
+						const lines = item.value.split('\n');
+						
+						lines.forEach(line => {
+							// Check for heading pattern (1-6 #s followed by space)
+							const headingMatch = line.match(/^(#{1,6})\s+(.+)$/);
+							
+							if (headingMatch) {
+								// Create heading element (h1-h6 based on # count)
+								const level = headingMatch[1].length;
+								const heading = document.createElement(`h${level}`);
+								heading.className = `lesson-heading lesson-h${level}`;
+								heading.innerHTML = processInlineCode(headingMatch[2]);
+								containerEl.appendChild(heading);
+							} else if (line.trim() !== '') {
+								// Create paragraph for non-heading text
+								const p = document.createElement("p");
+								p.className = "lesson-text";
+								p.innerHTML = processInlineCode(line);
+								containerEl.appendChild(p);
+							}
+						});
 					}
 					if (item.type === "code") {
 						const pre = document.createElement("pre");

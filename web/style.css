@@ -777,6 +777,46 @@ code:not(.lesson-content code) {
   padding-bottom: 8px;
 }
 
+/* Lesson heading styles - Godot Dark Theme */
+.lesson-heading {
+  margin: 1.5em 0 0.75em;
+  line-height: 1.2;
+  font-weight: 600;
+}
+
+.lesson-h1 {
+  font-size: 1.8em;
+  color: #57b3ff; /* Godot blue */
+  border-bottom: 2px solid #4a5568;
+  padding-bottom: 0.3em;
+}
+
+.lesson-h2 {
+  font-size: 1.5em;
+  color: #42ffc2; /* Godot mint green */
+}
+
+.lesson-h3 {
+  font-size: 1.3em;
+  color: #ffd942; /* Godot yellow */
+}
+
+.lesson-h4 {
+  font-size: 1.1em;
+  color: #ff7085; /* Godot pink */
+}
+
+.lesson-h5 {
+  font-size: 1em;
+  color: #ff8142; /* Godot orange */
+}
+
+.lesson-h6 {
+  font-size: 0.9em;
+  color: #cccccc; /* Godot light grey */
+  font-style: italic;
+}
+
 .lesson-text {
   color: #e2e8f0;
   line-height: 1.6;
