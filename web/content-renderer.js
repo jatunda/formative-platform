@@ -36,8 +36,15 @@ function renderContent(data, containerEl) {
 	}
 
 	if (data.blocks && Array.isArray(data.blocks)) {
-		data.blocks.forEach(block => {
+		data.blocks.forEach((block, blockIndex) => {
 			if (block.type === "question" && Array.isArray(block.content)) {
+				// Add separator between questions, but not before the first one
+				if (blockIndex > 0) {
+					const hr = document.createElement("hr");
+					hr.className = "lesson-separator";
+					containerEl.appendChild(hr);
+				}
+				
 				block.content.forEach(item => {
 					if (item.type === "text") {
 						// Split text into lines to process each separately
