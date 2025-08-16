@@ -159,18 +159,35 @@ In a video game, if you were designing different types of characters that all ne
 - Include visualization or flowchart questions where appropriate`,
     exampleQuestions: {
       review: 
- `# Binary Numbers Review
+ `# CSP - Binary Numbers Review
+
+
+
+## Mild
 
 How many different values can be represented with 3 bits? List them all.
 
 ---
+
+## Medium
+
 What is the largest decimal number that can be represented with 4 bits?
 
 ---
 
+## Medium
+
 What is 125 in binary?
 
-# Setting and Accessing Lists Review 
+# CSP - Setting and Accessing Lists Review 
+
+## Mild
+
+What are the main benefits of using a list over using individual variables?
+
+---
+
+## Mild
 
 Consider the following code segment. 
 \`\`\`APCSP
@@ -186,9 +203,13 @@ What are the contents of each of the lists after the code segment is executed?
 
 ---
 
+## Medium
+
 The list \`wordList\` contains a list of 3 string values. What are all the valid indexes for the list? 
 
 ---
+
+## Medium
 
 Assume that both lists and strings are indexed starting with index \`1\`.
 The list \`wordList\` has the following contents.
