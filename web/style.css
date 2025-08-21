@@ -824,6 +824,24 @@ code:not(.lesson-content code) {
   margin-bottom: 12px;
 }
 
+/* Lesson link styles */
+.lesson-link {
+  color: #63b3ed;  /* Match the blue used in titles */
+  text-decoration: none;
+  border-bottom: 1px dotted #63b3ed;
+  transition: all 0.2s ease;
+}
+
+.lesson-link:hover {
+  color: #90cdf4;  /* Lighter blue on hover */
+  border-bottom: 1px solid #90cdf4;
+}
+
+.lesson-link:active {
+  color: #4299e1;  /* Darker blue when clicked */
+  border-bottom-color: #4299e1;
+}
+
 /* Lesson list styles */
 .lesson-list {
   color: #e2e8f0;

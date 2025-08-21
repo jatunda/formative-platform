@@ -1,6 +1,12 @@
 // Shared content rendering module
 // Used by both view.js and editor.js for consistent rendering
 
+// Function to process markdown links
+function processMarkdownLinks(text) {
+    // Match markdown links: [text](url)
+    return text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="lesson-link">$1</a>');
+}
+
 // Function to process inline code formatting with backticks
 function processInlineCode(text) {
 	// Escape HTML to prevent XSS, then process backticks
@@ -11,8 +17,11 @@ function processInlineCode(text) {
 		.replace(/"/g, '&quot;')
 		.replace(/'/g, '&#39;');
 	
+	// Process links first, then backticks
+	const withLinks = processMarkdownLinks(escaped);
+	
 	// Replace backtick-enclosed text with <code> tags
-	return escaped.replace(/`([^`]+)`/g, '<code>$1</code>');
+	return withLinks.replace(/`([^`]+)`/g, '<code>$1</code>');
 }
 
 // Function to render parsed content data into a container element
