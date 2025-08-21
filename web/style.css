@@ -769,10 +769,11 @@ code:not(.lesson-content code) {
 }
 
 .lesson-title {
-  color: #e2e8f0;
+  color: #63b3ed;
   margin-top: 0;
   margin-bottom: 16px;
-  font-size: 1.5em;
+  font-size: 2em;
+  font-weight: bold;
   border-bottom: 2px solid #4a5568;
   padding-bottom: 8px;
 }
