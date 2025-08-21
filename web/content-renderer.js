@@ -61,6 +61,30 @@ function renderContent(data, containerEl) {
 								heading.className = `lesson-heading lesson-h${level}`;
 								heading.innerHTML = processInlineCode(headingMatch[2]);
 								containerEl.appendChild(heading);
+							} else if (line.match(/^[*-]\s+/)) {
+								// Handle unordered list items
+								let ul = containerEl.lastElementChild;
+								if (!ul || ul.tagName !== 'UL') {
+									ul = document.createElement('ul');
+									ul.className = 'lesson-list';
+									containerEl.appendChild(ul);
+								}
+								const li = document.createElement('li');
+								li.className = 'lesson-list-item';
+								li.innerHTML = processInlineCode(line.replace(/^[*-]\s+/, ''));
+								ul.appendChild(li);
+							} else if (line.match(/^\d+\.\s+/)) {
+								// Handle ordered list items
+								let ol = containerEl.lastElementChild;
+								if (!ol || ol.tagName !== 'OL') {
+									ol = document.createElement('ol');
+									ol.className = 'lesson-list';
+									containerEl.appendChild(ol);
+								}
+								const li = document.createElement('li');
+								li.className = 'lesson-list-item';
+								li.innerHTML = processInlineCode(line.replace(/^\d+\.\s+/, ''));
+								ol.appendChild(li);
 							} else if (line.trim() !== '') {
 								// Create paragraph for non-heading text
 								const p = document.createElement("p");

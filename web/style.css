@@ -824,6 +824,36 @@ code:not(.lesson-content code) {
   margin-bottom: 12px;
 }
 
+/* Lesson list styles */
+.lesson-list {
+  color: #e2e8f0;
+  line-height: 1.2;
+  margin: 8px 0;
+  padding-left: 2em;
+}
+
+.lesson-list-item {
+  margin-bottom: 6px;
+}
+
+/* Style bullet points for unordered lists */
+ul.lesson-list {
+  list-style-type: disc;
+}
+
+ul.lesson-list .lesson-list-item::marker {
+  color: #63b3ed;  /* Match the blue used in titles */
+}
+
+/* Style numbers for ordered lists */
+ol.lesson-list {
+  list-style-type: decimal;
+}
+
+ol.lesson-list .lesson-list-item::marker {
+  color: #63b3ed;  /* Match the blue used in titles */
+}
+
 .lesson-code {
   background-color: #2b2b2b !important;
   color: #cccccc !important;
