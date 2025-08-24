@@ -1,6 +1,20 @@
 // Shared content rendering module
 // Used by both view.js and editor.js for consistent rendering
 
+// Function to process text formatting (bold, italic, bold-italic)
+function processTextFormatting(text) {
+    return text
+        // Bold-italic (must come before bold and italic)
+        .replace(/\*\*\*([^*]+)\*\*\*/g, '<strong><em>$1</em></strong>')
+        .replace(/___([^_]+)___/g, '<strong><em>$1</em></strong>')
+        // Bold
+        .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+        .replace(/__([^_]+)__/g, '<strong>$1</strong>')
+        // Italic
+        .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+        .replace(/_([^_]+)_/g, '<em>$1</em>');
+}
+
 // Function to process markdown links
 function processMarkdownLinks(text) {
     // Match markdown links: [text](url)
@@ -17,11 +31,12 @@ function processInlineCode(text) {
 		.replace(/"/g, '&quot;')
 		.replace(/'/g, '&#39;');
 	
-	// Process links first, then backticks
+	// Process in order: links, text formatting, then code
 	const withLinks = processMarkdownLinks(escaped);
+	const withFormatting = processTextFormatting(withLinks);
 	
 	// Replace backtick-enclosed text with <code> tags
-	return withLinks.replace(/`([^`]+)`/g, '<code>$1</code>');
+	return withFormatting.replace(/`([^`]+)`/g, '<code>$1</code>');
 }
 
 // Function to render parsed content data into a container element
