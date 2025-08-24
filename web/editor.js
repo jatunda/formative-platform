@@ -98,6 +98,16 @@ async function main() {
 // Initialize the lesson search module with database reference
 initializeLessonSearch(db);
 
+// Update back to schedule link to preserve class selection
+const urlParams = new URLSearchParams(window.location.search);
+const classParam = urlParams.get('fromClass');
+if (classParam) {
+    const backLink = document.getElementById('backToScheduleLink');
+    if (backLink) {
+        backLink.href = `teacher.html?class=${classParam}`;
+    }
+}
+
 // Initialize AI Question Generator
 try {
   validateConfig();

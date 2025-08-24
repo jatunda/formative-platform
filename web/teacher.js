@@ -172,6 +172,12 @@ async function loadClasses() {
   // Set the class from URL parameter if it exists
   if (urlClassId && classSelect.querySelector(`option[value="${urlClassId}"]`)) {
     classSelect.value = urlClassId;
+    
+    // Update the editor link immediately if we have a class from URL
+    const editorLink = document.getElementById('goToEditorLink');
+    if (editorLink) {
+      editorLink.href = `editor.html?fromClass=${urlClassId}`;
+    }
   }
 }
 
@@ -390,6 +396,12 @@ async function loadFullSchedule() {
   const url = new URL(window.location);
   url.searchParams.set('class', classId);
   history.replaceState({}, '', url);
+  
+  // Update the editor link to include the class parameter
+  const editorLink = document.getElementById('goToEditorLink');
+  if (editorLink) {
+    editorLink.href = `editor.html?fromClass=${classId}`;
+  }
   
   // Show loading state
   const loadingState = document.getElementById('schedule-loading-state');
@@ -912,7 +924,7 @@ function createLessonCluster(lessonHash, dayIndex, i, lessons) {
   mainBtn.textContent = pageTitles[lessonHash] || DEFAULT_LESSON_TITLE;
   mainBtn.className = "schedule-action-btn lesson-main-btn";
   mainBtn.onclick = () => {
-    window.location.href = `editor.html?page=${lessonHash}`;
+    window.location.href = `editor.html?page=${lessonHash}&fromClass=${classSelect.value}`;
   };
   topRow.appendChild(mainBtn);
 
