@@ -8,6 +8,11 @@
     ],
     "rewrites": [
       {
+        "source": "/**",
+        "host": "teacher.mrhsieh.app",
+        "destination": "/teacher.html"
+      },
+      {
         "source": "/teacher.html",
         "destination": "/teacher.html"
       },
