@@ -156,6 +156,10 @@ async function loadClasses() {
   // Clear loading option
   classSelect.innerHTML = "";
   
+  // Get class from URL if present
+  const urlParams = new URLSearchParams(window.location.search);
+  const urlClassId = urlParams.get('class');
+  
   Object.entries(classes)
     .sort(([, a], [, b]) => a.displayOrder - b.displayOrder)
     .forEach(([id, data]) => {
@@ -164,6 +168,11 @@ async function loadClasses() {
       option.textContent = data.name;
       classSelect.appendChild(option);
     });
+
+  // Set the class from URL parameter if it exists
+  if (urlClassId && classSelect.querySelector(`option[value="${urlClassId}"]`)) {
+    classSelect.value = urlClassId;
+  }
 }
 
 async function loadSchedule() {
@@ -376,6 +385,11 @@ async function loadFullSchedule() {
   if (!classId) return;
   
   currentClassId = classId;
+  
+  // Update URL with the selected class
+  const url = new URL(window.location);
+  url.searchParams.set('class', classId);
+  history.replaceState({}, '', url);
   
   // Show loading state
   const loadingState = document.getElementById('schedule-loading-state');
