@@ -8,9 +8,9 @@
     ],
     "rewrites": [
       {
-        "source": "/**",
-        "host": "teacher.mrhsieh.app",
-        "destination": "/teacher.html"
+        "source": "**",
+        "destination": "/teacher.html",
+        "domain": "teacher.mrhsieh.app"
       },
       {
         "source": "/teacher.html",
