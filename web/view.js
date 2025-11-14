@@ -1,13 +1,8 @@
 // public/view.js
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-app.js";
-import { getDatabase, ref, get } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js";
+import { ref, get } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js";
+import { db } from './firebase-config.js';
 import { initializeDateUtils, getTodayDayIndex } from './date-utils.js';
 import { renderContent, renderMultipleContent } from './content-renderer.js';
-
-const app = initializeApp({ 
-	databaseURL: "https://formative-platform-default-rtdb.firebaseio.com/",
-});
-const db = getDatabase(app);
 
 // Initialize date utilities with database
 initializeDateUtils(db);

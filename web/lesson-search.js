@@ -5,7 +5,7 @@
 // - Supports abbreviations and acronyms
 // - Visual match quality indicators (green=exact, yellow=good, gray=weak)
 // - Results sorted by relevance score
-import { getDatabase, ref, get } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js";
+import { ref, get } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js";
 
 // Cache for page titles to avoid redundant queries
 const pageTitles = {}; // id → title

@@ -1,6 +1,5 @@
 // Database Utility Functions
 import {
-  getDatabase,
   ref,
   get,
   set,

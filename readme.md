@@ -14,7 +14,11 @@ A web app for students to see daily formative assignments.
 
 ## SOPs
 
-to run a dev version: CLI navigate to '/web' then run 'npm run dev'
-to deploy: 
+### to run a dev version
+
+1. CLI navigate to '/web' then run 'npm run dev'
+
+### to deploy: 
+
 1. run `npm run build` to run the build script
 1. in root, 'firebase deploy'

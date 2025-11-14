@@ -2,14 +2,11 @@
 window.teacherAuth = new TeacherAuth();
 
 import {
-  initializeApp
-} from "https://www.gstatic.com/firebasejs/10.4.0/firebase-app.js";
-import {
-  getDatabase,
   ref,
   get,
   set
 } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js";
+import { db } from './firebase-config.js';
 import { 
   initializeDateUtils, 
   getDateForDayIndex as sharedGetDateForDayIndex,
@@ -23,10 +20,7 @@ import {
   getCachedTitle
 } from "./lesson-search.js";
 
-const app = initializeApp({
-  databaseURL: "https://formative-platform-default-rtdb.firebaseio.com/",
-});
-const db = getDatabase(app);
+// Database is imported from centralized firebase-config.js
 
 // Initialize date utilities
 initializeDateUtils(db);

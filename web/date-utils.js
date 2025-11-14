@@ -1,5 +1,5 @@
 // Shared Date Utilities
-import { getDatabase, ref, get } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js";
+import { ref, get } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js";
 
 // Default class start date - should match the one used in teacher.js
 export const DEFAULT_CLASS_START_DATE = "2024-08-19";

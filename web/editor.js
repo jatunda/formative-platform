@@ -2,18 +2,13 @@
 window.teacherAuth = new TeacherAuth();
 
 import {
-	initializeApp
-} from "https://www.gstatic.com/firebasejs/10.4.0/firebase-app.js";
-import {
-	getDatabase,
 	ref,
 	get,
 	set,
-	remove
-} from "https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js";
-import {
+	remove,
 	child
 } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js";
+import { db } from './firebase-config.js';
 import {
 	parseDSL,
 	generateDSLFromContent
@@ -74,10 +69,7 @@ import {
 } from "./ai-config.js";
 
 
-const app = initializeApp({
-	databaseURL: "https://formative-platform-default-rtdb.firebaseio.com/",
-});
-const db = getDatabase(app);
+// Database is imported from centralized firebase-config.js
 
 // Check authentication before proceeding
 (async () => {

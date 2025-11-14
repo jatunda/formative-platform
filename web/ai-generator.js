@@ -1,4 +1,4 @@
-import { getDatabase, ref, get, set } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js";
+import { ref, get, set } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js";
 import { AI_CONFIG } from "./ai-config.js";
 import { parseDSL } from "./dsl.js";
 

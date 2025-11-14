@@ -1,18 +1,8 @@
 // public/landing.js
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-app.js";
-import { getDatabase, ref, get, child } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js";
+import { ref, get, child } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js";
+import { db } from './firebase-config.js';
 import { initializeDateUtils, getTodayDayIndex } from './date-utils.js';
 
-console.log("Landing.js loaded - initializing Firebase...");
-
-// Test with a more permissive configuration
-const app = initializeApp({
-  databaseURL: "https://formative-platform-default-rtdb.firebaseio.com/",
-});
-const db = getDatabase(app);
-
-console.log("Firebase initialized, database:", db);
-console.log("Database URL:", app.options.databaseURL);
 
 // Initialize date utilities with database
 initializeDateUtils(db);
