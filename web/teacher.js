@@ -16,6 +16,18 @@ import {
 import { DEFAULT_CLASS_START_DATE, DEFAULT_LESSON_TITLE, UNTITLED_LESSON } from './constants.js';
 import { showNotification } from './notification-utils.js';
 import {
+	createStyledButton,
+	createNewLessonButton as createNewLessonButtonShared,
+	createCloseButton,
+	createArrowButton,
+	createDeleteButton,
+	createInsertDayButton,
+	createUpArrowButton,
+	createDownArrowButton,
+	createLeftArrowButton,
+	createRightArrowButton
+} from './ui-components.js';
+import {
   initializeLessonSearch,
   showLessonSearchPopup,
   getCachedTitle
@@ -205,11 +217,8 @@ async function renderScheduleList() {
     const btnSpan = document.createElement("span");
     btnSpan.className = "flex-row-buttons";
 
-    const upBtn = createArrowButton("up", false, () => moveItem(i, i - 1));
-    upBtn.textContent = "↑";
-    
-    const downBtn = createArrowButton("down", false, () => moveItem(i, i + 1));
-    downBtn.textContent = "↓";
+    const upBtn = createUpArrowButton(() => moveItem(i, i - 1));
+    const downBtn = createDownArrowButton(() => moveItem(i, i + 1));
     
     const delBtn = createDeleteButton(() => deleteItem(i));
 
@@ -803,54 +812,10 @@ function showLessonLinkPopup({ onSelect }) {
   showLessonSearchPopup({ onSelect });
 }
 
-// Use CSS classes for styled buttons
-function createStyledButton(text, onClick) {
-  const btn = document.createElement("button");
-  btn.textContent = text;
-  btn.className = "schedule-action-btn";
-  btn.onclick = onClick;
-  return btn;
-}
-
-// Button helper functions
+// UI component functions are imported from ui-components.js
+// Wrapper for createNewLessonButton to match local usage pattern
 function createNewLessonButton(dayIndex) {
-  const btn = document.createElement("button");
-  btn.textContent = "New Lesson";
-  btn.className = "schedule-action-btn new-lesson-btn";
-  btn.onclick = () => addLessonToDay(dayIndex);
-  return btn;
-}
-
-function createCloseButton(popup) {
-  const btn = document.createElement("button");
-  btn.textContent = "Close";
-  btn.className = "schedule-action-btn";
-  btn.onclick = () => document.body.removeChild(popup);
-  return btn;
-}
-
-function createArrowButton(direction, isDisabled, onClick) {
-  const btn = document.createElement("button");
-  btn.textContent = direction === "left" ? "←" : "→";
-  btn.disabled = isDisabled;
-  btn.onclick = onClick;
-  return btn;
-}
-
-function createDeleteButton(onClick) {
-  const btn = document.createElement("button");
-  btn.textContent = "🗑️";
-  btn.className = "schedule-action-btn delete-btn";
-  btn.onclick = onClick;
-  return btn;
-}
-
-function createInsertDayButton(dayIndex, insertFunction) {
-  const btn = document.createElement("button");
-  btn.textContent = "+ Insert Day Here";
-  btn.className = "schedule-action-btn insert-day-btn";
-  btn.onclick = () => insertFunction(dayIndex);
-  return btn;
+	return createNewLessonButtonShared(dayIndex, addLessonToDay);
 }
 
 // Use CSS classes for lesson clusters
@@ -891,7 +856,7 @@ function createLessonCluster(lessonHash, dayIndex, i, lessons) {
   bottomRow.className = "lesson-cluster-bottom";
 
   // Left arrow
-  const leftBtn = createArrowButton("left", i === 0, async () => {
+  const leftBtn = createLeftArrowButton(i === 0, async () => {
     if (i > 0) {
       const classId = classSelect.value;
       const dayRef = ref(db, `schedule/${classId}/${dayIndex}`);
@@ -904,7 +869,7 @@ function createLessonCluster(lessonHash, dayIndex, i, lessons) {
   bottomRow.appendChild(leftBtn);
 
   // Right arrow
-  const rightBtn = createArrowButton("right", i === lessons.length - 1, async () => {
+  const rightBtn = createRightArrowButton(i === lessons.length - 1, async () => {
     if (i < lessons.length - 1) {
       const classId = classSelect.value;
       const dayRef = ref(db, `schedule/${classId}/${dayIndex}`);

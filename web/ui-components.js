@@ -12,7 +12,7 @@ export function createStyledButton(text, onClick) {
 // Button helper functions
 export function createNewLessonButton(dayIndex, addLessonCallback) {
   const btn = document.createElement("button");
-  btn.textContent = "+ New Lesson";
+  btn.textContent = "New Lesson";
   btn.className = "schedule-action-btn new-lesson-btn";
   btn.onclick = () => addLessonCallback(dayIndex);
   return btn;
@@ -63,6 +63,11 @@ export function createElement(tag, className = "", textContent = "") {
 export function createUpArrowButton(onClick) {
   const btn = createArrowButton("up", false, onClick);
   btn.textContent = "↑";
+  // Minimize width to fit content only
+  btn.style.width = "auto";
+  btn.style.minWidth = "auto";
+  btn.style.maxWidth = "none";
+  btn.style.padding = "4px 8px";
   return btn;
 }
 
@@ -70,6 +75,33 @@ export function createUpArrowButton(onClick) {
 export function createDownArrowButton(onClick) {
   const btn = createArrowButton("down", false, onClick);
   btn.textContent = "↓";
+  // Minimize width to fit content only
+  btn.style.width = "auto";
+  btn.style.minWidth = "auto";
+  btn.style.maxWidth = "none";
+  btn.style.padding = "4px 8px";
+  return btn;
+}
+
+// Create a button with left arrow (←)
+export function createLeftArrowButton(isDisabled, onClick) {
+  const btn = createArrowButton("left", isDisabled, onClick);
+  // Minimize width to fit content only
+  btn.style.width = "auto";
+  btn.style.minWidth = "auto";
+  btn.style.maxWidth = "none";
+  btn.style.padding = "4px 8px";
+  return btn;
+}
+
+// Create a button with right arrow (→)
+export function createRightArrowButton(isDisabled, onClick) {
+  const btn = createArrowButton("right", isDisabled, onClick);
+  // Minimize width to fit content only
+  btn.style.width = "auto";
+  btn.style.minWidth = "auto";
+  btn.style.maxWidth = "none";
+  btn.style.padding = "4px 8px";
   return btn;
 }
 
