@@ -6,6 +6,7 @@
 // - Visual match quality indicators (green=exact, yellow=good, gray=weak)
 // - Results sorted by relevance score
 import { ref, get } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js";
+import { UNTITLED_LESSON } from './constants.js';
 
 // Cache for page titles to avoid redundant queries
 const pageTitles = {}; // id → title
@@ -105,7 +106,7 @@ export function showLessonSearchPopup({ onSelect }) {
         }
         
         const titleSnap = await get(ref(db, `content/${id}/title`));
-        const title = titleSnap.exists() ? titleSnap.val() : "(Untitled)";
+        const title = titleSnap.exists() ? titleSnap.val() : UNTITLED_LESSON;
         pageTitles[id] = title; // Cache it
         return { id, title };
       });
@@ -146,7 +147,7 @@ export function showLessonSearchPopup({ onSelect }) {
         const allItems = Object.entries(contentMap)
           .map(([id, data]) => ({
             id,
-            title: (data.title || "(Untitled)").toString()
+            title: (data.title || UNTITLED_LESSON).toString()
           }))
           .map(item => {
             const titleScore = fuzzyScore(item.title.toLowerCase(), filterLower);

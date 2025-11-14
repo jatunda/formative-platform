@@ -67,6 +67,7 @@ import {
 	AI_CONFIG,
 	validateConfig
 } from "./ai-config.js";
+import { NO_CONTENT_SELECTED, UNTITLED_LESSON, UNTITLED_LESSON_LOWERCASE, CONTENT_NOT_FOUND } from './constants.js';
 
 
 // Database is imported from centralized firebase-config.js
@@ -454,7 +455,7 @@ searchLessonBtn.onclick = () => {
 
 saveBtn.onclick = async () => {
 	const id = contentIdEl.textContent.trim();
-	if (!id || id === "(No content selected)") return alert("No content ID available.");
+	if (!id || id === NO_CONTENT_SELECTED) return alert("No content ID available.");
 
 	const parsed = parseDSL(dslInput.value);
 	if (!parsed.title || !parsed.blocks) return alert("Parsing failed or content is malformed.");
@@ -466,7 +467,7 @@ saveBtn.onclick = async () => {
 	const timestamp = now.toLocaleString(); // This includes date and time down to seconds
 	
 	// Get the lesson title
-	const lessonTitle = parsed.title || "(Untitled)";
+	const lessonTitle = parsed.title || UNTITLED_LESSON;
 	
 	showNotification(`"${lessonTitle}" saved successfully at ${timestamp}`, "success");
 };
@@ -576,10 +577,10 @@ duplicateBtn.onclick = async () => {
 
 deleteBtn.onclick = async () => {
 	const id = contentIdEl.textContent.trim();
-	if (!id || id === "(No content selected)") return alert("No content ID available.");
+	if (!id || id === NO_CONTENT_SELECTED) return alert("No content ID available.");
 
 	// Get the title from the current content
-	let title = "(Untitled)";
+	let title = UNTITLED_LESSON;
 	try {
 		const parsed = parseDSL(dslInput.value);
 		if (parsed && parsed.title) {
@@ -606,7 +607,7 @@ deleteBtn.onclick = async () => {
 		await remove(ref(db, `content/${id}`));
 		
 		// Clear the editor
-		contentIdEl.textContent = "(No content selected)";
+		contentIdEl.textContent = NO_CONTENT_SELECTED;
 		dslInput.value = "";
 		preview.innerHTML = "";
 		
@@ -637,7 +638,7 @@ async function loadExistingContentList(selectLessonId = null) {
 	const sortedKeys = Object.keys(contentMap).sort();
 
 	for (let id of sortedKeys) {
-		const title = contentMap[id]?.title || "(untitled)";
+		const title = contentMap[id]?.title || UNTITLED_LESSON_LOWERCASE;
 		const option = document.createElement("option");
 		option.value = id;
 		option.textContent = title;
@@ -666,7 +667,7 @@ existingContentSelect.onchange = async () => {
   const selectedId = existingContentSelect.value;
   if (!selectedId) {
     // If nothing is selected, disable editing
-    contentIdEl.textContent = "(No content selected)";
+    contentIdEl.textContent = NO_CONTENT_SELECTED;
     dslInput.value = "";
     preview.innerHTML = "";
     setEditingEnabled(false);
@@ -680,7 +681,7 @@ existingContentSelect.onchange = async () => {
 async function loadContent(id) {
   const snap = await get(ref(db, `content/${id}`));
   if (!snap.exists()) {
-    alert("No content found.");
+    alert(CONTENT_NOT_FOUND);
     return;
   }
 

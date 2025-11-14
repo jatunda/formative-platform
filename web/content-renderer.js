@@ -1,5 +1,6 @@
 // Shared content rendering module
 // Used by both view.js and editor.js for consistent rendering
+import { CONTENT_NOT_FOUND } from './constants.js';
 
 // Function to process text formatting (bold, italic, bold-italic)
 function processTextFormatting(text) {
@@ -42,7 +43,7 @@ function processInlineCode(text) {
 // Function to render parsed content data into a container element
 function renderContent(data, containerEl) {
 	if (!data) {
-		containerEl.textContent = "Content not found.";
+		containerEl.textContent = CONTENT_NOT_FOUND;
 		return;
 	}
 

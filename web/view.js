@@ -3,6 +3,7 @@ import { ref, get } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-dat
 import { db } from './firebase-config.js';
 import { initializeDateUtils, getTodayDayIndex } from './date-utils.js';
 import { renderContent, renderMultipleContent } from './content-renderer.js';
+import { NO_CONTENT_FOR_TODAY } from './constants.js';
 
 // Initialize date utilities with database
 initializeDateUtils(db);
@@ -38,7 +39,7 @@ async function loadContent() {
   pageIds = scheduleSnap.val() || [];
   
   if (pageIds.length === 0) {
-    contentEl.textContent = "No content for today.";
+    contentEl.textContent = NO_CONTENT_FOR_TODAY;
     return;
   }
   

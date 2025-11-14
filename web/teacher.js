@@ -11,9 +11,9 @@ import {
   initializeDateUtils, 
   getDateForDayIndex as sharedGetDateForDayIndex,
   getTodayDayIndex,
-  DEFAULT_CLASS_START_DATE,
   clearDateOffsetCache
 } from './date-utils.js';
+import { DEFAULT_CLASS_START_DATE, DEFAULT_LESSON_TITLE, UNTITLED_LESSON } from './constants.js';
 import {
   initializeLessonSearch,
   showLessonSearchPopup,
@@ -54,7 +54,7 @@ const BUTTON_CONFIG = {
   maxWidth: "110px"
 };
 
-const DEFAULT_LESSON_TITLE = "Empty Lesson";
+// Constants imported from constants.js
 const POPUP_MAX_HEIGHT = "50vh";
 
 const classSelect = document.getElementById("classSelect");
@@ -192,7 +192,7 @@ async function renderScheduleList() {
 
     if (!pageTitles[pageId]) {
       const snap = await get(ref(db, `content/${pageId}/title`));
-      pageTitles[pageId] = snap.exists() ? snap.val() : "(Untitled)";
+      pageTitles[pageId] = snap.exists() ? snap.val() : UNTITLED_LESSON;
     }
 
     const li = document.createElement("li");

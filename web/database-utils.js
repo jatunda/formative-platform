@@ -6,7 +6,6 @@ import {
   update
 } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js";
 import { DEFAULT_LESSON_TITLE, UNTITLED_LESSON } from "./constants.js";
-import { createErrorHandler } from "./validation-utils.js";
 
 let db; // Database reference will be set by initializeDatabase
 
