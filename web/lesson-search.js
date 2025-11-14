@@ -13,7 +13,14 @@ const pageTitles = {}; // id → title
 
 let db; // Database reference
 
-// Fuzzy search scoring function
+/**
+ * Calculate fuzzy search score between text and query
+ * Handles typos, partial matches, abbreviations, and acronyms
+ * @param {string} text - The text to search in
+ * @param {string} query - The search query
+ * @returns {number} The relevance score (0 = no match, higher = better match)
+ * @private
+ */
 function fuzzyScore(text, query) {
   if (!query) return 1; // Empty query matches everything with high score
   if (!text) return 0; // Empty text never matches
@@ -74,12 +81,20 @@ function fuzzyScore(text, query) {
   return Math.max(0, score);
 }
 
-// Initialize the module with database reference
+/**
+ * Initialize the lesson search module with a database reference
+ * @param {import("https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js").Database} database - The Firebase database instance
+ */
 export function initializeLessonSearch(database) {
   db = database;
 }
 
-// Create and show the lesson search popup
+/**
+ * Create and show the lesson search popup with fuzzy search functionality
+ * Features fuzzy search, visual match quality indicators, and sorted results
+ * @param {Object} options - Options object
+ * @param {(lessonId: string) => void} options.onSelect - Callback function called when a lesson is selected
+ */
 export function showLessonSearchPopup({ onSelect }) {
   (async () => {
     if (!db) {
@@ -239,12 +254,18 @@ function createCloseButton(popup) {
   return btn;
 }
 
-// Export the cache for use by other modules if needed
+/**
+ * Get a cached lesson title by ID
+ * @param {string} id - The lesson ID
+ * @returns {string | undefined} The cached title, or undefined if not cached
+ */
 export function getCachedTitle(id) {
   return pageTitles[id];
 }
 
-// Clear cache if needed
+/**
+ * Clear the lesson title cache
+ */
 export function clearTitleCache() {
   Object.keys(pageTitles).forEach(key => delete pageTitles[key]);
 }

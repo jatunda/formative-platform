@@ -13,9 +13,15 @@ const FIREBASE_CONFIG = {
 // Initialize Firebase app (singleton pattern - initializeApp is idempotent)
 const app = initializeApp(FIREBASE_CONFIG);
 
-// Get and export the database instance
+/**
+ * Firebase Realtime Database instance
+ * @type {import("https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js").Database}
+ */
 export const db = getDatabase(app);
 
-// Export the app instance in case it's needed elsewhere
+/**
+ * Firebase App instance
+ * @type {import("https://www.gstatic.com/firebasejs/10.4.0/firebase-app.js").FirebaseApp}
+ */
 export { app };
 

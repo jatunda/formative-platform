@@ -22,7 +22,13 @@ export const DB_PATHS = {
 	CLASSES: "classes/",
 };
 
-// Helper function to build database paths
+/**
+ * Build a database path from path segments
+ * @param {...string} segments - Path segments to join together
+ * @returns {string} The joined path string
+ * @example
+ * buildPath("schedule", "class1", "0") // Returns "schedule/class1/0"
+ */
 export function buildPath(...segments) {
 	return segments.filter(Boolean).join("/");
 }

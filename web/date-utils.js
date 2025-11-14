@@ -1,7 +1,10 @@
 // Shared Date Utilities
 import { ref, get } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js";
 
-// Default class start date - should match the one used in teacher.js
+/**
+ * Default class start date in YYYY-MM-DD format
+ * @type {string}
+ */
 export const DEFAULT_CLASS_START_DATE = "2024-08-19";
 
 let db; // Database reference
@@ -9,12 +12,19 @@ let db; // Database reference
 // Cache for date offsets to avoid redundant queries
 const dateOffsetCache = new Map();
 
-// Initialize database reference
+/**
+ * Initialize date utilities with a database reference
+ * @param {import("https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js").Database} database - The Firebase database instance
+ */
 export function initializeDateUtils(database) {
   db = database;
 }
 
-// Get date offset for a class (with caching)
+/**
+ * Get date offset for a class (with caching)
+ * @param {string} classId - The class ID
+ * @returns {Promise<number>} The date offset in days (default: 0)
+ */
 export async function getClassDateOffset(classId) {
   // Check cache first
   if (dateOffsetCache.has(classId)) {
@@ -38,7 +48,10 @@ export async function getClassDateOffset(classId) {
   }
 }
 
-// Clear cache when offset is updated
+/**
+ * Clear the date offset cache for a specific class or all classes
+ * @param {string | null} [classId=null] - The class ID to clear, or null to clear all
+ */
 export function clearDateOffsetCache(classId = null) {
   if (classId) {
     dateOffsetCache.delete(classId);
@@ -91,7 +104,12 @@ function getBusinessDaysBetween(startDate, endDate) {
   return Math.max(0, businessDays - 1);
 }
 
-// Calculate day index for today with offset applied (business days only)
+/**
+ * Calculate day index for today with offset applied (business days only)
+ * @param {string} classId - The class ID
+ * @param {string} [classStartDate=DEFAULT_CLASS_START_DATE] - The class start date in YYYY-MM-DD format
+ * @returns {Promise<number>} The day index for today
+ */
 export async function getTodayDayIndex(classId, classStartDate = DEFAULT_CLASS_START_DATE) {
   const today = new Date();
   const startDate = createLocalDate(classStartDate);
@@ -108,7 +126,13 @@ export async function getTodayDayIndex(classId, classStartDate = DEFAULT_CLASS_S
   return effectiveDayIndex;
 }
 
-// Calculate actual date for a given day index with offset applied (business days only)
+/**
+ * Calculate actual date for a given day index with offset applied (business days only)
+ * @param {number} dayIndex - The day index
+ * @param {string} classId - The class ID
+ * @param {string} [classStartDate=DEFAULT_CLASS_START_DATE] - The class start date in YYYY-MM-DD format
+ * @returns {Promise<string>} The formatted date string with weekday (e.g., "1/15/2025 (Wednesday)")
+ */
 export async function getDateForDayIndex(dayIndex, classId, classStartDate = DEFAULT_CLASS_START_DATE) {
   const dateOffset = await getClassDateOffset(classId);
   
@@ -123,7 +147,13 @@ export async function getDateForDayIndex(dayIndex, classId, classStartDate = DEF
   return `${date.toLocaleDateString()} (${weekday})`;
 }
 
-// Get just the Date object for a day index with offset (business days only)
+/**
+ * Get just the Date object for a day index with offset (business days only)
+ * @param {number} dayIndex - The day index
+ * @param {string} classId - The class ID
+ * @param {string} [classStartDate=DEFAULT_CLASS_START_DATE] - The class start date in YYYY-MM-DD format
+ * @returns {Promise<Date>} The Date object for the given day index
+ */
 export async function getDateObjectForDayIndex(dayIndex, classId, classStartDate = DEFAULT_CLASS_START_DATE) {
   const dateOffset = await getClassDateOffset(classId);
   
@@ -135,7 +165,13 @@ export async function getDateObjectForDayIndex(dayIndex, classId, classStartDate
   return date;
 }
 
-// Check if a given day index represents today (accounting for offset)
+/**
+ * Check if a given day index represents today (accounting for offset)
+ * @param {number} dayIndex - The day index to check
+ * @param {string} classId - The class ID
+ * @param {string} [classStartDate=DEFAULT_CLASS_START_DATE] - The class start date in YYYY-MM-DD format
+ * @returns {Promise<boolean>} True if the day index represents today
+ */
 export async function isDayIndexToday(dayIndex, classId, classStartDate = DEFAULT_CLASS_START_DATE) {
   const todayDayIndex = await getTodayDayIndex(classId, classStartDate);
   return Number(dayIndex) === todayDayIndex;

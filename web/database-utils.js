@@ -9,7 +9,11 @@ import { DEFAULT_LESSON_TITLE, UNTITLED_LESSON } from "./constants.js";
 
 let db; // Database reference will be set by initializeDatabase
 
-// Initialize database reference
+/**
+ * Initialize database reference
+ * @param {import("https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js").Database} database - The Firebase database instance
+ * @throws {Error} If database instance is not provided
+ */
 export function initializeDatabase(database) {
   if (!database) {
     throw new Error("Database instance is required for initialization");
@@ -17,7 +21,13 @@ export function initializeDatabase(database) {
   db = database;
 }
 
-// Get schedule for a specific day
+/**
+ * Get schedule for a specific day
+ * @param {string} classId - The class ID
+ * @param {number} dayIndex - The day index
+ * @returns {Promise<string[]>} Array of lesson hashes for the day
+ * @throws {Error} If database is not initialized or operation fails
+ */
 export async function getScheduleForDay(classId, dayIndex) {
   if (!db) {
     throw new Error("Database not initialized. Call initializeDatabase first.");
@@ -31,7 +41,14 @@ export async function getScheduleForDay(classId, dayIndex) {
   }
 }
 
-// Update schedule for a specific day
+/**
+ * Update schedule for a specific day
+ * @param {string} classId - The class ID
+ * @param {number} dayIndex - The day index
+ * @param {string[]} lessons - Array of lesson hashes
+ * @returns {Promise<void>}
+ * @throws {Error} If database is not initialized or operation fails
+ */
 export async function updateScheduleForDay(classId, dayIndex, lessons) {
   if (!db) {
     throw new Error("Database not initialized. Call initializeDatabase first.");
@@ -45,7 +62,12 @@ export async function updateScheduleForDay(classId, dayIndex, lessons) {
   }
 }
 
-// Get full schedule for a class
+/**
+ * Get full schedule for a class (all days)
+ * @param {string} classId - The class ID
+ * @returns {Promise<Object<number, string[]>>} Object mapping day indices to arrays of lesson hashes
+ * @throws {Error} If database is not initialized or operation fails
+ */
 export async function getFullSchedule(classId) {
   if (!db) {
     throw new Error("Database not initialized. Call initializeDatabase first.");
@@ -60,26 +82,42 @@ export async function getFullSchedule(classId) {
   return snap.val() || {};
 }
 
-// Get lesson data from database
+/**
+ * Get lesson data from database
+ * @param {string} hash - The lesson hash/ID
+ * @returns {Promise<Object | null>} The lesson data, or null if not found
+ */
 export async function getLessonFromDB(hash) {
   const snap = await get(ref(db, `content/${hash}`));
   return snap.exists() ? snap.val() : null;
 }
 
-// Get lesson title from database
+/**
+ * Get lesson title from database
+ * @param {string} hash - The lesson hash/ID
+ * @returns {Promise<string>} The lesson title, or UNTITLED_LESSON if not found
+ */
 export async function getLessonTitleFromDB(hash) {
   const snap = await get(ref(db, `content/${hash}/title`));
   return snap.exists() ? snap.val() : UNTITLED_LESSON;
 }
 
-// Create a new lesson in the database
+/**
+ * Create a new lesson in the database with a unique hash
+ * @param {string} [title=DEFAULT_LESSON_TITLE] - The lesson title
+ * @returns {Promise<string>} The generated unique hash for the lesson
+ */
 export async function createNewLesson(title = DEFAULT_LESSON_TITLE) {
   const hash = await generateUniqueHash();
   await set(ref(db, `content/${hash}`), { title });
   return hash;
 }
 
-// Generate a unique hash for new lessons
+/**
+ * Generate a unique hash for new lessons
+ * Continuously generates hashes until one is found that doesn't exist in the database
+ * @returns {Promise<string>} A unique 32-character hexadecimal hash
+ */
 export async function generateUniqueHash() {
   let hash;
   let exists = true;
@@ -92,33 +130,61 @@ export async function generateUniqueHash() {
   return hash;
 }
 
-// Get all classes
+/**
+ * Get all classes from the database
+ * @returns {Promise<Object | null>} Object mapping class IDs to class data, or null if none exist
+ */
 export async function getClasses() {
   const snap = await get(ref(db, "classes"));
   return snap.val();
 }
 
-// Get all content (for lesson linking popup)
+/**
+ * Get all content (for lesson linking popup)
+ * @returns {Promise<Object | null>} Object mapping lesson hashes to lesson data, or null if none exist
+ */
 export async function getAllContent() {
   const snap = await get(ref(db, "content"));
   return snap.exists() ? snap.val() : null;
 }
 
-// Add lesson to a specific day
+/**
+ * Add a lesson to a specific day's schedule
+ * @param {string} classId - The class ID
+ * @param {number} dayIndex - The day index
+ * @param {string} lessonHash - The lesson hash to add
+ * @returns {Promise<void>}
+ * @throws {Error} If database is not initialized or operation fails
+ */
 export async function addLessonToSchedule(classId, dayIndex, lessonHash) {
   const lessons = await getScheduleForDay(classId, dayIndex);
   lessons.push(lessonHash);
   await updateScheduleForDay(classId, dayIndex, lessons);
 }
 
-// Remove lesson from a specific position
+/**
+ * Remove a lesson from a specific position in a day's schedule
+ * @param {string} classId - The class ID
+ * @param {number} dayIndex - The day index
+ * @param {number} lessonIndex - The index of the lesson to remove
+ * @returns {Promise<void>}
+ * @throws {Error} If database is not initialized or operation fails
+ */
 export async function removeLessonFromSchedule(classId, dayIndex, lessonIndex) {
   const lessons = await getScheduleForDay(classId, dayIndex);
   lessons.splice(lessonIndex, 1);
   await updateScheduleForDay(classId, dayIndex, lessons);
 }
 
-// Move lesson within the same day
+/**
+ * Move a lesson within the same day's schedule
+ * @param {string} classId - The class ID
+ * @param {number} dayIndex - The day index
+ * @param {number} fromIndex - The current index of the lesson
+ * @param {number} toIndex - The target index for the lesson
+ * @returns {Promise<boolean>} True if move was successful, false if toIndex is out of bounds
+ * @throws {Error} If database is not initialized or operation fails
+ */
 export async function moveLessonInSchedule(classId, dayIndex, fromIndex, toIndex) {
   const lessons = await getScheduleForDay(classId, dayIndex);
   if (toIndex < 0 || toIndex >= lessons.length) return false;
@@ -129,7 +195,15 @@ export async function moveLessonInSchedule(classId, dayIndex, fromIndex, toIndex
   return true;
 }
 
-// Move lesson between days (drag and drop)
+/**
+ * Move a lesson between different days (for drag and drop functionality)
+ * @param {string} classId - The class ID
+ * @param {number} fromDayIndex - The source day index
+ * @param {number} fromLessonIndex - The index of the lesson in the source day
+ * @param {number} toDayIndex - The target day index
+ * @returns {Promise<string>} The moved lesson hash
+ * @throws {Error} If database is not initialized or operation fails
+ */
 export async function moveLessonBetweenDays(classId, fromDayIndex, fromLessonIndex, toDayIndex) {
   // Get lessons from both days
   const fromLessons = await getScheduleForDay(classId, fromDayIndex);
@@ -148,7 +222,12 @@ export async function moveLessonBetweenDays(classId, fromDayIndex, fromLessonInd
   return lessonHash;
 }
 
-// Date offset functions
+/**
+ * Get date offset for a class
+ * @param {string} classId - The class ID
+ * @returns {Promise<number>} The date offset in days (default: 0)
+ * @throws {Error} If database is not initialized or operation fails
+ */
 export async function getClassDateOffset(classId) {
   if (!db) {
     throw new Error("Database not initialized. Call initializeDatabase first.");
@@ -162,6 +241,13 @@ export async function getClassDateOffset(classId) {
   }
 }
 
+/**
+ * Set date offset for a class
+ * @param {string} classId - The class ID
+ * @param {number} offset - The date offset in days
+ * @returns {Promise<void>}
+ * @throws {Error} If database is not initialized or operation fails
+ */
 export async function setClassDateOffset(classId, offset) {
   if (!db) {
     throw new Error("Database not initialized. Call initializeDatabase first.");
@@ -174,7 +260,14 @@ export async function setClassDateOffset(classId, offset) {
   }
 }
 
-// Insert new empty day at index (shifts other days up)
+/**
+ * Insert a new empty day at the specified index (shifts all days >= index up by 1)
+ * @param {string} classId - The class ID
+ * @param {number} index - The index where the new day should be inserted
+ * @param {number} maxDayIndex - The maximum day index currently in the schedule
+ * @returns {Promise<void>}
+ * @throws {Error} If database is not initialized or operation fails
+ */
 export async function insertDayAt(classId, index, maxDayIndex) {
   // Shift all days >= index up by 1
   for (let i = maxDayIndex; i >= index; i--) {

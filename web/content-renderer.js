@@ -2,7 +2,12 @@
 // Used by both view.js and editor.js for consistent rendering
 import { CONTENT_NOT_FOUND } from './constants.js';
 
-// Function to process text formatting (bold, italic, bold-italic)
+/**
+ * Process text formatting (bold, italic, bold-italic) using markdown syntax
+ * @param {string} text - The text to process
+ * @returns {string} The HTML formatted text
+ * @private
+ */
 function processTextFormatting(text) {
     return text
         // Bold-italic (must come before bold and italic)
@@ -16,13 +21,23 @@ function processTextFormatting(text) {
         .replace(/_([^_]+)_/g, '<em>$1</em>');
 }
 
-// Function to process markdown links
+/**
+ * Process markdown-style links: [text](url)
+ * @param {string} text - The text to process
+ * @returns {string} The HTML with links converted to anchor tags
+ * @private
+ */
 function processMarkdownLinks(text) {
     // Match markdown links: [text](url)
     return text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="lesson-link">$1</a>');
 }
 
-// Function to process inline code formatting with backticks
+/**
+ * Process inline code formatting with backticks, escaping HTML to prevent XSS
+ * Processes text in order: HTML escape, links, text formatting, then code blocks
+ * @param {string} text - The text to process
+ * @returns {string} The HTML formatted text with code tags
+ */
 function processInlineCode(text) {
 	// Escape HTML to prevent XSS, then process backticks
 	const escaped = text
@@ -40,7 +55,14 @@ function processInlineCode(text) {
 	return withFormatting.replace(/`([^`]+)`/g, '<code>$1</code>');
 }
 
-// Function to render parsed content data into a container element
+/**
+ * Render parsed content data into a container element
+ * Supports titles, text blocks, code blocks, headings, lists (ordered/unordered), and inline formatting
+ * @param {Object} data - The parsed content data
+ * @param {string} data.title - The lesson title
+ * @param {Array<Object>} data.blocks - Array of question blocks
+ * @param {HTMLElement} containerEl - The container element to render into
+ */
 function renderContent(data, containerEl) {
 	if (!data) {
 		containerEl.textContent = CONTENT_NOT_FOUND;
@@ -154,7 +176,11 @@ function renderContent(data, containerEl) {
 	}
 }
 
-// Function to render multiple content items with separators
+/**
+ * Render multiple content items with separators between them
+ * @param {Array<Object>} dataArray - Array of parsed content data objects
+ * @param {HTMLElement} containerEl - The container element to render into
+ */
 function renderMultipleContent(dataArray, containerEl) {
 	// Clear existing content
 	containerEl.innerHTML = '';

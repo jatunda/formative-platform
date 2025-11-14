@@ -277,20 +277,44 @@ What sensors might a robot need to safely navigate around a room?`
   },
 };
 
-// Abstract LLM interface for easy switching
+/**
+ * Abstract LLM provider interface for easy switching between LLM providers
+ * @abstract
+ */
 class LLMProvider {
+  /**
+   * Generate questions from a prompt
+   * @param {string} prompt - The prompt to send to the LLM
+   * @returns {Promise<string>} The generated questions as DSL text
+   * @abstract
+   * @throws {Error} Must be implemented by subclass
+   */
   async generateQuestions(prompt) {
     throw new Error('generateQuestions must be implemented by subclass');
   }
 }
 
+/**
+ * OpenAI LLM provider implementation
+ * @extends {LLMProvider}
+ */
 class OpenAIProvider extends LLMProvider {
+  /**
+   * Create an OpenAI provider instance
+   * @param {string} apiKey - The OpenAI API key
+   */
   constructor(apiKey) {
     super();
     this.apiKey = apiKey;
     this.baseUrl = 'https://api.openai.com/v1/chat/completions';
   }
 
+  /**
+   * Generate questions using OpenAI API
+   * @param {string} prompt - The prompt to send to OpenAI
+   * @returns {Promise<string>} The generated questions as DSL text
+   * @throws {Error} If the API request fails
+   */
   async generateQuestions(prompt) {
     const response = await fetch(this.baseUrl, {
       method: 'POST',
@@ -325,7 +349,16 @@ class OpenAIProvider extends LLMProvider {
   }
 }
 
+/**
+ * AI Question Generator class
+ * Handles UI setup and question generation using LLM providers
+ */
 export class AIQuestionGenerator {
+  /**
+   * Create an AI Question Generator instance
+   * @param {import("https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js").Database} database - The Firebase database instance
+   * @param {string} apiKey - The OpenAI API key
+   */
   constructor(database, apiKey) {
     this.db = database;
     this.llmProvider = new OpenAIProvider(apiKey);
@@ -334,6 +367,10 @@ export class AIQuestionGenerator {
     this.setupUI();
   }
 
+  /**
+   * Setup UI event listeners and initialize modal
+   * @private
+   */
   setupUI() {
     // Get UI elements
     this.modal = document.getElementById('aiGenerationModal');
@@ -367,6 +404,10 @@ export class AIQuestionGenerator {
     this.loadClasses();
   }
 
+  /**
+   * Load classes from database and populate the class select dropdown
+   * @private
+   */
   async loadClasses() {
     try {
       const snapshot = await get(ref(this.db, 'classes'));
@@ -402,6 +443,16 @@ export class AIQuestionGenerator {
     }
   }
 
+  /**
+   * Get class metadata (subject and grade level) for a given class
+   * Tries exact match first, then infers from class name patterns
+   * @param {string} classId - The class ID
+   * @param {string} className - The class name
+   * @returns {Object} Class metadata object
+   * @returns {string} returns.subject - The subject name
+   * @returns {number} returns.gradeLevel - The grade level
+   * @private
+   */
   getClassMetadata(classId, className) {
     // Try to find metadata by exact class ID first
     if (CLASS_METADATA[classId]) {
@@ -425,6 +476,10 @@ export class AIQuestionGenerator {
     return { subject: 'General', gradeLevel: 9 };
   }
 
+  /**
+   * Show the AI generation modal
+   * @private
+   */
   showModal() {
     this.modal.style.display = 'block';
     // Focus on first input
@@ -432,32 +487,57 @@ export class AIQuestionGenerator {
     if (firstRadio) firstRadio.focus();
   }
 
+  /**
+   * Hide the AI generation modal
+   * @private
+   */
   hideModal() {
     this.modal.style.display = 'none';
     this.hideError();
     this.hideLoading();
   }
 
+  /**
+   * Show loading state in the modal
+   * @private
+   */
   showLoading() {
     document.getElementById('loadingState').style.display = 'block';
     document.getElementById('generateBtn').disabled = true;
   }
 
+  /**
+   * Hide loading state in the modal
+   * @private
+   */
   hideLoading() {
     document.getElementById('loadingState').style.display = 'none';
     document.getElementById('generateBtn').disabled = false;
   }
 
+  /**
+   * Show error message in the modal
+   * @param {string} message - The error message to display
+   * @private
+   */
   showError(message) {
     document.getElementById('errorMessage').textContent = message;
     document.getElementById('errorState').style.display = 'block';
   }
 
+  /**
+   * Hide error message in the modal
+   * @private
+   */
   hideError() {
     document.getElementById('errorState').style.display = 'none';
   }
 
-  // Generate a unique hash that's not in the database
+  /**
+   * Generate a unique hash that's not in the database
+   * @returns {Promise<string>} A unique 8-character alphanumeric hash
+   * @private
+   */
   async generateUniqueHash() {
     const hashLength = 8;
     const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
@@ -477,6 +557,12 @@ export class AIQuestionGenerator {
     }
   }
 
+  /**
+   * Generate questions using AI based on user inputs
+   * Validates inputs, generates prompt, calls LLM, and inserts result into editor
+   * @returns {Promise<void>}
+   * @private
+   */
   async generateQuestions() {
     try {
       // Validate inputs
@@ -539,6 +625,17 @@ export class AIQuestionGenerator {
     }
   }
 
+  /**
+   * Build the prompt for the LLM based on question type, class metadata, and learning objectives
+   * @param {string} questionType - The question type ("review" or "preview")
+   * @param {Object} classMetadata - Class metadata object
+   * @param {string} classMetadata.subject - The subject name
+   * @param {number} classMetadata.gradeLevel - The grade level
+   * @param {string} classMetadata.name - The class name
+   * @param {string} learningObjectives - The learning objectives or topic
+   * @returns {string} The formatted prompt string
+   * @private
+   */
   buildPrompt(questionType, classMetadata, learningObjectives) {
     const isReview = questionType === 'review';
     const questionCount = isReview ? '3-5' : '2-3';
@@ -621,6 +718,13 @@ Second example question that shows appropriate depth for Grade ${classMetadata.g
 Now generate new questions following this style for the learning objectives above:`;
   }
 
+  /**
+   * Insert generated content into the editor
+   * Formats the content to ensure it follows DSL format and triggers preview update
+   * @param {string} content - The generated DSL content
+   * @param {string} contentId - The unique content ID
+   * @private
+   */
   insertIntoEditor(content, contentId) {
     const dslInput = document.getElementById('dslInput');
     const contentIdEl = document.getElementById('contentId');
@@ -662,6 +766,12 @@ Now generate new questions following this style for the learning objectives abov
     }
   }
 
+  /**
+   * Update the content list dropdown (currently just clears selection)
+   * @param {string} contentId - The content ID (currently unused)
+   * @returns {Promise<void>}
+   * @private
+   */
   async updateContentList(contentId) {
     // Get the select element
     const existingContentSelect = document.getElementById('existingContent');

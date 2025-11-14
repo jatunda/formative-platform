@@ -1,3 +1,24 @@
+/**
+ * Parse DSL (Domain-Specific Language) text into structured content format
+ * 
+ * DSL Format:
+ * - Title: Line starting with "# " (hash and space)
+ * - Questions: Separated by "---" on its own line
+ * - Text: Regular text lines (processed for inline formatting)
+ * - Code blocks: Enclosed in ``` (with optional language specification on opening)
+ * 
+ * @param {string} dslText - The DSL text to parse
+ * @returns {Object} Parsed content object
+ * @returns {string} returns.title - The lesson title
+ * @returns {Array<Object>} returns.blocks - Array of question blocks
+ * @returns {string} returns.blocks[].type - Block type ("question")
+ * @returns {Array<Object>} returns.blocks[].content - Array of content items
+ * @returns {string} returns.blocks[].content[].type - Content type ("text" or "code")
+ * @returns {string} returns.blocks[].content[].value - The content value
+ * @returns {string} [returns.blocks[].content[].language] - Language for code blocks (optional)
+ * @example
+ * parseDSL("# My Lesson\n\nSome text\n\n---\n\nMore text")
+ */
 export function parseDSL(dslText) {
   const lines = dslText.split("\n");
   
@@ -103,6 +124,14 @@ export function parseDSL(dslText) {
   return result;
 }
 
+/**
+ * Generate DSL text from structured content format (reverse of parseDSL)
+ * 
+ * @param {Object} content - The structured content object
+ * @param {string} content.title - The lesson title
+ * @param {Array<Object>} content.blocks - Array of question blocks
+ * @returns {string} The DSL text representation
+ */
 export function generateDSLFromContent(content) {
   const lines = [];
   
