@@ -283,3 +283,49 @@ export async function insertDayAt(classId, index, maxDayIndex) {
   // Set the new day to empty
   await set(ref(db, `schedule/${classId}/${index}`), []);
 }
+
+/**
+ * Delete a day at a given index, shifting all future days back by one
+ * @param {string} classId - The class ID
+ * @param {number} index - The day index to delete
+ * @returns {Promise<void>}
+ * @throws {Error} If database is not initialized or operation fails
+ */
+export async function deleteDayAt(classId, index) {
+  if (!db) {
+    throw new Error("Database not initialized. Call initializeDatabase first.");
+  }
+  try {
+    // Read all schedule data at once for batch operations
+    const scheduleSnap = await get(ref(db, `schedule/${classId}`));
+    const scheduleData = scheduleSnap.exists() ? scheduleSnap.val() : {};
+    
+    // Get all day indices and find max
+    const dayIndices = Object.keys(scheduleData).map(Number).sort((a, b) => a - b);
+    const maxDayIndex = dayIndices.length > 0 ? Math.max(...dayIndices) : 0;
+    
+    // Build array of all updates needed
+    const writeOperations = [];
+    
+    // Shift all days > index down by 1 in memory
+    for (const dayIdx of dayIndices) {
+      if (dayIdx > index) {
+        // Move this day's data to the previous index
+        writeOperations.push(
+          set(ref(db, `schedule/${classId}/${dayIdx - 1}`), scheduleData[dayIdx])
+        );
+      }
+    }
+    
+    // Remove the last day (set to null to delete it)
+    writeOperations.push(
+      set(ref(db, `schedule/${classId}/${maxDayIndex}`), null)
+    );
+    
+    // Perform all updates in parallel
+    await Promise.all(writeOperations);
+  } catch (error) {
+    console.error(`Failed to delete day ${index} for class ${classId}:`, error);
+    throw new Error(`Unable to delete day. Please try again.`);
+  }
+}
