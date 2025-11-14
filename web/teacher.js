@@ -14,6 +14,7 @@ import {
   clearDateOffsetCache
 } from './date-utils.js';
 import { DEFAULT_CLASS_START_DATE, DEFAULT_LESSON_TITLE, UNTITLED_LESSON } from './constants.js';
+import { showNotification } from './notification-utils.js';
 import {
   initializeLessonSearch,
   showLessonSearchPopup,
@@ -341,44 +342,7 @@ function createDateOffsetControl() {
   return container;
 }
 
-// Show notification messages
-function showNotification(message, type = "info") {
-  // Remove any existing notification
-  const existing = document.querySelector('.notification');
-  if (existing) {
-    existing.remove();
-  }
-  
-  const notification = document.createElement('div');
-  notification.className = `notification ${type}`;
-  notification.textContent = message;
-  notification.style.position = 'fixed';
-  notification.style.top = '20px';
-  notification.style.right = '20px';
-  notification.style.padding = '12px 16px';
-  notification.style.borderRadius = '8px';
-  notification.style.zIndex = '1000';
-  notification.style.maxWidth = '300px';
-  
-  if (type === 'success') {
-    notification.style.backgroundColor = '#d4edda';
-    notification.style.color = '#155724';
-    notification.style.border = '1px solid #c3e6cb';
-  } else if (type === 'error') {
-    notification.style.backgroundColor = '#f8d7da';
-    notification.style.color = '#721c24';
-    notification.style.border = '1px solid #f5c6cb';
-  }
-  
-  document.body.appendChild(notification);
-  
-  // Auto-remove after 3 seconds
-  setTimeout(() => {
-    if (notification.parentNode) {
-      notification.parentNode.removeChild(notification);
-    }
-  }, 3000);
-}
+// showNotification is imported from notification-utils.js
 
 async function loadFullSchedule() {
   const classId = classSelect.value;
