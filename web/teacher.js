@@ -34,10 +34,16 @@ import {
 } from "./lesson-search.js";
 import {
   insertDayAt,
-  deleteDayAt
+  deleteDayAt,
+  initializeDatabase,
+  getClassDateOffset as getClassDateOffsetDB,
+  setClassDateOffset as setClassDateOffsetDB
 } from "./database-utils.js";
 
 // Database is imported from centralized firebase-config.js
+
+// Initialize database utilities
+initializeDatabase(db);
 
 // Initialize date utilities
 initializeDateUtils(db);
@@ -136,11 +142,12 @@ function markVisit() {
   localStorage.setItem(LAST_VISIT_KEY, Date.now().toString());
 }
 
-// Date offset functions
+// Date offset functions - wrappers around database-utils functions
+// These handle local state (currentDateOffset) and cache clearing
 async function getClassDateOffset(classId) {
   try {
-    const snap = await get(ref(db, `classes/${classId}/dateOffset`));
-    return snap.exists() ? snap.val() : 0;
+    const offset = await getClassDateOffsetDB(classId);
+    return offset;
   } catch (error) {
     console.error(`Failed to get date offset for class ${classId}:`, error);
     return 0;
@@ -149,7 +156,7 @@ async function getClassDateOffset(classId) {
 
 async function setClassDateOffset(classId, offset) {
   try {
-    await set(ref(db, `classes/${classId}/dateOffset`), Number(offset));
+    await setClassDateOffsetDB(classId, offset);
     currentDateOffset = Number(offset);
     // Clear cache so next query gets fresh data
     clearDateOffsetCache(classId);
