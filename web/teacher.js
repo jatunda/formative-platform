@@ -42,6 +42,9 @@ import {
 import {
   showErrorState
 } from "./error-ui-utils.js";
+import {
+  createLessonClusterWithDB
+} from "./lesson-manager.js";
 
 // Database is imported from centralized firebase-config.js
 
@@ -826,83 +829,19 @@ function createNewLessonButton(dayIndex) {
 	return createNewLessonButtonShared(dayIndex, addLessonToDay);
 }
 
-// Use CSS classes for lesson clusters
+// createLessonCluster is imported from lesson-manager.js
+// Wrapper function to match local usage pattern
 function createLessonCluster(lessonHash, dayIndex, i, lessons) {
-  const cluster = document.createElement("span");
-  cluster.className = "lesson-cluster";
-  cluster.draggable = true;
-  cluster.dataset.lessonHash = lessonHash;
-  cluster.dataset.dayIndex = dayIndex;
-  cluster.dataset.lessonIndex = i;
-
-  cluster.addEventListener("dragstart", (e) => {
-    e.dataTransfer.setData("text/plain", JSON.stringify({
-      lessonHash,
-      fromDayIndex: dayIndex,
-      fromLessonIndex: i
-    }));
-    cluster.style.opacity = "0.5";
+  return createLessonClusterWithDB({
+    lessonHash,
+    dayIndex,
+    lessonIndex: i,
+    lessons,
+    lessonTitle: pageTitles[lessonHash] || DEFAULT_LESSON_TITLE,
+    classId: classSelect.value,
+    database: db,
+    onScheduleReload: loadFullSchedule
   });
-  cluster.addEventListener("dragend", () => {
-    cluster.style.opacity = "1";
-  });
-
-  // Top row: Main lesson button
-  const topRow = document.createElement("div");
-  topRow.className = "lesson-cluster-top";
-  const mainBtn = document.createElement("button");
-  // Use cached title instead of async loading for better performance
-  mainBtn.textContent = pageTitles[lessonHash] || DEFAULT_LESSON_TITLE;
-  mainBtn.className = "schedule-action-btn lesson-main-btn";
-  mainBtn.onclick = () => {
-    window.location.href = `editor.html?page=${lessonHash}&fromClass=${classSelect.value}`;
-  };
-  topRow.appendChild(mainBtn);
-
-  // Bottom row: left, right, delete
-  const bottomRow = document.createElement("div");
-  bottomRow.className = "lesson-cluster-bottom";
-
-  // Left arrow
-  const leftBtn = createLeftArrowButton(i === 0, async () => {
-    if (i > 0) {
-      const classId = classSelect.value;
-      const dayRef = ref(db, `schedule/${classId}/${dayIndex}`);
-      const newLessons = [...lessons];
-      [newLessons[i - 1], newLessons[i]] = [newLessons[i], newLessons[i - 1]];
-      await set(dayRef, newLessons);
-      loadFullSchedule();
-    }
-  });
-  bottomRow.appendChild(leftBtn);
-
-  // Right arrow
-  const rightBtn = createRightArrowButton(i === lessons.length - 1, async () => {
-    if (i < lessons.length - 1) {
-      const classId = classSelect.value;
-      const dayRef = ref(db, `schedule/${classId}/${dayIndex}`);
-      const newLessons = [...lessons];
-      [newLessons[i], newLessons[i + 1]] = [newLessons[i + 1], newLessons[i]];
-      await set(dayRef, newLessons);
-      loadFullSchedule();
-    }
-  });
-  bottomRow.appendChild(rightBtn);
-
-  // Delete button
-  const delBtn = createDeleteButton(async () => {
-    const classId = classSelect.value;
-    const dayRef = ref(db, `schedule/${classId}/${dayIndex}`);
-    const newLessons = lessons.filter((_, idx) => idx !== i);
-    await set(dayRef, newLessons);
-    loadFullSchedule();
-  });
-  bottomRow.appendChild(delBtn);
-
-  cluster.appendChild(topRow);
-  cluster.appendChild(bottomRow);
-
-  return cluster;
 }
 
 function appendLinkLessonButton(td, dayIndex) {
