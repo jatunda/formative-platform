@@ -1,6 +1,10 @@
 import { ref, get, set } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js";
 import { AI_CONFIG } from "./ai-config.js";
 import { parseDSL } from "./dsl.js";
+import {
+	initializeDatabase,
+	generateUniqueHash
+} from "./database-utils.js";
 
 // Class metadata mapping (hard-coded for MVP)
 const CLASS_METADATA = {
@@ -361,6 +365,8 @@ export class AIQuestionGenerator {
    */
   constructor(database, apiKey) {
     this.db = database;
+    // Initialize database utilities with the database instance
+    initializeDatabase(database);
     this.llmProvider = new OpenAIProvider(apiKey);
     this.modal = null;
     this.classSelect = null;
@@ -533,29 +539,7 @@ export class AIQuestionGenerator {
     document.getElementById('errorState').style.display = 'none';
   }
 
-  /**
-   * Generate a unique hash that's not in the database
-   * @returns {Promise<string>} A unique 8-character alphanumeric hash
-   * @private
-   */
-  async generateUniqueHash() {
-    const hashLength = 8;
-    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
-    
-    while (true) {
-      // Generate a random hash
-      let hash = '';
-      for (let i = 0; i < hashLength; i++) {
-        hash += chars.charAt(Math.floor(Math.random() * chars.length));
-      }
-      
-      // Check if this hash exists in the database
-      const snapshot = await get(ref(this.db, `content/${hash}`));
-      if (!snapshot.exists()) {
-        return hash;
-      }
-    }
-  }
+  // generateUniqueHash is imported from database-utils.js
 
   /**
    * Generate questions using AI based on user inputs
@@ -586,7 +570,7 @@ export class AIQuestionGenerator {
       }
 
       // Generate a unique content ID
-      const contentId = await this.generateUniqueHash();
+      const contentId = await generateUniqueHash();
 
       // Get class metadata
       const selectedOption = this.classSelect.selectedOptions[0];

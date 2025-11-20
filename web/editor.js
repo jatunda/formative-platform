@@ -27,6 +27,10 @@ import {
 import {
 	AIQuestionGenerator
 } from "./ai-generator.js";
+import {
+	initializeDatabase,
+	generateUniqueHash
+} from "./database-utils.js";
 
 // Handle AI generation
 async function handleAIGeneration(event) {
@@ -92,6 +96,9 @@ import { showNotification } from './notification-utils.js';
 })();
 
 async function main() {
+
+// Initialize database utilities
+initializeDatabase(db);
 
 // Initialize the lesson search module with database reference
 initializeLessonSearch(db);
@@ -494,18 +501,7 @@ function getQueryParams() {
   return params;
 }
 
-async function generateUniqueHash() {
-  // Use crypto API for random hash
-  let hash;
-  let exists = true;
-  while (exists) {
-    hash = Array.from(crypto.getRandomValues(new Uint8Array(16)))
-      .map(b => b.toString(16).padStart(2, "0")).join("");
-    const snap = await get(ref(db, `content/${hash}`));
-    exists = snap.exists();
-  }
-  return hash;
-}
+// generateUniqueHash is imported from database-utils.js
 
 (async function handleNewLessonContext() {
   const params = getQueryParams();
