@@ -39,6 +39,9 @@ import {
   getClassDateOffset as getClassDateOffsetDB,
   setClassDateOffset as setClassDateOffsetDB
 } from "./database-utils.js";
+import {
+  showErrorState
+} from "./error-ui-utils.js";
 
 // Database is imported from centralized firebase-config.js
 
@@ -416,18 +419,10 @@ async function loadFullSchedule() {
 }
 
 function showScheduleError() {
-  const loadingState = document.getElementById('schedule-loading-state');
-  if (loadingState) {
-    loadingState.innerHTML = `
-      <div style="text-align: center; color: #e53e3e;">
-        <h3>Unable to load schedule</h3>
-        <p style="color: #a0aec0; margin-bottom: 1rem;">There was a problem connecting to the server.</p>
-        <button onclick="location.reload()" style="width: auto; padding: 0.5rem 1rem;">
-          Try Again
-        </button>
-      </div>
-    `;
-  }
+  showErrorState({
+    container: 'schedule-loading-state',
+    title: 'Unable to load schedule'
+  });
 }
 
 async function handleScrollPositioning() {

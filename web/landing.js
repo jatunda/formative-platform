@@ -2,6 +2,7 @@
 import { ref, get, child } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js";
 import { db } from './firebase-config.js';
 import { initializeDateUtils, getTodayDayIndex } from './date-utils.js';
+import { showErrorState } from './error-ui-utils.js';
 
 
 // Initialize date utilities with database
@@ -105,23 +106,12 @@ async function loadWithErrorHandling() {
   } catch (error) {
     console.error("Error loading classes:", error);
     
-    // Show error state
-    const container = document.getElementById("class-list");
-    const loadingState = document.getElementById("loading-state");
-    
-    if (loadingState) {
-      loadingState.style.display = "none";
-    }
-    
-    container.innerHTML = `
-      <div style="text-align: center; padding: 2rem; color: #e53e3e;">
-        <h3>Unable to load lessons</h3>
-        <p style="color: #a0aec0; margin-bottom: 1rem;">There was a problem connecting to the server.</p>
-        <button onclick="location.reload()" style="width: auto; padding: 0.5rem 1rem;">
-          Try Again
-        </button>
-      </div>
-    `;
+    showErrorState({
+      container: 'class-list',
+      loadingState: 'loading-state',
+      title: 'Unable to load lessons',
+      withPadding: true
+    });
   }
 }
 
