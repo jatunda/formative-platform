@@ -10,6 +10,9 @@ import {
   createRightArrowButton,
   createDeleteButton
 } from './ui-components.js';
+import {
+  setupDragHandlers
+} from './drag-drop-utils.js';
 
 /**
  * Create a lesson cluster UI component with drag-and-drop support
@@ -45,18 +48,11 @@ export function createLessonCluster({
   cluster.dataset.dayIndex = dayIndex;
   cluster.dataset.lessonIndex = lessonIndex;
 
-  // Drag and drop handlers
-  cluster.addEventListener("dragstart", (e) => {
-    e.dataTransfer.setData("text/plain", JSON.stringify({
-      lessonHash,
-      fromDayIndex: dayIndex,
-      fromLessonIndex: lessonIndex
-    }));
-    cluster.style.opacity = "0.5";
-  });
-  
-  cluster.addEventListener("dragend", () => {
-    cluster.style.opacity = "1";
+  // Setup drag handlers
+  setupDragHandlers(cluster, {
+    lessonHash,
+    fromDayIndex: dayIndex,
+    fromLessonIndex: lessonIndex
   });
 
   // Top row: Main lesson button

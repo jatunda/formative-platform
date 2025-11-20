@@ -45,6 +45,9 @@ import {
 import {
   createLessonClusterWithDB
 } from "./lesson-manager.js";
+import {
+  setupDropHandlers
+} from "./drag-drop-utils.js";
 
 // Database is imported from centralized firebase-config.js
 
@@ -512,29 +515,8 @@ function createInsertDayRow(dayIndex, onInsert) {
  * @param {HTMLTableCellElement} tdLessons - The lessons cell element
  * @param {number} toDayIndex - The target day index for drops
  */
-function setupDropHandlers(tdLessons, toDayIndex) {
-  tdLessons.addEventListener("dragover", (e) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
-    tdLessons.classList.add("td-drop-hover");
-  });
-  
-  tdLessons.addEventListener("dragleave", () => {
-    tdLessons.classList.remove("td-drop-hover");
-  });
-  
-  tdLessons.addEventListener("drop", async (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    tdLessons.classList.remove("td-drop-hover");
-    
-    let data;
-    try {
-      data = JSON.parse(e.dataTransfer.getData("text/plain"));
-    } catch {
-      return;
-    }
-    
+function setupLessonDropHandlers(tdLessons, toDayIndex) {
+  setupDropHandlers(tdLessons, async (data) => {
     const { lessonHash, fromDayIndex, fromLessonIndex } = data;
     
     // Prevent dropping into the same day
@@ -636,7 +618,7 @@ async function createDayRow(dayIndex, lessons, todayDayIndex) {
   tdLessons.appendChild(createEndButtonsContainer(dayIndex));
   
   // Setup drag-and-drop handlers
-  setupDropHandlers(tdLessons, dayIndex);
+  setupLessonDropHandlers(tdLessons, dayIndex);
   
   tr.appendChild(tdLessons);
   
