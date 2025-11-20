@@ -16,7 +16,7 @@ A web app for students to see daily formative assignments.
 
 ### to run a dev version
 
-1. CLI navigate to '/web' then run 'npm run dev'
+1. CLI navigate to '/web' then run `npm run dev`
 
 ### to deploy: 
 
