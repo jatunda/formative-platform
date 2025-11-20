@@ -21,4 +21,4 @@ A web app for students to see daily formative assignments.
 ### to deploy: 
 
 1. run `npm run build` to run the build script
-1. in root, 'firebase deploy'
+1. in root, `firebase deploy`
