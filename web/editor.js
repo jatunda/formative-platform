@@ -14,6 +14,9 @@ import {
 	generateDSLFromContent
 } from "./dsl.js";
 import {
+	validateDSL
+} from "./dsl-validation.js";
+import {
 	initializeLessonSearch,
 	showLessonSearchPopup
 } from "./lesson-search.js";
@@ -372,43 +375,13 @@ function updatePreview() {
 	try {
 		const parsed = parseDSL(dslText);
 		
-		// Check if the parsed result is valid and complete
-		if (!parsed || typeof parsed !== 'object') {
-			throw new Error('Parser returned invalid data');
-		}
-		
-		// Check for common issues even if parsing didn't throw an error
-		let validationError = null;
-		
-		if (!dslText.trim()) {
-			validationError = 'Content is empty';
-		} else if (!parsed.title || parsed.title.trim() === '') {
-			validationError = 'Missing title - content should start with "# Title"';
-		} else if (!parsed.blocks || parsed.blocks.length === 0) {
-			validationError = 'No content blocks found - add some text or questions after the title';
-		} else {
-			// Check for unmatched code blocks with language support
-			const lines = dslText.split('\n');
-			const codeBlockMarkers = lines.filter(line => 
-				line.trim() === '```' || line.trim().match(/^```\s*\w+$/)
-			);
-			if (codeBlockMarkers.length % 2 !== 0) {
-				validationError = 'Unmatched code block - every ``` opening must have a closing ```';
-			} else {
-				// Check if blocks have content
-				const hasContent = parsed.blocks.some(block => 
-					block.content && block.content.length > 0
-				);
-				if (!hasContent) {
-					validationError = 'Content blocks are empty - add text or code to your questions';
-				}
-			}
-		}
+		// Validate the parsed content
+		const validationError = validateDSL(dslText, parsed);
 		
 		if (validationError) {
-			// Create a fake error object for consistent error display
-			const fakeError = new Error(validationError);
-			preview.innerHTML = getErrorExplanation(fakeError, dslText);
+			// Create an error object for consistent error display
+			const error = new Error(validationError);
+			preview.innerHTML = getErrorExplanation(error, dslText);
 		} else {
 			// Use the shared content renderer for valid content
 			renderContent(parsed, preview);
