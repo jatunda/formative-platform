@@ -896,7 +896,7 @@ pre[class*="language-"],
 .lesson-content code {
   background-color: var(--bg-secondary);
   color: var(--accent-blue-light);
-  padding: var(--spacing-xxs) var(--spacing-md);
+  padding: var(--spacing-xxs) var(--spacing-xs);
   border-radius: var(--radius-md);
   font-family: var(--font-mono);
   font-size: 0.9em;
