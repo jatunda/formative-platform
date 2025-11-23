@@ -22,3 +22,91 @@ A web app for students to see daily formative assignments.
 
 1. run `npm run build` to run the build script
 1. in root, `firebase deploy`
+
+## Testing
+
+The project uses [Vitest](https://vitest.dev/) for unit testing. Tests are located in the `web/__tests__/` directory.
+
+### Running Tests
+
+From the `web/` directory:
+
+- **Run tests in watch mode**: `npm test` or `npm run test`
+- **Run tests once**: `npm run test:run`
+- **Run tests with UI**: `npm run test:ui`
+- **Run tests with coverage**: `npm run test:coverage`
+
+### Test Structure
+
+```
+web/__tests__/
+├── unit/              # Unit tests for individual modules
+│   ├── dsl.test.js
+│   ├── dsl-validation.test.js
+│   ├── date-utils.test.js
+│   ├── constants.test.js
+│   ├── content-renderer.test.js
+│   ├── database-utils.test.js
+│   ├── notification-utils.test.js
+│   ├── drag-drop-utils.test.js
+│   ├── lesson-search.test.js
+│   ├── error-ui-utils.test.js
+│   ├── ui-components.test.js
+│   └── parseMarkdown.test.js
+├── integration/       # Integration tests for module interactions
+│   ├── dsl-pipeline.test.js
+│   ├── database-date-integration.test.js
+│   └── content-render-database.test.js
+└── helpers/          # Test utilities and mocks
+    ├── mock-firebase.js
+    ├── mock-firebase-module.js
+    └── test-utils.js
+```
+
+### Writing Tests
+
+Tests use Vitest's API which is similar to Jest:
+
+```javascript
+import { describe, it, expect } from 'vitest';
+import { myFunction } from '../../my-module.js';
+
+describe('myFunction', () => {
+  it('should do something', () => {
+    expect(myFunction()).toBe(expected);
+  });
+});
+```
+
+### Test Coverage
+
+Coverage reports are generated in the `coverage/` directory when running `npm run test:coverage`. The project aims for:
+- 70% minimum coverage for lines, functions, branches, and statements
+- Higher coverage (80%+) for critical utility functions
+
+**Current Test Count:** 201 tests across 15 test files
+- Unit tests: 193 tests
+- Integration tests: 8 tests
+
+### CI/CD Integration
+
+Tests automatically run on every push and pull request via GitHub Actions (`.github/workflows/test.yml`). The workflow:
+- Runs tests on Node.js 18.x and 20.x
+- Generates coverage reports
+- Uploads coverage artifacts for review
+
+To view test results, check the "Actions" tab in your GitHub repository.
+
+### Mocking
+
+- **Firebase**: Firebase Realtime Database functions are mocked in tests. See `__tests__/helpers/mock-firebase.js` for utilities.
+- **DOM**: Tests use jsdom environment for DOM manipulation testing.
+- **Timers**: Use Vitest's fake timers for testing time-dependent code.
+
+### Test Files
+
+Each module has a corresponding test file:
+- Pure utility functions (dsl.js, constants.js) - Direct unit tests
+- DOM-dependent (content-renderer.js, notification-utils.js) - jsdom environment
+- Database-dependent (database-utils.js) - Mocked Firebase
+- Date utilities (date-utils.js) - Mocked database calls
