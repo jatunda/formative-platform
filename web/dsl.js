@@ -105,8 +105,9 @@ export function parseDSL(dslText) {
       }
       
       // Add text to current question if we're in one
+      // Use raw line to preserve leading whitespace for indentation (needed for nested lists)
       if (inQuestion && currentBlock) {
-        currentBlock.content.push({ type: "text", value: line });
+        currentBlock.content.push({ type: "text", value: raw });
       }
     }
     
