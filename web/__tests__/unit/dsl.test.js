@@ -156,6 +156,243 @@ System.out.println("Hello");
     expect(result.blocks).toHaveLength(1);
     expect(result.blocks[0].content[0].type).toBe('code');
   });
+
+  it('should parse >>> collapsed section with title', () => {
+    const dsl = `# My Lesson
+
+>>> Hint Section
+This is hidden content
+<<<`;
+    const result = parseDSL(dsl);
+    expect(result.blocks).toHaveLength(1);
+    expect(result.blocks[0].content).toHaveLength(1);
+    expect(result.blocks[0].content[0].type).toBe('collapsible');
+    expect(result.blocks[0].content[0].title).toBe('Hint Section');
+    expect(result.blocks[0].content[0].expanded).toBe(false);
+    expect(result.blocks[0].content[0].content).toHaveLength(1);
+    expect(result.blocks[0].content[0].content[0].type).toBe('text');
+    expect(result.blocks[0].content[0].content[0].value).toBe('This is hidden content');
+  });
+
+  it('should parse >>>! expanded section with title', () => {
+    const dsl = `# My Lesson
+
+>>>! Expanded Section
+This is visible content
+<<<`;
+    const result = parseDSL(dsl);
+    expect(result.blocks).toHaveLength(1);
+    expect(result.blocks[0].content[0].type).toBe('collapsible');
+    expect(result.blocks[0].content[0].title).toBe('Expanded Section');
+    expect(result.blocks[0].content[0].expanded).toBe(true);
+  });
+
+  it('should parse >>> without title (collapsed, no title)', () => {
+    const dsl = `# My Lesson
+
+>>>
+Hidden content here
+<<<`;
+    const result = parseDSL(dsl);
+    expect(result.blocks).toHaveLength(1);
+    expect(result.blocks[0].content[0].type).toBe('collapsible');
+    expect(result.blocks[0].content[0].title).toBe('');
+    expect(result.blocks[0].content[0].expanded).toBe(false);
+  });
+
+  it('should parse >>>! without title (expanded, no title)', () => {
+    const dsl = `# My Lesson
+
+>>>!
+Visible content here
+<<<`;
+    const result = parseDSL(dsl);
+    expect(result.blocks).toHaveLength(1);
+    expect(result.blocks[0].content[0].type).toBe('collapsible');
+    expect(result.blocks[0].content[0].title).toBe('');
+    expect(result.blocks[0].content[0].expanded).toBe(true);
+  });
+
+  it('should parse nested collapsible sections', () => {
+    // Consecutive top-level >>> are nested (not siblings)
+    const dsl = `# My Lesson
+
+>>> Outer Section
+Some outer content
+>>> Inner Section
+Some inner content
+<<<
+<<<`;
+    const result = parseDSL(dsl);
+    expect(result.blocks).toHaveLength(1);
+    expect(result.blocks[0].content).toHaveLength(1);
+    expect(result.blocks[0].content[0].type).toBe('collapsible');
+    expect(result.blocks[0].content[0].title).toBe('Outer Section');
+    expect(result.blocks[0].content[0].content).toHaveLength(2);
+    expect(result.blocks[0].content[0].content[0].type).toBe('text');
+    expect(result.blocks[0].content[0].content[0].value).toBe('Some outer content');
+    expect(result.blocks[0].content[0].content[1].type).toBe('collapsible');
+    expect(result.blocks[0].content[0].content[1].title).toBe('Inner Section');
+  });
+
+  it('should parse collapsible with text content', () => {
+    const dsl = `# My Lesson
+
+>>> Section
+First line
+Second line
+<<<`;
+    const result = parseDSL(dsl);
+    expect(result.blocks[0].content[0].type).toBe('collapsible');
+    expect(result.blocks[0].content[0].content).toHaveLength(2);
+    expect(result.blocks[0].content[0].content[0].type).toBe('text');
+    expect(result.blocks[0].content[0].content[1].type).toBe('text');
+  });
+
+  it('should parse collapsible with code blocks', () => {
+    const dsl = `# My Lesson
+
+>>> Code Section
+\`\`\`javascript
+console.log("test");
+\`\`\`
+<<<`;
+    const result = parseDSL(dsl);
+    expect(result.blocks[0].content[0].type).toBe('collapsible');
+    expect(result.blocks[0].content[0].content).toHaveLength(1);
+    expect(result.blocks[0].content[0].content[0].type).toBe('code');
+    expect(result.blocks[0].content[0].content[0].language).toBe('javascript');
+  });
+
+  it('should parse >>> inside code block as literal text', () => {
+    const dsl = `# My Lesson
+
+\`\`\`
+>>> This should be literal text
+\`\`\``;
+    const result = parseDSL(dsl);
+    expect(result.blocks[0].content[0].type).toBe('code');
+    expect(result.blocks[0].content[0].value).toContain('>>>');
+    expect(result.blocks[0].content[0].value).toContain('This should be literal text');
+  });
+
+  it('should parse multiple consecutive collapsible sections as nested', () => {
+    // Consecutive top-level >>> are nested, not siblings
+    const dsl = `# My Lesson
+
+>>> First Section
+Content 1
+>>> Second Section
+Content 2
+<<<
+<<<`;
+    const result = parseDSL(dsl);
+    expect(result.blocks[0].content).toHaveLength(1);
+    expect(result.blocks[0].content[0].type).toBe('collapsible');
+    expect(result.blocks[0].content[0].title).toBe('First Section');
+    expect(result.blocks[0].content[0].content).toHaveLength(2);
+    expect(result.blocks[0].content[0].content[0].type).toBe('text');
+    expect(result.blocks[0].content[0].content[0].value).toBe('Content 1');
+    expect(result.blocks[0].content[0].content[1].type).toBe('collapsible');
+    expect(result.blocks[0].content[0].content[1].title).toBe('Second Section');
+  });
+
+  it('should parse collapsible section immediately after question separator', () => {
+    const dsl = `# My Lesson
+
+---
+
+>>> Section After Separator
+Content here
+<<<`;
+    const result = parseDSL(dsl);
+    expect(result.blocks).toHaveLength(1);
+    expect(result.blocks[0].content[0].type).toBe('collapsible');
+    expect(result.blocks[0].content[0].title).toBe('Section After Separator');
+  });
+
+  it('should parse <<< closing marker for collapsible sections', () => {
+    const dsl = `# My Lesson
+
+>>> Hint Section
+Hidden content
+<<<
+Regular content after collapsible`;
+    const result = parseDSL(dsl);
+    expect(result.blocks).toHaveLength(1);
+    expect(result.blocks[0].content).toHaveLength(2);
+    expect(result.blocks[0].content[0].type).toBe('collapsible');
+    expect(result.blocks[0].content[0].title).toBe('Hint Section');
+    expect(result.blocks[0].content[0].content).toHaveLength(1);
+    expect(result.blocks[0].content[0].content[0].value).toBe('Hidden content');
+    // Regular content should be outside the collapsible
+    expect(result.blocks[0].content[1].type).toBe('text');
+    expect(result.blocks[0].content[1].value).toBe('Regular content after collapsible');
+  });
+
+  it('should parse <<< inside code block as literal text', () => {
+    const dsl = `# My Lesson
+
+\`\`\`
+<<< This should be literal text
+\`\`\``;
+    const result = parseDSL(dsl);
+    expect(result.blocks[0].content[0].type).toBe('code');
+    expect(result.blocks[0].content[0].value).toContain('<<<');
+    expect(result.blocks[0].content[0].value).toContain('This should be literal text');
+  });
+
+  it('should handle nested collapsibles with explicit closing', () => {
+    // Consecutive top-level >>> are nested
+    const dsl = `# My Lesson
+
+>>> Outer Section
+Outer content
+>>> Inner Section
+Inner content
+<<<
+More outer content
+<<<`;
+    const result = parseDSL(dsl);
+    expect(result.blocks[0].content).toHaveLength(1);
+    expect(result.blocks[0].content[0].type).toBe('collapsible');
+    expect(result.blocks[0].content[0].title).toBe('Outer Section');
+    expect(result.blocks[0].content[0].content).toHaveLength(3);
+    expect(result.blocks[0].content[0].content[0].type).toBe('text');
+    expect(result.blocks[0].content[0].content[0].value).toBe('Outer content');
+    expect(result.blocks[0].content[0].content[1].type).toBe('collapsible');
+    expect(result.blocks[0].content[0].content[1].title).toBe('Inner Section');
+    expect(result.blocks[0].content[0].content[2].type).toBe('text');
+    expect(result.blocks[0].content[0].content[2].value).toBe('More outer content');
+  });
+
+  it('should throw error for unclosed collapsible section', () => {
+    const dsl = `# My Lesson
+
+>>> Unclosed Section
+Some content`;
+    expect(() => parseDSL(dsl)).toThrow('Unclosed collapsible section');
+  });
+
+  it('should throw error for multiple unclosed collapsible sections', () => {
+    const dsl = `# My Lesson
+
+>>> First Section
+Content 1
+>>> Second Section
+Content 2`;
+    expect(() => parseDSL(dsl)).toThrow('Unclosed collapsible section');
+  });
+
+  it('should throw error for unclosed collapsible before question separator', () => {
+    const dsl = `# My Lesson
+
+>>> Unclosed Section
+Content
+---
+Next question`;
+    expect(() => parseDSL(dsl)).toThrow('Unclosed collapsible section');
+  });
 });
 
 describe('generateDSLFromContent', () => {
@@ -280,6 +517,115 @@ describe('generateDSLFromContent', () => {
     const result = generateDSLFromContent(content);
     expect(result).toContain('Content');
     expect(result).not.toContain('#');
+  });
+
+  it('should generate DSL from content with collapsible sections', () => {
+    const content = {
+      title: 'My Lesson',
+      blocks: [
+        {
+          type: 'question',
+          content: [
+            {
+              type: 'collapsible',
+              title: 'Hint Section',
+              expanded: false,
+              content: [
+                { type: 'text', value: 'Hidden content' }
+              ]
+            }
+          ]
+        }
+      ]
+    };
+    const result = generateDSLFromContent(content);
+    expect(result).toContain('>>> Hint Section');
+    expect(result).toContain('Hidden content');
+    expect(result).not.toContain('>>>!');
+  });
+
+  it('should generate DSL from expanded collapsible sections', () => {
+    const content = {
+      title: 'My Lesson',
+      blocks: [
+        {
+          type: 'question',
+          content: [
+            {
+              type: 'collapsible',
+              title: 'Expanded Section',
+              expanded: true,
+              content: [
+                { type: 'text', value: 'Visible content' }
+              ]
+            }
+          ]
+        }
+      ]
+    };
+    const result = generateDSLFromContent(content);
+    expect(result).toContain('>>>! Expanded Section');
+  });
+
+  it('should generate DSL from collapsible sections without title', () => {
+    const content = {
+      title: 'My Lesson',
+      blocks: [
+        {
+          type: 'question',
+          content: [
+            {
+              type: 'collapsible',
+              title: '',
+              expanded: false,
+              content: [
+                { type: 'text', value: 'Content' }
+              ]
+            }
+          ]
+        }
+      ]
+    };
+    const result = generateDSLFromContent(content);
+    expect(result).toContain('>>>');
+    // Should not have space after >>>
+    const lines = result.split('\n');
+    const collapsibleLine = lines.find(l => l.startsWith('>>>'));
+    expect(collapsibleLine).toBe('>>>');
+  });
+
+  it('should generate DSL with nested collapsibles', () => {
+    const content = {
+      title: 'My Lesson',
+      blocks: [
+        {
+          type: 'question',
+          content: [
+            {
+              type: 'collapsible',
+              title: 'Outer',
+              expanded: false,
+              content: [
+                { type: 'text', value: 'Outer content' },
+                {
+                  type: 'collapsible',
+                  title: 'Inner',
+                  expanded: false,
+                  content: [
+                    { type: 'text', value: 'Inner content' }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    };
+    const result = generateDSLFromContent(content);
+    expect(result).toContain('>>> Outer');
+    expect(result).toContain('>>> Inner');
+    expect(result).toContain('Outer content');
+    expect(result).toContain('Inner content');
   });
 });
 

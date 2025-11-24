@@ -56,6 +56,202 @@ function processInlineCode(text) {
 }
 
 /**
+ * Render content items inside a collapsible section (recursive helper)
+ * Handles text, code, and nested collapsible sections
+ * @param {Array<Object>} contentItems - Array of content items to render
+ * @param {HTMLElement} containerEl - The container element to render into
+ * @private
+ */
+function renderCollapsibleContent(contentItems, containerEl) {
+	// Stack to track list hierarchy (separate from parent list stack)
+	const listStack = [];
+	let indentUnit = null;
+	
+	contentItems.forEach(item => {
+		if (item.type === "text") {
+			// Split text into lines to process each separately
+			const lines = item.value.split('\n');
+			
+			/**
+			 * Calculate nesting depth from indentation
+			 * @param {string} indent - The leading whitespace
+			 * @returns {number} The nesting depth (0 = top level)
+			 */
+			function calculateDepth(indent) {
+				if (!indent) return 0;
+				
+				// Check for tabs first
+				const tabCount = (indent.match(/\t/g) || []).length;
+				if (tabCount > 0) {
+					if (indentUnit === null) indentUnit = 'tab';
+					return tabCount;
+				}
+				
+				const spaceCount = indent.length;
+				if (spaceCount === 0) return 0;
+				
+				if (indentUnit === null) {
+					indentUnit = spaceCount;
+					return 1;
+				}
+				
+				if (typeof indentUnit === 'number') {
+					return Math.floor(spaceCount / indentUnit);
+				}
+				
+				return 0;
+			}
+			
+			/**
+			 * Get or create the appropriate list at the given depth
+			 * @param {number} depth - The nesting depth
+			 * @param {string} listType - 'ul' or 'ol'
+			 * @returns {HTMLElement} The list element at that depth
+			 */
+			function getListAtDepth(depth, listType) {
+				while (listStack.length > depth + 1) {
+					listStack.pop();
+				}
+				
+				while (listStack.length <= depth) {
+					listStack.push({ list: null, lastItem: null });
+				}
+				
+				const entry = listStack[depth];
+				let list = entry.list;
+				
+				const needsNewList = !list || list.tagName !== listType.toUpperCase();
+				
+				if (needsNewList) {
+					list = document.createElement(listType);
+					list.className = 'lesson-list';
+					
+					if (depth === 0) {
+						containerEl.appendChild(list);
+					} else {
+						const parentEntry = listStack[depth - 1];
+						if (parentEntry && parentEntry.lastItem) {
+							parentEntry.lastItem.appendChild(list);
+						} else {
+							containerEl.appendChild(list);
+						}
+					}
+					
+					entry.list = list;
+				}
+				
+				return list;
+			}
+			
+			lines.forEach(line => {
+				const headingMatch = line.match(/^(#{1,6})\s+(.+)$/);
+				
+				if (headingMatch) {
+					listStack.length = 0;
+					indentUnit = null;
+					
+					const level = headingMatch[1].length;
+					const heading = document.createElement(`h${level}`);
+					heading.className = `lesson-heading lesson-h${level}`;
+					heading.innerHTML = processInlineCode(headingMatch[2]);
+					containerEl.appendChild(heading);
+				} else {
+					const ulMatch = line.match(/^(\s*)([*-])\s+(.+)$/);
+					if (ulMatch) {
+						const [, indent, marker, content] = ulMatch;
+						const depth = calculateDepth(indent);
+						const ul = getListAtDepth(depth, 'ul');
+						
+						const li = document.createElement('li');
+						li.className = 'lesson-list-item';
+						li.innerHTML = processInlineCode(content);
+						ul.appendChild(li);
+						
+						if (listStack[depth]) {
+							listStack[depth].lastItem = li;
+						}
+					} else {
+						const olMatch = line.match(/^(\s*)(\d+)\.\s+(.+)$/);
+						if (olMatch) {
+							const [, indent, number, content] = olMatch;
+							const depth = calculateDepth(indent);
+							const ol = getListAtDepth(depth, 'ol');
+							
+							const li = document.createElement('li');
+							li.className = 'lesson-list-item';
+							li.innerHTML = processInlineCode(content);
+							ol.appendChild(li);
+							
+							if (listStack[depth]) {
+								listStack[depth].lastItem = li;
+							}
+						} else if (line.trim() !== '') {
+							listStack.length = 0;
+							indentUnit = null;
+							
+							const p = document.createElement("p");
+							p.className = "lesson-text";
+							p.innerHTML = processInlineCode(line);
+							containerEl.appendChild(p);
+						}
+					}
+				}
+			});
+		} else if (item.type === "code") {
+			const pre = document.createElement("pre");
+			pre.className = "lesson-code";
+			
+			if (item.language) {
+				pre.classList.add(`language-${item.language}`);
+				pre.setAttribute('data-language', item.language);
+			}
+			
+			const code = document.createElement("code");
+			if (item.language) {
+				code.className = `language-${item.language}`;
+			}
+			code.textContent = item.value;
+			
+			pre.appendChild(code);
+			containerEl.appendChild(pre);
+			
+			if (typeof Prism !== 'undefined') {
+				Prism.highlightElement(code);
+			}
+		} else if (item.type === "collapsible") {
+			// Recursively render nested collapsible section
+			const details = document.createElement("details");
+			details.className = "lesson-collapsible";
+			if (item.expanded) {
+				details.setAttribute("open", "");
+			}
+			
+			const summary = document.createElement("summary");
+			summary.className = "lesson-collapsible-summary";
+			if (!item.title || item.title.trim() === "") {
+				summary.classList.add("lesson-collapsible-summary-empty");
+			} else {
+				summary.innerHTML = processInlineCode(item.title);
+			}
+			
+			const contentDiv = document.createElement("div");
+			contentDiv.className = "collapsible-content";
+			
+			renderCollapsibleContent(item.content, contentDiv);
+			
+			details.appendChild(summary);
+			details.appendChild(contentDiv);
+			containerEl.appendChild(details);
+		}
+	});
+	
+	// Trigger Prism.js highlighting for code blocks if available
+	if (typeof Prism !== 'undefined') {
+		Prism.highlightAllUnder(containerEl);
+	}
+}
+
+/**
  * Render parsed content data into a container element
  * Supports titles, text blocks, code blocks, headings, lists (ordered/unordered), and inline formatting
  * @param {Object} data - The parsed content data
@@ -288,6 +484,39 @@ function renderContent(data, containerEl) {
 						if (typeof Prism !== 'undefined') {
 							Prism.highlightElement(code);
 						}
+					}
+					if (item.type === "collapsible") {
+						// Reset list state (like headings do at line 210)
+						listStack.length = 0;
+						indentUnit = null;
+						
+						// Create details element
+						const details = document.createElement("details");
+						details.className = "lesson-collapsible";
+						if (item.expanded) {
+							details.setAttribute("open", "");
+						}
+						
+						// Create summary element
+						const summary = document.createElement("summary");
+						summary.className = "lesson-collapsible-summary";
+						if (!item.title || item.title.trim() === "") {
+							summary.classList.add("lesson-collapsible-summary-empty");
+						} else {
+							summary.innerHTML = processInlineCode(item.title);
+						}
+						
+						// Create content wrapper
+						const contentDiv = document.createElement("div");
+						contentDiv.className = "collapsible-content";
+						
+						// Render nested content
+						renderCollapsibleContent(item.content, contentDiv);
+						
+						// Assemble and append
+						details.appendChild(summary);
+						details.appendChild(contentDiv);
+						containerEl.appendChild(details);
 					}
 				});
 			}

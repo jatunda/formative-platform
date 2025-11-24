@@ -719,5 +719,296 @@ describe('renderMultipleContent', () => {
     expect(container.textContent).not.toContain('Old content');
     expect(container.textContent).toContain('New content');
   });
+
+  it('should render collapsed section (details not open)', () => {
+    const data = {
+      title: 'My Lesson',
+      blocks: [
+        {
+          type: 'question',
+          content: [
+            {
+              type: 'collapsible',
+              title: 'Hint Section',
+              expanded: false,
+              content: [
+                { type: 'text', value: 'Hidden content' }
+              ]
+            }
+          ]
+        }
+      ]
+    };
+    renderContent(data, container);
+    const details = container.querySelector('.lesson-collapsible');
+    expect(details).toBeTruthy();
+    expect(details.hasAttribute('open')).toBe(false);
+    const summary = details.querySelector('.lesson-collapsible-summary');
+    expect(summary).toBeTruthy();
+    expect(summary.textContent).toContain('Hint Section');
+  });
+
+  it('should render expanded section (details has open attribute)', () => {
+    const data = {
+      title: 'My Lesson',
+      blocks: [
+        {
+          type: 'question',
+          content: [
+            {
+              type: 'collapsible',
+              title: 'Expanded Section',
+              expanded: true,
+              content: [
+                { type: 'text', value: 'Visible content' }
+              ]
+            }
+          ]
+        }
+      ]
+    };
+    renderContent(data, container);
+    const details = container.querySelector('.lesson-collapsible');
+    expect(details).toBeTruthy();
+    expect(details.hasAttribute('open')).toBe(true);
+  });
+
+  it('should render section without title (empty summary)', () => {
+    const data = {
+      title: 'My Lesson',
+      blocks: [
+        {
+          type: 'question',
+          content: [
+            {
+              type: 'collapsible',
+              title: '',
+              expanded: false,
+              content: [
+                { type: 'text', value: 'Content' }
+              ]
+            }
+          ]
+        }
+      ]
+    };
+    renderContent(data, container);
+    const summary = container.querySelector('.lesson-collapsible-summary');
+    expect(summary).toBeTruthy();
+    expect(summary.classList.contains('lesson-collapsible-summary-empty')).toBe(true);
+    expect(summary.textContent.trim()).toBe('');
+  });
+
+  it('should render nested sections', () => {
+    const data = {
+      title: 'My Lesson',
+      blocks: [
+        {
+          type: 'question',
+          content: [
+            {
+              type: 'collapsible',
+              title: 'Outer',
+              expanded: false,
+              content: [
+                { type: 'text', value: 'Outer content' },
+                {
+                  type: 'collapsible',
+                  title: 'Inner',
+                  expanded: false,
+                  content: [
+                    { type: 'text', value: 'Inner content' }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    };
+    renderContent(data, container);
+    const outerDetails = container.querySelector('.lesson-collapsible');
+    expect(outerDetails).toBeTruthy();
+    const innerDetails = outerDetails.querySelector('.lesson-collapsible');
+    expect(innerDetails).toBeTruthy();
+    expect(innerDetails.querySelector('.lesson-collapsible-summary').textContent).toContain('Inner');
+  });
+
+  it('should render section with text content', () => {
+    const data = {
+      title: 'My Lesson',
+      blocks: [
+        {
+          type: 'question',
+          content: [
+            {
+              type: 'collapsible',
+              title: 'Section',
+              expanded: true,
+              content: [
+                { type: 'text', value: 'Some text here' }
+              ]
+            }
+          ]
+        }
+      ]
+    };
+    renderContent(data, container);
+    const contentDiv = container.querySelector('.collapsible-content');
+    expect(contentDiv).toBeTruthy();
+    const text = contentDiv.querySelector('.lesson-text');
+    expect(text).toBeTruthy();
+    expect(text.textContent).toContain('Some text here');
+  });
+
+  it('should render section with code blocks', () => {
+    const data = {
+      title: 'My Lesson',
+      blocks: [
+        {
+          type: 'question',
+          content: [
+            {
+              type: 'collapsible',
+              title: 'Code Section',
+              expanded: true,
+              content: [
+                { type: 'code', value: 'console.log("test");', language: 'javascript' }
+              ]
+            }
+          ]
+        }
+      ]
+    };
+    renderContent(data, container);
+    const contentDiv = container.querySelector('.collapsible-content');
+    const code = contentDiv.querySelector('.lesson-code code');
+    expect(code).toBeTruthy();
+    expect(code.textContent).toBe('console.log("test");');
+    expect(code.className).toContain('language-javascript');
+  });
+
+  it('should render section with lists', () => {
+    const data = {
+      title: 'My Lesson',
+      blocks: [
+        {
+          type: 'question',
+          content: [
+            {
+              type: 'collapsible',
+              title: 'List Section',
+              expanded: true,
+              content: [
+                { type: 'text', value: '- Item 1\n- Item 2' }
+              ]
+            }
+          ]
+        }
+      ]
+    };
+    renderContent(data, container);
+    const contentDiv = container.querySelector('.collapsible-content');
+    const list = contentDiv.querySelector('.lesson-list');
+    expect(list).toBeTruthy();
+    const items = list.querySelectorAll('.lesson-list-item');
+    expect(items).toHaveLength(2);
+  });
+
+  it('should render section with headings', () => {
+    const data = {
+      title: 'My Lesson',
+      blocks: [
+        {
+          type: 'question',
+          content: [
+            {
+              type: 'collapsible',
+              title: 'Heading Section',
+              expanded: true,
+              content: [
+                { type: 'text', value: '### Subheading' }
+              ]
+            }
+          ]
+        }
+      ]
+    };
+    renderContent(data, container);
+    const contentDiv = container.querySelector('.collapsible-content');
+    const heading = contentDiv.querySelector('h3');
+    expect(heading).toBeTruthy();
+    expect(heading.textContent).toBe('Subheading');
+  });
+
+  it('should render section with mixed content', () => {
+    const data = {
+      title: 'My Lesson',
+      blocks: [
+        {
+          type: 'question',
+          content: [
+            {
+              type: 'collapsible',
+              title: 'Mixed Section',
+              expanded: true,
+              content: [
+                { type: 'text', value: 'Some text' },
+                { type: 'code', value: 'const x = 5;', language: 'javascript' },
+                { type: 'text', value: '- List item' }
+              ]
+            }
+          ]
+        }
+      ]
+    };
+    renderContent(data, container);
+    const contentDiv = container.querySelector('.collapsible-content');
+    expect(contentDiv.querySelector('.lesson-text')).toBeTruthy();
+    expect(contentDiv.querySelector('.lesson-code')).toBeTruthy();
+    expect(contentDiv.querySelector('.lesson-list')).toBeTruthy();
+  });
+
+  it('should verify backward compatibility (content without collapsible sections renders unchanged)', () => {
+    const data = {
+      title: 'My Lesson',
+      blocks: [
+        {
+          type: 'question',
+          content: [
+            { type: 'text', value: 'Regular text' },
+            { type: 'code', value: 'code here', language: 'javascript' }
+          ]
+        }
+      ]
+    };
+    renderContent(data, container);
+    expect(container.querySelector('.lesson-collapsible')).toBeFalsy();
+    expect(container.querySelector('.lesson-text')).toBeTruthy();
+    expect(container.querySelector('.lesson-code')).toBeTruthy();
+  });
+
+  it('should process summary title with processInlineCode (test with bold)', () => {
+    const data = {
+      title: 'My Lesson',
+      blocks: [
+        {
+          type: 'question',
+          content: [
+            {
+              type: 'collapsible',
+              title: '**Bold** title',
+              expanded: false,
+              content: []
+            }
+          ]
+        }
+      ]
+    };
+    renderContent(data, container);
+    const summary = container.querySelector('.lesson-collapsible-summary');
+    expect(summary).toBeTruthy();
+    expect(summary.innerHTML).toContain('<strong>Bold</strong>');
+  });
 });
 

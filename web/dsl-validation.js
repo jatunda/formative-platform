@@ -39,6 +39,22 @@ export function validateDSL(dslText, parsed) {
 		return 'Unmatched code block - every ``` opening must have a closing ```';
 	}
 
+	// Check for unmatched collapsible sections
+	const collapsibleOpeners = lines.filter(line => {
+		const trimmed = line.trim();
+		return trimmed.startsWith('>>>') && !trimmed.startsWith('>>>!');
+	}).length;
+	const collapsibleExpandedOpeners = lines.filter(line => 
+		line.trim().startsWith('>>>!')
+	).length;
+	const collapsibleClosers = lines.filter(line => 
+		line.trim() === '<<<'
+	).length;
+	const totalOpeners = collapsibleOpeners + collapsibleExpandedOpeners;
+	if (totalOpeners !== collapsibleClosers) {
+		return `Unmatched collapsible sections - every >>> or >>>! opening must have a closing <<<. Found ${totalOpeners} opener(s) and ${collapsibleClosers} closer(s).`;
+	}
+
 	// Check if blocks have content
 	const hasContent = parsed.blocks.some(block => 
 		block.content && block.content.length > 0
@@ -87,6 +103,11 @@ export function getErrorExplanation(error, dslText) {
 			issue: 'Invalid content structure',
 			solution: 'Content should have a title, followed by text or code blocks, separated by "---" for multiple questions',
 			example: '# Title\n\nText content\n\n```\ncode here\n```\n\n---\n\nNext question'
+		},
+		'collapsible': {
+			issue: 'Unclosed collapsible section(s)',
+			solution: 'Every collapsible section opened with >>> or >>>! must be explicitly closed with <<<',
+			example: '>>> Hint\nThis is hidden content\n<<<\n\nRegular content after'
 		}
 	};
 	
@@ -156,6 +177,8 @@ export function getErrorExplanation(error, dslText) {
 		if (invalidSeparators.length > 0) {
 			detectedIssue = explanations.separator;
 		}
+	} else if (errorMessage.includes('Unclosed collapsible') || errorMessage.includes('collapsible')) {
+		detectedIssue = explanations.collapsible;
 	} else if (errorMessage.includes('empty') || errorMessage.includes('No content')) {
 		detectedIssue = explanations.structure;
 	}
@@ -185,6 +208,7 @@ export function getErrorExplanation(error, dslText) {
 					<li>Write content as regular text</li>
 					<li>Use inline code: <code>\`code\`</code></li>
 					<li>Use code blocks: <code>\`\`\`</code> on separate lines</li>
+					<li>Use collapsible sections: <code>>>> Title</code> ... <code><<<</code></li>
 					<li>Separate questions with: <code>---</code> on its own line</li>
 				</ul>
 			</div>

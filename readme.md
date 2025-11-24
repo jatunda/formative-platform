@@ -10,7 +10,47 @@ A web app for students to see daily formative assignments.
 - `---`: question separator (three dashes mark question boundaries)
 - `\`\`\``: code block markers (three backticks to start/end code blocks)
 - `\`inline code\``: Wrap inline code in backticks
+- `>>> Title`: collapsible section (collapsed by default)
+- `>>>! Title`: collapsible section (expanded by default)
+- `>>>`: collapsible section without title (collapsed)
+- `>>>!`: collapsible section without title (expanded)
+- `<<<`: explicit closing marker for collapsible sections (optional)
 - Raw text: Any line of text becomes content (no special prefix needed)
+
+### Collapsible Sections
+
+Collapsible sections can contain any content type (text, code blocks, lists, headings, and even nested collapsible sections). They are rendered as native HTML `<details>` elements.
+
+**Closing collapsible sections**: Collapsible sections close automatically when:
+- Another `>>>` or `>>>!` appears (starts a new section)
+- A question separator `---` appears
+- End of input is reached
+
+You can also explicitly close a collapsible section using `<<<` for clarity, especially when you want regular content to follow:
+
+Examples:
+
+```markdown
+>>> Hint: Click to reveal
+This is hidden content that can contain:
+- Lists
+- Code blocks
+- **Formatting**
+<<<
+Regular content that follows (not in collapsible)
+
+>>>! Expanded Section
+This section starts expanded.
+
+>>> Nested Section
+>>> Inner Section
+Content here
+<<<  ← Closes Inner Section
+More nested content
+<<<  ← Closes Nested Section
+```
+
+Note: `>>>` and `<<<` inside code blocks are treated as literal text, not collapsible markers.
 
 ## SOPs
 
