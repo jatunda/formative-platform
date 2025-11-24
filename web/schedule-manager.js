@@ -51,6 +51,7 @@ export async function getDateForDayIndex(dayIndex, classId, classStartDate = DEF
 // Load all classes into the class select dropdown
 export async function loadClasses(classSelectElement) {
   const classes = await getClasses();
+  if (!classes) return; // Handle null/undefined
   Object.entries(classes)
     .sort(([, a], [, b]) => a.displayOrder - b.displayOrder)
     .forEach(([id, data]) => {
@@ -76,8 +77,8 @@ export async function loadSchedule(classSelectElement, dayInputElement, renderCa
   renderCallback(schedule);
 }
 
-// Get date string for a given day index
-export function getDateForDayIndex(dayIndex, classStartDate = DEFAULT_CLASS_START_DATE) {
+// Get date string for a given day index (sync version, without classId)
+export function getDateForDayIndexSync(dayIndex, classStartDate = DEFAULT_CLASS_START_DATE) {
   // Example: classStartDate is a Monday in ISO format
   const start = new Date(classStartDate);
   const date = new Date(start);
