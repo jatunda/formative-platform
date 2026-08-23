@@ -771,7 +771,7 @@ pre:not(.lesson-code) {
   font-size: 14px;
   tab-size: 4;
   line-height: 1.4;
-  margin-bottom: var(--spacing-md);
+  margin: var(--spacing-sm) 0;
   position: relative;
   box-shadow: none !important;
 }
@@ -918,14 +918,14 @@ pre[class*="language-"],
   margin-top: var(--spacing-sm);
   background-color: var(--bg-primary);
   min-height: 300px;
-  max-height: 500px;
+  max-height: 80vh;
   overflow-y: auto;
 }
 
 .lesson-title {
   color: var(--accent-blue);
   margin-top: 0;
-  margin-bottom: var(--spacing-lg);
+  margin-bottom: var(--spacing-md);
   font-size: 2em;
   font-weight: bold;
   border-bottom: 2px solid var(--border-color);
@@ -933,7 +933,7 @@ pre[class*="language-"],
 }
 
 .lesson-heading {
-  margin: 1.5em 0 0.75em;
+  margin: var(--spacing-md) 0 var(--spacing-xs);
   line-height: 1.2;
   font-weight: 600;
 }
@@ -974,7 +974,7 @@ pre[class*="language-"],
 .lesson-text {
   color: var(--text-primary);
   line-height: 1.6;
-  margin-bottom: var(--spacing-md);
+  margin: var(--spacing-sm) 0;
 }
 
 .lesson-list {
@@ -985,7 +985,7 @@ pre[class*="language-"],
 }
 
 .lesson-list-item {
-  margin-bottom: var(--radius-lg);
+  margin-bottom: var(--spacing-xs);
 }
 
 ul.lesson-list {
@@ -1004,12 +1004,12 @@ ol.lesson-list {
 .lesson-separator {
   border: none;
   border-top: 2px solid var(--border-color);
-  margin: var(--spacing-xl) 0;
+  margin: var(--spacing-md) 0;
 }
 
 /* Collapsible Sections */
 .lesson-collapsible {
-  margin: var(--spacing-md) 0;
+  margin: var(--spacing-sm) 0;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
   background-color: transparent;
