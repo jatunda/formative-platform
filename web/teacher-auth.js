@@ -5,7 +5,7 @@ class TeacherAuth {
   constructor() {
     this.sessionKey = 'teacherAuthSession';
     this.timeoutKey = 'teacherAuthTimeout';
-    this.sessionDuration = 15 * 60 * 1000; // 15 minutes in milliseconds
+    this.sessionDuration = 30 * 60 * 1000; // 30 minutes in milliseconds
     
     // Password hash (SHA-256) - you'll need to update this with your actual password hash
     // To generate: Use browser console: crypto.subtle.digest('SHA-256', new TextEncoder().encode('your-password')).then(hash => console.log(Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('')))
@@ -247,7 +247,7 @@ class TeacherAuth {
 
     // Check session validity every minute
     setInterval(() => {
-      if (!this.isSessionValid() && (window.location.pathname.includes('teacher') || window.location.pathname.includes('editor'))) {
+      if (!this.isSessionValid() && document.body?.dataset.teacherPage === 'true') {
         alert('Session expired. Please log in again.');
         window.location.href = 'index.html';
       }

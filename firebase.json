@@ -21,6 +21,10 @@
         "destination": "/editor.html"
       },
       {
+        "source": "/lesson-planning.html",
+        "destination": "/lesson-planning.html"
+      },
+      {
         "source": "/view.html",
         "destination": "/view.html"
       },

@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Lesson Planning</title>
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <link rel="stylesheet" href="style.css">
+  <script src="teacher-auth.js"></script>
+  <script type="module" src="lesson-planning.js"></script>
+</head>
+<body data-teacher-page="true">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+    <h1>Lesson Planning</h1>
+    <button onclick="window.teacherAuth.logout()" style="width: auto; padding: 0.3rem 1rem; background-color: #e53e3e; border-color: #e53e3e; color: white;">Logout</button>
+  </div>
+
+  <div id="teacherNav"></div>
+
+  <div id="bulkShiftContainer" style="margin-bottom: 1rem; padding: 1rem; border: 1px solid #4a5568; border-radius: 8px; background-color: #374151;">
+    <h3 style="margin-top: 0; margin-bottom: 0.5rem; font-size: 1.1rem; color: #63b3ed;">Shift All Classes</h3>
+    <p style="margin: 0 0 0.75rem 0; font-size: 0.9rem; color: #a0aec0;">
+      Move every class's schedule forward or backward by the same number of business days at once (e.g. after a snow day). Applies immediately.
+    </p>
+    <!-- Bulk shift control inserted here by JavaScript -->
+  </div>
+
+  <div id="classPanesContainer">
+    <div id="classPanes-loading-state" style="display: flex; flex-direction: column; align-items: center; gap: 1.5rem; padding: 2rem;">
+      <div class="loading-spinner"></div>
+      <p class="loading-text">Loading classes...</p>
+    </div>
+  </div>
+</body>
+</html>

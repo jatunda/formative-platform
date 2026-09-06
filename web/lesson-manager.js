@@ -48,11 +48,14 @@ export function createLessonCluster({
   cluster.dataset.dayIndex = dayIndex;
   cluster.dataset.lessonIndex = lessonIndex;
 
-  // Setup drag handlers
+  // Setup drag handlers. classId travels with the drag data so a drop target
+  // belonging to a different Class (only possible on the Lesson Planning page,
+  // which shows several Classes at once) can be detected and ignored.
   setupDragHandlers(cluster, {
     lessonHash,
     fromDayIndex: dayIndex,
-    fromLessonIndex: lessonIndex
+    fromLessonIndex: lessonIndex,
+    classId
   });
 
   // Top row: Main lesson button

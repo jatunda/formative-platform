@@ -31,6 +31,7 @@ import {
 	initializeDatabase,
 	generateUniqueHash
 } from "./database-utils.js";
+import { renderTeacherNav } from "./teacher-nav.js";
 
 // Handle AI generation
 async function handleAIGeneration(event) {
@@ -102,6 +103,8 @@ initializeDatabase(db);
 
 // Initialize the lesson search module with database reference
 initializeLessonSearch(db);
+
+renderTeacherNav('editor');
 
 // Update back to schedule link to preserve class selection
 const urlParams = new URLSearchParams(window.location.search);

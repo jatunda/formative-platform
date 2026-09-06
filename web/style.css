@@ -609,7 +609,8 @@ select:focus,
   padding: var(--spacing-lg);
 }
 
-#schedulePane {
+#schedulePane,
+.schedule-pane {
   width: 100%;
   max-width: 1600px;
   margin: 0 auto;
@@ -619,11 +620,38 @@ select:focus,
   border-radius: var(--radius-xl);
 }
 
-#scheduleTable {
+#scheduleTable,
+.schedule-table {
   width: 100%;
   min-width: 600px;
   background-color: var(--bg-dark);
   color: var(--text-primary);
+}
+
+/* ========================================
+   Lesson Planning page
+   ======================================== */
+.lesson-planning-pane {
+  margin-bottom: var(--spacing-2xl);
+}
+
+.lesson-planning-pane h2 {
+  margin-bottom: var(--spacing-sm);
+}
+
+/* ========================================
+   Teacher nav (Full Schedule / Lesson Planning / Content Editor)
+   ======================================== */
+.teacher-nav {
+  display: flex;
+  gap: var(--spacing-lg);
+  margin-bottom: 1rem;
+}
+
+.teacher-nav-link-active {
+  font-weight: bold;
+  color: var(--text-primary);
+  border-bottom-color: var(--accent-blue);
 }
 
 td {

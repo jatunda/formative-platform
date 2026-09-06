@@ -7,34 +7,23 @@ import {
   set
 } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js";
 import { db } from './firebase-config.js';
-import { 
-  initializeDateUtils, 
+import {
+  initializeDateUtils,
   getDateForDayIndex as sharedGetDateForDayIndex,
   getTodayDayIndex,
   clearDateOffsetCache
 } from './date-utils.js';
-import { DEFAULT_CLASS_START_DATE, DEFAULT_LESSON_TITLE, UNTITLED_LESSON } from './constants.js';
+import { DEFAULT_CLASS_START_DATE, UNTITLED_LESSON } from './constants.js';
 import { showNotification } from './notification-utils.js';
 import {
-	createStyledButton,
-	createNewLessonButton as createNewLessonButtonShared,
-	createCloseButton,
-	createArrowButton,
-	createDeleteButton,
-	createInsertDayButton,
 	createUpArrowButton,
 	createDownArrowButton,
-	createLeftArrowButton,
-	createRightArrowButton
+	createDeleteButton
 } from './ui-components.js';
 import {
-  initializeLessonSearch,
-  showLessonSearchPopup,
-  getCachedTitle
+  initializeLessonSearch
 } from "./lesson-search.js";
 import {
-  insertDayAt,
-  deleteDayAt,
   initializeDatabase,
   getClassDateOffset as getClassDateOffsetDB,
   setClassDateOffset as setClassDateOffsetDB
@@ -43,11 +32,14 @@ import {
   showErrorState
 } from "./error-ui-utils.js";
 import {
-  createLessonClusterWithDB
-} from "./lesson-manager.js";
-import {
-  setupDropHandlers
-} from "./drag-drop-utils.js";
+  createDayRow,
+  createInsertDayRow,
+  createEndButtonsContainer,
+  makeInsertDayHandler,
+  makeDeleteDayHandler,
+  getLessonTitles
+} from "./schedule-day-view.js";
+import { renderTeacherNav } from "./teacher-nav.js";
 
 // Database is imported from centralized firebase-config.js
 
@@ -78,6 +70,8 @@ const pageTitles = {}; // id → title
 
 // Initialize lesson search module
 initializeLessonSearch(db);
+
+renderTeacherNav('teacher');
 
 // Constants
 const BUTTON_CONFIG = {
@@ -495,167 +489,34 @@ function debounce(func, wait) {
 }
 
 /**
- * Create a row with an insert day button
- * @param {number} dayIndex - The day index to insert before
- * @param {Function} onInsert - Callback function when insert is clicked
- * @returns {HTMLTableRowElement} The insert row element
- */
-function createInsertDayRow(dayIndex, onInsert) {
-  const insertRow = document.createElement("tr");
-  const insertTd = document.createElement("td");
-  insertTd.colSpan = 4;
-  insertTd.className = "insert-day-cell";
-  insertTd.appendChild(createInsertDayButton(dayIndex, onInsert));
-  insertRow.appendChild(insertTd);
-  return insertRow;
-}
-
-/**
- * Setup drag-and-drop handlers for a lessons cell
- * @param {HTMLTableCellElement} tdLessons - The lessons cell element
- * @param {number} toDayIndex - The target day index for drops
- */
-function setupLessonDropHandlers(tdLessons, toDayIndex) {
-  setupDropHandlers(tdLessons, async (data) => {
-    const { lessonHash, fromDayIndex, fromLessonIndex } = data;
-    
-    // Prevent dropping into the same day
-    if (Number(fromDayIndex) === Number(toDayIndex)) return;
-    
-    // Batch the drag and drop operation
-    const classId = classSelect.value;
-    
-    // Read both days at once
-    const [fromSnap, toSnap] = await Promise.all([
-      get(ref(db, `schedule/${classId}/${fromDayIndex}`)),
-      get(ref(db, `schedule/${classId}/${toDayIndex}`))
-    ]);
-    
-    const fromLessons = fromSnap.exists() ? fromSnap.val() : [];
-    const toLessons = toSnap.exists() ? toSnap.val() : [];
-    
-    // Modify arrays in memory
-    fromLessons.splice(fromLessonIndex, 1);
-    toLessons.push(lessonHash);
-    
-    // Write both changes as individual operations
-    await Promise.all([
-      set(ref(db, `schedule/${classId}/${fromDayIndex}`), fromLessons),
-      set(ref(db, `schedule/${classId}/${toDayIndex}`), toLessons)
-    ]);
-    loadFullSchedule();
-  });
-}
-
-/**
- * Create the actions column with delete button
- * @param {number} dayIndex - The day index
- * @returns {HTMLTableCellElement} The actions cell element
- */
-function createActionsCell(dayIndex) {
-  const tdActions = document.createElement("td");
-  tdActions.style.textAlign = "center";
-  tdActions.style.verticalAlign = "middle";
-  tdActions.style.padding = "4px";
-  
-  const deleteButton = document.createElement("button");
-  deleteButton.textContent = "🗑️";
-  deleteButton.className = "delete-day-btn";
-  deleteButton.title = `Delete day ${dayIndex}`;
-  deleteButton.onclick = async () => {
-    const classId = classSelect.value;
-    if (!confirm(`Are you sure you want to delete day ${dayIndex}? This will shift all future days back by one.`)) {
-      return;
-    }
-    try {
-      await deleteDayAt(classId, dayIndex);
-      loadFullSchedule();
-    } catch (error) {
-      console.error("Failed to delete day:", error);
-      showNotification("Failed to delete day. Please try again.", "error");
-    }
-  };
-  tdActions.appendChild(deleteButton);
-  
-  return tdActions;
-}
-
-/**
- * Create a day row in the schedule table
- * @param {number} dayIndex - The day index
- * @param {string[]} lessons - Array of lesson hashes for this day
- * @param {number|undefined} todayDayIndex - Today's day index for highlighting
- * @returns {Promise<HTMLTableRowElement>} The day row element
- */
-async function createDayRow(dayIndex, lessons, todayDayIndex) {
-  const tr = document.createElement("tr");
-  
-  // Highlight today's row
-  if (todayDayIndex !== undefined && dayIndex === todayDayIndex) {
-    tr.className = "today-row";
-  }
-  
-  // Day Index
-  const tdDay = document.createElement("td");
-  tdDay.textContent = dayIndex;
-  tr.appendChild(tdDay);
-  
-  // Date column
-  const tdDate = document.createElement("td");
-  tdDate.textContent = await getDateForDayIndex(dayIndex);
-  tr.appendChild(tdDate);
-  
-  // Lessons (horizontal buttons or just a plus if empty)
-  const tdLessons = document.createElement("td");
-  tdLessons.className = "lessons-cell";
-  
-  for (let i = 0; i < lessons.length; i++) {
-    const lessonHash = lessons[i];
-    tdLessons.appendChild(createLessonCluster(lessonHash, dayIndex, i, lessons));
-  }
-  
-  // Add the stacked Link Lesson and New Lesson buttons
-  tdLessons.appendChild(createEndButtonsContainer(dayIndex));
-  
-  // Setup drag-and-drop handlers
-  setupLessonDropHandlers(tdLessons, dayIndex);
-  
-  tr.appendChild(tdLessons);
-  
-  // Actions column (delete button)
-  tr.appendChild(createActionsCell(dayIndex));
-  
-  return tr;
-}
-
-/**
- * Create the final row for adding a new day
+ * Create the final row for adding a new day past the end of the schedule
  * @param {number} nextIndex - The next day index
+ * @param {{classId: string, db: object, onReload: () => void}} ctx
  * @returns {Promise<HTMLTableRowElement>} The final row element
  */
-async function createFinalRow(nextIndex) {
+async function createFinalRow(nextIndex, ctx) {
   const addRow = document.createElement("tr");
-  
+
   // Day Index column
   const tdDay = document.createElement("td");
   tdDay.textContent = nextIndex;
   addRow.appendChild(tdDay);
-  
+
   // Date column
   const tdDate = document.createElement("td");
   tdDate.textContent = await getDateForDayIndex(nextIndex);
   addRow.appendChild(tdDate);
-  
+
   // Lessons column with "Link Lesson" and "New Lesson" buttons
   const tdLessons = document.createElement("td");
   tdLessons.className = "lessons-cell";
-  tdLessons.appendChild(createEndButtonsContainer(nextIndex));
+  tdLessons.appendChild(createEndButtonsContainer(nextIndex, ctx));
   addRow.appendChild(tdLessons);
-  
+
   // Empty actions column for the final row
   const tdActions = document.createElement("td");
   addRow.appendChild(tdActions);
-  
+
   return addRow;
 }
 
@@ -678,94 +539,33 @@ async function renderScheduleTable(schedule) {
     const lessons = schedule[dayIndex] || [];
     allLessonHashes.push(...lessons);
   }
-  // Remove duplicates and load titles in batch
-  const uniqueHashes = [...new Set(allLessonHashes)];
-  if (uniqueHashes.length > 0) {
-    await getLessonTitles(uniqueHashes);
-  }
+  await getLessonTitles(db, allLessonHashes);
 
-  // Wrapper function for inserting a day
-  async function handleInsertDay(index) {
-    const classId = classSelect.value;
-    try {
-      await insertDayAt(classId, index, maxDayIndex);
-      loadFullSchedule();
-    } catch (error) {
-      console.error("Failed to insert day:", error);
-      showNotification("Failed to insert day. Please try again.", "error");
-    }
-  }
+  const classId = classSelect.value;
+  const ctx = {
+    classId,
+    db,
+    onReload: loadFullSchedule,
+    onDeleteDay: makeDeleteDayHandler(classId, loadFullSchedule)
+  };
+  const onInsertDay = makeInsertDayHandler(classId, maxDayIndex, loadFullSchedule);
 
   // Render all days
   for (let dayIndex = 0; dayIndex <= maxDayIndex; dayIndex++) {
     // Insert row before each day
-    scheduleTableBody.appendChild(createInsertDayRow(dayIndex, handleInsertDay));
+    scheduleTableBody.appendChild(createInsertDayRow(dayIndex, onInsertDay));
 
     // Day row
     const lessons = schedule[dayIndex] || [];
-    const dayRow = await createDayRow(dayIndex, lessons, todayDayIndex);
+    const dateLabel = await getDateForDayIndex(dayIndex);
+    const dayRow = await createDayRow(dayIndex, lessons, todayDayIndex, dateLabel, ctx);
     scheduleTableBody.appendChild(dayRow);
   }
 
   // Final row for adding a new day
   const nextIndex = maxDayIndex + 1;
-  const finalRow = await createFinalRow(nextIndex);
+  const finalRow = await createFinalRow(nextIndex, ctx);
   scheduleTableBody.appendChild(finalRow);
-}
-
-// Optimize title fetching with batching
-async function getLessonTitles(hashes) {
-  const missingHashes = hashes.filter(hash => !pageTitles[hash]);
-  
-  if (missingHashes.length > 0) {
-    // Batch fetch missing titles
-    const titlePromises = missingHashes.map(async (hash) => {
-      const snap = await get(ref(db, `content/${hash}/title`));
-      return { hash, title: snap.exists() ? snap.val() : "(Untitled)" };
-    });
-    
-    const results = await Promise.all(titlePromises);
-    results.forEach(({ hash, title }) => {
-      pageTitles[hash] = title;
-    });
-  }
-  
-  return hashes.map(hash => pageTitles[hash]);
-}
-
-async function getLessonTitle(hash) {
-  if (pageTitles[hash]) return pageTitles[hash];
-  const titles = await getLessonTitles([hash]);
-  return titles[0];
-}
-
-async function addLessonToDay(dayIndex) {
-  // 1. Generate a unique hash for the new lesson
-  let hash;
-  let exists = true;
-  while (exists) {
-    hash = Array.from(crypto.getRandomValues(new Uint8Array(16)))
-      .map(b => b.toString(16).padStart(2, "0")).join("");
-    const snap = await get(ref(db, `content/${hash}`));
-    exists = snap.exists();
-  }
-
-  const classId = classSelect.value;
-  
-  // 2. Read current schedule for the day
-  const dayRef = ref(db, `schedule/${classId}/${dayIndex}`);
-  const snap = await get(dayRef);
-  const lessons = snap.exists() ? snap.val() : [];
-  lessons.push(hash);
-
-  // 3. Create lesson content and update schedule as separate operations
-  await Promise.all([
-    set(ref(db, `content/${hash}`), { title: DEFAULT_LESSON_TITLE }),
-    set(ref(db, `schedule/${classId}/${dayIndex}`), lessons)
-  ]);
-
-  // 4. Reload the table to show the new lesson
-  loadFullSchedule();
 }
 
 classSelect.onchange = loadFullSchedule;
@@ -799,80 +599,5 @@ initializeTeacherApp();
 
 // Global function for scrolling to today
 window.scrollToToday = scrollToToday;
-
-// Use the shared lesson search popup
-function showLessonLinkPopup({ onSelect }) {
-  showLessonSearchPopup({ onSelect });
-}
-
-// UI component functions are imported from ui-components.js
-// Wrapper for createNewLessonButton to match local usage pattern
-function createNewLessonButton(dayIndex) {
-	return createNewLessonButtonShared(dayIndex, addLessonToDay);
-}
-
-// createLessonCluster is imported from lesson-manager.js
-// Wrapper function to match local usage pattern
-function createLessonCluster(lessonHash, dayIndex, i, lessons) {
-  return createLessonClusterWithDB({
-    lessonHash,
-    dayIndex,
-    lessonIndex: i,
-    lessons,
-    lessonTitle: pageTitles[lessonHash] || DEFAULT_LESSON_TITLE,
-    classId: classSelect.value,
-    database: db,
-    onScheduleReload: loadFullSchedule
-  });
-}
-
-function appendLinkLessonButton(td, dayIndex) {
-  td.appendChild(createStyledButton("Link Lesson", () => {
-    showLessonLinkPopup({
-      onSelect: async (lessonId) => {
-        const classId = classSelect.value;
-        const dayRef = ref(db, `schedule/${classId}/${dayIndex}`);
-        const snap = await get(dayRef);
-        const lessons = snap.exists() ? snap.val() : [];
-        lessons.push(lessonId);
-        
-        // Single database write operation
-        await set(dayRef, lessons);
-        loadFullSchedule();
-      }
-    });
-  }));
-}
-
-// Helper function to create the stacked button container
-function createEndButtonsContainer(dayIndex) {
-  const container = document.createElement("div");
-  container.className = "lessons-end-buttons";
-  
-  // Link Lesson button
-  const linkBtn = createStyledButton("Link Lesson", () => {
-    showLessonLinkPopup({
-      onSelect: async (lessonId) => {
-        const classId = classSelect.value;
-        const dayRef = ref(db, `schedule/${classId}/${dayIndex}`);
-        const snap = await get(dayRef);
-        const lessons = snap.exists() ? snap.val() : [];
-        lessons.push(lessonId);
-        
-        // Single database write operation
-        await set(dayRef, lessons);
-        loadFullSchedule();
-      }
-    });
-  });
-  
-  // New Lesson button
-  const newBtn = createNewLessonButton(dayIndex);
-  
-  container.appendChild(linkBtn);
-  container.appendChild(newBtn);
-  
-  return container;
-}
 
 } // End of main function
