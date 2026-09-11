@@ -39,7 +39,7 @@ export default defineConfig({
       },
     },
     // Setup files
-    setupFiles: [],
+    setupFiles: ['__tests__/helpers/setup.js'],
     // Global test timeout
     testTimeout: 10000,
   },
