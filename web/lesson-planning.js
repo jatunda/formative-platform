@@ -17,6 +17,7 @@ import {
 } from './date-utils.js';
 import { showNotification } from './notification-utils.js';
 import { initializeLessonSearch } from './lesson-search.js';
+import { createDateOffsetControl } from './ui-components.js';
 import {
   initializeDatabase,
   getFullSchedule
@@ -66,26 +67,35 @@ async function main() {
 }
 
 /**
- * Build the "shift all classes" toolbar: a magnitude input (default 1) with
- * separate + and − buttons, each applying that magnitude instantly.
+ * Build the compact "shift all classes" toolbar: a magnitude input
+ * (default 1) with separate + and − buttons, each applying that magnitude
+ * instantly. The description/warning that used to sit below it as always-
+ * visible text now lives behind a "?" tooltip icon instead.
  */
 export function initializeBulkShiftControl() {
   const container = document.getElementById('bulkShiftContainer');
 
   const controls = document.createElement('div');
-  controls.style.display = 'flex';
-  controls.style.alignItems = 'center';
-  controls.style.gap = '8px';
+  controls.className = 'bulk-shift-control';
 
   const label = document.createElement('label');
-  label.textContent = 'Shift amount (business days): ';
+  label.textContent = 'Shift all classes:';
+
+  const infoIcon = document.createElement('span');
+  infoIcon.className = 'info-tooltip';
+  infoIcon.textContent = '?';
+  infoIcon.tabIndex = 0;
+  const infoText = document.createElement('span');
+  infoText.className = 'info-tooltip-text';
+  infoText.textContent = "Moves every class's schedule forward or backward by the same number of business days at once (e.g. after a snow day). Applies immediately, no confirmation.";
+  infoIcon.appendChild(infoText);
 
   const input = document.createElement('input');
   input.type = 'number';
   input.id = 'bulkShiftAmount';
   input.value = '1';
   input.min = '1';
-  input.style.width = '70px';
+  input.style.width = '60px';
 
   const minusBtn = document.createElement('button');
   minusBtn.textContent = '−'; // −
@@ -100,6 +110,7 @@ export function initializeBulkShiftControl() {
   plusBtn.onclick = () => applyBulkShift(getShiftMagnitude(input));
 
   controls.appendChild(label);
+  controls.appendChild(infoIcon);
   controls.appendChild(input);
   controls.appendChild(minusBtn);
   controls.appendChild(plusBtn);
@@ -159,18 +170,9 @@ export async function loadAndRenderAllPanes() {
     const renders = sortedEntries.map(([classId, data]) => {
       const pane = document.createElement('section');
       pane.className = 'lesson-planning-pane';
-
-      const heading = document.createElement('h2');
-      heading.textContent = data.name;
-      pane.appendChild(heading);
-
-      const tableWrapper = document.createElement('div');
-      tableWrapper.className = 'schedule-pane';
-      pane.appendChild(tableWrapper);
-
       container.appendChild(pane);
 
-      return renderClassPane(classId, tableWrapper);
+      return renderClassPane(classId, data.name, pane);
     });
 
     await Promise.all(renders);
@@ -184,13 +186,17 @@ export async function loadAndRenderAllPanes() {
 }
 
 /**
- * Render one Class's pane: its Planning Window of Day Indices, each with full
- * day-row functionality (drag-and-drop, lesson actions, Insert/Delete Day).
+ * Render one Class's whole pane: a header (Class name and its Date Offset
+ * control) plus its Planning Window of Day Indices, each with full day-row
+ * functionality (drag-and-drop, lesson actions, Insert/Delete Day). Changing
+ * the Class's Date Offset shifts which Day Indices the window shows, so a
+ * reload re-renders the whole pane, not just the table.
  */
-export async function renderClassPane(classId, containerEl) {
+export async function renderClassPane(classId, className, containerEl) {
   const schedule = await getFullSchedule(classId);
   const dayIndexes = Object.keys(schedule).map(Number);
   const maxDayIndex = dayIndexes.length > 0 ? Math.max(...dayIndexes) : 0;
+  const currentOffset = await getClassDateOffset(classId);
   const todayDayIndex = await getTodayDayIndex(classId);
 
   const windowIndexes = Array.from(
@@ -202,7 +208,7 @@ export async function renderClassPane(classId, containerEl) {
   const lessonHashesInWindow = windowIndexes.flatMap(idx => schedule[idx] || []);
   await getLessonTitles(db, lessonHashesInWindow);
 
-  const onReload = () => renderClassPane(classId, containerEl);
+  const onReload = () => renderClassPane(classId, className, containerEl);
   const ctx = {
     classId,
     db,
@@ -210,6 +216,33 @@ export async function renderClassPane(classId, containerEl) {
     onDeleteDay: makeDeleteDayHandler(classId, onReload)
   };
   const onInsertDay = makeInsertDayHandler(classId, maxDayIndex, onReload);
+
+  const header = document.createElement('div');
+  header.className = 'lesson-planning-pane-header';
+
+  const heading = document.createElement('h2');
+  heading.textContent = className;
+  header.appendChild(heading);
+
+  header.appendChild(createDateOffsetControl({
+    currentOffset,
+    onApply: async (newOffset) => {
+      try {
+        await setClassDateOffset(classId, newOffset);
+        await onReload();
+        showNotification(`Date offset for ${className} updated successfully!`, 'success');
+      } catch (error) {
+        console.error(`Failed to set date offset for class ${classId}:`, error);
+        showNotification('Failed to update date offset', 'error');
+        throw error;
+      }
+    },
+    computeTodayDayIndex: () => getTodayDayIndex(classId),
+    // No onGoToToday: the Planning Window is only PLANNING_WINDOW_SIZE days
+    // and already starts at today by definition, so there's nothing beyond
+    // it to scroll to.
+    compact: true
+  }));
 
   const table = document.createElement('table');
   table.className = 'schedule-table';
@@ -235,6 +268,12 @@ export async function renderClassPane(classId, containerEl) {
   tbody.appendChild(createInsertDayRow(afterWindowIndex, onInsertDay));
 
   table.appendChild(tbody);
+
+  const tableWrapper = document.createElement('div');
+  tableWrapper.className = 'schedule-pane';
+  tableWrapper.appendChild(table);
+
   containerEl.innerHTML = '';
-  containerEl.appendChild(table);
+  containerEl.appendChild(header);
+  containerEl.appendChild(tableWrapper);
 }

@@ -172,11 +172,12 @@ export function createRightArrowButton(isDisabled, onClick) {
  * @param {Object} config
  * @param {number} config.currentOffset - The current date offset value
  * @param {(newOffset: number) => Promise<void>} config.onApply - Persist the new offset (and notify the user of success/failure); the control re-renders its display only if this resolves, and swallows a thrown failure since the caller already handled it
- * @param {() => Promise<number>} config.computeTodayDayIndex - Resolve today's Day Index for display, called on mount and after a successful apply
+ * @param {() => Promise<number>} config.computeTodayDayIndex - Resolve today's Day Index for display, called on mount and after a successful apply. Never called when config.compact is true.
  * @param {() => void} [config.onGoToToday] - If provided, a "Go to Today" button is rendered
+ * @param {boolean} [config.compact=false] - Shorten the label and drop the "(Today is Day N)" indicator, for placements too narrow for the full control (e.g. one per pane on the Lesson Planning page)
  * @returns {HTMLElement & {updateOffset: (offset: number) => Promise<void>}} The container element with an updateOffset method
  */
-export function createDateOffsetControl({ currentOffset, onApply, computeTodayDayIndex, onGoToToday }) {
+export function createDateOffsetControl({ currentOffset, onApply, computeTodayDayIndex, onGoToToday, compact = false }) {
   const container = document.createElement("div");
   container.className = "date-offset-control";
   container.style.display = "flex";
@@ -184,7 +185,7 @@ export function createDateOffsetControl({ currentOffset, onApply, computeTodayDa
   container.style.gap = "8px";
 
   const label = document.createElement("label");
-  label.textContent = "Date Offset (days): ";
+  label.textContent = compact ? "Offset:" : "Date Offset (days): ";
 
   const currentDisplay = document.createElement("span");
   currentDisplay.className = "current-offset-display";
@@ -204,6 +205,7 @@ export function createDateOffsetControl({ currentOffset, onApply, computeTodayDa
   todayDisplay.style.fontStyle = "italic";
 
   async function refreshTodayDisplay() {
+    if (compact) return;
     const todayDayIndex = await computeTodayDayIndex();
     todayDisplay.textContent = `(Today is Day ${todayDayIndex})`;
   }
@@ -231,7 +233,9 @@ export function createDateOffsetControl({ currentOffset, onApply, computeTodayDa
 
   container.appendChild(label);
   container.appendChild(currentDisplay);
-  container.appendChild(todayDisplay);
+  if (!compact) {
+    container.appendChild(todayDisplay);
+  }
   container.appendChild(input);
   container.appendChild(applyBtn);
 

@@ -635,8 +635,89 @@ select:focus,
   margin-bottom: var(--spacing-2xl);
 }
 
-.lesson-planning-pane h2 {
+.lesson-planning-pane-header {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--spacing-md);
   margin-bottom: var(--spacing-sm);
+}
+
+.lesson-planning-pane-header h2 {
+  margin: 0;
+}
+
+.lesson-planning-pane-header .date-offset-control {
+  flex-wrap: wrap;
+}
+
+.bulk-shift-control {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+}
+
+.bulk-shift-control button {
+  /* .schedule-action-btn is 110px wide everywhere else, sized for longer
+     button text ("New Lesson", "Insert Day Here") - this control's +/-
+     buttons only ever hold one character, so override to stay compact. */
+  width: auto;
+  min-width: auto;
+  max-width: none;
+  padding: var(--spacing-xxs) var(--spacing-md);
+}
+
+.bulk-shift-control label {
+  font-weight: 500;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+}
+
+/* A small "?" icon with a CSS-only hover/focus tooltip - no JS state, no
+   existing pattern in this app to reuse, so introduced here. */
+.info-tooltip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background-color: var(--border-color);
+  color: var(--text-primary);
+  font-size: 0.7rem;
+  line-height: 1;
+  cursor: help;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.info-tooltip-text {
+  visibility: hidden;
+  opacity: 0;
+  position: absolute;
+  bottom: 130%;
+  left: 0;
+  width: 240px;
+  background-color: var(--bg-dark);
+  color: var(--text-primary);
+  text-align: left;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-sm) var(--spacing-md);
+  font-size: 0.8rem;
+  font-weight: normal;
+  line-height: 1.4;
+  z-index: 20;
+  transition: opacity var(--transition-fast);
+  pointer-events: none;
+}
+
+.info-tooltip:hover .info-tooltip-text,
+.info-tooltip:focus-visible .info-tooltip-text {
+  visibility: visible;
+  opacity: 1;
 }
 
 /* ========================================

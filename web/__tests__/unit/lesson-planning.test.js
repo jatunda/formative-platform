@@ -74,6 +74,16 @@ vi.mock('../../teacher-nav.js', () => ({
   renderTeacherNav: vi.fn(),
 }));
 
+const mockCreateDateOffsetControl = vi.fn((config) => {
+  const el = document.createElement('div');
+  el.className = 'date-offset-control';
+  el.__config = config;
+  return el;
+});
+vi.mock('../../ui-components.js', () => ({
+  createDateOffsetControl: (config) => mockCreateDateOffsetControl(config),
+}));
+
 describe('lesson-planning', () => {
   beforeEach(() => {
     for (const key of Object.keys(mockData)) delete mockData[key];
@@ -218,7 +228,7 @@ describe('lesson-planning', () => {
       mockGetFullSchedule.mockResolvedValue({ 10: ['hashA'], 11: [], 12: ['hashB'] });
       const containerEl = document.createElement('div');
 
-      await renderClassPane('csa', containerEl);
+      await renderClassPane('csa', 'CS A', containerEl);
 
       const dayRows = [...containerEl.querySelectorAll('.day-row')].map((r) => r.dataset.dayIndex);
       expect(dayRows).toEqual(['10', '11', '12']);
@@ -228,7 +238,7 @@ describe('lesson-planning', () => {
       mockGetFullSchedule.mockResolvedValue({});
       const containerEl = document.createElement('div');
 
-      await renderClassPane('csa', containerEl);
+      await renderClassPane('csa', 'CS A', containerEl);
 
       const rows = [...containerEl.querySelectorAll('tbody > tr')];
       expect(rows[0].className).toBe('insert-day-row');
@@ -246,7 +256,7 @@ describe('lesson-planning', () => {
       });
       const containerEl = document.createElement('div');
 
-      await renderClassPane('csa', containerEl);
+      await renderClassPane('csa', 'CS A', containerEl);
 
       expect(mockGetLessonTitles).toHaveBeenCalledWith(expect.anything(), ['hashA', 'hashB']);
     });
@@ -256,10 +266,72 @@ describe('lesson-planning', () => {
       const { makeDeleteDayHandler, makeInsertDayHandler } = await import('../../schedule-day-view.js');
       const containerEl = document.createElement('div');
 
-      await renderClassPane('csa', containerEl);
+      await renderClassPane('csa', 'CS A', containerEl);
 
       expect(makeDeleteDayHandler).toHaveBeenCalledWith('csa', expect.any(Function));
       expect(makeInsertDayHandler).toHaveBeenCalledWith('csa', 10, expect.any(Function));
+    });
+
+    it('renders the Class name heading alongside a Date Offset control, with no Go-to-Today', async () => {
+      mockGetFullSchedule.mockResolvedValue({});
+      const containerEl = document.createElement('div');
+
+      await renderClassPane('csa', 'CS A', containerEl);
+
+      const header = containerEl.querySelector('.lesson-planning-pane-header');
+      expect(header.querySelector('h2').textContent).toBe('CS A');
+      expect(header.querySelector('.date-offset-control')).toBeTruthy();
+      const config = mockCreateDateOffsetControl.mock.calls[0][0];
+      expect(config.currentOffset).toBe(5); // csa's mocked offset
+      expect(config.onGoToToday).toBeUndefined();
+    });
+
+    it("computeTodayDayIndex is wired to this Class's Today's Day Index", async () => {
+      mockGetFullSchedule.mockResolvedValue({});
+      const containerEl = document.createElement('div');
+      const { getTodayDayIndex } = await import('../../date-utils.js');
+
+      await renderClassPane('csa', 'CS A', containerEl);
+      const config = mockCreateDateOffsetControl.mock.calls[0][0];
+      getTodayDayIndex.mockClear();
+      await config.computeTodayDayIndex();
+
+      expect(getTodayDayIndex).toHaveBeenCalledWith('csa');
+    });
+
+    it("onApply persists the new offset, reloads the pane, and notifies with the Class's name", async () => {
+      mockGetFullSchedule.mockResolvedValue({});
+      const containerEl = document.createElement('div');
+      const { setClassDateOffset } = await import('../../date-utils.js');
+      const { showNotification } = await import('../../notification-utils.js');
+
+      await renderClassPane('csa', 'CS A', containerEl);
+      const config = mockCreateDateOffsetControl.mock.calls[0][0];
+      mockCreateDateOffsetControl.mockClear();
+
+      await config.onApply(9);
+
+      expect(setClassDateOffset).toHaveBeenCalledWith('csa', 9);
+      // Reloaded: renderClassPane ran again, rebuilding the control
+      expect(mockCreateDateOffsetControl).toHaveBeenCalledTimes(1);
+      expect(showNotification).toHaveBeenCalledWith(expect.stringContaining('CS A'), 'success');
+    });
+
+    it('onApply shows an error notification and rethrows on failure, without reloading', async () => {
+      mockGetFullSchedule.mockResolvedValue({});
+      const containerEl = document.createElement('div');
+      const { setClassDateOffset } = await import('../../date-utils.js');
+      const { showNotification } = await import('../../notification-utils.js');
+      setClassDateOffset.mockRejectedValueOnce(new Error('boom'));
+
+      await renderClassPane('csa', 'CS A', containerEl);
+      const config = mockCreateDateOffsetControl.mock.calls[0][0];
+      mockCreateDateOffsetControl.mockClear();
+
+      await expect(config.onApply(9)).rejects.toThrow('boom');
+
+      expect(mockCreateDateOffsetControl).not.toHaveBeenCalled();
+      expect(showNotification).toHaveBeenCalledWith('Failed to update date offset', 'error');
     });
   });
 });

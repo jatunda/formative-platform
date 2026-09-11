@@ -304,6 +304,59 @@ describe('ui-components', () => {
       goToTodayBtn.click();
       expect(onGoToToday).toHaveBeenCalled();
     });
+
+    describe('compact mode', () => {
+      it('shortens the label and omits the "(Today is Day N)" indicator', () => {
+        const control = makeControl({ compact: true });
+
+        expect(control.querySelector('label').textContent).toBe('Offset:');
+        expect(control.querySelector('.today-dayindex-display')).toBeNull();
+      });
+
+      it('never calls computeTodayDayIndex, on mount or after apply', async () => {
+        const computeTodayDayIndex = vi.fn().mockResolvedValue(12);
+        const onApply = vi.fn().mockResolvedValue(undefined);
+        const control = makeControl({ compact: true, computeTodayDayIndex, onApply });
+        await flush();
+
+        control.querySelector('input').value = '7';
+        control.querySelector('button').click();
+        await flush();
+
+        expect(computeTodayDayIndex).not.toHaveBeenCalled();
+      });
+
+      it('still updates the current-offset badge on a successful apply', async () => {
+        const onApply = vi.fn().mockResolvedValue(undefined);
+        const control = makeControl({ compact: true, onApply });
+        await flush();
+
+        control.querySelector('input').value = '9';
+        control.querySelector('button').click();
+        await flush();
+
+        expect(onApply).toHaveBeenCalledWith(9);
+        expect(control.querySelector('.current-offset-display').textContent).toBe('Current: 9');
+      });
+
+      it('updateOffset also skips the today-index computation in compact mode', async () => {
+        const computeTodayDayIndex = vi.fn().mockResolvedValue(12);
+        const control = makeControl({ compact: true, computeTodayDayIndex });
+        await flush();
+        computeTodayDayIndex.mockClear();
+
+        await control.updateOffset(15);
+
+        expect(control.querySelector('.current-offset-display').textContent).toBe('Current: 15');
+        expect(computeTodayDayIndex).not.toHaveBeenCalled();
+      });
+
+      it('defaults to non-compact when the option is omitted', () => {
+        const control = makeControl();
+        expect(control.querySelector('label').textContent).toBe('Date Offset (days): ');
+        expect(control.querySelector('.today-dayindex-display')).toBeTruthy();
+      });
+    });
   });
 });
 
