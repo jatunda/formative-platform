@@ -1,7 +1,7 @@
 // teacher-auth.js - Simple password authentication for teacher pages
 // Password is hashed using SHA-256 to avoid storing plaintext in code
 
-class TeacherAuth {
+export class TeacherAuth {
   constructor() {
     this.sessionKey = 'teacherAuthSession';
     this.timeoutKey = 'teacherAuthTimeout';
@@ -316,21 +316,5 @@ class TeacherAuth {
         window.location.href = 'index.html';
       }
     }, 60000); // Check every minute
-  }
-}
-
-// Export for use in other modules
-window.TeacherAuth = TeacherAuth;
-
-// Auto-setup if this script is loaded directly
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => {
-    if (window.teacherAuth) {
-      window.teacherAuth.setupActivityListeners();
-    }
-  });
-} else {
-  if (window.teacherAuth) {
-    window.teacherAuth.setupActivityListeners();
   }
 }

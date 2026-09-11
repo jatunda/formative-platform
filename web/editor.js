@@ -1,3 +1,5 @@
+import { TeacherAuth } from './teacher-auth.js';
+
 // Initialize teacher authentication
 window.teacherAuth = new TeacherAuth();
 

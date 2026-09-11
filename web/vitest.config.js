@@ -41,10 +41,10 @@ export default defineConfig({
       // coverage work lands, so this catches regressions without leaving
       // CI permanently red in the meantime.
       thresholds: {
-        lines: 55,
-        functions: 70,
-        branches: 85,
-        statements: 55,
+        lines: 65,
+        functions: 78,
+        branches: 87,
+        statements: 65,
       },
     },
     // Setup files

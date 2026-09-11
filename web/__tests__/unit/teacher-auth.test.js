@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { TeacherAuth } from '../../teacher-auth.js';
 
-// Mock localStorage
 const createLocalStorageMock = () => {
   let store = {};
   return {
-    getItem: vi.fn((key) => store[key] || null),
+    getItem: vi.fn((key) => (key in store ? store[key] : null)),
     setItem: vi.fn((key, value) => {
       store[key] = value.toString();
     }),
@@ -17,127 +17,39 @@ const createLocalStorageMock = () => {
   };
 };
 
-// Mock window.alert
-global.alert = vi.fn();
+async function sha256Hex(text) {
+  const data = new TextEncoder().encode(text);
+  const hash = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(hash)).map((b) => b.toString(16).padStart(2, '0')).join('');
+}
 
-// Mock window.location
-const mockLocation = {
-  href: '',
-  pathname: '/teacher.html',
-};
+global.alert = vi.fn();
+global.confirm = vi.fn(() => true);
+
+let mockLocation;
 
 describe('TeacherAuth', () => {
-  let TeacherAuth;
   let auth;
   let localStorageMock;
 
-  beforeEach(async () => {
-    // Create fresh localStorage mock
+  beforeEach(() => {
     localStorageMock = createLocalStorageMock();
     vi.clearAllMocks();
-    
-    // Mock global objects
+
     Object.defineProperty(global, 'localStorage', {
       value: localStorageMock,
       writable: true,
       configurable: true,
     });
-    
+
+    mockLocation = { href: '', hostname: 'localhost', search: '', reload: vi.fn() };
     Object.defineProperty(window, 'location', {
       value: mockLocation,
       writable: true,
       configurable: true,
     });
-    
-    // crypto.subtle should be available in jsdom environment
-    // If not, we'll handle it in the test
 
-    // Import TeacherAuth class
-    // Since it's not exported as ES module, we'll need to test it differently
-    // For now, let's create a testable version
-    TeacherAuth = class TeacherAuth {
-      constructor() {
-        this.sessionKey = 'teacherAuthSession';
-        this.timeoutKey = 'teacherAuthTimeout';
-        this.sessionDuration = 15 * 60 * 1000;
-        this.passwordHash = '8d2c6f8f6bec6ec2590f27787dcf38008cec8ceb3c41eb3777fcb6d084a0b0b8';
-      }
-
-      async hashPassword(password) {
-        const encoder = new TextEncoder();
-        const data = encoder.encode(password);
-        const hash = await crypto.subtle.digest('SHA-256', data);
-        return Array.from(new Uint8Array(hash))
-          .map(b => b.toString(16).padStart(2, '0'))
-          .join('');
-      }
-
-      isSessionValid() {
-        const sessionTime = localStorage.getItem(this.timeoutKey);
-        if (!sessionTime) return false;
-        
-        const currentTime = Date.now();
-        const sessionExpiry = parseInt(sessionTime);
-        
-        if (currentTime > sessionExpiry) {
-          this.clearSession();
-          return false;
-        }
-        
-        return localStorage.getItem(this.sessionKey) === 'authenticated';
-      }
-
-      extendSession() {
-        const currentTime = Date.now();
-        const existingTimeout = localStorage.getItem(this.timeoutKey);
-        
-        if (existingTimeout) {
-          const lastUpdateTime = parseInt(existingTimeout) - this.sessionDuration;
-          const timeSinceLastUpdate = currentTime - lastUpdateTime;
-          
-          if (timeSinceLastUpdate < 60000) {
-            return;
-          }
-        }
-        
-        const newTimeout = currentTime + this.sessionDuration;
-        localStorage.setItem(this.timeoutKey, newTimeout.toString());
-      }
-
-      setSession() {
-        localStorage.setItem(this.sessionKey, 'authenticated');
-        this.extendSession();
-      }
-
-      clearSession() {
-        localStorage.removeItem(this.sessionKey);
-        localStorage.removeItem(this.timeoutKey);
-      }
-
-      async authenticate() {
-        if (this.isSessionValid()) {
-          return true;
-        }
-        // For testing, we'll skip the modal creation
-        return false;
-      }
-
-      async requireAuth() {
-        const isAuthenticated = await this.authenticate();
-        if (!isAuthenticated) {
-          alert('Access denied. Redirecting to student portal.');
-          window.location.href = 'index.html';
-          return false;
-        }
-        return true;
-      }
-
-      logout() {
-        this.clearSession();
-        alert('Logged out successfully.');
-        window.location.href = 'index.html';
-      }
-    };
+    document.body.innerHTML = '';
 
     auth = new TeacherAuth();
   });
@@ -147,157 +59,288 @@ describe('TeacherAuth', () => {
   });
 
   describe('hashPassword', () => {
-    it('should hash a password', async () => {
-      // Use actual crypto if available in test environment
+    it('hashes a password', async () => {
       const hash = await auth.hashPassword('testpassword');
-      
-      expect(hash).toBeDefined();
       expect(typeof hash).toBe('string');
       expect(hash.length).toBeGreaterThan(0);
     });
 
-    it('should produce consistent hashes for same input', async () => {
-      const hash1 = await auth.hashPassword('test');
-      const hash2 = await auth.hashPassword('test');
-      
-      // Hashes should be consistent (same input = same output)
-      expect(hash1).toBe(hash2);
+    it('produces consistent hashes for the same input', async () => {
+      expect(await auth.hashPassword('test')).toBe(await auth.hashPassword('test'));
     });
 
-    it('should produce different hashes for different inputs', async () => {
-      const hash1 = await auth.hashPassword('password1');
-      const hash2 = await auth.hashPassword('password2');
-      
-      // Different inputs should produce different hashes (very unlikely to collide)
-      expect(hash1).not.toBe(hash2);
+    it('produces different hashes for different inputs', async () => {
+      expect(await auth.hashPassword('password1')).not.toBe(await auth.hashPassword('password2'));
     });
   });
 
   describe('isSessionValid', () => {
-    it('should return false when no session exists', () => {
+    it('returns false when no session exists', () => {
       expect(auth.isSessionValid()).toBe(false);
     });
 
-    it('should return false when session is expired', () => {
-      const pastTime = Date.now() - 1000000;
-      localStorage.setItem(auth.timeoutKey, pastTime.toString());
+    it('returns false when the session is expired', () => {
+      localStorage.setItem(auth.timeoutKey, (Date.now() - 1000000).toString());
       localStorage.setItem(auth.sessionKey, 'authenticated');
-      
       expect(auth.isSessionValid()).toBe(false);
     });
 
-    it('should return true when session is valid', () => {
-      const futureTime = Date.now() + 1000000;
-      localStorage.setItem(auth.timeoutKey, futureTime.toString());
+    it('returns true when the session is valid', () => {
+      localStorage.setItem(auth.timeoutKey, (Date.now() + 1000000).toString());
       localStorage.setItem(auth.sessionKey, 'authenticated');
-      
       expect(auth.isSessionValid()).toBe(true);
     });
 
-    it('should clear session when expired', () => {
-      const pastTime = Date.now() - 1000000;
-      localStorage.setItem(auth.timeoutKey, pastTime.toString());
+    it('clears the session once it has expired', () => {
+      localStorage.setItem(auth.timeoutKey, (Date.now() - 1000000).toString());
       localStorage.setItem(auth.sessionKey, 'authenticated');
-      
       auth.isSessionValid();
-      
       expect(localStorage.getItem(auth.sessionKey)).toBeNull();
     });
   });
 
   describe('extendSession', () => {
-    it('should set new timeout when no existing timeout', () => {
-      vi.clearAllMocks();
+    it('sets a new timeout when there is no existing one', () => {
       auth.extendSession();
-      
-      expect(localStorage.setItem).toHaveBeenCalledWith(
-        auth.timeoutKey,
-        expect.any(String)
-      );
+      expect(localStorage.setItem).toHaveBeenCalledWith(auth.timeoutKey, expect.any(String));
     });
 
-    it('should update timeout when more than 1 minute has passed', () => {
-      vi.clearAllMocks();
-      const oldTime = Date.now() - 120000; // 2 minutes ago
-      const oldTimeout = oldTime + auth.sessionDuration;
+    it('updates the timeout once more than a minute has passed', () => {
+      const oldTimeout = Date.now() - 120000 + auth.sessionDuration;
       localStorage.setItem(auth.timeoutKey, oldTimeout.toString());
-      
+      vi.clearAllMocks();
+
       auth.extendSession();
-      
+
       expect(localStorage.setItem).toHaveBeenCalled();
     });
 
-    it('should not update timeout when less than 1 minute has passed', () => {
-      vi.clearAllMocks();
-      const recentTime = Date.now() - 30000; // 30 seconds ago
-      const recentTimeout = recentTime + auth.sessionDuration;
+    it('does not update the timeout within a minute of the last update', () => {
+      const recentTimeout = Date.now() - 30000 + auth.sessionDuration;
       localStorage.setItem(auth.timeoutKey, recentTimeout.toString());
-      
-      const initialCallCount = localStorage.setItem.mock.calls.length;
+      vi.clearAllMocks();
+
       auth.extendSession();
-      
-      // Should not have added a new call
-      expect(localStorage.setItem.mock.calls.length).toBe(initialCallCount);
+
+      expect(localStorage.setItem).not.toHaveBeenCalled();
     });
   });
 
-  describe('setSession', () => {
-    it('should set authenticated session', () => {
+  describe('setSession / clearSession', () => {
+    it('setSession marks the session authenticated and sets a timeout', () => {
       auth.setSession();
-      
       expect(localStorage.setItem).toHaveBeenCalledWith(auth.sessionKey, 'authenticated');
-      expect(localStorage.setItem).toHaveBeenCalledWith(
-        auth.timeoutKey,
-        expect.any(String)
-      );
+      expect(localStorage.setItem).toHaveBeenCalledWith(auth.timeoutKey, expect.any(String));
     });
-  });
 
-  describe('clearSession', () => {
-    it('should remove session data', () => {
-      localStorage.setItem(auth.sessionKey, 'authenticated');
-      localStorage.setItem(auth.timeoutKey, '12345');
-      
+    it('clearSession removes both session keys', () => {
+      auth.setSession();
       auth.clearSession();
-      
-      expect(localStorage.removeItem).toHaveBeenCalledWith(auth.sessionKey);
-      expect(localStorage.removeItem).toHaveBeenCalledWith(auth.timeoutKey);
+      expect(auth.isSessionValid()).toBe(false);
     });
   });
 
   describe('logout', () => {
-    it('should clear session and redirect', () => {
-      localStorage.setItem(auth.sessionKey, 'authenticated');
-      
+    it('clears the session, notifies, and redirects to the student portal', () => {
+      auth.setSession();
       auth.logout();
-      
-      expect(localStorage.removeItem).toHaveBeenCalledWith(auth.sessionKey);
+
+      expect(auth.isSessionValid()).toBe(false);
       expect(alert).toHaveBeenCalledWith('Logged out successfully.');
       expect(window.location.href).toBe('index.html');
     });
   });
 
+  describe('createPasswordModal + authenticate (real DOM interaction)', () => {
+    it('resolves true and starts a session when the correct password is entered and Login is clicked', async () => {
+      auth.passwordHash = await sha256Hex('correct-horse');
+      const promise = auth.authenticate();
+
+      await vi.waitFor(() => expect(document.getElementById('teacherPasswordInput')).toBeTruthy());
+      document.getElementById('teacherPasswordInput').value = 'correct-horse';
+      document.getElementById('loginBtn').click();
+
+      expect(await promise).toBe(true);
+      expect(auth.isSessionValid()).toBe(true);
+    });
+
+    it('resolves false and alerts when the wrong password is entered', async () => {
+      auth.passwordHash = await sha256Hex('correct-horse');
+      const promise = auth.authenticate();
+
+      await vi.waitFor(() => expect(document.getElementById('teacherPasswordInput')).toBeTruthy());
+      document.getElementById('teacherPasswordInput').value = 'wrong-password';
+      document.getElementById('loginBtn').click();
+
+      expect(await promise).toBe(false);
+      expect(alert).toHaveBeenCalledWith('Incorrect password. Access denied.');
+      expect(auth.isSessionValid()).toBe(false);
+    });
+
+    it('resolves false when Cancel is clicked, without checking the password', async () => {
+      const promise = auth.authenticate();
+
+      await vi.waitFor(() => expect(document.getElementById('cancelBtn')).toBeTruthy());
+      document.getElementById('cancelBtn').click();
+
+      expect(await promise).toBe(false);
+      expect(alert).not.toHaveBeenCalled();
+    });
+
+    it('submits on Enter and cancels on Escape', async () => {
+      auth.passwordHash = await sha256Hex('enter-key-pw');
+      let promise = auth.authenticate();
+      await vi.waitFor(() => expect(document.getElementById('teacherPasswordInput')).toBeTruthy());
+      const input = document.getElementById('teacherPasswordInput');
+      input.value = 'enter-key-pw';
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+      expect(await promise).toBe(true);
+
+      auth.clearSession();
+      promise = auth.authenticate();
+      await vi.waitFor(() => expect(document.getElementById('teacherPasswordInput')).toBeTruthy());
+      document.getElementById('teacherPasswordInput').dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })
+      );
+      expect(await promise).toBe(false);
+    });
+
+    it('skips the modal entirely when the session is already valid', async () => {
+      auth.setSession();
+      const result = await auth.authenticate();
+      expect(result).toBe(true);
+      expect(document.getElementById('teacherPasswordInput')).toBeNull();
+    });
+  });
+
   describe('requireAuth', () => {
-    it('should redirect when not authenticated', async () => {
-      const result = await auth.requireAuth();
-      
-      expect(result).toBe(false);
+    it('redirects to the student portal when authentication fails', async () => {
+      const promise = auth.requireAuth();
+      await vi.waitFor(() => expect(document.getElementById('cancelBtn')).toBeTruthy());
+      document.getElementById('cancelBtn').click();
+
+      expect(await promise).toBe(false);
       expect(alert).toHaveBeenCalledWith('Access denied. Redirecting to student portal.');
       expect(window.location.href).toBe('index.html');
     });
 
-    it('should return true when session is valid', async () => {
-      const futureTime = Date.now() + 1000000;
-      localStorage.setItem(auth.timeoutKey, futureTime.toString());
-      localStorage.setItem(auth.sessionKey, 'authenticated');
-      
-      // Mock authenticate to return true
-      auth.authenticate = vi.fn().mockResolvedValue(true);
-      
-      const result = await auth.requireAuth();
-      
+    it('returns true without redirecting when the session is already valid', async () => {
+      auth.setSession();
+      expect(await auth.requireAuth()).toBe(true);
+      expect(window.location.href).toBe('');
+    });
+  });
+
+  describe('dev auth bypass', () => {
+    it('is never active off localhost, even with the bypass flag set', () => {
+      mockLocation.hostname = 'formative-platform.example.com';
+      localStorage.setItem(auth.devBypassKey, 'true');
+      expect(auth.isDevBypassActive()).toBe(false);
+    });
+
+    it('is inactive on localhost until the flag is set', () => {
+      expect(auth.isDevBypassActive()).toBe(false);
+    });
+
+    it('?devAuth=off persists the bypass, applied at construction time', () => {
+      mockLocation.search = '?devAuth=off';
+      const bypassedAuth = new TeacherAuth();
+      expect(bypassedAuth.isDevBypassActive()).toBe(true);
+      expect(localStorage.getItem(bypassedAuth.devBypassKey)).toBe('true');
+    });
+
+    it('?devAuth=on clears a previously-set bypass', () => {
+      localStorage.setItem(auth.devBypassKey, 'true');
+      mockLocation.search = '?devAuth=on';
+      const clearedAuth = new TeacherAuth();
+      expect(clearedAuth.isDevBypassActive()).toBe(false);
+    });
+
+    it('ignores ?devAuth off of localhost', () => {
+      mockLocation.hostname = 'formative-platform.example.com';
+      mockLocation.search = '?devAuth=off';
+      const notBypassedAuth = new TeacherAuth();
+      expect(localStorage.getItem(notBypassedAuth.devBypassKey)).toBeNull();
+    });
+
+    it('authenticate() short-circuits to true and shows the banner when the bypass is active', async () => {
+      localStorage.setItem(auth.devBypassKey, 'true');
+      const result = await auth.authenticate();
+
       expect(result).toBe(true);
+      expect(document.getElementById('devAuthBypassBanner')).toBeTruthy();
+    });
+
+    it('the banner disables the bypass and reloads when clicked', async () => {
+      localStorage.setItem(auth.devBypassKey, 'true');
+      await auth.authenticate();
+
+      document.getElementById('devAuthBypassBanner').click();
+
+      expect(localStorage.getItem(auth.devBypassKey)).toBeNull();
+      expect(mockLocation.reload).toHaveBeenCalled();
+    });
+
+    it('does not render a second banner if one is already showing', async () => {
+      localStorage.setItem(auth.devBypassKey, 'true');
+      await auth.authenticate();
+      await auth.authenticate();
+
+      expect(document.querySelectorAll('#devAuthBypassBanner')).toHaveLength(1);
+    });
+  });
+
+  describe('setupActivityListeners', () => {
+    beforeEach(() => {
+      document.body.dataset.teacherPage = 'true';
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('extends a valid session on user activity', () => {
+      auth.setSession();
+      // setSession() just extended the timeout - move it back over a minute
+      // so the next extend isn't throttled by the "already recent" guard.
+      localStorage.setItem(auth.timeoutKey, (Date.now() + auth.sessionDuration - 120000).toString());
+      auth.setupActivityListeners();
+      vi.clearAllMocks();
+
+      document.dispatchEvent(new Event('click', { bubbles: true }));
+
+      expect(localStorage.setItem).toHaveBeenCalledWith(auth.timeoutKey, expect.any(String));
+    });
+
+    it('does not extend an invalid (not-logged-in) session on activity', () => {
+      auth.setupActivityListeners();
+      vi.clearAllMocks();
+
+      document.dispatchEvent(new Event('click', { bubbles: true }));
+
+      expect(localStorage.setItem).not.toHaveBeenCalled();
+    });
+
+    it('redirects once the session has expired, on a teacher page', () => {
+      auth.setSession();
+      auth.setupActivityListeners();
+      localStorage.setItem(auth.timeoutKey, (Date.now() - 1000).toString());
+
+      vi.advanceTimersByTime(60000);
+
+      expect(alert).toHaveBeenCalledWith('Session expired. Please log in again.');
+      expect(window.location.href).toBe('index.html');
+    });
+
+    it('does not redirect while the dev bypass is active, even with an expired session', () => {
+      localStorage.setItem(auth.devBypassKey, 'true');
+      auth.setupActivityListeners();
+      localStorage.setItem(auth.timeoutKey, (Date.now() - 1000).toString());
+
+      vi.advanceTimersByTime(60000);
+
+      expect(alert).not.toHaveBeenCalled();
     });
   });
 });
-
