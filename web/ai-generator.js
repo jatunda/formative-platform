@@ -6,8 +6,10 @@ import {
 	generateUniqueHash
 } from "./database-utils.js";
 
-// Class metadata mapping (hard-coded for MVP)
-const CLASS_METADATA = {
+// Prompt Profile per Class (hard-coded for MVP) - see CONTEXT.md. Distinct
+// from the Class record in Firebase; a Class without an entry here falls
+// back to generic subject/grade-level defaults (see getPromptProfile).
+const CLASS_PROMPT_PROFILES = {
   // Computer Science A classes
   'csa': { 
     subject: 'Computer Science A', 
@@ -282,6 +284,132 @@ What sensors might a robot need to safely navigate around a room?`
 };
 
 /**
+ * Resolve the Prompt Profile for a Class: subject, grade level, and (when
+ * available) class-specific prompting instructions and example questions.
+ * Tries an exact match in the table first, then infers subject/grade from
+ * the Class name, then falls back to a generic default. isFallback marks
+ * both inferred and generic results, since neither carries
+ * promptInstructions/exampleQuestions.
+ * @param {string} classId - The Class id
+ * @param {string} className - The Class name (used only for the fallback inference)
+ * @param {Object} [table=CLASS_PROMPT_PROFILES] - The Prompt Profile table
+ * @returns {{subject: string, gradeLevel: number, promptInstructions?: string, exampleQuestions?: Object, isFallback: boolean}}
+ */
+export function getPromptProfile(classId, className, table = CLASS_PROMPT_PROFILES) {
+  // Try to find a profile by exact class ID first
+  if (table[classId]) {
+    return { ...table[classId], isFallback: false };
+  }
+
+  // Try to infer from class name patterns
+  const name = className.toLowerCase();
+  if (name.includes('csa') || name.includes('computer science a')) {
+    return { subject: 'Computer Science A', gradeLevel: 11, isFallback: true };
+  }
+  if (name.includes('csp') || name.includes('computer science p')) {
+    return { subject: 'Computer Science Principles', gradeLevel: 10, isFallback: true };
+  }
+  if (name.includes('engr') || name.includes('engineering')) {
+    const grade = name.match(/(\d+)/)?.[1] || '9';
+    return { subject: 'Engineering', gradeLevel: parseInt(grade), isFallback: true };
+  }
+
+  // Default fallback
+  return { subject: 'General', gradeLevel: 9, isFallback: true };
+}
+
+/**
+ * Build the prompt sent to the LLM for a given question type, Class, and
+ * set of learning objectives. Pure function of its arguments - no DOM, no
+ * network, no database access.
+ * @param {string} questionType - The question type ("review" or "preview")
+ * @param {string} classId - The Class id, used to look up its Prompt Profile directly (avoids re-matching by subject/gradeLevel, which could pick the wrong entry if two Classes ever shared both)
+ * @param {Object} classMetadata - Class metadata object
+ * @param {string} classMetadata.subject - The subject name
+ * @param {number} classMetadata.gradeLevel - The grade level
+ * @param {string} classMetadata.name - The class name
+ * @param {string} learningObjectives - The learning objectives or topic
+ * @param {Object} [table=CLASS_PROMPT_PROFILES] - The Prompt Profile table
+ * @returns {string} The formatted prompt string
+ */
+export function buildPrompt(questionType, classId, classMetadata, learningObjectives, table = CLASS_PROMPT_PROFILES) {
+  const isReview = questionType === 'review';
+  const questionCount = isReview ? '3-5' : '2-3';
+  const questionStyle = isReview
+    ? 'recall and comprehension questions that test knowledge students should already have learned'
+    : 'anticipatory questions that activate prior knowledge and spark curiosity about upcoming content';
+
+  // Look up this class's Prompt Profile directly by id
+  const profile = table[classId];
+
+  // Get example questions for this class and question type
+  const exampleQuestions = profile?.exampleQuestions?.[questionType];
+
+  return `Create ${questionCount} formative assessment questions for a ${classMetadata.subject} class at Grade ${classMetadata.gradeLevel} level.
+
+Question Type: ${questionType.toUpperCase()}
+${isReview ?
+  'These should be REVIEW questions - ' + questionStyle :
+  'These should be PREVIEW questions - ' + questionStyle
+}
+
+Learning Objectives/Topic:
+${learningObjectives}
+
+Requirements:
+- Generate questions in the following DSL format
+- Start with a title line using # followed by the title
+- Separate each question with exactly "---" on its own line
+- Include code blocks using \`\`\` when relevant for ${classMetadata.subject}
+- Make questions appropriate for Grade ${classMetadata.gradeLevel} students
+- ${isReview ? 'Focus on testing understanding of concepts students have already learned' : 'Design questions that students can begin reasoning about even if they haven\'t learned the full topic yet'}
+- Questions should increase in difficulty. Easy questions should be under the heading "## Mild", medium questions should be under the heading "## Medium" and hard questions should be under the headding "## Spicy"'
+- There should be at least 1 question of each difficulty
+- Easy questions should focus on definitions, factual recall, identifying elements, and explaining basic concepts, with questions that are self-contained and use familiar examples.
+- Medium questions should focus on applying concepts to familiar situations, explaining relationships between ideas, or adapting known solutions, like reading or writing code similar to what they have seen before, with slight variations.
+- Hard questions should involve novel contexts, combining multiple concepts, or designing from scratch, and should focus on adaptation, far transfer, and creative problem solving.
+- Avoid repeating the same question at multiple difficulties—each should introduce new cognitive demands
+- Vary question formats—include direct questions, short coding tasks, “explain why” prompts, and design challenges
+- Cover the topic across all three difficulty levels, ensuring each higher level builds on skills from lower levels
+
+
+DSL Format Example:
+# Title Here
+
+## Mild
+First question text here?
+
+---
+## Medium
+Second question with code:
+
+\`\`\`java
+// code example if relevant
+\`\`\`
+
+What does this code do?
+
+---
+## Spicy
+Third question text here?
+
+${profile?.promptInstructions ?
+  `\nClass-Specific Instructions:\n${profile.promptInstructions}\n` :
+  ''}
+
+
+Example questions for this class and question type:
+${exampleQuestions || `# Example Title
+
+First example question that demonstrates good questioning style for ${classMetadata.subject}?
+
+---
+Second example question that shows appropriate depth for Grade ${classMetadata.gradeLevel}?`}
+
+Now generate new questions following this style for the learning objectives above:`;
+}
+
+/**
  * Abstract LLM provider interface for easy switching between LLM providers
  * @abstract
  */
@@ -363,12 +491,13 @@ export class AIQuestionGenerator {
    * @param {import("https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js").Database} database - The Firebase database instance
    * @param {string} apiKey - The OpenAI API key
    * @param {(enabled: boolean) => void} enableEditing - Called to enable/disable the host page's editor once questions are generated
+   * @param {{generateQuestions: (prompt: string) => Promise<string>}} [llmProvider] - The LLM provider to use; defaults to OpenAI
    */
-  constructor(database, apiKey, enableEditing) {
+  constructor(database, apiKey, enableEditing, llmProvider = new OpenAIProvider(apiKey)) {
     this.db = database;
     // Initialize database utilities with the database instance
     initializeDatabase(database);
-    this.llmProvider = new OpenAIProvider(apiKey);
+    this.llmProvider = llmProvider;
     this.enableEditing = enableEditing;
     this.modal = null;
     this.classSelect = null;
@@ -383,6 +512,7 @@ export class AIQuestionGenerator {
     // Get UI elements
     this.modal = document.getElementById('aiGenerationModal');
     this.classSelect = document.getElementById('aiClassSelect');
+    this.genericProfileNotice = document.getElementById('genericProfileNotice');
     const generateBtn = document.getElementById('generateAIBtn');
     const closeBtn = document.getElementById('closeModalBtn');
     const cancelBtn = document.getElementById('cancelBtn');
@@ -393,6 +523,7 @@ export class AIQuestionGenerator {
     closeBtn.addEventListener('click', () => this.hideModal());
     cancelBtn.addEventListener('click', () => this.hideModal());
     generateModalBtn.addEventListener('click', () => this.generateQuestions());
+    this.classSelect.addEventListener('change', () => this.updateGenericProfileNotice());
 
     // Close modal on outside click
     this.modal.addEventListener('click', (e) => {
@@ -436,12 +567,13 @@ export class AIQuestionGenerator {
           const option = document.createElement('option');
           option.value = id;
           
-          // Get metadata for this class
-          const metadata = this.getClassMetadata(id, classData.name);
-          option.textContent = `${classData.name} (${metadata.subject}, Grade ${metadata.gradeLevel})`;
-          option.dataset.subject = metadata.subject;
-          option.dataset.gradeLevel = metadata.gradeLevel;
-          
+          // Resolve this class's Prompt Profile
+          const profile = getPromptProfile(id, classData.name);
+          option.textContent = `${classData.name} (${profile.subject}, Grade ${profile.gradeLevel})`;
+          option.dataset.subject = profile.subject;
+          option.dataset.gradeLevel = profile.gradeLevel;
+          option.dataset.isFallback = String(profile.isFallback);
+
           this.classSelect.appendChild(option);
         });
 
@@ -452,36 +584,15 @@ export class AIQuestionGenerator {
   }
 
   /**
-   * Get class metadata (subject and grade level) for a given class
-   * Tries exact match first, then infers from class name patterns
-   * @param {string} classId - The class ID
-   * @param {string} className - The class name
-   * @returns {Object} Class metadata object
-   * @returns {string} returns.subject - The subject name
-   * @returns {number} returns.gradeLevel - The grade level
+   * Show or hide the "no specific Prompt Profile" notice for the currently
+   * selected class - a Class added the normal way has no Prompt Profile
+   * until one is added to CLASS_PROMPT_PROFILES.
    * @private
    */
-  getClassMetadata(classId, className) {
-    // Try to find metadata by exact class ID first
-    if (CLASS_METADATA[classId]) {
-      return CLASS_METADATA[classId];
-    }
-
-    // Try to infer from class name patterns
-    const name = className.toLowerCase();
-    if (name.includes('csa') || name.includes('computer science a')) {
-      return { subject: 'Computer Science A', gradeLevel: 11 };
-    }
-    if (name.includes('csp') || name.includes('computer science p')) {
-      return { subject: 'Computer Science Principles', gradeLevel: 10 };
-    }
-    if (name.includes('engr') || name.includes('engineering')) {
-      const grade = name.match(/(\d+)/)?.[1] || '9';
-      return { subject: 'Engineering', gradeLevel: parseInt(grade) };
-    }
-
-    // Default fallback
-    return { subject: 'General', gradeLevel: 9 };
+  updateGenericProfileNotice() {
+    const selectedOption = this.classSelect.selectedOptions[0];
+    const isFallback = selectedOption?.dataset.isFallback === 'true';
+    this.genericProfileNotice.style.display = isFallback ? 'block' : 'none';
   }
 
   /**
@@ -490,6 +601,7 @@ export class AIQuestionGenerator {
    */
   showModal() {
     this.modal.style.display = 'block';
+    this.updateGenericProfileNotice();
     // Focus on first input
     const firstRadio = document.querySelector('input[name="questionType"]');
     if (firstRadio) firstRadio.focus();
@@ -586,7 +698,7 @@ export class AIQuestionGenerator {
       this.hideError();
 
       // Generate prompt
-      const prompt = this.buildPrompt(questionType, classMetadata, learningObjectives);
+      const prompt = buildPrompt(questionType, selectedClass, classMetadata, learningObjectives);
       
       // Call LLM
       const generatedContent = await this.llmProvider.generateQuestions(prompt);
@@ -609,99 +721,6 @@ export class AIQuestionGenerator {
     } finally {
       this.hideLoading();
     }
-  }
-
-  /**
-   * Build the prompt for the LLM based on question type, class metadata, and learning objectives
-   * @param {string} questionType - The question type ("review" or "preview")
-   * @param {Object} classMetadata - Class metadata object
-   * @param {string} classMetadata.subject - The subject name
-   * @param {number} classMetadata.gradeLevel - The grade level
-   * @param {string} classMetadata.name - The class name
-   * @param {string} learningObjectives - The learning objectives or topic
-   * @returns {string} The formatted prompt string
-   * @private
-   */
-  buildPrompt(questionType, classMetadata, learningObjectives) {
-    const isReview = questionType === 'review';
-    const questionCount = isReview ? '3-5' : '2-3';
-    const questionStyle = isReview 
-      ? 'recall and comprehension questions that test knowledge students should already have learned'
-      : 'anticipatory questions that activate prior knowledge and spark curiosity about upcoming content';
-    
-    // Find the class metadata and examples based on the selected class
-    const classKey = Object.keys(CLASS_METADATA).find(key => 
-      CLASS_METADATA[key].subject === classMetadata.subject && 
-      CLASS_METADATA[key].gradeLevel === classMetadata.gradeLevel
-    );
-    
-    // Get example questions for this class and question type
-    const exampleQuestions = classKey ? 
-      CLASS_METADATA[classKey].exampleQuestions?.[questionType] : 
-      null;
-
-    return `Create ${questionCount} formative assessment questions for a ${classMetadata.subject} class at Grade ${classMetadata.gradeLevel} level.
-
-Question Type: ${questionType.toUpperCase()}
-${isReview ? 
-  'These should be REVIEW questions - ' + questionStyle :
-  'These should be PREVIEW questions - ' + questionStyle
-}
-
-Learning Objectives/Topic:
-${learningObjectives}
-
-Requirements:
-- Generate questions in the following DSL format
-- Start with a title line using # followed by the title
-- Separate each question with exactly "---" on its own line
-- Include code blocks using \`\`\` when relevant for ${classMetadata.subject}
-- Make questions appropriate for Grade ${classMetadata.gradeLevel} students
-- ${isReview ? 'Focus on testing understanding of concepts students have already learned' : 'Design questions that students can begin reasoning about even if they haven\'t learned the full topic yet'}
-- Questions should increase in difficulty. Easy questions should be under the heading "## Mild", medium questions should be under the heading "## Medium" and hard questions should be under the headding "## Spicy"'
-- There should be at least 1 question of each difficulty
-- Easy questions should focus on definitions, factual recall, identifying elements, and explaining basic concepts, with questions that are self-contained and use familiar examples.
-- Medium questions should focus on applying concepts to familiar situations, explaining relationships between ideas, or adapting known solutions, like reading or writing code similar to what they have seen before, with slight variations. 
-- Hard questions should involve novel contexts, combining multiple concepts, or designing from scratch, and should focus on adaptation, far transfer, and creative problem solving. 
-- Avoid repeating the same question at multiple difficulties—each should introduce new cognitive demands
-- Vary question formats—include direct questions, short coding tasks, “explain why” prompts, and design challenges
-- Cover the topic across all three difficulty levels, ensuring each higher level builds on skills from lower levels
-
-
-DSL Format Example:
-# Title Here
-
-## Mild
-First question text here?
-
----
-## Medium
-Second question with code:
-
-\`\`\`java
-// code example if relevant
-\`\`\`
-
-What does this code do?
-
----
-## Spicy
-Third question text here?
-
-${classKey && CLASS_METADATA[classKey].promptInstructions ? 
-  `\nClass-Specific Instructions:\n${CLASS_METADATA[classKey].promptInstructions}\n` : 
-  ''}
-
-
-Example questions for this class and question type:
-${exampleQuestions || `# Example Title
-
-First example question that demonstrates good questioning style for ${classMetadata.subject}?
-
----
-Second example question that shows appropriate depth for Grade ${classMetadata.gradeLevel}?`}
-
-Now generate new questions following this style for the learning objectives above:`;
   }
 
   /**

@@ -29,6 +29,10 @@ jobs:
       working-directory: ./web
       run: npm ci
 
+    - name: Set up AI config (gitignored, not committed - tests only need the placeholder shape)
+      working-directory: ./web
+      run: test -f ai-config.js || cp ai-config.template.js ai-config.js
+
     - name: Run tests
       working-directory: ./web
       run: npm run test:run

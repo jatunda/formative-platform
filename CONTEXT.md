@@ -29,3 +29,6 @@ The act of changing every Class's Date Offset by the same signed amount in one a
 
 **Planning Window**:
 For a given Class, the small run of consecutive Day Indices — starting at Today's Day Index — shown together in the Lesson Planning view. The window's length is a fixed setting, not a per-Class or per-session value; every Class is shown the same number of days.
+
+**Prompt Profile**:
+Per-Class configuration used only when generating AI-assisted questions in the Content Editor: subject, grade level, and (optionally) class-specific prompting instructions and example questions. Hard-coded in `ai-generator.js`, keyed by Class id. Distinct from the Class record itself in Firebase — a new Class has no Prompt Profile until one is added there, and generation falls back to generic subject/grade-level defaults in that case (surfaced as a notice in the AI Generation modal, not a silent guess).

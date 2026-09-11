@@ -39,22 +39,6 @@ export function validateDSL(dslText, parsed) {
 		return 'Unmatched code block - every ``` opening must have a closing ```';
 	}
 
-	// Check for unmatched collapsible sections
-	const collapsibleOpeners = lines.filter(line => {
-		const trimmed = line.trim();
-		return trimmed.startsWith('>>>') && !trimmed.startsWith('>>>!');
-	}).length;
-	const collapsibleExpandedOpeners = lines.filter(line => 
-		line.trim().startsWith('>>>!')
-	).length;
-	const collapsibleClosers = lines.filter(line => 
-		line.trim() === '<<<'
-	).length;
-	const totalOpeners = collapsibleOpeners + collapsibleExpandedOpeners;
-	if (totalOpeners !== collapsibleClosers) {
-		return `Unmatched collapsible sections - every >>> or >>>! opening must have a closing <<<. Found ${totalOpeners} opener(s) and ${collapsibleClosers} closer(s).`;
-	}
-
 	// Check if blocks have content
 	const hasContent = parsed.blocks.some(block => 
 		block.content && block.content.length > 0
