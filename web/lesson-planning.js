@@ -41,18 +41,22 @@ initializeDatabase(db);
 // Initialize date utilities
 initializeDateUtils(db);
 
-// Check authentication before proceeding
-(async () => {
-  const isAuthenticated = await window.teacherAuth.requireAuth();
-  if (!isAuthenticated) {
-    return; // Stop execution if not authenticated
-  }
+// Check authentication before proceeding. Only run automatically when
+// actually loaded on lesson-planning.html - importing this module elsewhere
+// (tests) never triggers real auth/Firebase/DOM side effects on its own.
+if (document.getElementById('classPanesContainer')) {
+  (async () => {
+    const isAuthenticated = await window.teacherAuth.requireAuth();
+    if (!isAuthenticated) {
+      return; // Stop execution if not authenticated
+    }
 
-  // Setup activity listeners for session management
-  window.teacherAuth.setupActivityListeners();
+    // Setup activity listeners for session management
+    window.teacherAuth.setupActivityListeners();
 
-  main();
-})();
+    main();
+  })();
+}
 
 async function main() {
   initializeLessonSearch(db);
@@ -65,7 +69,7 @@ async function main() {
  * Build the "shift all classes" toolbar: a magnitude input (default 1) with
  * separate + and − buttons, each applying that magnitude instantly.
  */
-function initializeBulkShiftControl() {
+export function initializeBulkShiftControl() {
   const container = document.getElementById('bulkShiftContainer');
 
   const controls = document.createElement('div');
@@ -102,7 +106,7 @@ function initializeBulkShiftControl() {
   container.appendChild(controls);
 }
 
-function getShiftMagnitude(input) {
+export function getShiftMagnitude(input) {
   const magnitude = Math.abs(parseInt(input.value, 10));
   return Number.isFinite(magnitude) && magnitude > 0 ? magnitude : 1;
 }
@@ -111,7 +115,7 @@ function getShiftMagnitude(input) {
  * Shift every Class's Date Offset by the same signed amount in one action.
  * Applies instantly, no confirmation - clicking the opposite button undoes it.
  */
-async function applyBulkShift(delta) {
+export async function applyBulkShift(delta) {
   try {
     const snap = await get(ref(db, 'classes'));
     const classes = snap.val() || {};
@@ -134,7 +138,7 @@ async function applyBulkShift(delta) {
   }
 }
 
-async function loadAndRenderAllPanes() {
+export async function loadAndRenderAllPanes() {
   const container = document.getElementById('classPanesContainer');
 
   try {
@@ -183,7 +187,7 @@ async function loadAndRenderAllPanes() {
  * Render one Class's pane: its Planning Window of Day Indices, each with full
  * day-row functionality (drag-and-drop, lesson actions, Insert/Delete Day).
  */
-async function renderClassPane(classId, containerEl) {
+export async function renderClassPane(classId, containerEl) {
   const schedule = await getFullSchedule(classId);
   const dayIndexes = Object.keys(schedule).map(Number);
   const maxDayIndex = dayIndexes.length > 0 ? Math.max(...dayIndexes) : 0;
