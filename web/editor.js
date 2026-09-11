@@ -77,21 +77,6 @@ if (classParam) {
     }
 }
 
-// Initialize AI Question Generator
-try {
-  validateConfig();
-  const aiGenerator = new AIQuestionGenerator(db, AI_CONFIG.OPENAI_API_KEY, setEditingEnabled);
-} catch (error) {
-  console.warn('AI Generator not available:', error.message);
-  // Disable the AI button if configuration is missing
-  const aiBtn = document.getElementById('generateAIBtn');
-  if (aiBtn) {
-    aiBtn.disabled = true;
-    aiBtn.title = 'AI Generation requires OpenAI API key configuration';
-    aiBtn.textContent = '🤖 Generate Questions (Not Configured)';
-  }
-}
-
 const contentIdEl = document.getElementById("contentId");
 const dslInput = document.getElementById("dslInput");
 const preview = document.getElementById("preview");
@@ -237,6 +222,22 @@ window.setEditingEnabled = function(enabled) {
     dslInput.placeholder = "Select a file from the dropdown or use a URL parameter to edit content";
   } else {
     dslInput.placeholder = "";
+  }
+}
+
+// Initialize AI Question Generator - after setEditingEnabled above, since
+// the constructor takes it as an argument rather than reaching for it lazily
+try {
+  validateConfig();
+  const aiGenerator = new AIQuestionGenerator(db, AI_CONFIG.OPENAI_API_KEY, setEditingEnabled);
+} catch (error) {
+  console.warn('AI Generator not available:', error.message);
+  // Disable the AI button if configuration is missing
+  const aiBtn = document.getElementById('generateAIBtn');
+  if (aiBtn) {
+    aiBtn.disabled = true;
+    aiBtn.title = 'AI Generation requires OpenAI API key configuration';
+    aiBtn.textContent = '🤖 Generate Questions (Not Configured)';
   }
 }
 

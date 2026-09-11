@@ -6,10 +6,68 @@ class TeacherAuth {
     this.sessionKey = 'teacherAuthSession';
     this.timeoutKey = 'teacherAuthTimeout';
     this.sessionDuration = 30 * 60 * 1000; // 30 minutes in milliseconds
-    
+    this.devBypassKey = 'teacherAuthDevBypass';
+
     // Password hash (SHA-256) - you'll need to update this with your actual password hash
     // To generate: Use browser console: crypto.subtle.digest('SHA-256', new TextEncoder().encode('your-password')).then(hash => console.log(Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('')))
     this.passwordHash = '8d2c6f8f6bec6ec2590f27787dcf38008cec8ceb3c41eb3777fcb6d084a0b0b8'; // Replace with actual hash
+
+    this.applyDevBypassParam();
+  }
+
+  // Dev-only auth bypass, for testing teacher pages without the password
+  // gate. Gated strictly on hostname - never true for the real deployed
+  // site, regardless of how the dev server was started or what flags are
+  // set, since localStorage can't cross from a dev machine into production.
+  isDevEnvironment() {
+    return ['localhost', '127.0.0.1'].includes(window.location.hostname);
+  }
+
+  // Reads ?devAuth=off|on from the URL (only honored on localhost) and
+  // persists the choice, so it survives navigating to a plain URL afterward.
+  applyDevBypassParam() {
+    if (!this.isDevEnvironment()) return;
+    const devAuthParam = new URLSearchParams(window.location.search).get('devAuth');
+    if (devAuthParam === 'off') {
+      localStorage.setItem(this.devBypassKey, 'true');
+    } else if (devAuthParam === 'on') {
+      localStorage.removeItem(this.devBypassKey);
+    }
+  }
+
+  isDevBypassActive() {
+    return this.isDevEnvironment() && localStorage.getItem(this.devBypassKey) === 'true';
+  }
+
+  disableDevBypass() {
+    localStorage.removeItem(this.devBypassKey);
+    window.location.reload();
+  }
+
+  // Shows a fixed, unmissable banner while the dev bypass is active, so a
+  // bypassed page is never mistaken for the real gated experience. Clicking
+  // it turns auth back on.
+  showDevBypassBanner() {
+    if (document.getElementById('devAuthBypassBanner')) return;
+    const banner = document.createElement('div');
+    banner.id = 'devAuthBypassBanner';
+    banner.textContent = 'DEV: Auth Bypassed - click to require login again';
+    banner.style.cssText = `
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: 10001;
+      background: #b45309;
+      color: #fff;
+      font-family: sans-serif;
+      font-size: 13px;
+      text-align: center;
+      padding: 4px;
+      cursor: pointer;
+    `;
+    banner.addEventListener('click', () => this.disableDevBypass());
+    document.body.appendChild(banner);
   }
 
   // Hash a password using SHA-256
@@ -187,6 +245,11 @@ class TeacherAuth {
 
   // Prompt for password and authenticate
   async authenticate() {
+    if (this.isDevBypassActive()) {
+      this.showDevBypassBanner();
+      return true;
+    }
+
     if (this.isSessionValid()) {
       return true;
     }
@@ -247,6 +310,7 @@ class TeacherAuth {
 
     // Check session validity every minute
     setInterval(() => {
+      if (this.isDevBypassActive()) return;
       if (!this.isSessionValid() && document.body?.dataset.teacherPage === 'true') {
         alert('Session expired. Please log in again.');
         window.location.href = 'index.html';
