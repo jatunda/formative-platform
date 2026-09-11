@@ -834,6 +834,49 @@ describe('renderMultipleContent', () => {
     expect(innerDetails.querySelector('.lesson-collapsible-summary').textContent).toContain('Inner');
   });
 
+  it('should start a new list after a nested collapsible section, not continue the list from before it', () => {
+    // A list right before a nested collapsible, inside an outer collapsible,
+    // followed by another list after it - the second list must not be
+    // merged into the first just because they're both top-level lists.
+    const data = {
+      title: 'My Lesson',
+      blocks: [
+        {
+          type: 'question',
+          content: [
+            {
+              type: 'collapsible',
+              title: 'Outer',
+              expanded: true,
+              content: [
+                { type: 'text', value: '- Item A' },
+                {
+                  type: 'collapsible',
+                  title: 'Inner',
+                  expanded: false,
+                  content: [{ type: 'text', value: 'Inner content' }]
+                },
+                { type: 'text', value: '- Item B' }
+              ]
+            }
+          ]
+        }
+      ]
+    };
+    renderContent(data, container);
+    const outerContent = container.querySelector('.lesson-collapsible .collapsible-content');
+    const children = [...outerContent.children];
+    const lists = children.filter((el) => el.tagName === 'UL');
+
+    expect(lists).toHaveLength(2);
+    expect(lists[0].children).toHaveLength(1);
+    expect(lists[0].textContent).toContain('Item A');
+    expect(lists[1].children).toHaveLength(1);
+    expect(lists[1].textContent).toContain('Item B');
+    // The second list comes after the nested <details>, not merged into the first
+    expect(children.indexOf(lists[1])).toBeGreaterThan(children.findIndex((el) => el.tagName === 'DETAILS'));
+  });
+
   it('should render section with text content', () => {
     const data = {
       title: 'My Lesson',
