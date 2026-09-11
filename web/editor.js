@@ -42,180 +42,128 @@ import {
 import { NO_CONTENT_SELECTED, UNTITLED_LESSON, UNTITLED_LESSON_LOWERCASE, CONTENT_NOT_FOUND } from './constants.js';
 import { showNotification } from './notification-utils.js';
 
-
 // Database is imported from centralized firebase-config.js
 
-// Check authentication before proceeding
-(async () => {
-  const isAuthenticated = await window.teacherAuth.requireAuth();
-  if (!isAuthenticated) {
-    return; // Stop execution if not authenticated
-  }
-  
-  // Setup activity listeners for session management
-  window.teacherAuth.setupActivityListeners();
-  
-  // Continue with normal editor.js execution
-  main();
-})();
-
-async function main() {
-
-// Initialize database utilities
-initializeDatabase(db);
-
-// Initialize the lesson search module with database reference
-initializeLessonSearch(db);
-
-renderTeacherNav('editor');
-
-// Update back to schedule link to preserve class selection
-const urlParams = new URLSearchParams(window.location.search);
-const classParam = urlParams.get('fromClass');
-if (classParam) {
-    const backLink = document.getElementById('backToScheduleLink');
-    if (backLink) {
-        backLink.href = `teacher.html?class=${classParam}`;
-    }
+export function getQueryParams() {
+  const params = {};
+  window.location.search.substring(1).split("&").forEach(pair => {
+    const [k, v] = pair.split("=");
+    if (k) params[decodeURIComponent(k)] = decodeURIComponent(v || "");
+  });
+  return params;
 }
 
-const contentIdEl = document.getElementById("contentId");
-const dslInput = document.getElementById("dslInput");
-const preview = document.getElementById("preview");
-const saveBtn = document.getElementById("saveBtn");
-const duplicateBtn = document.getElementById("duplicateBtn");
-const deleteBtn = document.getElementById("deleteBtn");
-const searchLessonBtn = document.getElementById("searchLessonBtn");
+export function updatePreview(dslText, previewEl) {
+  try {
+    const parsed = parseDSL(dslText);
+    const validationError = validateDSL(dslText, parsed);
 
-// Content ID is now a div, no need for readOnly property
+    if (validationError) {
+      const error = new Error(validationError);
+      previewEl.innerHTML = getErrorExplanation(error, dslText);
+    } else {
+      renderContent(parsed, previewEl);
+    }
+  } catch (err) {
+    previewEl.innerHTML = getErrorExplanation(err, dslText);
+  }
+}
 
-dslInput.addEventListener("input", updatePreview);
+/**
+ * Compute the result of pressing Tab in the DSL editor: insert 4 spaces at
+ * the cursor (replacing any selection).
+ * @returns {{value: string, cursor: number}}
+ */
+export function computeTabIndent(value, selectionStart, selectionEnd) {
+  const newValue = value.substring(0, selectionStart) + "    " + value.substring(selectionEnd);
+  return { value: newValue, cursor: selectionStart + 4 };
+}
 
-// Handle Tab key in DSL input to insert 4 spaces instead of changing focus
-dslInput.addEventListener("keydown", (event) => {
+/**
+ * Compute the result of pressing Backspace with the cursor at the end of a
+ * run of only-spaces at the start of a line: delete back to the previous
+ * multiple-of-4 indent level. Returns null when smart backspace doesn't
+ * apply (there's a selection, or the text before the cursor on this line
+ * isn't all spaces, or there's less than one indent level of it) - the
+ * caller should let a normal Backspace proceed in that case.
+ * @returns {{value: string, cursor: number}|null}
+ */
+export function computeSmartBackspace(value, selectionStart, selectionEnd) {
+  if (selectionStart !== selectionEnd || selectionStart === 0) return null;
+
+  const lineStart = value.lastIndexOf('\n', selectionStart - 1) + 1;
+  const lineBeforeCursor = value.substring(lineStart, selectionStart);
+
+  if (!/^ +$/.test(lineBeforeCursor) || lineBeforeCursor.length < 4) return null;
+
+  const spacesToDelete = lineBeforeCursor.length % 4 || 4;
+  const newValue = value.substring(0, selectionStart - spacesToDelete) + value.substring(selectionStart);
+  return { value: newValue, cursor: selectionStart - spacesToDelete };
+}
+
+/**
+ * Compute the result of pressing Enter: start the new line with the same
+ * leading whitespace as the current line. Returns null when there's no
+ * indentation to carry over (there's a selection, or the current line has
+ * no leading spaces) - the caller should let a normal Enter proceed.
+ * @returns {{value: string, cursor: number}|null}
+ */
+export function computeAutoIndentNewline(value, selectionStart, selectionEnd) {
+  if (selectionStart !== selectionEnd) return null;
+
+  const lineStart = value.lastIndexOf('\n', selectionStart - 1) + 1;
+  const currentLine = value.substring(lineStart, selectionStart);
+  const indentMatch = currentLine.match(/^( *)/);
+  const indent = indentMatch ? indentMatch[1] : '';
+
+  if (indent.length === 0) return null;
+
+  const newValue = value.substring(0, selectionStart) + '\n' + indent + value.substring(selectionEnd);
+  return { value: newValue, cursor: selectionStart + 1 + indent.length };
+}
+
+function applyComputedEdit(dslInputEl, result) {
+  dslInputEl.value = result.value;
+  dslInputEl.selectionStart = dslInputEl.selectionEnd = result.cursor;
+  dslInputEl.dispatchEvent(new Event('input'));
+}
+
+/**
+ * Handle Tab/Backspace/Enter smart-indentation in the DSL textarea.
+ * @param {KeyboardEvent} event
+ * @param {HTMLTextAreaElement} dslInputEl
+ */
+export function handleDslInputKeydown(event, dslInputEl) {
+  const { value, selectionStart, selectionEnd } = dslInputEl;
+
   if (event.key === "Tab") {
-    event.preventDefault(); // Prevent default tab behavior
-    
-    const start = dslInput.selectionStart;
-    const end = dslInput.selectionEnd;
-    const value = dslInput.value;
-    
-    // Insert 4 spaces at cursor position
-    const newValue = value.substring(0, start) + "    " + value.substring(end);
-    dslInput.value = newValue;
-    
-    // Move cursor to after the inserted spaces
-    dslInput.selectionStart = dslInput.selectionEnd = start + 4;
-    
-    // Trigger input event to update preview
-    dslInput.dispatchEvent(new Event('input'));
-  }
-  
-  // Handle smart backspace for indentation
-  if (event.key === "Backspace") {
-    const start = dslInput.selectionStart;
-    const end = dslInput.selectionEnd;
-    const value = dslInput.value;
-    
-    // Only do smart backspace if nothing is selected
-    if (start === end && start > 0) {
-      // Find the start of the current line
-      const lineStart = value.lastIndexOf('\n', start - 1) + 1;
-      const lineBeforeCursor = value.substring(lineStart, start);
-      
-      // Check if we're at the beginning of the line's text (only spaces before cursor)
-      if (/^ +$/.test(lineBeforeCursor) && lineBeforeCursor.length >= 4) {
-        event.preventDefault();
-        
-        // Calculate how many spaces to delete to reach the next multiple of 4
-        const spacesToDelete = lineBeforeCursor.length % 4 || 4;
-        
-        // Delete the spaces
-        const newValue = value.substring(0, start - spacesToDelete) + value.substring(start);
-        dslInput.value = newValue;
-        
-        // Move cursor back
-        dslInput.selectionStart = dslInput.selectionEnd = start - spacesToDelete;
-        
-        // Trigger input event to update preview
-        dslInput.dispatchEvent(new Event('input'));
-      }
+    event.preventDefault();
+    applyComputedEdit(dslInputEl, computeTabIndent(value, selectionStart, selectionEnd));
+  } else if (event.key === "Backspace") {
+    const result = computeSmartBackspace(value, selectionStart, selectionEnd);
+    if (result) {
+      event.preventDefault();
+      applyComputedEdit(dslInputEl, result);
+    }
+  } else if (event.key === "Enter") {
+    const result = computeAutoIndentNewline(value, selectionStart, selectionEnd);
+    if (result) {
+      event.preventDefault();
+      applyComputedEdit(dslInputEl, result);
     }
   }
-  
-  // Handle auto-indentation on Enter
-  if (event.key === "Enter") {
-    const start = dslInput.selectionStart;
-    const end = dslInput.selectionEnd;
-    const value = dslInput.value;
-    
-    // Only do auto-indent if nothing is selected
-    if (start === end) {
-      // Find the start of the current line
-      const lineStart = value.lastIndexOf('\n', start - 1) + 1;
-      const currentLine = value.substring(lineStart, start);
-      
-      // Extract the leading whitespace from the current line
-      const indentMatch = currentLine.match(/^( *)/);
-      const indent = indentMatch ? indentMatch[1] : '';
-      
-      if (indent.length > 0) {
-        event.preventDefault();
-        
-        // Insert newline followed by the same indentation
-        const newValue = value.substring(0, start) + '\n' + indent + value.substring(end);
-        dslInput.value = newValue;
-        
-        // Move cursor to after the inserted indentation
-        dslInput.selectionStart = dslInput.selectionEnd = start + 1 + indent.length;
-        
-        // Trigger input event to update preview
-        dslInput.dispatchEvent(new Event('input'));
-      }
-    }
-  }
-});
-
-const existingContentSelect = document.getElementById("existingContent");
-
-// Add keyboard shortcut for save (Ctrl+S on Windows, Cmd+S on Mac)
-document.addEventListener("keydown", (event) => {
-  // Check for Ctrl+S (Windows/Linux) or Cmd+S (Mac)
-  if ((event.ctrlKey || event.metaKey) && event.key === 's') {
-    event.preventDefault(); // Prevent browser's default save dialog
-    
-    // Only trigger save if editing is enabled (content is loaded)
-    if (!saveBtn.disabled) {
-      saveBtn.click(); // Trigger the existing save functionality
-    }
-  }
-});
-
-function updatePreview() {
-	const dslText = dslInput.value;
-	
-	try {
-		const parsed = parseDSL(dslText);
-		
-		// Validate the parsed content
-		const validationError = validateDSL(dslText, parsed);
-		
-		if (validationError) {
-			// Create an error object for consistent error display
-			const error = new Error(validationError);
-			preview.innerHTML = getErrorExplanation(error, dslText);
-		} else {
-			// Use the shared content renderer for valid content
-			renderContent(parsed, preview);
-		}
-	} catch (err) {
-		preview.innerHTML = getErrorExplanation(err, dslText);
-	}
 }
 
-// Function to enable/disable the DSL input and save button
-// Make setEditingEnabled available globally
-window.setEditingEnabled = function(enabled) {
+// Enable/disable the DSL input and the action buttons together, e.g. while
+// no lesson is selected. Queries its elements fresh rather than caching
+// them, since it's called from several independent places (this file and
+// ai-generator.js, which takes it as a constructor argument).
+export function setEditingEnabled(enabled) {
+  const dslInput = document.getElementById("dslInput");
+  const saveBtn = document.getElementById("saveBtn");
+  const duplicateBtn = document.getElementById("duplicateBtn");
+  const deleteBtn = document.getElementById("deleteBtn");
+
   dslInput.disabled = !enabled;
   saveBtn.disabled = !enabled;
   duplicateBtn.disabled = !enabled;
@@ -227,282 +175,329 @@ window.setEditingEnabled = function(enabled) {
   }
 }
 
-// Initialize AI Question Generator - after setEditingEnabled above, since
-// the constructor takes it as an argument rather than reaching for it lazily
-try {
-  validateConfig();
-  const aiGenerator = new AIQuestionGenerator(db, AI_CONFIG.ANTHROPIC_API_KEY, setEditingEnabled);
-} catch (error) {
-  console.warn('AI Generator not available:', error.message);
-  // Disable the AI button if configuration is missing
-  const aiBtn = document.getElementById('generateAIBtn');
-  if (aiBtn) {
-    aiBtn.disabled = true;
-    aiBtn.title = 'AI Generation requires Anthropic API key configuration';
-    aiBtn.textContent = '🤖 Generate Questions (Not Configured)';
-  }
-}
-
-// Search lesson button functionality
-searchLessonBtn.onclick = () => {
-  showLessonSearchPopup({
-    onSelect: async (lessonId) => {
-      // Set the selected lesson in the dropdown if it exists
-      for (let i = 0; i < existingContentSelect.options.length; i++) {
-        if (existingContentSelect.options[i].value === lessonId) {
-          existingContentSelect.selectedIndex = i;
-          break;
-        }
-      }
-      
-      // Update the content ID display
-      contentIdEl.textContent = lessonId;
-      
-      // Load the content
-      await loadContent(lessonId);
-      setEditingEnabled(true);
-    }
-  });
-};
-
-saveBtn.onclick = async () => {
-	const id = contentIdEl.textContent.trim();
-	if (!id || id === NO_CONTENT_SELECTED) return alert("No content ID available.");
-
-	const parsed = parseDSL(dslInput.value);
-	if (!parsed.title || !parsed.blocks) return alert("Parsing failed or content is malformed.");
-
-	await set(ref(db, `content/${id}`), parsed);
-	
-	// Get current timestamp
-	const now = new Date();
-	const timestamp = now.toLocaleString(); // This includes date and time down to seconds
-	
-	// Get the lesson title
-	const lessonTitle = parsed.title || UNTITLED_LESSON;
-	
-	showNotification(`"${lessonTitle}" saved successfully at ${timestamp}`, "success");
-};
-
-
-duplicateBtn.onclick = async () => {
-	const currentId = contentIdEl.textContent.trim();
-	if (!currentId || currentId === "(No content selected)") return alert("No content ID available.");
-
-	// Check if current content is valid
-	let parsed;
-	try {
-		parsed = parseDSL(dslInput.value);
-		if (!parsed.title || !parsed.blocks) {
-			alert("Cannot duplicate: Current content is malformed or empty.");
-			return;
-		}
-	} catch (err) {
-		alert("Cannot duplicate: Failed to parse current content.");
-		return;
-	}
-
-	try {
-		// Generate a new unique hash
-		const newHash = await generateUniqueHash();
-		
-		// Create a copy with modified title to indicate it's a duplicate
-		const duplicatedContent = { ...parsed };
-		duplicatedContent.title = `${parsed.title} (Copy)`;
-		
-		// Save the duplicated content to Firebase
-		await set(ref(db, `content/${newHash}`), duplicatedContent);
-		
-		// Update the editor to show the duplicated content
-		contentIdEl.textContent = newHash;
-		
-		// Update the DSL input to reflect the new title
-		const newDslText = generateDSLFromContent(duplicatedContent);
-		dslInput.value = newDslText;
-		updatePreview();
-		
-		// Clear dropdown selection since this is a new item
-		existingContentSelect.value = "";
-		
-		// Reload the content list to include the new item
-		await loadExistingContentList();
-		
-		// Try to select the new item in the dropdown
-		for (let i = 0; i < existingContentSelect.options.length; i++) {
-			if (existingContentSelect.options[i].value === newHash) {
-				existingContentSelect.selectedIndex = i;
-				break;
-			}
-		}
-		
-		alert(`Content duplicated successfully!\nNew ID: ${newHash}`);
-	} catch (error) {
-		console.error("Error duplicating content:", error);
-		showNotification("Failed to duplicate content. Please try again.", "error");
-	}
-};
-
-deleteBtn.onclick = async () => {
-	const id = contentIdEl.textContent.trim();
-	if (!id || id === NO_CONTENT_SELECTED) return alert("No content ID available.");
-
-	// Get the title from the current content
-	let title = UNTITLED_LESSON;
-	try {
-		const parsed = parseDSL(dslInput.value);
-		if (parsed && parsed.title) {
-			title = parsed.title;
-		}
-	} catch (err) {
-		// If parsing fails, try to get title from database
-		try {
-			const snap = await get(ref(db, `content/${id}/title`));
-			if (snap.exists()) {
-				title = snap.val();
-			}
-		} catch (dbErr) {
-			// Keep default title if both methods fail
-		}
-	}
-
-	// Show confirmation dialog with title
-	const confirmed = confirm(`Are you sure you want to delete the lesson "${title}"?\n\nContent ID: ${id}\nThis action cannot be undone.`);
-	if (!confirmed) return;
-
-	try {
-		// Delete the content from Firebase
-		await remove(ref(db, `content/${id}`));
-		
-		// Clear the editor
-		contentIdEl.textContent = NO_CONTENT_SELECTED;
-		dslInput.value = "";
-		preview.innerHTML = "";
-		
-		// Clear the dropdown selection
-		existingContentSelect.value = "";
-		
-		// Disable editing
-		setEditingEnabled(false);
-		
-		// Reload the content list to remove the deleted item
-		await loadExistingContentList();
-		
-		showNotification("Content deleted successfully!", "success");
-	} catch (error) {
-		console.error("Error deleting content:", error);
-		showNotification("Failed to delete content. Please try again.", "error");
-	}
-};
-
-async function loadExistingContentList(selectLessonId = null) {
-	// Clear existing options except the first one
-	existingContentSelect.innerHTML = '<option value="">-- Select a lesson --</option>';
-	
-	const snap = await get(child(ref(db), "content"));
-	if (!snap.exists()) return;
-
-	const contentMap = snap.val();
-	const sortedKeys = Object.keys(contentMap).sort();
-
-	for (let id of sortedKeys) {
-		const title = contentMap[id]?.title || UNTITLED_LESSON_LOWERCASE;
-		const option = document.createElement("option");
-		option.value = id;
-		option.textContent = title;
-		existingContentSelect.appendChild(option);
-	}
-	
-	// If a specific lesson ID was provided, select it in the dropdown
-	if (selectLessonId) {
-		for (let i = 0; i < existingContentSelect.options.length; i++) {
-			if (existingContentSelect.options[i].value === selectLessonId) {
-				existingContentSelect.selectedIndex = i;
-				break;
-			}
-		}
-	}
-}
-
-// Check for URL parameters first to see if we need to select a specific lesson
-const params = getQueryParams();
-const initialLessonId = params.page || null;
-
-// Load the content list and potentially select a specific lesson
-loadExistingContentList(initialLessonId);
-
-existingContentSelect.onchange = async () => {
-  const selectedId = existingContentSelect.value;
-  if (!selectedId) {
-    // If nothing is selected, disable editing
-    contentIdEl.textContent = NO_CONTENT_SELECTED;
-    dslInput.value = "";
-    preview.innerHTML = "";
-    setEditingEnabled(false);
+export async function saveLesson(id, dslText) {
+  if (!id || id === NO_CONTENT_SELECTED) {
+    alert("No content ID available.");
     return;
   }
-  contentIdEl.textContent = selectedId;
-  await loadContent(selectedId);
-  setEditingEnabled(true);
-};
 
-async function loadContent(id) {
+  const parsed = parseDSL(dslText);
+  if (!parsed.title || !parsed.blocks) {
+    alert("Parsing failed or content is malformed.");
+    return;
+  }
+
+  await set(ref(db, `content/${id}`), parsed);
+
+  const timestamp = new Date().toLocaleString();
+  const lessonTitle = parsed.title || UNTITLED_LESSON;
+  showNotification(`"${lessonTitle}" saved successfully at ${timestamp}`, "success");
+}
+
+/**
+ * Duplicate a Lesson: parse the current DSL, save a copy under a new hash
+ * with "(Copy)" appended to its title. Returns the new hash and the
+ * duplicated content on success, so the caller can update the editor and
+ * the lesson dropdown - or null if duplication didn't happen (invalid
+ * content, or a save failure, both already alerted/notified here).
+ * @returns {Promise<{newHash: string, duplicatedContent: Object}|null>}
+ */
+export async function duplicateLesson(currentId, dslText) {
+  if (!currentId || currentId === NO_CONTENT_SELECTED) {
+    alert("No content ID available.");
+    return null;
+  }
+
+  let parsed;
+  try {
+    parsed = parseDSL(dslText);
+    if (!parsed.title || !parsed.blocks) {
+      alert("Cannot duplicate: Current content is malformed or empty.");
+      return null;
+    }
+  } catch (err) {
+    alert("Cannot duplicate: Failed to parse current content.");
+    return null;
+  }
+
+  try {
+    const newHash = await generateUniqueHash();
+    const duplicatedContent = { ...parsed, title: `${parsed.title} (Copy)` };
+    await set(ref(db, `content/${newHash}`), duplicatedContent);
+    alert(`Content duplicated successfully!\nNew ID: ${newHash}`);
+    return { newHash, duplicatedContent };
+  } catch (error) {
+    console.error("Error duplicating content:", error);
+    showNotification("Failed to duplicate content. Please try again.", "error");
+    return null;
+  }
+}
+
+/**
+ * Delete a Lesson after confirming with the teacher (using its title from
+ * the current DSL, falling back to the database, then to a generic title).
+ * @returns {Promise<boolean>} Whether the delete actually happened
+ */
+export async function deleteLesson(id, dslText) {
+  if (!id || id === NO_CONTENT_SELECTED) {
+    alert("No content ID available.");
+    return false;
+  }
+
+  let title = UNTITLED_LESSON;
+  try {
+    const parsed = parseDSL(dslText);
+    if (parsed && parsed.title) {
+      title = parsed.title;
+    }
+  } catch (err) {
+    try {
+      const snap = await get(ref(db, `content/${id}/title`));
+      if (snap.exists()) {
+        title = snap.val();
+      }
+    } catch (dbErr) {
+      // Keep default title if both methods fail
+    }
+  }
+
+  const confirmed = confirm(`Are you sure you want to delete the lesson "${title}"?\n\nContent ID: ${id}\nThis action cannot be undone.`);
+  if (!confirmed) return false;
+
+  try {
+    await remove(ref(db, `content/${id}`));
+    showNotification("Content deleted successfully!", "success");
+    return true;
+  } catch (error) {
+    console.error("Error deleting content:", error);
+    showNotification("Failed to delete content. Please try again.", "error");
+    return false;
+  }
+}
+
+export async function loadExistingContentList(existingContentSelectEl, selectLessonId = null) {
+  existingContentSelectEl.innerHTML = '<option value="">-- Select a lesson --</option>';
+
+  const snap = await get(child(ref(db), "content"));
+  if (!snap.exists()) return;
+
+  const contentMap = snap.val();
+  const sortedKeys = Object.keys(contentMap).sort();
+
+  for (let id of sortedKeys) {
+    const title = contentMap[id]?.title || UNTITLED_LESSON_LOWERCASE;
+    const option = document.createElement("option");
+    option.value = id;
+    option.textContent = title;
+    existingContentSelectEl.appendChild(option);
+  }
+
+  if (selectLessonId) {
+    for (let i = 0; i < existingContentSelectEl.options.length; i++) {
+      if (existingContentSelectEl.options[i].value === selectLessonId) {
+        existingContentSelectEl.selectedIndex = i;
+        break;
+      }
+    }
+  }
+}
+
+/**
+ * Load a Lesson's content into the editor and preview. Does not enable
+ * editing itself - callers do that, since they already need to decide
+ * whether to (e.g. handleExistingPageContext doesn't, on a load failure).
+ * @returns {Promise<boolean>} Whether the Lesson was found and loaded
+ */
+export async function loadContent(id, dslInputEl, previewEl) {
   const snap = await get(ref(db, `content/${id}`));
   if (!snap.exists()) {
     alert(CONTENT_NOT_FOUND);
-    return;
+    return false;
   }
 
   const data = snap.val();
   const dslText = generateDSLFromContent(data);
-  dslInput.value = dslText;
-  updatePreview();
+  dslInputEl.value = dslText;
+  updatePreview(dslText, previewEl);
+  return true;
+}
+
+/**
+ * If ?new=1 is in the URL, seed the editor with a blank, ready-to-edit
+ * Lesson and a fresh content id.
+ */
+export async function handleNewLessonContext(params, contentIdEl, dslInputEl, previewEl) {
+  if (params.new !== "1") return;
+
+  const newHash = await generateUniqueHash();
+  contentIdEl.textContent = newHash;
+  const dslText = generateDSLFromContent({
+    title: "New Lesson",
+    blocks: [{ type: "question", content: [{ type: "text", value: "Type your question or content here..." }] }]
+  });
+  dslInputEl.value = dslText;
+  updatePreview(dslText, previewEl);
+  dslInputEl.focus();
+  window._newLessonDayIndex = params.dayIndex;
   setEditingEnabled(true);
 }
 
-function getQueryParams() {
-  const params = {};
-  window.location.search.substring(1).split("&").forEach(pair => {
-    const [k, v] = pair.split("=");
-    if (k) params[decodeURIComponent(k)] = decodeURIComponent(v || "");
-  });
-  return params;
-}
-
-// generateUniqueHash is imported from database-utils.js
-
-(async function handleNewLessonContext() {
-  const params = getQueryParams();
-  if (params.new === "1") {
-    // Generate a new unique hash
-    const newHash = await generateUniqueHash();
-    // Set the contentId display to the new hash
-    contentIdEl.textContent = newHash;
-    // Pre-fill the DSL input with a valid, ready-to-edit lesson
-    dslInput.value = generateDSLFromContent({
-      title: "New Lesson",
-      blocks: [{ type: "question", content: [{ type: "text", value: "Type your question or content here..." }] }]
-    });
-    updatePreview();
-    // Optionally, focus the title or DSL input
-    dslInput.focus();
-    // You can also store the dayIndex in a variable if needed for later use
-    window._newLessonDayIndex = params.dayIndex;
-    // Enable editing for new lessons
-    setEditingEnabled(true);
-  }
-})();
-
-(async function handleExistingPageContext() {
-  const params = getQueryParams();
+/**
+ * If ?page=<id> is in the URL, load that Lesson; otherwise leave editing
+ * disabled until the teacher picks something.
+ */
+export async function handleExistingPageContext(params, contentIdEl, dslInputEl, previewEl) {
   if (params.page) {
-    // Set the contentId display (dropdown selection is handled by loadExistingContentList)
     contentIdEl.textContent = params.page;
-    // Load the content into the editor
-    await loadContent(params.page);
+    const found = await loadContent(params.page, dslInputEl, previewEl);
+    if (found) setEditingEnabled(true);
   } else {
-    // No content ID provided, disable editing until something is selected
     setEditingEnabled(false);
   }
-})();
+}
 
-} // End of main function
+export async function main() {
+  // Initialize database utilities
+  initializeDatabase(db);
+
+  // Initialize the lesson search module with database reference
+  initializeLessonSearch(db);
+
+  renderTeacherNav('editor');
+
+  // Update back to schedule link to preserve class selection
+  const urlParams = new URLSearchParams(window.location.search);
+  const classParam = urlParams.get('fromClass');
+  if (classParam) {
+    const backLink = document.getElementById('backToScheduleLink');
+    if (backLink) {
+      backLink.href = `teacher.html?class=${classParam}`;
+    }
+  }
+
+  const contentIdEl = document.getElementById("contentId");
+  const dslInput = document.getElementById("dslInput");
+  const preview = document.getElementById("preview");
+  const saveBtn = document.getElementById("saveBtn");
+  const duplicateBtn = document.getElementById("duplicateBtn");
+  const deleteBtn = document.getElementById("deleteBtn");
+  const searchLessonBtn = document.getElementById("searchLessonBtn");
+  const existingContentSelect = document.getElementById("existingContent");
+
+  dslInput.addEventListener("input", () => updatePreview(dslInput.value, preview));
+  dslInput.addEventListener("keydown", (event) => handleDslInputKeydown(event, dslInput));
+
+  // Add keyboard shortcut for save (Ctrl+S on Windows, Cmd+S on Mac)
+  document.addEventListener("keydown", (event) => {
+    if ((event.ctrlKey || event.metaKey) && event.key === 's') {
+      event.preventDefault(); // Prevent browser's default save dialog
+      if (!saveBtn.disabled) {
+        saveBtn.click();
+      }
+    }
+  });
+
+  // Initialize AI Question Generator - after setEditingEnabled is defined
+  // above, since the constructor takes it as an argument rather than
+  // reaching for it lazily
+  try {
+    validateConfig();
+    new AIQuestionGenerator(db, AI_CONFIG.ANTHROPIC_API_KEY, setEditingEnabled);
+  } catch (error) {
+    console.warn('AI Generator not available:', error.message);
+    // Disable the AI button if configuration is missing
+    const aiBtn = document.getElementById('generateAIBtn');
+    if (aiBtn) {
+      aiBtn.disabled = true;
+      aiBtn.title = 'AI Generation requires Anthropic API key configuration';
+      aiBtn.textContent = '🤖 Generate Questions (Not Configured)';
+    }
+  }
+
+  // Search lesson button functionality
+  searchLessonBtn.onclick = () => {
+    showLessonSearchPopup({
+      onSelect: async (lessonId) => {
+        for (let i = 0; i < existingContentSelect.options.length; i++) {
+          if (existingContentSelect.options[i].value === lessonId) {
+            existingContentSelect.selectedIndex = i;
+            break;
+          }
+        }
+        contentIdEl.textContent = lessonId;
+        const found = await loadContent(lessonId, dslInput, preview);
+        if (found) setEditingEnabled(true);
+      }
+    });
+  };
+
+  saveBtn.onclick = () => saveLesson(contentIdEl.textContent.trim(), dslInput.value);
+
+  duplicateBtn.onclick = async () => {
+    const result = await duplicateLesson(contentIdEl.textContent.trim(), dslInput.value);
+    if (!result) return;
+
+    const { newHash, duplicatedContent } = result;
+    contentIdEl.textContent = newHash;
+    const newDslText = generateDSLFromContent(duplicatedContent);
+    dslInput.value = newDslText;
+    updatePreview(newDslText, preview);
+
+    existingContentSelect.value = "";
+    await loadExistingContentList(existingContentSelect, newHash);
+  };
+
+  deleteBtn.onclick = async () => {
+    const deleted = await deleteLesson(contentIdEl.textContent.trim(), dslInput.value);
+    if (!deleted) return;
+
+    contentIdEl.textContent = NO_CONTENT_SELECTED;
+    dslInput.value = "";
+    preview.innerHTML = "";
+    existingContentSelect.value = "";
+    setEditingEnabled(false);
+    await loadExistingContentList(existingContentSelect);
+  };
+
+  existingContentSelect.onchange = async () => {
+    const selectedId = existingContentSelect.value;
+    if (!selectedId) {
+      contentIdEl.textContent = NO_CONTENT_SELECTED;
+      dslInput.value = "";
+      preview.innerHTML = "";
+      setEditingEnabled(false);
+      return;
+    }
+    contentIdEl.textContent = selectedId;
+    const found = await loadContent(selectedId, dslInput, preview);
+    if (found) setEditingEnabled(true);
+  };
+
+  // Check for URL parameters first to see if we need to select a specific lesson
+  const params = getQueryParams();
+  const initialLessonId = params.page || null;
+
+  // Load the content list and potentially select a specific lesson
+  await loadExistingContentList(existingContentSelect, initialLessonId);
+
+  await handleNewLessonContext(params, contentIdEl, dslInput, preview);
+  await handleExistingPageContext(params, contentIdEl, dslInput, preview);
+}
+
+// Check authentication before proceeding. Only run automatically when
+// actually loaded on editor.html - importing this module elsewhere (tests)
+// never triggers real auth/Firebase/DOM side effects on its own.
+if (document.getElementById('dslInput')) {
+  (async () => {
+    const isAuthenticated = await window.teacherAuth.requireAuth();
+    if (!isAuthenticated) {
+      return; // Stop execution if not authenticated
+    }
+
+    // Setup activity listeners for session management
+    window.teacherAuth.setupActivityListeners();
+
+    // Continue with normal editor.js execution
+    main();
+  })();
+}
