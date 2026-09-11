@@ -229,14 +229,14 @@ window.setEditingEnabled = function(enabled) {
 // the constructor takes it as an argument rather than reaching for it lazily
 try {
   validateConfig();
-  const aiGenerator = new AIQuestionGenerator(db, AI_CONFIG.OPENAI_API_KEY, setEditingEnabled);
+  const aiGenerator = new AIQuestionGenerator(db, AI_CONFIG.ANTHROPIC_API_KEY, setEditingEnabled);
 } catch (error) {
   console.warn('AI Generator not available:', error.message);
   // Disable the AI button if configuration is missing
   const aiBtn = document.getElementById('generateAIBtn');
   if (aiBtn) {
     aiBtn.disabled = true;
-    aiBtn.title = 'AI Generation requires OpenAI API key configuration';
+    aiBtn.title = 'AI Generation requires Anthropic API key configuration';
     aiBtn.textContent = '🤖 Generate Questions (Not Configured)';
   }
 }

@@ -410,40 +410,26 @@ Now generate new questions following this style for the learning objectives abov
 }
 
 /**
- * Abstract LLM provider interface for easy switching between LLM providers
- * @abstract
+ * Claude (Anthropic) LLM provider: calls the Messages API directly from the
+ * browser. There's deliberately no abstract base class here - with exactly
+ * one provider in use, an interface with one implementation is ceremony,
+ * not a real seam. AIQuestionGenerator takes this as a constructor
+ * argument, so tests can substitute a fake one without needing a second
+ * real implementation to justify the seam.
  */
-class LLMProvider {
+class ClaudeProvider {
   /**
-   * Generate questions from a prompt
-   * @param {string} prompt - The prompt to send to the LLM
-   * @returns {Promise<string>} The generated questions as DSL text
-   * @abstract
-   * @throws {Error} Must be implemented by subclass
-   */
-  async generateQuestions(prompt) {
-    throw new Error('generateQuestions must be implemented by subclass');
-  }
-}
-
-/**
- * OpenAI LLM provider implementation
- * @extends {LLMProvider}
- */
-class OpenAIProvider extends LLMProvider {
-  /**
-   * Create an OpenAI provider instance
-   * @param {string} apiKey - The OpenAI API key
+   * Create a Claude provider instance
+   * @param {string} apiKey - The Anthropic API key
    */
   constructor(apiKey) {
-    super();
     this.apiKey = apiKey;
-    this.baseUrl = 'https://api.openai.com/v1/chat/completions';
+    this.baseUrl = 'https://api.anthropic.com/v1/messages';
   }
 
   /**
-   * Generate questions using OpenAI API
-   * @param {string} prompt - The prompt to send to OpenAI
+   * Generate questions using the Anthropic Messages API
+   * @param {string} prompt - The prompt to send to Claude
    * @returns {Promise<string>} The generated questions as DSL text
    * @throws {Error} If the API request fails
    */
@@ -451,18 +437,21 @@ class OpenAIProvider extends LLMProvider {
     const response = await fetch(this.baseUrl, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${this.apiKey}`,
-        'Content-Type': 'application/json',
+        'x-api-key': this.apiKey,
+        'anthropic-version': '2023-06-01',
+        // Anthropic blocks direct browser calls by default, to discourage
+        // shipping an API key to the client - this app already does that
+        // for its own API key (ai-config.js), so this doesn't add a new
+        // risk category, just makes the fetch work.
+        'anthropic-dangerous-direct-browser-access': 'true',
+        'content-type': 'application/json',
       },
       body: JSON.stringify({
         model: AI_CONFIG.MODEL,
+        system: 'You are an expert educational content creator specializing in formative assessments. You create engaging questions that help students learn effectively.',
         messages: [
           {
-            role: 'system',
-            content: 'You are an expert educational content creator specializing in formative assessments. You create engaging questions that help students learn effectively.'
-          },
-          {
-            role: 'user', 
+            role: 'user',
             content: prompt
           }
         ],
@@ -473,11 +462,11 @@ class OpenAIProvider extends LLMProvider {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(`OpenAI API error: ${error.error?.message || 'Unknown error'}`);
+      throw new Error(`Claude API error: ${error.error?.message || 'Unknown error'}`);
     }
 
     const data = await response.json();
-    return data.choices[0].message.content;
+    return data.content[0].text;
   }
 }
 
@@ -489,11 +478,11 @@ export class AIQuestionGenerator {
   /**
    * Create an AI Question Generator instance
    * @param {import("https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js").Database} database - The Firebase database instance
-   * @param {string} apiKey - The OpenAI API key
+   * @param {string} apiKey - The Anthropic API key
    * @param {(enabled: boolean) => void} enableEditing - Called to enable/disable the host page's editor once questions are generated
-   * @param {{generateQuestions: (prompt: string) => Promise<string>}} [llmProvider] - The LLM provider to use; defaults to OpenAI
+   * @param {{generateQuestions: (prompt: string) => Promise<string>}} [llmProvider] - The LLM provider to use; defaults to Claude
    */
-  constructor(database, apiKey, enableEditing, llmProvider = new OpenAIProvider(apiKey)) {
+  constructor(database, apiKey, enableEditing, llmProvider = new ClaudeProvider(apiKey)) {
     this.db = database;
     // Initialize database utilities with the database instance
     initializeDatabase(database);
