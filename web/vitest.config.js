@@ -7,7 +7,9 @@ const __dirname = fileURLToPath(new URL('.', import.meta.url));
 export default defineConfig({
   resolve: {
     alias: {
-      'https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js': 
+      'https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js':
+        resolve(__dirname, '__tests__/helpers/mock-firebase-module.js'),
+      'https://www.gstatic.com/firebasejs/10.4.0/firebase-app.js':
         resolve(__dirname, '__tests__/helpers/mock-firebase-module.js'),
     },
   },

@@ -1,5 +1,5 @@
 // public/landing.js
-import { ref, get, child } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js";
+import { ref, get } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js";
 import { db } from './firebase-config.js';
 import { initializeDateUtils, getTodayDayIndex } from './date-utils.js';
 import { showErrorState } from './error-ui-utils.js';
@@ -8,104 +8,108 @@ import { showErrorState } from './error-ui-utils.js';
 // Initialize date utilities with database
 initializeDateUtils(db);
 
-async function getAvailableClasses() {
-  try {
-    // Check if database is properly initialized
-    if (!db) {
-      throw new Error("Database not initialized");
+/**
+ * Fetch every Class, each with today's Day Index and that day's Schedule
+ * (a list of Lesson ids, empty if there's nothing scheduled).
+ * @returns {Promise<Array<{classId: string, name: string, dayIndex: number, schedule: string[]}>>}
+ *   Sorted by each Class's displayOrder.
+ */
+export async function getClassesWithTodaySchedule() {
+  if (!db) {
+    throw new Error("Database not initialized");
+  }
+
+  console.log("Fetching classes from database...");
+  const classesSnap = await get(ref(db, "classes"));
+
+  if (!classesSnap.exists()) {
+    console.warn("Classes node does not exist in database");
+    return [];
+  }
+
+  const classes = classesSnap.val() || {};
+  console.log("Classes data:", classes);
+
+  if (Object.keys(classes).length === 0) {
+    console.warn("No classes found in database");
+    return [];
+  }
+
+  const classEntries = Object.entries(classes)
+    .sort(([, a], [, b]) => (a.displayOrder || 0) - (b.displayOrder || 0));
+
+  // Calculate today's day index for each class in parallel
+  console.log("Calculating day indices for", classEntries.length, "classes");
+  const dayIndexResults = await Promise.all(classEntries.map(async ([classId]) => {
+    try {
+      const todayDayIndex = await getTodayDayIndex(classId);
+      return { classId, todayDayIndex };
+    } catch (error) {
+      console.error(`Error getting day index for class ${classId}:`, error);
+      return { classId, todayDayIndex: 0 };
     }
-    
-    // OPTIMIZATION: Fetch classes and calculate today's day indices first
-    console.log("Fetching classes from database...");
-    const classesSnap = await get(ref(db, "classes"));
-    
-    if (!classesSnap.exists()) {
-      console.warn("Classes node does not exist in database");
-      return [];
-    }
-    
-    const classes = classesSnap.val() || {};
-    console.log("Classes data:", classes);
+  }));
 
-    if (Object.keys(classes).length === 0) {
-      console.warn("No classes found in database");
-      return [];
-    }
-
-    const classEntries = Object.entries(classes)
-      .sort(([, a], [, b]) => (a.displayOrder || 0) - (b.displayOrder || 0));
-
-    // Calculate today's day index for each class in parallel
-    console.log("Calculating day indices for", classEntries.length, "classes");
-    const dayIndexPromises = classEntries.map(async ([classId]) => {
-      try {
-        const todayDayIndex = await getTodayDayIndex(classId);
-        return { classId, todayDayIndex };
-      } catch (error) {
-        console.error(`Error getting day index for class ${classId}:`, error);
-        return { classId, todayDayIndex: 0 };
-      }
-    });
-
-  const dayIndexResults = await Promise.all(dayIndexPromises);
-
-  // Build paths for batch fetch of all today's schedules
-  const schedulePaths = dayIndexResults.map(({ classId, todayDayIndex }) => 
-    `schedule/${classId}/${todayDayIndex}`
+  // Batch fetch all of today's schedules at once
+  const scheduleSnaps = await Promise.all(
+    dayIndexResults.map(({ classId, todayDayIndex }) => get(ref(db, `schedule/${classId}/${todayDayIndex}`)))
   );
 
-  // OPTIMIZATION: Batch fetch all schedules at once
-  const schedulePromises = schedulePaths.map(path => get(ref(db, path)));
-  const scheduleSnaps = await Promise.all(schedulePromises);
-
-  // Combine results
-  const schedules = dayIndexResults.map(({ classId, todayDayIndex }, index) => ({
+  return dayIndexResults.map(({ classId, todayDayIndex }, index) => ({
     classId,
+    name: classes[classId].name,
     dayIndex: todayDayIndex,
     schedule: scheduleSnaps[index].val() || []
   }));
+}
 
-  const container = document.getElementById("class-list");
-  
-  // Hide loading state
-  const loadingState = document.getElementById("loading-state");
-  if (loadingState) {
-    loadingState.style.display = "none";
-  }
-  
-  // Clear any existing content and add the actual class list
+/**
+ * Render the class list: a clickable link for a Class with Lessons today,
+ * inactive text for one without. Replaces the container's existing content.
+ * @param {HTMLElement} container
+ * @param {Array<{classId: string, name: string, dayIndex: number, schedule: string[]}>} classesWithSchedule
+ */
+export function renderClassList(container, classesWithSchedule) {
   container.innerHTML = "";
 
-  schedules.forEach(({ classId, dayIndex, schedule }) => {
-    const classData = classes[classId];
-    
+  classesWithSchedule.forEach(({ classId, name, dayIndex, schedule }) => {
     if (Array.isArray(schedule) && schedule.length > 0) {
-      // Class has lessons today - show as clickable link
       const link = document.createElement("a");
-      link.textContent = classData.name;
+      link.textContent = name;
       link.className = "class-link";
       link.href = `view.html?class=${classId}&day=${dayIndex}`;
       container.appendChild(link);
     } else {
-      // Class exists but has no lessons today - show as inactive text
       const item = document.createElement("div");
-      item.textContent = `${classData.name} - nothing today`;
+      item.textContent = `${name} - nothing today`;
       item.className = "class-link-inactive";
       container.appendChild(item);
     }
   });
-  } catch (error) {
-    console.error("Error in getAvailableClasses:", error);
-    throw error; // Re-throw to be handled by loadWithErrorHandling
+}
+
+/**
+ * Fetch and render the class list into the given container, hiding the
+ * loading state once data arrives.
+ * @param {HTMLElement} container
+ * @param {HTMLElement|null} loadingState
+ */
+export async function loadAndRenderClasses(container, loadingState) {
+  const classesWithSchedule = await getClassesWithTodaySchedule();
+  if (loadingState) {
+    loadingState.style.display = "none";
   }
+  renderClassList(container, classesWithSchedule);
 }
 
 async function loadWithErrorHandling() {
   try {
-    await getAvailableClasses();
+    const container = document.getElementById("class-list");
+    const loadingState = document.getElementById("loading-state");
+    await loadAndRenderClasses(container, loadingState);
   } catch (error) {
     console.error("Error loading classes:", error);
-    
+
     showErrorState({
       container: 'class-list',
       loadingState: 'loading-state',
@@ -115,4 +119,9 @@ async function loadWithErrorHandling() {
   }
 }
 
-loadWithErrorHandling();
+// Only run automatically when actually loaded on a page with a #class-list
+// element (i.e. index.html) - importing this module elsewhere (tests) never
+// triggers real Firebase/DOM side effects on its own.
+if (document.getElementById("class-list")) {
+  loadWithErrorHandling();
+}
