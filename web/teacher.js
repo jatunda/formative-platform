@@ -47,41 +47,10 @@ initializeDatabase(db);
 // Initialize date utilities
 initializeDateUtils(db);
 
-// Check authentication before proceeding
-(async () => {
-  const isAuthenticated = await window.teacherAuth.requireAuth();
-  if (!isAuthenticated) {
-    return; // Stop execution if not authenticated
-  }
-  
-  // Setup activity listeners for session management
-  window.teacherAuth.setupActivityListeners();
-  
-  // Continue with normal teacher.js execution
-  main();
-})();
-
-async function main() {
-
-// Initialize lesson search module
-initializeLessonSearch(db);
-
-renderTeacherNav('teacher');
-
-// Constants
-const BUTTON_CONFIG = {
-  width: "110px",
-  minWidth: "110px",
-  maxWidth: "110px"
-};
-
-// Constants imported from constants.js
-const POPUP_MAX_HEIGHT = "50vh";
-
-const classSelect = document.getElementById("classSelect");
-const scheduleTableBody = document.querySelector("#scheduleTable tbody");
-const dateOffsetContainer = document.getElementById("dateOffsetContainer");
-
+// The currently-selected Class and its Date Offset control. Module-level
+// because they're genuinely shared, mutable "current selection" state, not
+// because functions need to close over DOM refs - those are queried fresh
+// each time (see e.g. scrollToToday, saveScrollPosition below).
 let currentClassId = "";
 let currentDateOffset = 0;
 let dateOffsetControl = null;
@@ -91,11 +60,11 @@ const SCROLL_STORAGE_KEY = 'teacher-schedule-scroll';
 const LAST_VISIT_KEY = 'teacher-schedule-last-visit';
 const VISIT_TIMEOUT = 10 * 60 * 1000; // 10 minutes
 
-function saveScrollPosition() {
+export function saveScrollPosition(classId = currentClassId) {
   const schedulePane = document.getElementById('schedulePane');
-  if (schedulePane && currentClassId) {
+  if (schedulePane && classId) {
     const scrollData = {
-      classId: currentClassId,
+      classId,
       scrollTop: schedulePane.scrollTop,
       timestamp: Date.now()
     };
@@ -103,12 +72,12 @@ function saveScrollPosition() {
   }
 }
 
-function getSavedScrollPosition() {
+export function getSavedScrollPosition(classId = currentClassId) {
   try {
     const saved = localStorage.getItem(SCROLL_STORAGE_KEY);
     if (saved) {
       const data = JSON.parse(saved);
-      if (data.classId === currentClassId) {
+      if (data.classId === classId) {
         return data;
       }
     }
@@ -118,11 +87,11 @@ function getSavedScrollPosition() {
   return null;
 }
 
-function isFirstVisitInAWhile() {
+export function isFirstVisitInAWhile() {
   try {
     const lastVisit = localStorage.getItem(LAST_VISIT_KEY);
     if (!lastVisit) return true;
-    
+
     const lastVisitTime = parseInt(lastVisit);
     const now = Date.now();
     return (now - lastVisitTime) > VISIT_TIMEOUT;
@@ -131,34 +100,34 @@ function isFirstVisitInAWhile() {
   }
 }
 
-function markVisit() {
+export function markVisit() {
   localStorage.setItem(LAST_VISIT_KEY, Date.now().toString());
 }
 
-async function loadClasses() {
+export async function loadClasses(classSelectEl) {
   const snap = await get(ref(db, "classes"));
   const classes = snap.val();
-  
+
   // Clear loading option
-  classSelect.innerHTML = "";
-  
+  classSelectEl.innerHTML = "";
+
   // Get class from URL if present
   const urlParams = new URLSearchParams(window.location.search);
   const urlClassId = urlParams.get('class');
-  
+
   Object.entries(classes)
     .sort(([, a], [, b]) => a.displayOrder - b.displayOrder)
     .forEach(([id, data]) => {
       const option = document.createElement("option");
       option.value = id;
       option.textContent = data.name;
-      classSelect.appendChild(option);
+      classSelectEl.appendChild(option);
     });
 
   // Set the class from URL parameter if it exists
-  if (urlClassId && classSelect.querySelector(`option[value="${urlClassId}"]`)) {
-    classSelect.value = urlClassId;
-    
+  if (urlClassId && classSelectEl.querySelector(`option[value="${urlClassId}"]`)) {
+    classSelectEl.value = urlClassId;
+
     // Update the editor link immediately if we have a class from URL
     const editorLink = document.getElementById('goToEditorLink');
     if (editorLink) {
@@ -168,100 +137,99 @@ async function loadClasses() {
 }
 
 // Use the shared date calculation function
-async function getDateForDayIndex(dayIndex, classStartDate = DEFAULT_CLASS_START_DATE) {
-  return await sharedGetDateForDayIndex(dayIndex, currentClassId, classStartDate);
+export async function getDateForDayIndex(dayIndex, classId = currentClassId, classStartDate = DEFAULT_CLASS_START_DATE) {
+  return await sharedGetDateForDayIndex(dayIndex, classId, classStartDate);
 }
 
-async function applyDateOffset(newOffset) {
+export async function applyDateOffset(newOffset, classId = currentClassId) {
   try {
-    await setClassDateOffset(currentClassId, newOffset);
+    await setClassDateOffset(classId, newOffset);
     currentDateOffset = newOffset;
-    if (currentClassId) {
+    if (classId) {
       await loadFullSchedule();
     }
     showNotification("Date offset updated successfully!", "success");
   } catch (error) {
-    console.error(`Failed to set date offset for class ${currentClassId}:`, error);
+    console.error(`Failed to set date offset for class ${classId}:`, error);
     showNotification("Failed to update date offset", "error");
     throw error;
   }
 }
 
-// showNotification is imported from notification-utils.js
-
-async function loadFullSchedule() {
-  const classId = classSelect.value;
-  if (!classId) return;
-  
-  currentClassId = classId;
-  
-  // Update URL with the selected class
-  const url = new URL(window.location);
-  url.searchParams.set('class', classId);
-  history.replaceState({}, '', url);
-  
-  // Update the editor link to include the class parameter
-  const editorLink = document.getElementById('goToEditorLink');
-  if (editorLink) {
-    editorLink.href = `editor.html?fromClass=${classId}`;
-  }
-  
-  // Show loading state
-  const loadingState = document.getElementById('schedule-loading-state');
-  const scheduleTable = document.getElementById('scheduleTable');
-  
-  if (loadingState) loadingState.style.display = 'flex';
-  if (scheduleTable) scheduleTable.style.display = 'none';
-  
-  try {
-    // Load the date offset for this class
-    currentDateOffset = await getClassDateOffset(classId);
-    
-    // Update the date offset control if it exists
-    if (dateOffsetControl) {
-      await dateOffsetControl.updateOffset(currentDateOffset);
-    }
-    
-    // Fetch all days for this class
-    const snap = await get(ref(db, `schedule/${classId}`));
-    const schedule = snap.val() || {};
-    await renderScheduleTable(schedule);
-    
-    // Hide loading state and show table
-    if (loadingState) loadingState.style.display = 'none';
-    if (scheduleTable) scheduleTable.style.display = 'table';
-    
-    // Handle scrolling after table is rendered
-    await handleScrollPositioning();
-    
-  } catch (error) {
-    console.error('Error loading schedule:', error);
-    showScheduleError();
-  }
-}
-
-function showScheduleError() {
+export function showScheduleError() {
   showErrorState({
     container: 'schedule-loading-state',
     title: 'Unable to load schedule'
   });
 }
 
-async function handleScrollPositioning() {
+export async function loadFullSchedule() {
+  const classSelectEl = document.getElementById("classSelect");
+  const classId = classSelectEl.value;
+  if (!classId) return;
+
+  currentClassId = classId;
+
+  // Update URL with the selected class
+  const url = new URL(window.location);
+  url.searchParams.set('class', classId);
+  history.replaceState({}, '', url);
+
+  // Update the editor link to include the class parameter
+  const editorLink = document.getElementById('goToEditorLink');
+  if (editorLink) {
+    editorLink.href = `editor.html?fromClass=${classId}`;
+  }
+
+  // Show loading state
+  const loadingState = document.getElementById('schedule-loading-state');
+  const scheduleTable = document.getElementById('scheduleTable');
+
+  if (loadingState) loadingState.style.display = 'flex';
+  if (scheduleTable) scheduleTable.style.display = 'none';
+
+  try {
+    // Load the date offset for this class
+    currentDateOffset = await getClassDateOffset(classId);
+
+    // Update the date offset control if it exists
+    if (dateOffsetControl) {
+      await dateOffsetControl.updateOffset(currentDateOffset);
+    }
+
+    // Fetch all days for this class
+    const snap = await get(ref(db, `schedule/${classId}`));
+    const schedule = snap.val() || {};
+    await renderScheduleTable(schedule, classId);
+
+    // Hide loading state and show table
+    if (loadingState) loadingState.style.display = 'none';
+    if (scheduleTable) scheduleTable.style.display = 'table';
+
+    // Handle scrolling after table is rendered
+    await handleScrollPositioning(classId);
+
+  } catch (error) {
+    console.error('Error loading schedule:', error);
+    showScheduleError();
+  }
+}
+
+export async function handleScrollPositioning(classId = currentClassId) {
   const schedulePane = document.getElementById('schedulePane');
   if (!schedulePane) return;
-  
+
   // Get today's day index
   let todayDayIndex;
   try {
-    todayDayIndex = await getTodayDayIndex(currentClassId);
+    todayDayIndex = await getTodayDayIndex(classId);
   } catch (e) {
     console.warn('Could not determine today\'s day index:', e);
   }
-  
+
   const isFirstVisit = isFirstVisitInAWhile();
-  const savedScrollData = getSavedScrollPosition();
-  
+  const savedScrollData = getSavedScrollPosition(classId);
+
   // Determine scrolling behavior
   if (isFirstVisit && todayDayIndex !== undefined) {
     // First visit in a while - scroll to today
@@ -272,15 +240,15 @@ async function handleScrollPositioning() {
       schedulePane.scrollTop = savedScrollData.scrollTop;
     }, 100);
   }
-  
+
   // Mark this visit and set up scroll saving
   markVisit();
-  
+
   // Save scroll position on scroll
-  schedulePane.addEventListener('scroll', debounce(saveScrollPosition, 500));
+  schedulePane.addEventListener('scroll', debounce(() => saveScrollPosition(classId), 500));
 }
 
-function scrollToToday() {
+export function scrollToToday() {
   const todayRow = document.querySelector('.today-row');
   if (todayRow) {
     const schedulePane = document.getElementById('schedulePane');
@@ -288,7 +256,7 @@ function scrollToToday() {
       const rowRect = todayRow.getBoundingClientRect();
       const paneRect = schedulePane.getBoundingClientRect();
       const scrollTop = schedulePane.scrollTop + rowRect.top - paneRect.top - 50; // 50px offset from top
-      
+
       schedulePane.scrollTo({
         top: Math.max(0, scrollTop),
         behavior: 'smooth'
@@ -298,7 +266,7 @@ function scrollToToday() {
 }
 
 // Debounce utility function
-function debounce(func, wait) {
+export function debounce(func, wait) {
   let timeout;
   return function executedFunction(...args) {
     const later = () => {
@@ -316,7 +284,7 @@ function debounce(func, wait) {
  * @param {{classId: string, db: object, onReload: () => void}} ctx
  * @returns {Promise<HTMLTableRowElement>} The final row element
  */
-async function createFinalRow(nextIndex, ctx) {
+export async function createFinalRow(nextIndex, ctx) {
   const addRow = document.createElement("tr");
 
   // Day Index column
@@ -326,7 +294,7 @@ async function createFinalRow(nextIndex, ctx) {
 
   // Date column
   const tdDate = document.createElement("td");
-  tdDate.textContent = await getDateForDayIndex(nextIndex);
+  tdDate.textContent = await getDateForDayIndex(nextIndex, ctx.classId);
   addRow.appendChild(tdDate);
 
   // Lessons column with "Link Lesson" and "New Lesson" buttons
@@ -342,7 +310,8 @@ async function createFinalRow(nextIndex, ctx) {
   return addRow;
 }
 
-async function renderScheduleTable(schedule) {
+export async function renderScheduleTable(schedule, classId = currentClassId) {
+  const scheduleTableBody = document.querySelector("#scheduleTable tbody");
   scheduleTableBody.innerHTML = "";
   const dayIndexes = Object.keys(schedule).map(Number).sort((a, b) => a - b);
   const maxDayIndex = dayIndexes.length > 0 ? Math.max(...dayIndexes) : 0;
@@ -350,7 +319,7 @@ async function renderScheduleTable(schedule) {
   // Get today's day index for highlighting
   let todayDayIndex;
   try {
-    todayDayIndex = await getTodayDayIndex(currentClassId);
+    todayDayIndex = await getTodayDayIndex(classId);
   } catch (e) {
     console.warn('Could not determine today\'s day index:', e);
   }
@@ -363,7 +332,6 @@ async function renderScheduleTable(schedule) {
   }
   await getLessonTitles(db, allLessonHashes);
 
-  const classId = classSelect.value;
   const ctx = {
     classId,
     db,
@@ -379,7 +347,7 @@ async function renderScheduleTable(schedule) {
 
     // Day row
     const lessons = schedule[dayIndex] || [];
-    const dateLabel = await getDateForDayIndex(dayIndex);
+    const dateLabel = await getDateForDayIndex(dayIndex, classId);
     const dayRow = await createDayRow(dayIndex, lessons, todayDayIndex, dateLabel, ctx);
     scheduleTableBody.appendChild(dayRow);
   }
@@ -390,41 +358,58 @@ async function renderScheduleTable(schedule) {
   scheduleTableBody.appendChild(finalRow);
 }
 
-classSelect.onchange = loadFullSchedule;
-
 // Initialize date offset control
-function initializeDateOffsetControl() {
+export function initializeDateOffsetControl() {
   dateOffsetControl = createDateOffsetControl({
     currentOffset: currentDateOffset,
     onApply: applyDateOffset,
     computeTodayDayIndex: () => getTodayDayIndex(currentClassId),
     onGoToToday: () => scrollToToday()
   });
+  const dateOffsetContainer = document.getElementById("dateOffsetContainer");
   dateOffsetContainer.innerHTML = '';
   dateOffsetContainer.appendChild(dateOffsetControl);
 }
 
 // Initial load with optimized parallel loading
-async function initializeTeacherApp() {
+export async function initializeTeacherApp() {
   try {
     // Start loading classes immediately
-    await loadClasses();
-    
+    await loadClasses(document.getElementById("classSelect"));
+
     // Initialize date offset control
     initializeDateOffsetControl();
-    
+
     // Load the schedule for the first class
     await loadFullSchedule();
-    
+
   } catch (error) {
     console.error('Failed to initialize app:', error);
     showScheduleError();
   }
 }
 
-initializeTeacherApp();
+export async function main() {
+  initializeLessonSearch(db);
+  renderTeacherNav('teacher');
+  document.getElementById("classSelect").onchange = loadFullSchedule;
+  await initializeTeacherApp();
+}
 
-// Global function for scrolling to today
-window.scrollToToday = scrollToToday;
+// Check authentication before proceeding. Only run automatically when
+// actually loaded on teacher.html - importing this module elsewhere (tests)
+// never triggers real auth/Firebase/DOM side effects on its own.
+if (document.getElementById('classSelect')) {
+  (async () => {
+    const isAuthenticated = await window.teacherAuth.requireAuth();
+    if (!isAuthenticated) {
+      return; // Stop execution if not authenticated
+    }
 
-} // End of main function
+    // Setup activity listeners for session management
+    window.teacherAuth.setupActivityListeners();
+
+    // Continue with normal teacher.js execution
+    main();
+  })();
+}
