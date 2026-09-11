@@ -10,15 +10,14 @@ import {
   initializeDateUtils,
   getDateForDayIndex,
   getTodayDayIndex,
-  clearDateOffsetCache
+  getClassDateOffset,
+  setClassDateOffset
 } from './date-utils.js';
 import { showNotification } from './notification-utils.js';
 import { initializeLessonSearch } from './lesson-search.js';
 import {
   initializeDatabase,
-  getFullSchedule,
-  getClassDateOffset as getClassDateOffsetDB,
-  setClassDateOffset as setClassDateOffsetDB
+  getFullSchedule
 } from './database-utils.js';
 import { showErrorState } from './error-ui-utils.js';
 import {
@@ -118,11 +117,10 @@ async function applyBulkShift(delta) {
     if (classIds.length === 0) return;
 
     await Promise.all(classIds.map(async (classId) => {
-      const current = await getClassDateOffsetDB(classId);
-      await setClassDateOffsetDB(classId, current + delta);
+      const current = await getClassDateOffset(classId);
+      await setClassDateOffset(classId, current + delta);
     }));
 
-    clearDateOffsetCache();
     showNotification(
       `Shifted all classes by ${delta > 0 ? '+' : ''}${delta} day${Math.abs(delta) === 1 ? '' : 's'}.`,
       'success'

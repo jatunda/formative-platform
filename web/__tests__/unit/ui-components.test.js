@@ -204,59 +204,105 @@ describe('ui-components', () => {
   });
 
   describe('createDateOffsetControl', () => {
-    it('should create control with label, input, and button', () => {
-      const onOffsetChange = vi.fn();
-      const control = createDateOffsetControl(5, onOffsetChange);
-      
-      expect(control.className).toBe('date-offset-control');
+    function makeControl(overrides = {}) {
+      return createDateOffsetControl({
+        currentOffset: 5,
+        onApply: vi.fn().mockResolvedValue(undefined),
+        computeTodayDayIndex: vi.fn().mockResolvedValue(12),
+        ...overrides,
+      });
+    }
+
+    // Let any pending refreshTodayDisplay() microtasks settle
+    const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+    it('should create control with label, current-offset badge, input, and Apply button', () => {
+      const control = makeControl();
+
       expect(control.querySelector('label')).toBeTruthy();
+      expect(control.querySelector('.current-offset-display').textContent).toBe('Current: 5');
       expect(control.querySelector('input[type="number"]')).toBeTruthy();
-      expect(control.querySelector('button')).toBeTruthy();
+      expect(control.querySelector('button').textContent).toBe('Apply');
     });
 
     it('should set initial value in input', () => {
-      const onOffsetChange = vi.fn();
-      const control = createDateOffsetControl(10, onOffsetChange);
-      
+      const control = makeControl({ currentOffset: 10 });
       const input = control.querySelector('input');
       expect(input.value).toBe('10');
     });
 
-    it('should call onOffsetChange when Apply is clicked', () => {
-      const onOffsetChange = vi.fn();
-      const control = createDateOffsetControl(5, onOffsetChange);
-      
-      const input = control.querySelector('input');
-      input.value = '7';
-      
-      const button = control.querySelector('button');
-      button.click();
-      
-      expect(onOffsetChange).toHaveBeenCalledWith(7);
+    it("should show today's Day Index from computeTodayDayIndex on mount", async () => {
+      const control = makeControl({ computeTodayDayIndex: vi.fn().mockResolvedValue(3) });
+      await flush();
+      expect(control.querySelector('.today-dayindex-display').textContent).toBe('(Today is Day 3)');
     });
 
-    it('should have updateOffset method', () => {
-      const onOffsetChange = vi.fn();
-      const control = createDateOffsetControl(5, onOffsetChange);
-      
-      expect(typeof control.updateOffset).toBe('function');
-      
-      control.updateOffset(15);
-      const input = control.querySelector('input');
-      expect(input.value).toBe('15');
+    it('should call onApply with the parsed input value when Apply is clicked, and update the display on success', async () => {
+      const onApply = vi.fn().mockResolvedValue(undefined);
+      const control = makeControl({ onApply, computeTodayDayIndex: vi.fn().mockResolvedValue(9) });
+      await flush();
+
+      control.querySelector('input').value = '7';
+      control.querySelector('button').click();
+      await flush();
+
+      expect(onApply).toHaveBeenCalledWith(7);
+      expect(control.querySelector('.current-offset-display').textContent).toBe('Current: 7');
+      expect(control.querySelector('.today-dayindex-display').textContent).toBe('(Today is Day 9)');
     });
 
-    it('should handle invalid input by defaulting to 0', () => {
-      const onOffsetChange = vi.fn();
-      const control = createDateOffsetControl(5, onOffsetChange);
-      
-      const input = control.querySelector('input');
-      input.value = 'invalid';
-      
-      const button = control.querySelector('button');
-      button.click();
-      
-      expect(onOffsetChange).toHaveBeenCalledWith(0);
+    it('should leave the display unchanged if onApply rejects', async () => {
+      const onApply = vi.fn().mockRejectedValue(new Error('write failed'));
+      const control = makeControl({ onApply, currentOffset: 5 });
+      await flush();
+
+      control.querySelector('input').value = '7';
+      control.querySelector('button').click();
+      await flush();
+
+      expect(control.querySelector('.current-offset-display').textContent).toBe('Current: 5');
+    });
+
+    it('should default to 0 for invalid input', async () => {
+      const onApply = vi.fn().mockResolvedValue(undefined);
+      const control = makeControl({ onApply });
+      await flush();
+
+      control.querySelector('input').value = 'invalid';
+      control.querySelector('button').click();
+      await flush();
+
+      expect(onApply).toHaveBeenCalledWith(0);
+    });
+
+    it('should have an updateOffset method that refreshes both displays', async () => {
+      const computeTodayDayIndex = vi.fn().mockResolvedValue(12).mockResolvedValueOnce(1);
+      const control = makeControl({ computeTodayDayIndex });
+      await flush();
+
+      await control.updateOffset(15);
+
+      expect(control.querySelector('input').value).toBe('15');
+      expect(control.querySelector('.current-offset-display').textContent).toBe('Current: 15');
+      expect(control.querySelector('.today-dayindex-display').textContent).toBe('(Today is Day 12)');
+    });
+
+    it('should not render a "Go to Today" button when onGoToToday is omitted', () => {
+      const control = makeControl();
+      const buttons = [...control.querySelectorAll('button')].map((b) => b.textContent);
+      expect(buttons).not.toContain('Go to Today');
+    });
+
+    it('should render and wire a "Go to Today" button when onGoToToday is provided', () => {
+      const onGoToToday = vi.fn();
+      const control = makeControl({ onGoToToday });
+
+      const buttons = [...control.querySelectorAll('button')];
+      const goToTodayBtn = buttons.find((b) => b.textContent === 'Go to Today');
+      expect(goToTodayBtn).toBeTruthy();
+
+      goToTodayBtn.click();
+      expect(onGoToToday).toHaveBeenCalled();
     });
   });
 });

@@ -1,5 +1,9 @@
 // Shared Date Utilities
-import { ref, get } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js";
+import {
+  initializeDatabase,
+  getClassDateOffset as getClassDateOffsetFromDB,
+  setClassDateOffset as setClassDateOffsetInDB
+} from "./database-utils.js";
 
 /**
  * Default class start date in YYYY-MM-DD format
@@ -13,15 +17,21 @@ let db; // Database reference
 const dateOffsetCache = new Map();
 
 /**
- * Initialize date utilities with a database reference
+ * Initialize date utilities with a database reference. Also initializes
+ * database-utils.js, since Date Offset reads/writes go through it - callers
+ * only need to call this one function, not both.
  * @param {import("https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js").Database} database - The Firebase database instance
  */
 export function initializeDateUtils(database) {
   db = database;
+  initializeDatabase(database);
 }
 
 /**
- * Get date offset for a class (with caching)
+ * Get date offset for a class (with caching). database-utils.js is the only
+ * module that talks to Firebase directly; this is the sole app-facing
+ * accessor for Date Offset, so a read failure here is swallowed to 0 rather
+ * than thrown.
  * @param {string} classId - The class ID
  * @returns {Promise<number>} The date offset in days (default: 0)
  */
@@ -30,22 +40,33 @@ export async function getClassDateOffset(classId) {
   if (dateOffsetCache.has(classId)) {
     return dateOffsetCache.get(classId);
   }
-  
+
   if (!db) {
     console.warn("Database not initialized in date utils");
     return 0;
   }
   try {
-    const snap = await get(ref(db, `classes/${classId}/dateOffset`));
-    const offset = snap.exists() ? snap.val() : 0;
-    
-    // Cache the result
+    const offset = await getClassDateOffsetFromDB(classId);
     dateOffsetCache.set(classId, offset);
     return offset;
   } catch (error) {
     console.error(`Failed to get date offset for class ${classId}:`, error);
     return 0;
   }
+}
+
+/**
+ * Set date offset for a class. Writes through database-utils.js, then
+ * updates the cache in place with the known new value (no refetch needed).
+ * A write failure is not swallowed - it propagates so callers can notify
+ * the user.
+ * @param {string} classId - The class ID
+ * @param {number} offset - The new date offset in days
+ * @returns {Promise<void>}
+ */
+export async function setClassDateOffset(classId, offset) {
+  await setClassDateOffsetInDB(classId, offset);
+  dateOffsetCache.set(classId, Number(offset));
 }
 
 /**

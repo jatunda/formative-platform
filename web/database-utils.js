@@ -223,7 +223,8 @@ export async function moveLessonBetweenDays(classId, fromDayIndex, fromLessonInd
 }
 
 /**
- * Get date offset for a class
+ * Get date offset for a class. Raw, uncached read - app code should go
+ * through date-utils.js's getClassDateOffset instead, which caches this.
  * @param {string} classId - The class ID
  * @returns {Promise<number>} The date offset in days (default: 0)
  * @throws {Error} If database is not initialized or operation fails
@@ -242,7 +243,9 @@ export async function getClassDateOffset(classId) {
 }
 
 /**
- * Set date offset for a class
+ * Set date offset for a class. Raw write, no cache - app code should go
+ * through date-utils.js's setClassDateOffset instead, which keeps its cache
+ * in sync.
  * @param {string} classId - The class ID
  * @param {number} offset - The date offset in days
  * @returns {Promise<void>}

@@ -163,41 +163,92 @@ export function createRightArrowButton(isDisabled, onClick) {
 }
 
 /**
- * Create a date offset control component
- * @param {number} currentOffset - The current date offset value
- * @param {(offset: number) => void} onOffsetChange - Callback function called when offset changes
- * @returns {HTMLElement & {updateOffset: (offset: number) => void}} The container element with updateOffset method
+ * Create a Date Offset editing control: a "Current: N" badge, a "(Today is
+ * Day N)" indicator, an input + Apply button, and an optional "Go to Today"
+ * button. Has no data or notification dependencies of its own - persistence,
+ * the today-index computation, and any scroll behavior are all supplied by
+ * the caller, so the same control works both in teacher.js's full-schedule
+ * view and in a lesson-planning.html per-class pane.
+ * @param {Object} config
+ * @param {number} config.currentOffset - The current date offset value
+ * @param {(newOffset: number) => Promise<void>} config.onApply - Persist the new offset (and notify the user of success/failure); the control re-renders its display only if this resolves, and swallows a thrown failure since the caller already handled it
+ * @param {() => Promise<number>} config.computeTodayDayIndex - Resolve today's Day Index for display, called on mount and after a successful apply
+ * @param {() => void} [config.onGoToToday] - If provided, a "Go to Today" button is rendered
+ * @returns {HTMLElement & {updateOffset: (offset: number) => Promise<void>}} The container element with an updateOffset method
  */
-export function createDateOffsetControl(currentOffset, onOffsetChange) {
+export function createDateOffsetControl({ currentOffset, onApply, computeTodayDayIndex, onGoToToday }) {
   const container = document.createElement("div");
   container.className = "date-offset-control";
-  
+  container.style.display = "flex";
+  container.style.alignItems = "center";
+  container.style.gap = "8px";
+
   const label = document.createElement("label");
   label.textContent = "Date Offset (days): ";
-  label.style.marginRight = "8px";
-  
+
+  const currentDisplay = document.createElement("span");
+  currentDisplay.className = "current-offset-display";
+  currentDisplay.textContent = `Current: ${currentOffset}`;
+  currentDisplay.style.fontWeight = "bold";
+  currentDisplay.style.color = "#007cba";
+  currentDisplay.style.backgroundColor = "#e8f4fd";
+  currentDisplay.style.padding = "4px 8px";
+  currentDisplay.style.borderRadius = "4px";
+  currentDisplay.style.border = "1px solid #b3d9f7";
+  currentDisplay.style.fontSize = "0.9rem";
+
+  const todayDisplay = document.createElement("span");
+  todayDisplay.className = "today-dayindex-display";
+  todayDisplay.style.fontSize = "0.85rem";
+  todayDisplay.style.color = "#666";
+  todayDisplay.style.fontStyle = "italic";
+
+  async function refreshTodayDisplay() {
+    const todayDayIndex = await computeTodayDayIndex();
+    todayDisplay.textContent = `(Today is Day ${todayDayIndex})`;
+  }
+  refreshTodayDisplay();
+
   const input = document.createElement("input");
   input.type = "number";
   input.value = currentOffset;
   input.style.width = "80px";
-  input.style.marginRight = "8px";
-  
-  const applyBtn = createStyledButton("Apply", () => {
+  input.placeholder = "New offset";
+
+  const applyBtn = createStyledButton("Apply", async () => {
     const newOffset = parseInt(input.value) || 0;
-    onOffsetChange(newOffset);
+    try {
+      await onApply(newOffset);
+      currentDisplay.textContent = `Current: ${newOffset}`;
+      await refreshTodayDisplay();
+    } catch (error) {
+      // onApply is responsible for notifying the user of the failure
+    }
   });
   applyBtn.style.width = "auto";
   applyBtn.style.padding = "4px 12px";
   applyBtn.style.fontSize = "0.9rem";
-  
+
   container.appendChild(label);
+  container.appendChild(currentDisplay);
+  container.appendChild(todayDisplay);
   container.appendChild(input);
   container.appendChild(applyBtn);
-  
-  // Method to update the displayed offset
-  container.updateOffset = (newOffset) => {
+
+  if (onGoToToday) {
+    const goToTodayBtn = createStyledButton("Go to Today", onGoToToday);
+    goToTodayBtn.className = "schedule-action-btn go-to-today-btn";
+    goToTodayBtn.style.padding = "4px 12px";
+    goToTodayBtn.style.fontSize = "0.9rem";
+    container.appendChild(goToTodayBtn);
+  }
+
+  // Method to update the displayed offset (e.g. after switching classes)
+  container.updateOffset = async (newOffset) => {
     input.value = newOffset;
+    currentDisplay.textContent = `Current: ${newOffset}`;
+    await refreshTodayDisplay();
   };
-  
+
   return container;
 }

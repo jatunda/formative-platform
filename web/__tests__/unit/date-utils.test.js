@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   initializeDateUtils,
   getClassDateOffset,
+  setClassDateOffset,
   clearDateOffsetCache,
   getTodayDayIndex,
   getDateForDayIndex,
@@ -10,32 +11,31 @@ import {
   DEFAULT_CLASS_START_DATE,
 } from '../../date-utils.js';
 
-// Mock Firebase
-const mockDb = {
-  ref: vi.fn(),
-};
+// date-utils.js has no Firebase access of its own - it reads/writes Date
+// Offset through database-utils.js, so that's the seam to mock here.
+const dbOffsets = { testClass: 2 };
+const mockGetClassDateOffset = vi.fn((classId) =>
+  Promise.resolve(Object.prototype.hasOwnProperty.call(dbOffsets, classId) ? dbOffsets[classId] : 0)
+);
+const mockSetClassDateOffset = vi.fn((classId, offset) => {
+  dbOffsets[classId] = Number(offset);
+  return Promise.resolve();
+});
 
-vi.mock('https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js', () => ({
-  ref: vi.fn((db, path) => ({ path })),
-  get: vi.fn((ref) => {
-    // Mock get to return different values based on path
-    if (ref.path === 'classes/testClass/dateOffset') {
-      return Promise.resolve({
-        exists: () => true,
-        val: () => 2,
-      });
-    }
-    return Promise.resolve({
-      exists: () => false,
-      val: () => null,
-    });
-  }),
+vi.mock('../../database-utils.js', () => ({
+  initializeDatabase: vi.fn(),
+  getClassDateOffset: (classId) => mockGetClassDateOffset(classId),
+  setClassDateOffset: (classId, offset) => mockSetClassDateOffset(classId, offset),
 }));
+
+const mockDb = { ref: vi.fn() };
 
 describe('date-utils', () => {
   beforeEach(() => {
     clearDateOffsetCache();
     vi.clearAllMocks();
+    dbOffsets.testClass = 2;
+    delete dbOffsets.nonexistent;
   });
 
   describe('initializeDateUtils', () => {
@@ -64,6 +64,34 @@ describe('date-utils', () => {
       // Since we haven't initialized, db will be undefined and should return 0
       const offset = await getClassDateOffset('nonexistent');
       expect(offset).toBe(0);
+    });
+
+    it('should return 0 and swallow the error if the underlying read fails', async () => {
+      initializeDateUtils(mockDb);
+      mockGetClassDateOffset.mockRejectedValueOnce(new Error('boom'));
+      const offset = await getClassDateOffset('testClass');
+      expect(offset).toBe(0);
+    });
+  });
+
+  describe('setClassDateOffset', () => {
+    it('should write through database-utils and update the cache in place, with no refetch', async () => {
+      initializeDateUtils(mockDb);
+      await getClassDateOffset('testClass'); // prime the cache at 2
+      mockGetClassDateOffset.mockClear();
+
+      await setClassDateOffset('testClass', 5);
+      const offset = await getClassDateOffset('testClass');
+
+      expect(offset).toBe(5);
+      // The cache was updated in place - no refetch was needed to see the new value
+      expect(mockGetClassDateOffset).not.toHaveBeenCalled();
+    });
+
+    it('should propagate a write failure instead of swallowing it', async () => {
+      initializeDateUtils(mockDb);
+      mockSetClassDateOffset.mockRejectedValueOnce(new Error('write failed'));
+      await expect(setClassDateOffset('testClass', 5)).rejects.toThrow('write failed');
     });
   });
 
