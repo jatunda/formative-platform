@@ -4,6 +4,7 @@ import { db } from './firebase-config.js';
 import { initializeDateUtils, getTodayDayIndex } from './date-utils.js';
 import { renderContent, renderMultipleContent } from './content-renderer.js';
 import { NO_CONTENT_FOR_TODAY } from './constants.js';
+import { showErrorState, showSlowConnectionMessage, withConnectionTimeout } from './error-ui-utils.js';
 
 // Initialize date utilities with database
 initializeDateUtils(db);
@@ -58,7 +59,10 @@ export async function loadContent(classId, dayIndex, contentEl) {
 }
 
 /**
- * Read the page's own URL/DOM state and load the right content into it.
+ * Read the page's own URL/DOM state and load the right content into it,
+ * escalating the UI if it's taking unusually long (e.g. a device still
+ * negotiating Wi-Fi on wake) rather than leaving the skeleton showing
+ * indefinitely with no feedback.
  */
 export async function initializePage() {
   const params = new URLSearchParams(window.location.search);
@@ -66,10 +70,29 @@ export async function initializePage() {
   const dayFromUrl = params.get("day");
   const contentEl = document.getElementById("content");
 
-  const dayIndex = await resolveDayIndex(classId, dayFromUrl);
-  console.log("view.js using day index: %s", dayIndex);
-
-  await loadContent(classId, dayIndex, contentEl);
+  try {
+    await withConnectionTimeout(
+      (async () => {
+        const dayIndex = await resolveDayIndex(classId, dayFromUrl);
+        console.log("view.js using day index: %s", dayIndex);
+        await loadContent(classId, dayIndex, contentEl);
+      })(),
+      {
+        onSlow: () => showSlowConnectionMessage(contentEl),
+        onTimeout: () => showErrorState({
+          container: contentEl,
+          title: 'Unable to load lesson',
+          message: 'This is taking longer than expected. Check your Wi-Fi connection and try again.',
+        }),
+      }
+    );
+  } catch (error) {
+    console.error("Error loading lesson content:", error);
+    showErrorState({
+      container: contentEl,
+      title: 'Unable to load lesson',
+    });
+  }
 }
 
 // Only run automatically when actually loaded on a page with a #content

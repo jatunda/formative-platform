@@ -4,6 +4,7 @@ import {
   getClassDateOffset,
   setClassDateOffset,
   clearDateOffsetCache,
+  primeDateOffsetCache,
   getTodayDayIndex,
   getDateForDayIndex,
   getDateObjectForDayIndex,
@@ -112,6 +113,39 @@ describe('date-utils', () => {
       clearDateOffsetCache();
       // Both caches should be cleared
       expect(true).toBe(true);
+    });
+  });
+
+  describe('primeDateOffsetCache', () => {
+    it('seeds the cache from a classes payload, avoiding a Firebase read on the next getClassDateOffset call', async () => {
+      initializeDateUtils(mockDb);
+      primeDateOffsetCache({ classA: { dateOffset: 3 }, classB: { dateOffset: -1 } });
+
+      expect(await getClassDateOffset('classA')).toBe(3);
+      expect(await getClassDateOffset('classB')).toBe(-1);
+      expect(mockGetClassDateOffset).not.toHaveBeenCalled();
+    });
+
+    it('defaults a missing dateOffset field to 0', async () => {
+      initializeDateUtils(mockDb);
+      primeDateOffsetCache({ classA: {} });
+
+      expect(await getClassDateOffset('classA')).toBe(0);
+      expect(mockGetClassDateOffset).not.toHaveBeenCalled();
+    });
+
+    it('does not overwrite a value already cached', async () => {
+      initializeDateUtils(mockDb);
+      await getClassDateOffset('testClass'); // caches the real value, 2
+
+      primeDateOffsetCache({ testClass: { dateOffset: 999 } });
+
+      expect(await getClassDateOffset('testClass')).toBe(2);
+    });
+
+    it('handles a null/undefined classes payload without throwing', () => {
+      expect(() => primeDateOffsetCache(undefined)).not.toThrow();
+      expect(() => primeDateOffsetCache(null)).not.toThrow();
     });
   });
 

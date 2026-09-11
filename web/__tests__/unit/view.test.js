@@ -1,10 +1,20 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { resolveDayIndex, fetchPages, loadContent } from '../../view.js';
+import { resolveDayIndex, fetchPages, loadContent, initializePage } from '../../view.js';
 import { NO_CONTENT_FOR_TODAY } from '../../constants.js';
 
 vi.mock('../../date-utils.js', () => ({
   initializeDateUtils: vi.fn(),
   getTodayDayIndex: vi.fn(async () => 7),
+}));
+
+let capturedTimeoutOptions;
+vi.mock('../../error-ui-utils.js', () => ({
+  showErrorState: vi.fn(),
+  showSlowConnectionMessage: vi.fn(),
+  withConnectionTimeout: vi.fn((promise, options) => {
+    capturedTimeoutOptions = options;
+    return promise;
+  }),
 }));
 
 // firebase-app.js and firebase-database.js both alias to this same mock
@@ -18,6 +28,7 @@ vi.mock('https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js', () => 
   ref: (db, path) => ({ path }),
   get: async (ref) => {
     const value = mockData[ref.path];
+    if (value instanceof Error) throw value;
     return { exists: () => value !== undefined, val: () => value };
   },
 }));
@@ -32,6 +43,7 @@ vi.mock('../../content-renderer.js', () => ({
 describe('view', () => {
   beforeEach(() => {
     for (const key of Object.keys(mockData)) delete mockData[key];
+    capturedTimeoutOptions = undefined;
   });
 
   describe('resolveDayIndex', () => {
@@ -100,6 +112,62 @@ describe('view', () => {
       await loadContent('class1', 3, contentEl);
 
       expect(contentEl.textContent).toBe('rendered:1');
+    });
+  });
+
+  describe('initializePage', () => {
+    beforeEach(() => {
+      document.body.innerHTML = '<div id="content"><div id="content-loading"></div></div>';
+    });
+
+    it('wraps the load in withConnectionTimeout and renders normally on success', async () => {
+      window.history.pushState(null, '', '?class=class1&day=3');
+      mockData['schedule/class1/3'] = ['hashA'];
+      mockData['content/hashA'] = { title: 'A' };
+      const { withConnectionTimeout } = await import('../../error-ui-utils.js');
+
+      await initializePage();
+
+      expect(withConnectionTimeout).toHaveBeenCalled();
+      expect(document.getElementById('content').textContent).toBe('rendered:1');
+    });
+
+    it("wires onSlow to swap the content area's caption to a Wi-Fi-specific message", async () => {
+      window.history.pushState(null, '', '?class=class1&day=3');
+      mockData['schedule/class1/3'] = [];
+      const { showSlowConnectionMessage } = await import('../../error-ui-utils.js');
+
+      await initializePage();
+      capturedTimeoutOptions.onSlow();
+
+      expect(showSlowConnectionMessage).toHaveBeenCalledWith(document.getElementById('content'));
+    });
+
+    it('wires onTimeout to show an error state with a Wi-Fi-specific message', async () => {
+      window.history.pushState(null, '', '?class=class1&day=3');
+      mockData['schedule/class1/3'] = [];
+      const { showErrorState } = await import('../../error-ui-utils.js');
+
+      await initializePage();
+      capturedTimeoutOptions.onTimeout();
+
+      expect(showErrorState).toHaveBeenCalledWith(expect.objectContaining({
+        container: document.getElementById('content'),
+        message: expect.stringMatching(/wi-fi/i),
+      }));
+    });
+
+    it('shows the generic error state if the load itself rejects', async () => {
+      window.history.pushState(null, '', '?class=class1&day=3');
+      mockData['schedule/class1/3'] = new Error('network down');
+      const { showErrorState } = await import('../../error-ui-utils.js');
+
+      await initializePage();
+
+      expect(showErrorState).toHaveBeenCalledWith(expect.objectContaining({
+        container: document.getElementById('content'),
+        title: 'Unable to load lesson',
+      }));
     });
   });
 });

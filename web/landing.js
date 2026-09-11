@@ -1,8 +1,8 @@
 // public/landing.js
 import { ref, get } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js";
 import { db } from './firebase-config.js';
-import { initializeDateUtils, getTodayDayIndex } from './date-utils.js';
-import { showErrorState } from './error-ui-utils.js';
+import { initializeDateUtils, getTodayDayIndex, primeDateOffsetCache } from './date-utils.js';
+import { showErrorState, showSlowConnectionMessage, withConnectionTimeout } from './error-ui-utils.js';
 
 
 // Initialize date utilities with database
@@ -37,6 +37,12 @@ export async function getClassesWithTodaySchedule() {
 
   const classEntries = Object.entries(classes)
     .sort(([, a], [, b]) => (a.displayOrder || 0) - (b.displayOrder || 0));
+
+  // The classes payload above already carries each Class's dateOffset, so
+  // seed the cache with it before computing day indices - otherwise
+  // getTodayDayIndex would trigger one redundant per-class Firebase read to
+  // re-fetch a value already sitting in memory.
+  primeDateOffsetCache(classes);
 
   // Calculate today's day index for each class in parallel
   console.log("Calculating day indices for", classEntries.length, "classes");
@@ -102,11 +108,26 @@ export async function loadAndRenderClasses(container, loadingState) {
   renderClassList(container, classesWithSchedule);
 }
 
-async function loadWithErrorHandling() {
+/**
+ * Load and render the class list, escalating the UI if it's taking unusually
+ * long (e.g. a device still negotiating Wi-Fi on wake) rather than leaving
+ * the skeleton showing indefinitely with no feedback.
+ */
+export async function loadWithErrorHandling() {
+  const container = document.getElementById("class-list");
+  const loadingState = document.getElementById("loading-state");
+
   try {
-    const container = document.getElementById("class-list");
-    const loadingState = document.getElementById("loading-state");
-    await loadAndRenderClasses(container, loadingState);
+    await withConnectionTimeout(loadAndRenderClasses(container, loadingState), {
+      onSlow: () => showSlowConnectionMessage(loadingState),
+      onTimeout: () => showErrorState({
+        container: 'class-list',
+        loadingState: 'loading-state',
+        title: 'Unable to load lessons',
+        message: 'This is taking longer than expected. Check your Wi-Fi connection and try again.',
+        withPadding: true
+      }),
+    });
   } catch (error) {
     console.error("Error loading classes:", error);
 

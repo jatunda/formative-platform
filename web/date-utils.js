@@ -70,6 +70,23 @@ export async function setClassDateOffset(classId, offset) {
 }
 
 /**
+ * Seed the date offset cache from a Classes payload that already contains
+ * each Class's dateOffset field (e.g. a single `get(ref(db, "classes"))`
+ * read), so a subsequent getClassDateOffset/getTodayDayIndex call per Class
+ * hits the cache instead of issuing its own redundant Firebase read. Only
+ * fills gaps - never overwrites a value already cached (e.g. one just
+ * written via setClassDateOffset).
+ * @param {Object<string, {dateOffset?: number}>} classesData - The value of the "classes" node, keyed by classId
+ */
+export function primeDateOffsetCache(classesData) {
+  for (const [classId, data] of Object.entries(classesData || {})) {
+    if (!dateOffsetCache.has(classId)) {
+      dateOffsetCache.set(classId, Number(data?.dateOffset) || 0);
+    }
+  }
+}
+
+/**
  * Clear the date offset cache for a specific class or all classes
  * @param {string | null} [classId=null] - The class ID to clear, or null to clear all
  */

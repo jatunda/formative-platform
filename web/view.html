@@ -13,7 +13,20 @@
   <nav style="margin-bottom: 1rem;">
     <a href="index.html">&larr; Back to Class Selection</a>
   </nav>
-  <div id="content"></div>
+  <div id="content">
+    <!-- Generic content-shaped placeholder, replaced once loadContent()
+         renders real content (or an error/empty state) into this container. -->
+    <div id="content-loading">
+      <p class="loading-text">Loading lesson...</p>
+      <div class="skeleton-items">
+        <div class="skeleton-item" style="width: 45%; height: 2rem;"></div>
+        <div class="skeleton-item" style="width: 100%;"></div>
+        <div class="skeleton-item" style="width: 95%;"></div>
+        <div class="skeleton-item" style="width: 80%;"></div>
+        <div class="skeleton-item" style="width: 60%;"></div>
+      </div>
+    </div>
+  </div>
   
   <!-- Prism.js core and language components -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>

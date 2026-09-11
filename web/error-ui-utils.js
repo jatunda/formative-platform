@@ -43,3 +43,60 @@ export function showErrorState({ container, loadingState, title = "Unable to loa
 	containerEl.innerHTML = errorHtml;
 }
 
+const SLOW_CONNECTION_MESSAGE = "Still connecting — check your Wi-Fi.";
+
+/**
+ * Swap a loading state's caption (an element with class "loading-text",
+ * either the root itself or a descendant) to a Wi-Fi-specific message. Used
+ * as the onSlow callback for withConnectionTimeout.
+ * @param {HTMLElement|string} root - The loading-state element (or its ID) whose caption should change
+ */
+export function showSlowConnectionMessage(root) {
+	const rootEl = typeof root === 'string' ? document.getElementById(root) : root;
+	if (!rootEl) return;
+	const textEl = rootEl.classList?.contains('loading-text') ? rootEl : rootEl.querySelector('.loading-text');
+	if (textEl) {
+		textEl.textContent = SLOW_CONNECTION_MESSAGE;
+	}
+}
+
+/**
+ * Watch a load in progress and escalate the UI if it's taking unusually
+ * long, without altering the load's own result - callers still await/catch
+ * the returned promise exactly as they would the original. Firebase's get()
+ * has no built-in timeout, so on a hung connection (e.g. a device still
+ * negotiating Wi-Fi) the promise would otherwise just stay pending forever
+ * with no feedback and no rejection to catch.
+ * @param {Promise} taskPromise - The in-flight load to watch
+ * @param {Object} [options]
+ * @param {() => void} [options.onSlow] - Called if taskPromise hasn't settled after slowMs
+ * @param {() => void} [options.onTimeout] - Called if taskPromise hasn't settled after timeoutMs (e.g. show an error state with a Try Again button); if taskPromise later settles successfully anyway, the caller's own .then/await naturally overwrites whatever onTimeout rendered
+ * @param {number} [options.slowMs=6000]
+ * @param {number} [options.timeoutMs=15000]
+ * @returns {Promise} The same taskPromise, unmodified
+ */
+export function withConnectionTimeout(taskPromise, { onSlow, onTimeout, slowMs = 6000, timeoutMs = 15000 } = {}) {
+	let settled = false;
+
+	const slowTimer = setTimeout(() => {
+		if (!settled) onSlow?.();
+	}, slowMs);
+
+	const timeoutTimer = setTimeout(() => {
+		if (!settled) onTimeout?.();
+	}, timeoutMs);
+
+	// Attaching a rejection handler here (even a no-op one) is what makes a
+	// rejected taskPromise "handled" - without it, a caller that awaits the
+	// returned promise later (rather than immediately) can still trigger a
+	// spurious unhandled-rejection warning in the meantime. Using .finally()
+	// instead would reintroduce that problem: it returns a new derived
+	// promise that re-rejects and is never awaited by anyone.
+	taskPromise.then(
+		() => { settled = true; clearTimeout(slowTimer); clearTimeout(timeoutTimer); },
+		() => { settled = true; clearTimeout(slowTimer); clearTimeout(timeoutTimer); }
+	);
+
+	return taskPromise;
+}
+

@@ -1,13 +1,20 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { getClassesWithTodaySchedule, renderClassList, loadAndRenderClasses } from '../../landing.js';
+import { getClassesWithTodaySchedule, renderClassList, loadAndRenderClasses, loadWithErrorHandling } from '../../landing.js';
 
 vi.mock('../../date-utils.js', () => ({
   initializeDateUtils: vi.fn(),
   getTodayDayIndex: vi.fn(async (classId) => ({ csa: 5, csp: 3 })[classId] ?? 0),
+  primeDateOffsetCache: vi.fn(),
 }));
 
+let capturedTimeoutOptions;
 vi.mock('../../error-ui-utils.js', () => ({
   showErrorState: vi.fn(),
+  showSlowConnectionMessage: vi.fn(),
+  withConnectionTimeout: vi.fn((promise, options) => {
+    capturedTimeoutOptions = options;
+    return promise;
+  }),
 }));
 
 // firebase-app.js and firebase-database.js both alias to this same mock
@@ -19,6 +26,7 @@ vi.mock('https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js', () => 
   ref: (db, path) => ({ path }),
   get: async (ref) => {
     const value = mockData[ref.path];
+    if (value instanceof Error) throw value;
     return { exists: () => value !== undefined, val: () => value };
   },
 }));
@@ -26,6 +34,7 @@ vi.mock('https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js', () => 
 describe('landing', () => {
   beforeEach(() => {
     for (const key of Object.keys(mockData)) delete mockData[key];
+    capturedTimeoutOptions = undefined;
   });
 
   describe('getClassesWithTodaySchedule', () => {
@@ -73,6 +82,15 @@ describe('landing', () => {
       const result = await getClassesWithTodaySchedule();
 
       expect(result[0].schedule).toEqual([]);
+    });
+
+    it("seeds the date offset cache from the classes payload before computing each Class's Day Index, avoiding a redundant per-class Firebase read", async () => {
+      mockData['classes'] = { csa: { name: 'CS A', displayOrder: 1, dateOffset: 3 } };
+      const { primeDateOffsetCache } = await import('../../date-utils.js');
+
+      await getClassesWithTodaySchedule();
+
+      expect(primeDateOffsetCache).toHaveBeenCalledWith(mockData['classes']);
     });
   });
 
@@ -124,6 +142,64 @@ describe('landing', () => {
       const container = document.createElement('div');
 
       await expect(loadAndRenderClasses(container, null)).resolves.not.toThrow();
+    });
+  });
+
+  describe('loadWithErrorHandling', () => {
+    beforeEach(() => {
+      document.body.innerHTML = '<div id="class-list"><div id="loading-state"></div></div>';
+    });
+
+    it('wraps the load in withConnectionTimeout and renders normally on success', async () => {
+      mockData['classes'] = { csa: { name: 'CS A', displayOrder: 1 } };
+      mockData['schedule/csa/5'] = ['hashA'];
+      const { withConnectionTimeout } = await import('../../error-ui-utils.js');
+
+      await loadWithErrorHandling();
+
+      expect(withConnectionTimeout).toHaveBeenCalled();
+      expect(document.querySelector('a.class-link')).toBeTruthy();
+    });
+
+    it("wires onSlow to swap the loading state's caption to a Wi-Fi-specific message", async () => {
+      mockData['classes'] = {};
+      // Captured before the load runs: a successful load's renderClassList
+      // wipes #class-list's innerHTML, which detaches this nested element
+      // from the document, so re-querying by ID afterward would find nothing.
+      const loadingStateEl = document.getElementById('loading-state');
+      const { showSlowConnectionMessage } = await import('../../error-ui-utils.js');
+
+      await loadWithErrorHandling();
+      capturedTimeoutOptions.onSlow();
+
+      expect(showSlowConnectionMessage).toHaveBeenCalledWith(loadingStateEl);
+    });
+
+    it('wires onTimeout to show an error state with a Wi-Fi-specific message, without throwing past loadWithErrorHandling', async () => {
+      mockData['classes'] = {};
+      const { showErrorState } = await import('../../error-ui-utils.js');
+
+      await loadWithErrorHandling();
+      capturedTimeoutOptions.onTimeout();
+
+      expect(showErrorState).toHaveBeenCalledWith(expect.objectContaining({
+        container: 'class-list',
+        loadingState: 'loading-state',
+        message: expect.stringMatching(/wi-fi/i),
+      }));
+    });
+
+    it('shows the generic error state if the load itself rejects', async () => {
+      mockData['classes'] = new Error('network down');
+      const { showErrorState } = await import('../../error-ui-utils.js');
+
+      await loadWithErrorHandling();
+
+      expect(showErrorState).toHaveBeenCalledWith(expect.objectContaining({
+        container: 'class-list',
+        loadingState: 'loading-state',
+        title: 'Unable to load lessons',
+      }));
     });
   });
 });
