@@ -362,12 +362,14 @@ export class AIQuestionGenerator {
    * Create an AI Question Generator instance
    * @param {import("https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js").Database} database - The Firebase database instance
    * @param {string} apiKey - The OpenAI API key
+   * @param {(enabled: boolean) => void} enableEditing - Called to enable/disable the host page's editor once questions are generated
    */
-  constructor(database, apiKey) {
+  constructor(database, apiKey, enableEditing) {
     this.db = database;
     // Initialize database utilities with the database instance
     initializeDatabase(database);
     this.llmProvider = new OpenAIProvider(apiKey);
+    this.enableEditing = enableEditing;
     this.modal = null;
     this.classSelect = null;
     this.setupUI();
@@ -593,7 +595,7 @@ export class AIQuestionGenerator {
       this.insertIntoEditor(generatedContent, contentId);
       
       // Enable editing in the editor
-      setEditingEnabled(true);
+      this.enableEditing(true);
       
       // Update dropdown list to include the new content
       await this.updateContentList(contentId);

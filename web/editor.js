@@ -33,45 +33,6 @@ import {
 } from "./database-utils.js";
 import { renderTeacherNav } from "./teacher-nav.js";
 
-// Handle AI generation
-async function handleAIGeneration(event) {
-  event.preventDefault();
-  
-  const classId = document.getElementById('aiClassSelect').value;
-  const objectives = document.getElementById('learningObjectives').value;
-  
-  if (!classId || !objectives) {
-    alert('Please select a class and enter learning objectives');
-    return;
-  }
-  
-  try {
-    // Show loading state
-    const generateBtn = document.getElementById('generateBtn');
-    const originalText = generateBtn.textContent;
-    generateBtn.textContent = 'Generating...';
-    generateBtn.disabled = true;
-    
-    // Generate content
-    const content = await generateFormativeQuestions(classId, objectives);
-    
-    // Update editor
-    document.getElementById('dslInput').value = content;
-    
-    // Trigger preview update
-    document.getElementById('dslInput').dispatchEvent(new Event('input'));
-    
-    // Close modal
-    closeModal();
-  } catch (error) {
-    console.error('Error generating questions:', error);
-    alert('Error generating questions: ' + error.message);
-  } finally {
-    // Reset button state
-    generateBtn.textContent = originalText;
-    generateBtn.disabled = false;
-  }
-}
 import {
 	AI_CONFIG,
 	validateConfig
@@ -119,7 +80,7 @@ if (classParam) {
 // Initialize AI Question Generator
 try {
   validateConfig();
-  const aiGenerator = new AIQuestionGenerator(db, AI_CONFIG.OPENAI_API_KEY);
+  const aiGenerator = new AIQuestionGenerator(db, AI_CONFIG.OPENAI_API_KEY, setEditingEnabled);
 } catch (error) {
   console.warn('AI Generator not available:', error.message);
   // Disable the AI button if configuration is missing
@@ -513,8 +474,11 @@ function getQueryParams() {
     const newHash = await generateUniqueHash();
     // Set the contentId display to the new hash
     contentIdEl.textContent = newHash;
-    // Optionally, you can pre-fill the DSL input with a template
-    dslInput.value = `title: New Lesson\nblocks:\n  - type: text\n    text: ""\n`;
+    // Pre-fill the DSL input with a valid, ready-to-edit lesson
+    dslInput.value = generateDSLFromContent({
+      title: "New Lesson",
+      blocks: [{ type: "question", content: [{ type: "text", value: "Type your question or content here..." }] }]
+    });
     updatePreview();
     // Optionally, focus the title or DSL input
     dslInput.focus();
