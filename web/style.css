@@ -921,6 +921,7 @@ pre:not(.lesson-code) {
   border-radius: var(--radius-lg);
   border: 1px solid var(--border-color-dark) !important;
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
   white-space: pre;
   font-family: var(--font-mono);
   font-size: 14px;
@@ -929,6 +930,16 @@ pre:not(.lesson-code) {
   margin: var(--spacing-sm) 0;
   position: relative;
   box-shadow: none !important;
+  /* Edge-fade cue: see #schedulePane for how the local/scroll pairing works. */
+  background-image:
+    linear-gradient(to right, var(--bg-darker), transparent 24px),
+    linear-gradient(to left, var(--bg-darker), transparent 24px),
+    linear-gradient(to right, rgba(0, 0, 0, 0.45), transparent 14px),
+    linear-gradient(to left, rgba(0, 0, 0, 0.45), transparent 14px);
+  background-repeat: no-repeat;
+  background-position: left, right, left, right;
+  background-size: 24px 100%, 24px 100%, 14px 100%, 14px 100%;
+  background-attachment: local, local, scroll, scroll;
 }
 
 /* Prism.js syntax highlighting overrides */
@@ -1383,5 +1394,16 @@ ol.lesson-list {
   button {
     font-size: 1rem;
     padding: 0.8rem;
+  }
+
+  /* Nested collapsibles' per-level indentation compounds with depth;
+     shrink the increment so deep nesting doesn't eat the narrow viewport. */
+  .collapsible-content {
+    padding-left: calc(var(--spacing-sm) + 1em);
+  }
+
+  .lesson-collapsible .lesson-collapsible {
+    margin-left: var(--spacing-sm);
+    padding-left: var(--spacing-xs);
   }
 }
