@@ -105,6 +105,33 @@ h1, h2 {
 }
 
 /* ========================================
+   Scrollbars (Godot-editor-inspired: thin, flat, no arrow buttons)
+   ======================================== */
+html {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-color) var(--bg-dark);
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: var(--bg-dark);
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: var(--border-color);
+  border: 2px solid var(--bg-dark);
+  border-radius: var(--radius-sm);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: var(--accent-blue-godot);
+}
+
+/* ========================================
    Buttons
    ======================================== */
 button {
