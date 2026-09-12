@@ -493,6 +493,7 @@ select:focus,
 
 .date-offset-control {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   font-size: 0.95rem;
@@ -649,6 +650,20 @@ select:focus,
   background-color: var(--bg-dark);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-xl);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  /* Edge-fade cue: the outer pair only shows once the inner content
+     has scrolled away from that edge (background-attachment: local
+     scrolls with the content, scroll doesn't). */
+  background-image:
+    linear-gradient(to right, var(--bg-dark), transparent 24px),
+    linear-gradient(to left, var(--bg-dark), transparent 24px),
+    linear-gradient(to right, rgba(0, 0, 0, 0.45), transparent 14px),
+    linear-gradient(to left, rgba(0, 0, 0, 0.45), transparent 14px);
+  background-repeat: no-repeat;
+  background-position: left, right, left, right;
+  background-size: 24px 100%, 24px 100%, 14px 100%, 14px 100%;
+  background-attachment: local, local, scroll, scroll;
 }
 
 #scheduleTable,

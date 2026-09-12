@@ -2,6 +2,8 @@
 <html>
 
 <head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<title>Content Editor</title>
 	<link rel="icon" type="image/x-icon" href="favicon.ico">
 	<link rel="stylesheet" href="style.css">
@@ -20,9 +22,9 @@
 
 	<div id="teacherNav"></div>
 
-		<div style="display: flex; gap: 10px; align-items: center;">
+		<div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center;">
 		<label for="existingContent">Lesson:</label>
-		<select id="existingContent" style="flex: 1; max-width: 300px; overflow: hidden; text-overflow: ellipsis;">
+		<select id="existingContent" style="flex: 1; min-width: 150px; max-width: 300px; overflow: hidden; text-overflow: ellipsis;">
 			<option value="">-- Select a lesson --</option>
 		</select>
 		<label for="contentId">Content ID:</label>
@@ -31,7 +33,7 @@
 		<button id="searchLessonBtn" class="schedule-action-btn">Search</button>
 	</div>
 
-	<div style="display: flex; gap: 10px; align-items: center; margin: 20px 0;">
+	<div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 20px 0;">
 		<button id="saveBtn" class="schedule-action-btn">Save</button>
 		<button id="duplicateBtn" class="schedule-action-btn">Duplicate</button>
 		<button id="deleteBtn" class="schedule-action-btn delete-btn">Delete</button>
