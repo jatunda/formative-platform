@@ -12,7 +12,7 @@ A piece of content (text/activity) that can be placed into a Class's Schedule. A
 _Avoid_: Content, Page, Content Page — these leak the underlying storage shape (lessons are technically stored under a `content` tree, but nothing in the domain should be described that way).
 
 **Schedule**:
-The ordered sequence of Lessons for one Class, indexed by Day Index. A Schedule can have gaps (a Day Index with zero Lessons) — an empty day is a normal, valid state, not an error or a missing day.
+The ordered sequence of Lessons for one Class, indexed by Day Index. A Day Index can hold zero, one, or many Lessons — both an empty day (a gap) and a day with multiple Lessons are normal, valid states, not an error or a missing day.
 
 **Day Index**:
 A zero-based integer identifying a day's position within a Class's Schedule (0, 1, 2, ...). It is sequence position, not a calendar date, and not tied to weekdays — Day Index 3 doesn't inherently mean "the fourth school day" in the calendar sense until it's converted via the Date Offset.
