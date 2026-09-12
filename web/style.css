@@ -368,6 +368,10 @@ textarea:focus-visible {
   font-variant-ligatures: none;
   letter-spacing: 0.3px;
   line-height: 1.5;
+  width: 100%;
+  box-sizing: border-box;
+  white-space: pre-wrap;
+  overflow-wrap: normal;
 }
 
 #dslInput:focus,
