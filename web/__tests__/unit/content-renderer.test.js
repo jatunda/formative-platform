@@ -834,6 +834,33 @@ describe('renderMultipleContent', () => {
     expect(innerDetails.querySelector('.lesson-collapsible-summary').textContent).toContain('Inner');
   });
 
+  it('should not throw when a nested collapsible has no content field at all (Firebase RTDB drops empty arrays on write)', () => {
+    const data = {
+      title: 'My Lesson',
+      blocks: [
+        {
+          type: 'question',
+          content: [
+            {
+              type: 'collapsible',
+              title: 'Outer',
+              expanded: false,
+              content: [
+                { type: 'collapsible', title: 'Inner', expanded: false }
+                // no `content` key here - matches what Firebase actually
+                // returns for a collapsible saved with empty content
+              ]
+            }
+          ]
+        }
+      ]
+    };
+    expect(() => renderContent(data, container)).not.toThrow();
+    const outerDetails = container.querySelector('.lesson-collapsible');
+    const innerDetails = outerDetails.querySelector('.lesson-collapsible');
+    expect(innerDetails.querySelector('.lesson-collapsible-summary').textContent).toContain('Inner');
+  });
+
   it('should start a new list after a nested collapsible section, not continue the list from before it', () => {
     // A list right before a nested collapsible, inside an outer collapsible,
     // followed by another list after it - the second list must not be

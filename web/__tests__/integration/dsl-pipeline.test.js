@@ -38,13 +38,26 @@ More text here`;
   });
 
   it('should handle invalid DSL through the pipeline', () => {
-    const invalidDSL = `# Title Only`;
-    
+    const invalidDSL = `Missing a title`;
+
     const parsed = parseDSL(invalidDSL);
     const validationError = validateDSL(invalidDSL, parsed);
-    
+
     expect(validationError).toBeTruthy();
-    expect(validationError).toContain('No content blocks');
+    expect(validationError).toContain('Missing title');
+  });
+
+  it('should treat title-only DSL (no blocks yet) as valid through the pipeline', () => {
+    // A freshly-created page/lesson starts this way - title, no content yet.
+    const titleOnlyDSL = `# Title Only`;
+
+    const parsed = parseDSL(titleOnlyDSL);
+    const validationError = validateDSL(titleOnlyDSL, parsed);
+    expect(validationError).toBeNull();
+
+    const container = document.createElement('div');
+    renderContent(parsed, container);
+    expect(container.querySelector('.lesson-title').textContent).toBe('Title Only');
   });
 
   it('should maintain data integrity through parse → generate → parse cycle', () => {

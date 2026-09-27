@@ -594,6 +594,32 @@ describe('generateDSLFromContent', () => {
     expect(collapsibleLine).toBe('>>>');
   });
 
+  it('should generate DSL for a nested collapsible whose content field is missing entirely, not just empty (Firebase RTDB drops empty arrays on write)', () => {
+    const content = {
+      title: 'this is a thing',
+      blocks: [
+        {
+          type: 'question',
+          content: [
+            {
+              type: 'collapsible',
+              title: 'top',
+              expanded: false,
+              content: [
+                { type: 'collapsible', title: 'middle', expanded: false }
+                // no `content` key here - this is what Firebase actually
+                // returns for a collapsible saved with empty content, not
+                // `content: []`
+              ]
+            }
+          ]
+        }
+      ]
+    };
+    expect(() => generateDSLFromContent(content)).not.toThrow();
+    expect(generateDSLFromContent(content)).toBe('# this is a thing\n\n>>> top\n>>> middle\n<<<\n<<<\n');
+  });
+
   it('should generate DSL with nested collapsibles', () => {
     const content = {
       title: 'My Lesson',

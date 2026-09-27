@@ -242,7 +242,11 @@ function renderContentItems(contentItems, containerEl) {
 			const contentDiv = document.createElement("div");
 			contentDiv.className = "collapsible-content";
 
-			renderContentItems(item.content, contentDiv);
+			// Firebase RTDB silently drops empty arrays on write, so a
+			// collapsible saved with no content of its own comes back with
+			// `content` missing entirely, not `[]` - guard against that here
+			// rather than crash when rendering it back.
+			renderContentItems(item.content || [], contentDiv);
 
 			details.appendChild(summary);
 			details.appendChild(contentDiv);

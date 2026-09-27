@@ -310,8 +310,11 @@ function serializeContentItems(contentItems, lines) {
       } else {
         lines.push(marker);
       }
-      // Recursively serialize nested content
-      serializeContentItems(item.content, lines);
+      // Recursively serialize nested content. Firebase RTDB silently drops
+      // empty arrays on write, so a collapsible saved with no content of its
+      // own comes back with `content` missing entirely, not `[]` - guard
+      // against that here rather than crash on the next save/reload.
+      serializeContentItems(item.content || [], lines);
       // Output explicit closing marker for clarity (optional, but helpful)
       lines.push("<<<");
     }
