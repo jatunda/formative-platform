@@ -12,7 +12,8 @@
 const PAGES = [
   { key: "teacher", href: "teacher.html", label: "Full Schedule", linkId: "backToScheduleLink" },
   { key: "lesson-planning", href: "lesson-planning.html", label: "Lesson Planning", linkId: "goToLessonPlanningLink" },
-  { key: "editor", href: "editor.html", label: "Content Editor", linkId: "goToEditorLink" }
+  { key: "editor", href: "editor.html", label: "Content Editor", linkId: "goToEditorLink" },
+  { key: "pages", href: "page-manager.html", label: "Pages", linkId: "goToPageManagerLink" }
 ];
 
 /**

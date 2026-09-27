@@ -9,8 +9,8 @@ describe('teacher-nav', () => {
   it('renders a link for each page', () => {
     renderTeacherNav('teacher');
     const links = document.querySelectorAll('.teacher-nav-link');
-    expect(links).toHaveLength(3);
-    expect([...links].map((l) => l.textContent)).toEqual(['Full Schedule', 'Lesson Planning', 'Content Editor']);
+    expect(links).toHaveLength(4);
+    expect([...links].map((l) => l.textContent)).toEqual(['Full Schedule', 'Lesson Planning', 'Content Editor', 'Pages']);
   });
 
   it('uses the link ids the individual pages already look up', () => {
@@ -42,7 +42,7 @@ describe('teacher-nav', () => {
   it('replaces previous content on re-render rather than appending', () => {
     renderTeacherNav('teacher');
     renderTeacherNav('editor');
-    expect(document.querySelectorAll('.teacher-nav-link')).toHaveLength(3);
+    expect(document.querySelectorAll('.teacher-nav-link')).toHaveLength(4);
   });
 
   it('does nothing when the mount point is missing', () => {

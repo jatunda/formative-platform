@@ -32,6 +32,17 @@
     
     "content": {
       ".write": true
+    },
+
+    "pages": {
+      ".write": true
+    },
+
+    "slugIndex": {
+      ".write": true,
+      "$slug": {
+        ".validate": "(!newData.exists() || !data.exists() || newData.val() === data.val()) && (!newData.exists() || newData.isString())"
+      }
     }
   }
 }

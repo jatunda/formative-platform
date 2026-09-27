@@ -29,6 +29,14 @@
         "destination": "/view.html"
       },
       {
+        "source": "/page-manager.html",
+        "destination": "/page-manager.html"
+      },
+      {
+        "source": "/page-editor.html",
+        "destination": "/page-editor.html"
+      },
+      {
         "source": "**",
         "destination": "/index.html"
       }
@@ -36,5 +44,8 @@
   },
   "database": {
     "rules": "database.rules.json"
+  },
+  "functions": {
+    "source": "functions"
   }
 }

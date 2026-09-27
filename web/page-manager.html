@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Pages</title>
+	<link rel="icon" type="image/x-icon" href="favicon.ico">
+	<link rel="stylesheet" href="style.css">
+	<script type="module" src="teacher-auth.js"></script>
+	<script type="module" src="page-manager.js"></script>
+</head>
+
+<body data-teacher-page="true">
+	<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+		<h1>Pages</h1>
+		<button onclick="window.teacherAuth.logout()" style="width: auto; padding: 0.3rem 1rem; background-color: #e53e3e; border-color: #e53e3e; color: white;">Logout</button>
+	</div>
+
+	<div id="teacherNav"></div>
+
+	<p>Pages are standalone content reachable at a URL you choose, for sharing outside the app (e.g. a syllabus posted in Google Classroom). Unlike Lessons, they're not part of any Class's Schedule.</p>
+
+	<div style="margin: 20px 0;">
+		<button id="newPageBtn" class="schedule-action-btn">New Page</button>
+	</div>
+
+	<div id="pageList"></div>
+</body>
+
+</html>

@@ -114,17 +114,18 @@ export async function createNewLesson(title = DEFAULT_LESSON_TITLE) {
 }
 
 /**
- * Generate a unique hash for new lessons
- * Continuously generates hashes until one is found that doesn't exist in the database
+ * Generate a unique hash for new database records (lessons, pages, ...)
+ * Continuously generates hashes until one is found that doesn't exist under basePath
+ * @param {string} [basePath="content"] - The top-level DB tree to check uniqueness against
  * @returns {Promise<string>} A unique 32-character hexadecimal hash
  */
-export async function generateUniqueHash() {
+export async function generateUniqueHash(basePath = "content") {
   let hash;
   let exists = true;
   while (exists) {
     hash = Array.from(crypto.getRandomValues(new Uint8Array(16)))
       .map(b => b.toString(16).padStart(2, "0")).join("");
-    const snap = await get(ref(db, `content/${hash}`));
+    const snap = await get(ref(db, `${basePath}/${hash}`));
     exists = snap.exists();
   }
   return hash;

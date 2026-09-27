@@ -9,7 +9,15 @@ A course/section the teacher teaches. Owns a Schedule and a Date Offset. There i
 
 **Lesson**:
 A piece of content (text/activity) that can be placed into a Class's Schedule. A Lesson exists independently of any placement — the same Lesson can be referenced by day, and moved between days, without being copied. Editing "a lesson" always means editing this content, not a placement of it.
-_Avoid_: Content, Page, Content Page — these leak the underlying storage shape (lessons are technically stored under a `content` tree, but nothing in the domain should be described that way).
+_Avoid_: Content, Content Page — these leak the underlying storage shape (lessons are technically stored under a `content` tree, but nothing in the domain should be described that way). Do not confuse with **Page** (below) — a Page is a distinct concept, not a synonym for Lesson.
+
+**Page**:
+A standalone piece of DSL-authored content reachable directly by URL, independent of any Class's Schedule. Unlike a Lesson, a Page is never placed into a Schedule or tied to a Day Index — it exists to be linked to directly (e.g. shared in Google Classroom, linked from a nav menu). A Page with no Slug assigned still exists and can be edited, but is not reachable by any URL. Deleting a Page frees its Slug(s) for immediate reuse.
+_Avoid_: Static Page (redundant — "Page" already implies this), Content (same reasoning as Lesson — leaks storage shape).
+
+**Slug**:
+The human-chosen identifier that makes a Page reachable at a URL. A Page can have more than one Slug pointing to it; each Slug resolves to exactly one Page. Distinct from a Lesson's id, which is an opaque generated hash the teacher never chooses or sees.
+_Avoid_: URL, path, permalink — Slug refers specifically to the chosen identifier, not the resulting address.
 
 **Schedule**:
 The ordered sequence of Lessons for one Class, indexed by Day Index. A Day Index can hold zero, one, or many Lessons — both an empty day (a gap) and a day with multiple Lessons are normal, valid states, not an error or a missing day.

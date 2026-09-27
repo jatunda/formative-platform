@@ -15,6 +15,11 @@ export const NO_CONTENT_SELECTED = "(No content selected)";
 export const CONTENT_NOT_FOUND = "Content not found.";
 export const NO_CONTENT_FOR_TODAY = "No content for today.";
 
+// Page-related constants
+export const DEFAULT_PAGE_TITLE = "Empty Page";
+export const UNTITLED_PAGE_LOWERCASE = "(untitled)";
+export const PAGE_NOT_FOUND = "Page not found.";
+
 // Database path constants
 export const DB_PATHS = {
 	SCHEDULE: "schedule/",
