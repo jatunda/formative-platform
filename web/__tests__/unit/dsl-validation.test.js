@@ -41,10 +41,16 @@ Some content`;
     expect(result).toBe('Missing title - content should start with "# Title"');
   });
 
-  it('should return error for no content blocks', () => {
+  it('should accept title-only content with no blocks yet (e.g. a freshly-created page)', () => {
     const dsl = `# Title Only`;
     const parsed = parseDSL(dsl);
     const result = validateDSL(dsl, parsed);
+    expect(result).toBeNull();
+  });
+
+  it('should return error when blocks is missing entirely (malformed parse)', () => {
+    const dsl = `# Title Only`;
+    const result = validateDSL(dsl, { title: 'Title Only', blocks: null });
     expect(result).toBe('No content blocks found - add some text or questions after the title');
   });
 
@@ -60,17 +66,18 @@ unclosed code block`;
     expect(result).toBe('Unmatched code block - every ``` opening must have a closing ```');
   });
 
-  it('should return error for empty blocks', () => {
-    const dsl = `# My Lesson
-
----
-
-Some content`;
-    const parsed = parseDSL(dsl);
-    // The parser filters empty blocks, so we need to test with actual empty content scenario
+  it('should accept an empty blocks array (title-only, nothing to flag)', () => {
+    const dsl = `# My Lesson`;
     const emptyParsed = { title: 'My Lesson', blocks: [] };
     const result = validateDSL(dsl, emptyParsed);
-    expect(result).toBe('No content blocks found - add some text or questions after the title');
+    expect(result).toBeNull();
+  });
+
+  it('should return error when a present block has no content (malformed parse)', () => {
+    const dsl = `# My Lesson`;
+    const malformedParsed = { title: 'My Lesson', blocks: [{ type: 'question', content: [] }] };
+    const result = validateDSL(dsl, malformedParsed);
+    expect(result).toBe('Content blocks are empty - add text or code to your questions');
   });
 
   it('should accept valid DSL with code blocks', () => {

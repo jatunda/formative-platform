@@ -1224,11 +1224,13 @@ ol.lesson-list {
   padding-left: calc(var(--spacing-lg) + 1.5em);
 }
 
-/* Nested collapsibles */
+/* Nested collapsibles - each level already gets its own .collapsible-content
+   padding, so this only needs to add a thin visual marker per level, not a
+   second full indent stacked on top of it. */
 .lesson-collapsible .lesson-collapsible {
-  margin-left: var(--spacing-lg);
+  margin-left: var(--spacing-sm);
   border-left: 2px solid var(--border-color);
-  padding-left: var(--spacing-md);
+  padding-left: var(--spacing-xs);
 }
 
 /* ========================================
@@ -1434,7 +1436,7 @@ ol.lesson-list {
   }
 
   .lesson-collapsible .lesson-collapsible {
-    margin-left: var(--spacing-sm);
-    padding-left: var(--spacing-xs);
+    margin-left: var(--spacing-xxs);
+    padding-left: 0;
   }
 }

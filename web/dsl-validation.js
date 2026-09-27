@@ -25,26 +25,32 @@ export function validateDSL(dslText, parsed) {
 		return 'Missing title - content should start with "# Title"';
 	}
 
-	// Check for no content blocks
-	if (!parsed.blocks || parsed.blocks.length === 0) {
+	// A title with no blocks yet (e.g. a freshly-created page) is valid, not
+	// an error - only a malformed parse (blocks missing entirely) is a problem.
+	if (!Array.isArray(parsed.blocks)) {
 		return 'No content blocks found - add some text or questions after the title';
 	}
 
 	// Check for unmatched code blocks with language support
 	const lines = dslText.split('\n');
-	const codeBlockMarkers = lines.filter(line => 
+	const codeBlockMarkers = lines.filter(line =>
 		line.trim() === '```' || line.trim().match(/^```\s*\w+$/)
 	);
 	if (codeBlockMarkers.length % 2 !== 0) {
 		return 'Unmatched code block - every ``` opening must have a closing ```';
 	}
 
-	// Check if blocks have content
-	const hasContent = parsed.blocks.some(block => 
-		block.content && block.content.length > 0
-	);
-	if (!hasContent) {
-		return 'Content blocks are empty - add text or code to your questions';
+	// Check if any present blocks are unexpectedly empty. parseDSL always
+	// filters these out itself, so this only fires for a hand-built/malformed
+	// parsed object - a title-only parse (blocks: []) has nothing to check
+	// here and is valid.
+	if (parsed.blocks.length > 0) {
+		const hasContent = parsed.blocks.some(block =>
+			block.content && block.content.length > 0
+		);
+		if (!hasContent) {
+			return 'Content blocks are empty - add text or code to your questions';
+		}
 	}
 
 	// All validation checks passed
