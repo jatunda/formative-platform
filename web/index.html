@@ -4,6 +4,16 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Firebase Hosting has no way to make a rewrite conditional on the
+       request domain, so the teacher.mrhsieh.app -> teacher.html shortcut
+       has to happen client-side instead, for any path that falls through to
+       this file (real static files on that domain, e.g. /editor.html, are
+       served directly and never reach here). -->
+  <script>
+    if (window.location.hostname === 'teacher.mrhsieh.app') {
+      window.location.replace('/teacher.html' + window.location.search);
+    }
+  </script>
   <title>Student Portal</title>
   <link rel="icon" type="image/x-icon" href="favicon.ico">
   <script type="module" src="landing.js"></script>

@@ -12,11 +12,6 @@
         "function": "pageSSR"
       },
       {
-        "source": "**",
-        "destination": "/teacher.html",
-        "domain": "teacher.mrhsieh.app"
-      },
-      {
         "source": "/teacher.html",
         "destination": "/teacher.html"
       },
