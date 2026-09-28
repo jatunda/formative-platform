@@ -16,8 +16,24 @@ A standalone piece of DSL-authored content reachable directly by URL, independen
 _Avoid_: Static Page (redundant — "Page" already implies this), Content (same reasoning as Lesson — leaks storage shape).
 
 **Slug**:
-The human-chosen identifier that makes a Page reachable at a URL. A Page can have more than one Slug pointing to it; each Slug resolves to exactly one Page. Distinct from a Lesson's id, which is an opaque generated hash the teacher never chooses or sees.
+The human-chosen identifier that makes a Page reachable at a URL. A Page can have more than one Slug pointing to it; each Slug resolves to exactly one Page. Distinct from a Lesson's id, which is an opaque generated hash the teacher never chooses or sees. A Page Link (below) elsewhere in the app can embed a Slug's text directly; removing that Slug without a Slug Rename leaves those Page Links pointing nowhere — they still render as normal links, they just lead to the site's "Page not found" page on click.
 _Avoid_: URL, path, permalink — Slug refers specifically to the chosen identifier, not the resulting address.
+
+**Slug Rename**:
+Changing a Slug's text while keeping it pointing at the same Page, as one action — distinct from removing one Slug and separately adding another, which the system has no way to tell apart from two unrelated changes. A Slug Rename uses the Backlink index (below) to find every Page Link pointing at the old Slug text and rewrites them to the new text, so links elsewhere in the app don't silently break.
+
+**Page Link**:
+An `[[slug]]` or `[[slug|Display Text]]` reference inside one Page's content pointing at another Page — written and stored as plain text embedding the target's *current* Slug, not the target Page's id, and not resolved against the database at render time. Because it's just static text, a Slug change would silently break every Page Link pointing at the old value unless done through a Slug Rename, which rewrites them all in place.
+_Avoid_: link, hyperlink — those cover any `<a>` tag rendered from ordinary `[text](url)` markdown, which isn't a domain concept; Page Link means specifically the `[[...]]` form pointing at another Page.
+
+**Section Link**:
+An `[[#Header Text]]` or `[[#Header Text|Display Text]]` reference to a header within the *same* Page, matched by the header's own text at render time rather than by any separately-maintained identifier. Same-page only — there is no cross-Page form (that would be `[[slug#Header Text]]`, deliberately not supported). Renaming the referenced header's wording breaks the Section Link silently; unlike a Slug Rename, there is no rewrite mechanism for headers.
+
+**Backlink**:
+A record that one Page's content currently contains a Page Link to another Page, indexed by the two Pages' ids rather than by Slug — a Slug Rename doesn't change which Backlinks exist, only which Slug text the Page Links pointing through them contain. Maintained continuously (recalculated whenever a Page containing a Page Link is saved), not just recomputed on demand, so it stays accurate between Slug Renames too.
+
+**Broken Link**:
+A Section Link whose header text no longer matches any header in the Page — rendered as plain, non-clickable, visually distinct text. Section Links can be checked for free at render time (matching against headers already in memory, no database access needed), so this detection is real. Page Links deliberately do *not* get this treatment: checking whether a Slug still resolves would mean a database call on every render, which the Page Link design (see `docs/adr/0007`) specifically avoids — a Page Link whose target is gone still renders as a normal link, leading to the site's "Page not found" page on click instead.
 
 **Schedule**:
 The ordered sequence of Lessons for one Class, indexed by Day Index. A Day Index can hold zero, one, or many Lessons — both an empty day (a gap) and a day with multiple Lessons are normal, valid states, not an error or a missing day.

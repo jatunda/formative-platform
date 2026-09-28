@@ -1,6 +1,113 @@
 // Shared content rendering module
 // Used by both view.js and editor.js for consistent rendering
 import { CONTENT_NOT_FOUND } from './constants.js';
+import { PAGE_LINK_PATTERN, parsePageLinkMatch } from './page-links.js';
+
+/**
+ * Turn heading text into a URL-safe id fragment for Section Link targets.
+ * @private
+ */
+function slugifyHeadingText(text) {
+	return text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'section';
+}
+
+/**
+ * Normalize heading text for matching a Section Link against it - case and
+ * whitespace shouldn't matter for `[[#Header Text]]` to find "Header Text".
+ * @private
+ */
+function normalizeHeadingText(text) {
+	return text.trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+/**
+ * Walk every heading in this content (including inside collapsibles) in
+ * document order. Two things fall out of this, deliberately kept separate:
+ * every heading occurrence gets its OWN unique DOM id (a GitHub-style -2/-3
+ * suffix when the text repeats - two "## Notes" headings must not share one
+ * id), while a Section Link like `[[#Notes]]` is inherently ambiguous
+ * between them and always resolves to the FIRST occurrence only. Scoped to
+ * one content object at a time (renderContent calls this per item), matching
+ * Section Links being same-page only, never spanning multiple rendered
+ * Lessons on one Schedule day.
+ * @param {{blocks: Array}} data
+ * @returns {{lookupByText: Map<string,string>, idsInOrder: string[]}}
+ * @private
+ */
+function collectHeadingIds(data) {
+	const lookupByText = new Map();
+	const idsInOrder = [];
+	const usedIds = new Set();
+
+	function visitItems(items) {
+		for (const item of items || []) {
+			if (item.type === "text") {
+				for (const line of item.value.split('\n')) {
+					const headingMatch = line.match(/^(#{1,6})\s+(.+)$/);
+					if (!headingMatch) continue;
+					const headingText = headingMatch[2].trim();
+					const normalized = normalizeHeadingText(headingText);
+
+					const baseId = slugifyHeadingText(headingText);
+					let id = baseId;
+					let suffix = 2;
+					while (usedIds.has(id)) {
+						id = `${baseId}-${suffix}`;
+						suffix++;
+					}
+					usedIds.add(id);
+					idsInOrder.push(id);
+					if (!lookupByText.has(normalized)) {
+						lookupByText.set(normalized, id);
+					}
+				}
+			} else if (item.type === "collapsible") {
+				visitItems(item.content);
+			}
+		}
+	}
+
+	for (const block of (data && data.blocks) || []) {
+		if (block.type === "question") {
+			visitItems(block.content);
+		}
+	}
+
+	return { lookupByText, idsInOrder };
+}
+
+/**
+ * Process Page Links (`[[slug]]`/`[[slug|text]]`) and Section Links
+ * (`[[#Header]]`/`[[#Header|text]]`). A Page Link always renders as a plain
+ * link - no validation against the database at render time, by design (see
+ * docs/adr/0007) - a stale slug just leads to the site's existing "Page not
+ * found" page on click. A Section Link resolves against `headingIds` (free,
+ * same-page, no DB needed) or renders as a Broken Link if nothing matches.
+ * @param {string} text - Already HTML-escaped text
+ * @param {Map<string, string>} headingIds - From collectHeadingIds
+ * @private
+ */
+function processPageAndSectionLinks(text, headingIds) {
+	return text.replace(PAGE_LINK_PATTERN, (fullMatch, slugGroup, headerGroup, displayGroup) => {
+		const { slug, header, display } = parsePageLinkMatch(slugGroup, headerGroup, displayGroup);
+
+		if (slug) {
+			const label = display || slug;
+			return `<a href="/p/${slug}" class="lesson-link">${label}</a>`;
+		}
+
+		if (header) {
+			const label = display || header;
+			const id = headingIds.get(normalizeHeadingText(header));
+			if (id) {
+				return `<a href="#${id}" class="lesson-link">${label}</a>`;
+			}
+			return `<span class="broken-link">${label}</span>`;
+		}
+
+		return fullMatch;
+	});
+}
 
 /**
  * Process text formatting (bold, italic, bold-italic) using markdown syntax
@@ -38,7 +145,7 @@ function processMarkdownLinks(text) {
  * @param {string} text - The text to process
  * @returns {string} The HTML formatted text with code tags
  */
-function processInlineCode(text) {
+function processInlineCode(text, headingIds = new Map()) {
 	// Escape HTML to prevent XSS, then process backticks
 	const escaped = text
 		.replace(/&/g, '&amp;')
@@ -46,11 +153,12 @@ function processInlineCode(text) {
 		.replace(/>/g, '&gt;')
 		.replace(/"/g, '&quot;')
 		.replace(/'/g, '&#39;');
-	
-	// Process in order: links, text formatting, then code
-	const withLinks = processMarkdownLinks(escaped);
+
+	// Process in order: Page/Section Links, plain links, text formatting, then code
+	const withPageLinks = processPageAndSectionLinks(escaped, headingIds);
+	const withLinks = processMarkdownLinks(withPageLinks);
 	const withFormatting = processTextFormatting(withLinks);
-	
+
 	// Replace backtick-enclosed text with <code> tags
 	return withFormatting.replace(/`([^`]+)`/g, '<code>$1</code>');
 }
@@ -62,9 +170,11 @@ function processInlineCode(text) {
  * content, and it calls itself for a collapsible section's nested content.
  * @param {Array<Object>} contentItems - Array of content items to render
  * @param {HTMLElement} containerEl - The container element to render into
+ * @param {Map<string, string>} [headingIds] - lookupByText from collectHeadingIds, for resolving Section Links
+ * @param {string[]} [headingIdQueue] - idsInOrder from collectHeadingIds, consumed one per heading rendered
  * @private
  */
-function renderContentItems(contentItems, containerEl) {
+function renderContentItems(contentItems, containerEl, headingIds = new Map(), headingIdQueue = []) {
 	// Stack to track list hierarchy (separate from parent list stack)
 	const listStack = [];
 	let indentUnit = null;
@@ -155,7 +265,9 @@ function renderContentItems(contentItems, containerEl) {
 					const level = headingMatch[1].length;
 					const heading = document.createElement(`h${level}`);
 					heading.className = `lesson-heading lesson-h${level}`;
-					heading.innerHTML = processInlineCode(headingMatch[2]);
+					heading.innerHTML = processInlineCode(headingMatch[2], headingIds);
+					const id = headingIdQueue.shift();
+					if (id) heading.id = id;
 					containerEl.appendChild(heading);
 				} else {
 					const ulMatch = line.match(/^(\s*)([*-])\s+(.+)$/);
@@ -166,7 +278,7 @@ function renderContentItems(contentItems, containerEl) {
 						
 						const li = document.createElement('li');
 						li.className = 'lesson-list-item';
-						li.innerHTML = processInlineCode(content);
+						li.innerHTML = processInlineCode(content, headingIds);
 						ul.appendChild(li);
 						
 						if (listStack[depth]) {
@@ -181,7 +293,7 @@ function renderContentItems(contentItems, containerEl) {
 							
 							const li = document.createElement('li');
 							li.className = 'lesson-list-item';
-							li.innerHTML = processInlineCode(content);
+							li.innerHTML = processInlineCode(content, headingIds);
 							ol.appendChild(li);
 							
 							if (listStack[depth]) {
@@ -193,7 +305,7 @@ function renderContentItems(contentItems, containerEl) {
 							
 							const p = document.createElement("p");
 							p.className = "lesson-text";
-							p.innerHTML = processInlineCode(line);
+							p.innerHTML = processInlineCode(line, headingIds);
 							containerEl.appendChild(p);
 						}
 					}
@@ -236,7 +348,7 @@ function renderContentItems(contentItems, containerEl) {
 			if (!item.title || item.title.trim() === "") {
 				summary.classList.add("lesson-collapsible-summary-empty");
 			} else {
-				summary.innerHTML = processInlineCode(item.title);
+				summary.innerHTML = processInlineCode(item.title, headingIds);
 			}
 
 			const contentDiv = document.createElement("div");
@@ -246,7 +358,7 @@ function renderContentItems(contentItems, containerEl) {
 			// collapsible saved with no content of its own comes back with
 			// `content` missing entirely, not `[]` - guard against that here
 			// rather than crash when rendering it back.
-			renderContentItems(item.content || [], contentDiv);
+			renderContentItems(item.content || [], contentDiv, headingIds, headingIdQueue);
 
 			details.appendChild(summary);
 			details.appendChild(contentDiv);
@@ -287,6 +399,8 @@ function renderContent(data, containerEl) {
 		containerEl.appendChild(title);
 	}
 
+	const { lookupByText, idsInOrder } = collectHeadingIds(data);
+
 	if (data.blocks && Array.isArray(data.blocks)) {
 		data.blocks.forEach((block, blockIndex) => {
 			if (block.type === "question" && Array.isArray(block.content)) {
@@ -297,7 +411,7 @@ function renderContent(data, containerEl) {
 					containerEl.appendChild(hr);
 				}
 				
-				renderContentItems(block.content, containerEl);
+				renderContentItems(block.content, containerEl, lookupByText, idsInOrder);
 			}
 		});
 	}

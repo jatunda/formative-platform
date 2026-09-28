@@ -5,6 +5,7 @@ import {
   computeTabIndent,
   computeSmartBackspace,
   computeAutoIndentNewline,
+  computeInsertAtCursor,
   handleDslInputKeydown,
   setEditingEnabled,
   saveLesson,
@@ -193,6 +194,23 @@ describe('editor', () => {
 
     it('returns null when there is a selection', () => {
       expect(computeAutoIndentNewline('    some text', 2, 5)).toBeNull();
+    });
+  });
+
+  describe('computeInsertAtCursor', () => {
+    it('inserts text at the cursor with no selection', () => {
+      const result = computeInsertAtCursor('abcdef', 3, 3, '[[link]]');
+      expect(result).toEqual({ value: 'abc[[link]]def', cursor: 11 });
+    });
+
+    it('replaces a selection with the inserted text', () => {
+      const result = computeInsertAtCursor('abcdef', 1, 4, '[[link]]');
+      expect(result).toEqual({ value: 'a[[link]]ef', cursor: 9 });
+    });
+
+    it('inserts at the end when the cursor is at the end of the text', () => {
+      const result = computeInsertAtCursor('abc', 3, 3, '!');
+      expect(result).toEqual({ value: 'abc!', cursor: 4 });
     });
   });
 

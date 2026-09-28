@@ -46,6 +46,33 @@ describe('processInlineCode', () => {
     expect(result).toContain('<code>code</code>');
     expect(result).toContain('<strong>bold</strong>');
   });
+
+  it('should render a Page Link as a plain link, with no heading map supplied', () => {
+    const result = processInlineCode('See [[syllabus]]');
+    expect(result).toBe('See <a href="/p/syllabus" class="lesson-link">syllabus</a>');
+  });
+
+  it('should render a Page Link with a display alias', () => {
+    const result = processInlineCode('See [[syllabus|Course Syllabus]]');
+    expect(result).toContain('<a href="/p/syllabus" class="lesson-link">Course Syllabus</a>');
+  });
+
+  it('should render a Section Link as a broken link when no heading map is supplied', () => {
+    const result = processInlineCode('See [[#Grading Policy]]');
+    expect(result).toBe('See <span class="broken-link">Grading Policy</span>');
+  });
+
+  it('should resolve a Section Link against a supplied heading map', () => {
+    const headingIds = new Map([['grading policy', 'grading-policy']]);
+    const result = processInlineCode('See [[#Grading Policy]]', headingIds);
+    expect(result).toBe('See <a href="#grading-policy" class="lesson-link">Grading Policy</a>');
+  });
+
+  it('should resolve a Section Link case-insensitively with a display alias', () => {
+    const headingIds = new Map([['grading policy', 'grading-policy']]);
+    const result = processInlineCode('[[#GRADING POLICY|Jump here]]', headingIds);
+    expect(result).toBe('<a href="#grading-policy" class="lesson-link">Jump here</a>');
+  });
 });
 
 describe('renderContent', () => {
@@ -141,6 +168,84 @@ describe('renderContent', () => {
     const heading = container.querySelector('h3');
     expect(heading).toBeTruthy();
     expect(heading.textContent).toBe('Heading 3');
+  });
+
+  it('should give a heading an id derived from its text', () => {
+    const data = {
+      title: 'T',
+      blocks: [{ type: 'question', content: [{ type: 'text', value: '## Grading Policy' }] }]
+    };
+    renderContent(data, container);
+    expect(container.querySelector('h2.lesson-heading').id).toBe('grading-policy');
+  });
+
+  it('should disambiguate two headings with the same text using a -2 suffix', () => {
+    const data = {
+      title: 'T',
+      blocks: [{
+        type: 'question',
+        content: [
+          { type: 'text', value: '## Notes\nfirst' },
+          { type: 'text', value: '## Notes\nsecond' }
+        ]
+      }]
+    };
+    renderContent(data, container);
+    const headings = container.querySelectorAll('h2.lesson-heading');
+    expect(headings[0].id).toBe('notes');
+    expect(headings[1].id).toBe('notes-2');
+  });
+
+  it('should resolve a Section Link to a heading that appears later in the document', () => {
+    const data = {
+      title: 'T',
+      blocks: [{
+        type: 'question',
+        content: [
+          { type: 'text', value: 'See [[#Grading Policy]] below.' },
+          { type: 'text', value: '## Grading Policy' }
+        ]
+      }]
+    };
+    renderContent(data, container);
+    const link = container.querySelector('a.lesson-link');
+    expect(link.getAttribute('href')).toBe('#grading-policy');
+  });
+
+  it('should render a Section Link with no matching heading as a Broken Link', () => {
+    const data = {
+      title: 'T',
+      blocks: [{ type: 'question', content: [{ type: 'text', value: 'See [[#Nonexistent]].' }] }]
+    };
+    renderContent(data, container);
+    const broken = container.querySelector('.broken-link');
+    expect(broken).toBeTruthy();
+    expect(broken.textContent).toBe('Nonexistent');
+    expect(container.querySelector('a.lesson-link')).toBeFalsy();
+  });
+
+  it('should render a Page Link as a plain, always-clickable link regardless of target validity', () => {
+    const data = {
+      title: 'T',
+      blocks: [{ type: 'question', content: [{ type: 'text', value: 'See [[some-page]].' }] }]
+    };
+    renderContent(data, container);
+    const link = container.querySelector('a.lesson-link');
+    expect(link.getAttribute('href')).toBe('/p/some-page');
+  });
+
+  it('should scope heading ids separately per rendered content item (renderMultipleContent)', async () => {
+    const { renderMultipleContent } = await import('../../content-renderer.js');
+    const dataArray = [
+      { title: 'A', blocks: [{ type: 'question', content: [{ type: 'text', value: '## Notes' }] }] },
+      { title: 'B', blocks: [{ type: 'question', content: [{ type: 'text', value: '## Notes' }] }] }
+    ];
+    renderMultipleContent(dataArray, container);
+    const headings = container.querySelectorAll('h2.lesson-heading');
+    // Same-page-only Section Links: each item gets its own "notes" id, not
+    // "notes"/"notes-2" as if they shared one document.
+    expect(headings[0].id).toBe('notes');
+    expect(headings[1].id).toBe('notes');
   });
 
   it('should render unordered lists', () => {

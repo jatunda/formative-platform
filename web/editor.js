@@ -34,6 +34,7 @@ import {
 	generateUniqueHash
 } from "./database-utils.js";
 import { renderTeacherNav } from "./teacher-nav.js";
+import { createDslCheatSheetPanel } from "./dsl-cheat-sheet.js";
 
 import {
 	AI_CONFIG,
@@ -122,7 +123,23 @@ export function computeAutoIndentNewline(value, selectionStart, selectionEnd) {
   return { value: newValue, cursor: selectionStart + 1 + indent.length };
 }
 
-function applyComputedEdit(dslInputEl, result) {
+/**
+ * Compute the result of inserting text at the cursor, replacing any current
+ * selection - used both by Tab/Backspace/Enter handling below and by
+ * anything that inserts a snippet on the user's behalf (e.g. the Insert
+ * Page Link picker in page-editor.js).
+ * @returns {{value: string, cursor: number}}
+ */
+export function computeInsertAtCursor(value, selectionStart, selectionEnd, textToInsert) {
+  const newValue = value.substring(0, selectionStart) + textToInsert + value.substring(selectionEnd);
+  return { value: newValue, cursor: selectionStart + textToInsert.length };
+}
+
+/**
+ * Apply a computed {value, cursor} edit to a textarea and dispatch an input
+ * event so listeners (preview, dirty-tracking) pick it up.
+ */
+export function applyComputedEdit(dslInputEl, result) {
   dslInputEl.value = result.value;
   dslInputEl.selectionStart = dslInputEl.selectionEnd = result.cursor;
   dslInputEl.dispatchEvent(new Event('input'));
@@ -403,6 +420,8 @@ export async function main() {
   initializeLessonSearch(db);
 
   renderTeacherNav('editor');
+
+  document.getElementById('cheatSheetContainer').appendChild(createDslCheatSheetPanel());
 
   // Update back to schedule link to preserve class selection
   const urlParams = new URLSearchParams(window.location.search);

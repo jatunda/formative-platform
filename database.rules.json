@@ -43,6 +43,10 @@
       "$slug": {
         ".validate": "(!newData.exists() || !data.exists() || newData.val() === data.val()) && (!newData.exists() || newData.isString())"
       }
+    },
+
+    "backlinks": {
+      ".write": true
     }
   }
 }

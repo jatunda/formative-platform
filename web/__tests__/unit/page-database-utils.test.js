@@ -9,8 +9,11 @@ import {
   getAllSlugs,
   assignSlug,
   removeSlug,
+  renameSlug,
   resolveSlugToPageId,
-  deletePageAndSlugs
+  deletePageAndSlugs,
+  getBacklinks,
+  updateBacklinksForPage
 } from '../../page-database-utils.js';
 
 // Mock Firebase - same in-memory path-keyed store pattern as database-utils.test.js
@@ -251,6 +254,136 @@ describe('page-database-utils', () => {
       setAtPath('pages/abc', { title: 'To Delete' });
       await deletePageAndSlugs('abc');
       expect(getAtPath('pages/abc')).toBeUndefined();
+    });
+
+    it('removes this page\'s own incoming backlinks entry', async () => {
+      setAtPath('pages/abc', { title: 'To Delete' });
+      setAtPath('backlinks/abc', { other: true });
+
+      await deletePageAndSlugs('abc');
+
+      expect(getAtPath('backlinks/abc')).toBeUndefined();
+    });
+
+    it('removes this page\'s outgoing backlink entries using its stored linksTo', async () => {
+      setAtPath('pages/abc', { title: 'To Delete', linksTo: ['target1', 'target2'] });
+      setAtPath('backlinks/target1/abc', true);
+      setAtPath('backlinks/target2/abc', true);
+      setAtPath('backlinks/target1/unrelated', true);
+
+      await deletePageAndSlugs('abc');
+
+      expect(getAtPath('backlinks/target1/abc')).toBeUndefined();
+      expect(getAtPath('backlinks/target2/abc')).toBeUndefined();
+      expect(getAtPath('backlinks/target1/unrelated')).toBe(true);
+    });
+  });
+
+  describe('getBacklinks', () => {
+    it('returns the source pageIds that link to this page', async () => {
+      setAtPath('backlinks/target', { source1: true, source2: true });
+      expect(await getBacklinks('target')).toEqual(['source1', 'source2']);
+    });
+
+    it('returns an empty array when nothing links here', async () => {
+      expect(await getBacklinks('target')).toEqual([]);
+    });
+  });
+
+  describe('updateBacklinksForPage', () => {
+    it('adds a backlink for a newly-referenced page', async () => {
+      setAtPath('slugIndex/target-slug', 'target-id');
+      const parsed = { title: 'T', blocks: [{ type: 'question', content: [{ type: 'text', value: '[[target-slug]]' }] }] };
+
+      await updateBacklinksForPage('source-id', parsed);
+
+      expect(getAtPath('backlinks/target-id/source-id')).toBe(true);
+      expect(getAtPath('pages/source-id/linksTo')).toEqual(['target-id']);
+    });
+
+    it('removes a stale backlink when a link is deleted from the content', async () => {
+      setAtPath('pages/source-id/linksTo', ['old-target']);
+      setAtPath('backlinks/old-target/source-id', true);
+      const parsed = { title: 'T', blocks: [{ type: 'question', content: [{ type: 'text', value: 'no links here' }] }] };
+
+      await updateBacklinksForPage('source-id', parsed);
+
+      expect(getAtPath('backlinks/old-target/source-id')).toBeUndefined();
+      expect(getAtPath('pages/source-id/linksTo')).toBeUndefined();
+    });
+
+    it('does nothing when the set of linked pages has not changed', async () => {
+      setAtPath('slugIndex/target-slug', 'target-id');
+      setAtPath('pages/source-id/linksTo', ['target-id']);
+      setAtPath('backlinks/target-id/source-id', true);
+      const parsed = { title: 'T', blocks: [{ type: 'question', content: [{ type: 'text', value: '[[target-slug]]' }] }] };
+
+      await updateBacklinksForPage('source-id', parsed);
+
+      // mockUpdate should not have been called with any actual changes -
+      // verify by confirming the update call count stayed at zero
+      expect(mockUpdate).not.toHaveBeenCalled();
+    });
+
+    it('skips a Page Link that does not resolve to any page', async () => {
+      const parsed = { title: 'T', blocks: [{ type: 'question', content: [{ type: 'text', value: '[[nonexistent-slug]]' }] }] };
+      await updateBacklinksForPage('source-id', parsed);
+      expect(getAtPath('pages/source-id/linksTo')).toBeUndefined();
+    });
+
+    it('does not create a backlink from a page to itself', async () => {
+      setAtPath('slugIndex/self-slug', 'source-id');
+      const parsed = { title: 'T', blocks: [{ type: 'question', content: [{ type: 'text', value: '[[self-slug]]' }] }] };
+
+      await updateBacklinksForPage('source-id', parsed);
+
+      expect(getAtPath('backlinks/source-id/source-id')).toBeUndefined();
+    });
+  });
+
+  describe('renameSlug', () => {
+    it('swaps the slugIndex entry from old to new', async () => {
+      setAtPath('slugIndex/old-slug', 'abc');
+      await renameSlug('abc', 'old-slug', 'new-slug');
+      expect(getAtPath('slugIndex/old-slug')).toBeUndefined();
+      expect(getAtPath('slugIndex/new-slug')).toBe('abc');
+    });
+
+    it('rejects a malformed new slug without changing anything', async () => {
+      setAtPath('slugIndex/old-slug', 'abc');
+      await expect(renameSlug('abc', 'old-slug', 'Bad Slug')).rejects.toThrow('lowercase letters');
+      expect(getAtPath('slugIndex/old-slug')).toBe('abc');
+    });
+
+    it('rejects a new slug already taken by a different page', async () => {
+      setAtPath('slugIndex/old-slug', 'abc');
+      setAtPath('slugIndex/new-slug', 'other-page');
+      await expect(renameSlug('abc', 'old-slug', 'new-slug')).rejects.toThrow('already in use');
+      expect(getAtPath('slugIndex/old-slug')).toBe('abc');
+    });
+
+    it('rewrites every backlinked page\'s Page Link to the new slug', async () => {
+      setAtPath('slugIndex/old-slug', 'abc');
+      setAtPath('backlinks/abc', { source1: true });
+      setAtPath('pages/source1', {
+        title: 'Source',
+        blocks: [{ type: 'question', content: [{ type: 'text', value: 'See [[old-slug|The Page]].' }] }]
+      });
+
+      await renameSlug('abc', 'old-slug', 'new-slug');
+
+      expect(getAtPath('pages/source1').blocks[0].content[0].value).toBe('See [[new-slug|The Page]].');
+    });
+
+    it('does not touch a backlinked page that links via a different slug of the same target', async () => {
+      setAtPath('slugIndex/old-slug', 'abc');
+      setAtPath('backlinks/abc', { source1: true });
+      const original = { title: 'Source', blocks: [{ type: 'question', content: [{ type: 'text', value: 'See [[other-slug]].' }] }] };
+      setAtPath('pages/source1', original);
+
+      await renameSlug('abc', 'old-slug', 'new-slug');
+
+      expect(getAtPath('pages/source1')).toEqual(original);
     });
   });
 });

@@ -19,6 +19,14 @@ vi.mock('../../editor.js', () => ({
   getQueryParams: (...args) => mockGetQueryParams(...args),
   updatePreview: (...args) => mockUpdatePreview(...args),
   handleDslInputKeydown: (...args) => mockHandleDslInputKeydown(...args),
+  computeInsertAtCursor: (value, start, end, text) => ({
+    value: value.substring(0, start) + text + value.substring(end),
+    cursor: start + text.length,
+  }),
+  applyComputedEdit: (el, result) => {
+    el.value = result.value;
+    el.selectionStart = el.selectionEnd = result.cursor;
+  },
   updateUnsavedIndicator: (indicatorEl, isDirty) => {
     indicatorEl.style.display = isDirty ? 'inline' : 'none';
   },
@@ -34,12 +42,24 @@ vi.mock('../../ui-components.js', () => ({
   withWorkingIndicator: (btn, onClick) => onClick,
 }));
 
+vi.mock('../../dsl-cheat-sheet.js', () => ({
+  createDslCheatSheetPanel: () => document.createElement('details'),
+}));
+
+const mockShowPageLinkPicker = vi.fn();
+vi.mock('../../page-link-picker.js', () => ({
+  showPageLinkPicker: (...args) => mockShowPageLinkPicker(...args),
+}));
+
 const mockGetPageFromDB = vi.fn();
 const mockSavePage = vi.fn();
 const mockDeletePageAndSlugs = vi.fn();
 const mockGetAllSlugs = vi.fn(async () => ({}));
 const mockAssignSlug = vi.fn();
 const mockRemoveSlug = vi.fn();
+const mockRenameSlug = vi.fn();
+const mockGetBacklinks = vi.fn(async () => []);
+const mockUpdateBacklinksForPage = vi.fn();
 vi.mock('../../page-database-utils.js', () => ({
   initializePageDatabase: vi.fn(),
   getPageFromDB: (...args) => mockGetPageFromDB(...args),
@@ -48,10 +68,14 @@ vi.mock('../../page-database-utils.js', () => ({
   getAllSlugs: (...args) => mockGetAllSlugs(...args),
   assignSlug: (...args) => mockAssignSlug(...args),
   removeSlug: (...args) => mockRemoveSlug(...args),
+  renameSlug: (...args) => mockRenameSlug(...args),
+  getBacklinks: (...args) => mockGetBacklinks(...args),
+  updateBacklinksForPage: (...args) => mockUpdateBacklinksForPage(...args),
 }));
 
 global.alert = vi.fn();
 global.confirm = vi.fn(() => true);
+global.prompt = vi.fn();
 
 function renderEditorDom() {
   document.body.innerHTML = `
@@ -60,6 +84,8 @@ function renderEditorDom() {
     <div id="preview"></div>
     <button id="saveBtn"></button>
     <button id="deleteBtn"></button>
+    <button id="insertPageLinkBtn"></button>
+    <div id="cheatSheetContainer"></div>
     <ul id="slugList"></ul>
     <input id="newSlugInput" />
     <button id="addSlugBtn"></button>
@@ -77,10 +103,15 @@ describe('page-editor', () => {
     mockGetAllSlugs.mockReset().mockResolvedValue({});
     mockAssignSlug.mockReset().mockResolvedValue(undefined);
     mockRemoveSlug.mockReset().mockResolvedValue(undefined);
+    mockRenameSlug.mockReset().mockResolvedValue(undefined);
+    mockGetBacklinks.mockReset().mockResolvedValue([]);
+    mockUpdateBacklinksForPage.mockReset().mockResolvedValue(undefined);
+    mockShowPageLinkPicker.mockReset();
     mockParseDSL.mockReset().mockReturnValue({ title: 'Parsed Title', blocks: [{ type: 'question', content: [] }] });
     mockGenerateDSLFromContent.mockClear();
     global.alert.mockClear();
     global.confirm.mockReturnValue(true);
+    global.prompt.mockReset();
 
     Object.defineProperty(window, 'location', {
       value: { href: 'page-editor.html?page=abc123' },
@@ -179,6 +210,7 @@ describe('page-editor', () => {
         await new Promise((resolve) => setTimeout(resolve, 0));
 
         expect(mockSavePage).toHaveBeenCalledWith('abc123', { title: 'Parsed Title', blocks: [{ type: 'question', content: [] }] });
+        expect(mockUpdateBacklinksForPage).toHaveBeenCalledWith('abc123', { title: 'Parsed Title', blocks: [{ type: 'question', content: [] }] });
         expect(showNotification).toHaveBeenCalledWith(expect.stringContaining('Parsed Title'), 'success');
       });
 
@@ -213,6 +245,16 @@ describe('page-editor', () => {
         await new Promise((resolve) => setTimeout(resolve, 0));
 
         expect(mockDeletePageAndSlugs).not.toHaveBeenCalled();
+      });
+
+      it('mentions affected pages when deleting a page with backlinks', async () => {
+        mockGetBacklinks.mockResolvedValue(['source1']);
+        await main();
+
+        document.getElementById('deleteBtn').onclick();
+        await new Promise((resolve) => setTimeout(resolve, 0));
+
+        expect(global.confirm).toHaveBeenCalledWith(expect.stringContaining('1 other page'));
       });
     });
 
@@ -253,14 +295,80 @@ describe('page-editor', () => {
         expect(global.alert).toHaveBeenCalledWith('already in use');
       });
 
-      it('removes a slug when its Remove button is clicked', async () => {
+      it('removes a slug when its Remove button is clicked and confirmed', async () => {
         mockGetAllSlugs.mockResolvedValue({ syllabus: 'abc123' });
         await main();
 
-        document.querySelector('#slugList button').onclick();
+        document.querySelector('#slugList .delete-btn').onclick();
         await new Promise((resolve) => setTimeout(resolve, 0));
 
+        expect(global.confirm).toHaveBeenCalledWith(expect.stringContaining('/p/syllabus'));
         expect(mockRemoveSlug).toHaveBeenCalledWith('syllabus');
+      });
+
+      it('does not remove a slug when the confirmation is cancelled', async () => {
+        mockGetAllSlugs.mockResolvedValue({ syllabus: 'abc123' });
+        global.confirm.mockReturnValue(false);
+        await main();
+
+        document.querySelector('#slugList .delete-btn').onclick();
+        await new Promise((resolve) => setTimeout(resolve, 0));
+
+        expect(mockRemoveSlug).not.toHaveBeenCalled();
+      });
+
+      it('mentions affected pages when removing a slug with backlinks', async () => {
+        mockGetAllSlugs.mockResolvedValue({ syllabus: 'abc123' });
+        mockGetBacklinks.mockResolvedValue(['source1', 'source2']);
+        await main();
+
+        document.querySelector('#slugList .delete-btn').onclick();
+        await new Promise((resolve) => setTimeout(resolve, 0));
+
+        expect(global.confirm).toHaveBeenCalledWith(expect.stringContaining('2 other pages'));
+      });
+
+      it('renames a slug via the Rename button', async () => {
+        mockGetAllSlugs.mockResolvedValue({ 'old-slug': 'abc123' });
+        global.prompt.mockReturnValue('new-slug');
+        await main();
+
+        const renameBtn = [...document.querySelectorAll('#slugList button')]
+          .find((btn) => btn.textContent === 'Rename');
+        renameBtn.onclick();
+        await new Promise((resolve) => setTimeout(resolve, 0));
+
+        expect(mockRenameSlug).toHaveBeenCalledWith('abc123', 'old-slug', 'new-slug');
+      });
+
+      it('does nothing when Rename is cancelled', async () => {
+        mockGetAllSlugs.mockResolvedValue({ 'old-slug': 'abc123' });
+        global.prompt.mockReturnValue(null);
+        await main();
+
+        const renameBtn = [...document.querySelectorAll('#slugList button')]
+          .find((btn) => btn.textContent === 'Rename');
+        renameBtn.onclick();
+        await new Promise((resolve) => setTimeout(resolve, 0));
+
+        expect(mockRenameSlug).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('insert page link', () => {
+      it('inserts [[slug|Title]] at the cursor when a page is picked', async () => {
+        await main();
+        const dslInput = document.getElementById('dslInput');
+        dslInput.value = 'before after';
+        dslInput.selectionStart = dslInput.selectionEnd = 7;
+
+        mockShowPageLinkPicker.mockImplementation(({ onSelect }) => {
+          onSelect({ slug: 'syllabus', title: 'Syllabus' });
+        });
+
+        document.getElementById('insertPageLinkBtn').onclick();
+
+        expect(dslInput.value).toBe('before [[syllabus|Syllabus]]after');
       });
     });
   });
