@@ -1445,4 +1445,19 @@ ol.lesson-list {
     margin-left: var(--spacing-xxs);
     padding-left: 0;
   }
+
+  /* .schedule-action-btn/.new-lesson-btn have a fixed 110px width (see
+     "Button Variants" above); the bigger touch-target padding this media
+     query gives every button eats into that fixed box, so "Link Lesson"/
+     "New Lesson" no longer fit on one line, and grow taller besides.
+     Restore the original padding just for these two, which is already
+     known to fit that text at 110px width above this breakpoint. */
+  .lessons-end-buttons button {
+    padding: 0.3rem;
+  }
+
+  /* Same fixed-width collision as above, for the lesson title button. */
+  .lesson-main-btn {
+    padding: 0.3rem;
+  }
 }
