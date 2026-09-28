@@ -7,10 +7,13 @@ import { db } from './firebase-config.js';
 import { parseDSL, generateDSLFromContent } from './dsl.js';
 import { renderTeacherNav } from './teacher-nav.js';
 import { showNotification } from './notification-utils.js';
+import { withWorkingIndicator } from './ui-components.js';
 import {
   getQueryParams,
   updatePreview,
-  handleDslInputKeydown
+  handleDslInputKeydown,
+  updateUnsavedIndicator,
+  handleBeforeUnload
 } from './editor.js';
 import {
   initializePageDatabase,
@@ -56,10 +59,10 @@ async function refreshSlugList(pageId, slugListEl) {
     const removeBtn = document.createElement('button');
     removeBtn.textContent = 'Remove';
     removeBtn.className = 'schedule-action-btn delete-btn';
-    removeBtn.onclick = async () => {
+    removeBtn.onclick = withWorkingIndicator(removeBtn, async () => {
       await removeSlug(slug);
       await refreshSlugList(pageId, slugListEl);
-    };
+    });
 
     li.appendChild(link);
     li.appendChild(removeBtn);
@@ -88,10 +91,30 @@ export async function main() {
   const slugList = document.getElementById('slugList');
   const newSlugInput = document.getElementById('newSlugInput');
   const addSlugBtn = document.getElementById('addSlugBtn');
+  const unsavedIndicator = document.getElementById('unsavedIndicator');
+
+  // Unsaved-changes tracking, same pattern as editor.js: dirty as soon as
+  // the DSL textarea changes, clean again after a successful save. No
+  // in-app dropdown/search to switch through here (that's a navigation to
+  // page-manager.html instead), so beforeunload is the only guard needed.
+  let isDirty = false;
+  const markDirty = () => {
+    isDirty = true;
+    updateUnsavedIndicator(unsavedIndicator, isDirty);
+  };
+  const markClean = () => {
+    isDirty = false;
+    updateUnsavedIndicator(unsavedIndicator, isDirty);
+  };
+
+  window.addEventListener('beforeunload', (event) => handleBeforeUnload(event, isDirty));
 
   pageIdEl.textContent = pageId;
 
-  dslInput.addEventListener('input', () => updatePreview(dslInput.value, preview));
+  dslInput.addEventListener('input', () => {
+    markDirty();
+    updatePreview(dslInput.value, preview);
+  });
   dslInput.addEventListener('keydown', (event) => handleDslInputKeydown(event, dslInput));
 
   document.addEventListener('keydown', (event) => {
@@ -101,7 +124,7 @@ export async function main() {
     }
   });
 
-  addSlugBtn.onclick = async () => {
+  addSlugBtn.onclick = withWorkingIndicator(addSlugBtn, async () => {
     const slug = newSlugInput.value.trim().toLowerCase();
     if (!slug) return;
     try {
@@ -112,7 +135,7 @@ export async function main() {
     } catch (err) {
       alert(err.message);
     }
-  };
+  });
 
   saveBtn.onclick = async () => {
     const parsed = parseDSL(dslInput.value);
@@ -122,6 +145,7 @@ export async function main() {
     }
     await savePage(pageId, parsed);
     showNotification(`"${parsed.title}" saved successfully at ${new Date().toLocaleString()}`, 'success');
+    markClean();
   };
 
   deleteBtn.onclick = async () => {
@@ -131,6 +155,7 @@ export async function main() {
     );
     if (!confirmed) return;
     await deletePageAndSlugs(pageId);
+    markClean();
     window.location.href = 'page-manager.html';
   };
 
@@ -140,6 +165,7 @@ export async function main() {
     : generateDSLFromContent({ title: DEFAULT_PAGE_TITLE, blocks: [] });
   dslInput.value = dslText;
   updatePreview(dslText, preview);
+  markClean();
 
   await refreshSlugList(pageId, slugList);
 }

@@ -17,7 +17,7 @@ import {
 } from './date-utils.js';
 import { showNotification } from './notification-utils.js';
 import { initializeLessonSearch } from './lesson-search.js';
-import { createDateOffsetControl } from './ui-components.js';
+import { createDateOffsetControl, withWorkingIndicator } from './ui-components.js';
 import {
   initializeDatabase,
   getFullSchedule
@@ -101,13 +101,13 @@ export function initializeBulkShiftControl() {
   minusBtn.textContent = '−'; // −
   minusBtn.className = 'schedule-action-btn';
   minusBtn.title = 'Shift all classes backward';
-  minusBtn.onclick = () => applyBulkShift(-getShiftMagnitude(input));
+  minusBtn.onclick = withWorkingIndicator(minusBtn, () => applyBulkShift(-getShiftMagnitude(input)));
 
   const plusBtn = document.createElement('button');
   plusBtn.textContent = '+';
   plusBtn.className = 'schedule-action-btn';
   plusBtn.title = 'Shift all classes forward';
-  plusBtn.onclick = () => applyBulkShift(getShiftMagnitude(input));
+  plusBtn.onclick = withWorkingIndicator(plusBtn, () => applyBulkShift(getShiftMagnitude(input)));
 
   controls.appendChild(label);
   controls.appendChild(infoIcon);

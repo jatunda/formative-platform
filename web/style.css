@@ -1389,6 +1389,12 @@ ol.lesson-list {
   border: 1px solid var(--warning-border);
 }
 
+.unsaved-indicator {
+  color: var(--warning-yellow);
+  font-size: 0.9rem;
+  font-weight: bold;
+}
+
 /* ========================================
    Page manager / editor
    ======================================== */

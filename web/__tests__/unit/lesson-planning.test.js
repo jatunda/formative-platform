@@ -82,6 +82,7 @@ const mockCreateDateOffsetControl = vi.fn((config) => {
 });
 vi.mock('../../ui-components.js', () => ({
   createDateOffsetControl: (config) => mockCreateDateOffsetControl(config),
+  withWorkingIndicator: (btn, onClick) => onClick,
 }));
 
 describe('lesson-planning', () => {

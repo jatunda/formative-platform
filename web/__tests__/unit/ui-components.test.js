@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   createStyledButton,
   createNewLessonButton,
@@ -12,6 +12,7 @@ import {
   createLeftArrowButton,
   createRightArrowButton,
   createDateOffsetControl,
+  withWorkingIndicator,
 } from '../../ui-components.js';
 
 describe('ui-components', () => {
@@ -356,6 +357,78 @@ describe('ui-components', () => {
         expect(control.querySelector('label').textContent).toBe('Date Offset (days): ');
         expect(control.querySelector('.today-dayindex-display')).toBeTruthy();
       });
+    });
+  });
+
+  describe('withWorkingIndicator', () => {
+    let btn;
+
+    beforeEach(() => {
+      btn = document.createElement('button');
+      btn.textContent = 'Do Thing';
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('does not touch the button for an operation that finishes before the delay', async () => {
+      const onClick = vi.fn().mockResolvedValue('result');
+      const wrapped = withWorkingIndicator(btn, onClick, { delayMs: 1000 });
+
+      const promise = wrapped();
+      await Promise.resolve(); // let the microtask queue drain without advancing timers
+      await promise;
+
+      expect(onClick).toHaveBeenCalledTimes(1);
+      expect(btn.textContent).toBe('Do Thing');
+      expect(btn.disabled).toBe(false);
+    });
+
+    it('disables the button and shows the working label once the delay elapses', async () => {
+      let resolveOnClick;
+      const onClick = vi.fn(() => new Promise((resolve) => { resolveOnClick = resolve; }));
+      const wrapped = withWorkingIndicator(btn, onClick, { delayMs: 1000, workingLabel: 'Working…' });
+
+      const promise = wrapped();
+      await vi.advanceTimersByTimeAsync(1000);
+
+      expect(btn.disabled).toBe(true);
+      expect(btn.textContent).toBe('Working…');
+
+      resolveOnClick();
+      await promise;
+
+      expect(btn.disabled).toBe(false);
+      expect(btn.textContent).toBe('Do Thing');
+    });
+
+    it('restores the original text and disabled state even when onClick throws', async () => {
+      let rejectOnClick;
+      const onClick = vi.fn(() => new Promise((_, reject) => { rejectOnClick = reject; }));
+      btn.disabled = false;
+      const wrapped = withWorkingIndicator(btn, onClick, { delayMs: 1000 });
+
+      const promise = wrapped();
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(btn.disabled).toBe(true);
+
+      rejectOnClick(new Error('boom'));
+      await expect(promise).rejects.toThrow('boom');
+
+      expect(btn.disabled).toBe(false);
+      expect(btn.textContent).toBe('Do Thing');
+    });
+
+    it('passes through arguments and the resolved value', async () => {
+      const onClick = vi.fn(async (a, b) => a + b);
+      const wrapped = withWorkingIndicator(btn, onClick);
+
+      const result = await wrapped(2, 3);
+
+      expect(onClick).toHaveBeenCalledWith(2, 3);
+      expect(result).toBe(5);
     });
   });
 });

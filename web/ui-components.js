@@ -1,6 +1,40 @@
 // UI Component Helper Functions
 
 /**
+ * Wrap a button's click handler so that if the resulting work takes longer
+ * than `delayMs`, the button disables itself and shows `workingLabel` until
+ * it settles - so a slow auto-save operation (e.g. inserting a day) doesn't
+ * look like the click did nothing. Fast operations (the common case) never
+ * show anything, since the timer is cleared before it fires.
+ * @param {HTMLButtonElement} btn - The button whose own text/disabled state gets restored
+ * @param {(...args: any[]) => any} onClick - The original click handler (sync or async)
+ * @param {{delayMs?: number, workingLabel?: string}} [options]
+ * @returns {(...args: any[]) => Promise<any>}
+ */
+export function withWorkingIndicator(btn, onClick, { delayMs = 1000, workingLabel = "Working…" } = {}) {
+  return async (...args) => {
+    const originalText = btn.textContent;
+    const originalDisabled = btn.disabled;
+    let showed = false;
+    const timer = setTimeout(() => {
+      showed = true;
+      btn.disabled = true;
+      btn.textContent = workingLabel;
+    }, delayMs);
+
+    try {
+      return await onClick(...args);
+    } finally {
+      clearTimeout(timer);
+      if (showed) {
+        btn.textContent = originalText;
+        btn.disabled = originalDisabled;
+      }
+    }
+  };
+}
+
+/**
  * Create a styled button with the schedule-action-btn class
  * @param {string} text - The button text content
  * @param {() => void} onClick - The click handler function
@@ -10,7 +44,7 @@ export function createStyledButton(text, onClick) {
   const btn = document.createElement("button");
   btn.textContent = text;
   btn.className = "schedule-action-btn";
-  btn.onclick = onClick;
+  btn.onclick = withWorkingIndicator(btn, onClick);
   return btn;
 }
 
@@ -24,7 +58,7 @@ export function createNewLessonButton(dayIndex, addLessonCallback) {
   const btn = document.createElement("button");
   btn.textContent = "New Lesson";
   btn.className = "schedule-action-btn new-lesson-btn";
-  btn.onclick = () => addLessonCallback(dayIndex);
+  btn.onclick = withWorkingIndicator(btn, () => addLessonCallback(dayIndex));
   return btn;
 }
 
@@ -53,7 +87,7 @@ export function createArrowButton(direction, isDisabled, onClick) {
   btn.textContent = direction === "left" ? "←" : "→";
   btn.className = "schedule-action-btn";
   btn.disabled = isDisabled;
-  btn.onclick = onClick;
+  btn.onclick = withWorkingIndicator(btn, onClick);
   return btn;
 }
 
@@ -66,7 +100,7 @@ export function createDeleteButton(onClick) {
   const btn = document.createElement("button");
   btn.textContent = "🗑️";
   btn.className = "schedule-action-btn delete-btn";
-  btn.onclick = onClick;
+  btn.onclick = withWorkingIndicator(btn, onClick);
   return btn;
 }
 
@@ -80,7 +114,7 @@ export function createInsertDayButton(dayIndex, insertFunction) {
   const btn = document.createElement("button");
   btn.textContent = "+ Insert Day Here";
   btn.className = "schedule-action-btn insert-day-btn";
-  btn.onclick = () => insertFunction(dayIndex);
+  btn.onclick = withWorkingIndicator(btn, () => insertFunction(dayIndex));
   return btn;
 }
 

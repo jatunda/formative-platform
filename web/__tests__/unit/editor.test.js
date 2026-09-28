@@ -14,6 +14,9 @@ import {
   loadContent,
   handleNewLessonContext,
   handleExistingPageContext,
+  updateUnsavedIndicator,
+  confirmDiscardUnsavedChanges,
+  handleBeforeUnload,
 } from '../../editor.js';
 
 // firebase-app.js and firebase-database.js both alias to this same mock
@@ -284,27 +287,30 @@ describe('editor', () => {
   });
 
   describe('saveLesson', () => {
-    it('saves the parsed content and shows a success notification', async () => {
+    it('saves the parsed content, shows a success notification, and reports success', async () => {
       const { showNotification } = await import('../../notification-utils.js');
       mockParseDSL.mockReturnValue({ title: 'My Lesson', blocks: [{}] });
 
-      await saveLesson('abc123', '# My Lesson');
+      const result = await saveLesson('abc123', '# My Lesson');
 
       expect(mockData['content/abc123']).toEqual({ title: 'My Lesson', blocks: [{}] });
       expect(showNotification).toHaveBeenCalledWith(expect.stringContaining('My Lesson'), 'success');
+      expect(result).toBe(true);
     });
 
-    it('alerts and does not save when there is no content id', async () => {
-      await saveLesson('', '# Title');
+    it('alerts, does not save, and reports failure when there is no content id', async () => {
+      const result = await saveLesson('', '# Title');
       expect(mockData['content/']).toBeUndefined();
       expect(alert).toHaveBeenCalledWith('No content ID available.');
+      expect(result).toBe(false);
     });
 
-    it('alerts and does not save when parsing produced malformed content', async () => {
+    it('alerts, does not save, and reports failure when parsing produced malformed content', async () => {
       mockParseDSL.mockReturnValue({ title: null, blocks: null });
-      await saveLesson('abc123', 'garbage');
+      const result = await saveLesson('abc123', 'garbage');
       expect(mockData['content/abc123']).toBeUndefined();
       expect(alert).toHaveBeenCalledWith('Parsing failed or content is malformed.');
+      expect(result).toBe(false);
     });
   });
 
@@ -495,6 +501,53 @@ describe('editor', () => {
       await handleExistingPageContext({}, contentIdEl, document.getElementById('dslInput'), preview);
 
       expect(document.getElementById('dslInput').disabled).toBe(true);
+    });
+  });
+
+  describe('updateUnsavedIndicator', () => {
+    it('shows the indicator when dirty', () => {
+      const el = document.createElement('span');
+      updateUnsavedIndicator(el, true);
+      expect(el.style.display).toBe('inline');
+    });
+
+    it('hides the indicator when clean', () => {
+      const el = document.createElement('span');
+      el.style.display = 'inline';
+      updateUnsavedIndicator(el, false);
+      expect(el.style.display).toBe('none');
+    });
+  });
+
+  describe('confirmDiscardUnsavedChanges', () => {
+    it('returns true immediately when there are no unsaved changes, without prompting', () => {
+      expect(confirmDiscardUnsavedChanges(false)).toBe(true);
+      expect(confirm).not.toHaveBeenCalled();
+    });
+
+    it('prompts and returns the confirm result when dirty', () => {
+      global.confirm.mockReturnValue(true);
+      expect(confirmDiscardUnsavedChanges(true)).toBe(true);
+      expect(confirm).toHaveBeenCalledWith(expect.stringContaining('unsaved changes'));
+
+      global.confirm.mockReturnValue(false);
+      expect(confirmDiscardUnsavedChanges(true)).toBe(false);
+    });
+  });
+
+  describe('handleBeforeUnload', () => {
+    it('prevents the default and sets returnValue when dirty', () => {
+      const event = { preventDefault: vi.fn(), returnValue: undefined };
+      handleBeforeUnload(event, true);
+      expect(event.preventDefault).toHaveBeenCalled();
+      expect(event.returnValue).toBe('');
+    });
+
+    it('does nothing when clean', () => {
+      const event = { preventDefault: vi.fn(), returnValue: undefined };
+      handleBeforeUnload(event, false);
+      expect(event.preventDefault).not.toHaveBeenCalled();
+      expect(event.returnValue).toBeUndefined();
     });
   });
 });

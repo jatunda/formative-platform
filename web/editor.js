@@ -154,6 +154,40 @@ export function handleDslInputKeydown(event, dslInputEl) {
   }
 }
 
+/**
+ * Show or hide the "unsaved changes" indicator next to the Save button.
+ * @param {HTMLElement} indicatorEl
+ * @param {boolean} isDirty
+ */
+export function updateUnsavedIndicator(indicatorEl, isDirty) {
+  indicatorEl.style.display = isDirty ? "inline" : "none";
+}
+
+/**
+ * Gate an in-app action that would discard the current unsaved edits (e.g.
+ * switching to a different lesson). Returns true immediately when there's
+ * nothing to lose; otherwise asks via the native confirm dialog.
+ * @param {boolean} isDirty
+ * @returns {boolean} Whether it's safe to proceed
+ */
+export function confirmDiscardUnsavedChanges(isDirty) {
+  return !isDirty || confirm("You have unsaved changes. Discard them and continue?");
+}
+
+/**
+ * beforeunload handler: warns via the browser's native dialog when leaving
+ * with unsaved edits. The dialog's own text is browser-controlled - setting
+ * returnValue is what triggers it, not what it says.
+ * @param {BeforeUnloadEvent} event
+ * @param {boolean} isDirty
+ */
+export function handleBeforeUnload(event, isDirty) {
+  if (isDirty) {
+    event.preventDefault();
+    event.returnValue = "";
+  }
+}
+
 // Enable/disable the DSL input and the action buttons together, e.g. while
 // no lesson is selected. Queries its elements fresh rather than caching
 // them, since it's called from several independent places (this file and
@@ -175,16 +209,20 @@ export function setEditingEnabled(enabled) {
   }
 }
 
+/**
+ * @returns {Promise<boolean>} Whether the lesson was actually saved (false
+ * on the early-return validation failures below, alerted in place)
+ */
 export async function saveLesson(id, dslText) {
   if (!id || id === NO_CONTENT_SELECTED) {
     alert("No content ID available.");
-    return;
+    return false;
   }
 
   const parsed = parseDSL(dslText);
   if (!parsed.title || !parsed.blocks) {
     alert("Parsing failed or content is malformed.");
-    return;
+    return false;
   }
 
   await set(ref(db, `content/${id}`), parsed);
@@ -192,6 +230,7 @@ export async function saveLesson(id, dslText) {
   const timestamp = new Date().toLocaleString();
   const lessonTitle = parsed.title || UNTITLED_LESSON;
   showNotification(`"${lessonTitle}" saved successfully at ${timestamp}`, "success");
+  return true;
 }
 
 /**
@@ -383,8 +422,30 @@ export async function main() {
   const deleteBtn = document.getElementById("deleteBtn");
   const searchLessonBtn = document.getElementById("searchLessonBtn");
   const existingContentSelect = document.getElementById("existingContent");
+  const unsavedIndicator = document.getElementById("unsavedIndicator");
 
-  dslInput.addEventListener("input", () => updatePreview(dslInput.value, preview));
+  // Unsaved-changes tracking: dirty as soon as the DSL textarea changes,
+  // clean again after any successful save/duplicate/load. Guards the two
+  // in-app actions that would otherwise silently discard the current edits
+  // (switching lessons via the dropdown or search) plus an actual tab
+  // close/navigation via beforeunload below.
+  let isDirty = false;
+  const markDirty = () => {
+    isDirty = true;
+    updateUnsavedIndicator(unsavedIndicator, isDirty);
+  };
+  const markClean = () => {
+    isDirty = false;
+    updateUnsavedIndicator(unsavedIndicator, isDirty);
+  };
+  let previousSelectedValue = existingContentSelect.value;
+
+  window.addEventListener("beforeunload", (event) => handleBeforeUnload(event, isDirty));
+
+  dslInput.addEventListener("input", () => {
+    markDirty();
+    updatePreview(dslInput.value, preview);
+  });
   dslInput.addEventListener("keydown", (event) => handleDslInputKeydown(event, dslInput));
 
   // Add keyboard shortcut for save (Ctrl+S on Windows, Cmd+S on Mac)
@@ -418,6 +479,8 @@ export async function main() {
   searchLessonBtn.onclick = () => {
     showLessonSearchPopup({
       onSelect: async (lessonId) => {
+        if (!confirmDiscardUnsavedChanges(isDirty)) return;
+
         for (let i = 0; i < existingContentSelect.options.length; i++) {
           if (existingContentSelect.options[i].value === lessonId) {
             existingContentSelect.selectedIndex = i;
@@ -427,11 +490,16 @@ export async function main() {
         contentIdEl.textContent = lessonId;
         const found = await loadContent(lessonId, dslInput, preview);
         if (found) setEditingEnabled(true);
+        markClean();
+        previousSelectedValue = existingContentSelect.value;
       }
     });
   };
 
-  saveBtn.onclick = () => saveLesson(contentIdEl.textContent.trim(), dslInput.value);
+  saveBtn.onclick = async () => {
+    const saved = await saveLesson(contentIdEl.textContent.trim(), dslInput.value);
+    if (saved) markClean();
+  };
 
   duplicateBtn.onclick = async () => {
     const result = await duplicateLesson(contentIdEl.textContent.trim(), dslInput.value);
@@ -442,9 +510,11 @@ export async function main() {
     const newDslText = generateDSLFromContent(duplicatedContent);
     dslInput.value = newDslText;
     updatePreview(newDslText, preview);
+    markClean();
 
     existingContentSelect.value = "";
     await loadExistingContentList(existingContentSelect, newHash);
+    previousSelectedValue = existingContentSelect.value;
   };
 
   deleteBtn.onclick = async () => {
@@ -456,21 +526,32 @@ export async function main() {
     preview.innerHTML = "";
     existingContentSelect.value = "";
     setEditingEnabled(false);
+    markClean();
     await loadExistingContentList(existingContentSelect);
+    previousSelectedValue = existingContentSelect.value;
   };
 
   existingContentSelect.onchange = async () => {
+    if (!confirmDiscardUnsavedChanges(isDirty)) {
+      existingContentSelect.value = previousSelectedValue;
+      return;
+    }
+
     const selectedId = existingContentSelect.value;
     if (!selectedId) {
       contentIdEl.textContent = NO_CONTENT_SELECTED;
       dslInput.value = "";
       preview.innerHTML = "";
       setEditingEnabled(false);
+      markClean();
+      previousSelectedValue = existingContentSelect.value;
       return;
     }
     contentIdEl.textContent = selectedId;
     const found = await loadContent(selectedId, dslInput, preview);
     if (found) setEditingEnabled(true);
+    markClean();
+    previousSelectedValue = existingContentSelect.value;
   };
 
   // Check for URL parameters first to see if we need to select a specific lesson
@@ -479,9 +560,11 @@ export async function main() {
 
   // Load the content list and potentially select a specific lesson
   await loadExistingContentList(existingContentSelect, initialLessonId);
+  previousSelectedValue = existingContentSelect.value;
 
   await handleNewLessonContext(params, contentIdEl, dslInput, preview);
   await handleExistingPageContext(params, contentIdEl, dslInput, preview);
+  markClean();
 }
 
 // Check authentication before proceeding. Only run automatically when

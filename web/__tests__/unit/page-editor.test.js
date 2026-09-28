@@ -19,6 +19,19 @@ vi.mock('../../editor.js', () => ({
   getQueryParams: (...args) => mockGetQueryParams(...args),
   updatePreview: (...args) => mockUpdatePreview(...args),
   handleDslInputKeydown: (...args) => mockHandleDslInputKeydown(...args),
+  updateUnsavedIndicator: (indicatorEl, isDirty) => {
+    indicatorEl.style.display = isDirty ? 'inline' : 'none';
+  },
+  handleBeforeUnload: (event, isDirty) => {
+    if (isDirty) {
+      event.preventDefault();
+      event.returnValue = '';
+    }
+  },
+}));
+
+vi.mock('../../ui-components.js', () => ({
+  withWorkingIndicator: (btn, onClick) => onClick,
 }));
 
 const mockGetPageFromDB = vi.fn();
@@ -50,6 +63,7 @@ function renderEditorDom() {
     <ul id="slugList"></ul>
     <input id="newSlugInput" />
     <button id="addSlugBtn"></button>
+    <span id="unsavedIndicator" style="display: none;"></span>
   `;
 }
 
@@ -103,6 +117,56 @@ describe('page-editor', () => {
       await main();
 
       expect(mockGenerateDSLFromContent).toHaveBeenCalledWith({ title: 'Empty Page', blocks: [] });
+    });
+
+    describe('unsaved changes', () => {
+      it('starts clean after loading, with no beforeunload warning', async () => {
+        await main();
+
+        const event = { preventDefault: vi.fn(), returnValue: undefined };
+        window.dispatchEvent(Object.assign(new Event('beforeunload', { cancelable: true }), event));
+        expect(document.getElementById('unsavedIndicator').style.display).toBe('none');
+      });
+
+      it('marks dirty on input and shows the indicator', async () => {
+        await main();
+
+        document.getElementById('dslInput').dispatchEvent(new Event('input'));
+
+        expect(document.getElementById('unsavedIndicator').style.display).toBe('inline');
+      });
+
+      it('warns via beforeunload once dirty', async () => {
+        await main();
+        document.getElementById('dslInput').dispatchEvent(new Event('input'));
+
+        const event = new Event('beforeunload', { cancelable: true });
+        window.dispatchEvent(event);
+
+        expect(event.defaultPrevented).toBe(true);
+      });
+
+      it('clears the indicator after a successful save', async () => {
+        await main();
+        document.getElementById('dslInput').dispatchEvent(new Event('input'));
+        expect(document.getElementById('unsavedIndicator').style.display).toBe('inline');
+
+        document.getElementById('saveBtn').onclick();
+        await new Promise((resolve) => setTimeout(resolve, 0));
+
+        expect(document.getElementById('unsavedIndicator').style.display).toBe('none');
+      });
+
+      it('does not clear the indicator when save fails validation', async () => {
+        mockParseDSL.mockReturnValue({ title: null, blocks: null });
+        await main();
+        document.getElementById('dslInput').dispatchEvent(new Event('input'));
+
+        document.getElementById('saveBtn').onclick();
+        await new Promise((resolve) => setTimeout(resolve, 0));
+
+        expect(document.getElementById('unsavedIndicator').style.display).toBe('inline');
+      });
     });
 
     describe('save', () => {

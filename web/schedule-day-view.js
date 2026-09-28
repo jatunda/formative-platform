@@ -16,7 +16,8 @@ import { DEFAULT_LESSON_TITLE, UNTITLED_LESSON } from './constants.js';
 import {
   createStyledButton,
   createNewLessonButton as createNewLessonButtonShared,
-  createInsertDayButton
+  createInsertDayButton,
+  withWorkingIndicator
 } from './ui-components.js';
 import { createLessonClusterWithDB } from './lesson-manager.js';
 import { setupDropHandlers } from './drag-drop-utils.js';
@@ -140,7 +141,7 @@ export function createActionsCell(dayIndex, onDeleteDay) {
   deleteButton.textContent = "🗑️";
   deleteButton.className = "delete-day-btn";
   deleteButton.title = `Delete day ${dayIndex}`;
-  deleteButton.onclick = () => onDeleteDay(dayIndex);
+  deleteButton.onclick = withWorkingIndicator(deleteButton, () => onDeleteDay(dayIndex));
   tdActions.appendChild(deleteButton);
 
   return tdActions;
