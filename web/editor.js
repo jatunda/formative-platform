@@ -587,9 +587,12 @@ export async function main() {
 }
 
 // Check authentication before proceeding. Only run automatically when
-// actually loaded on editor.html - importing this module elsewhere (tests)
-// never triggers real auth/Firebase/DOM side effects on its own.
-if (document.getElementById('dslInput')) {
+// actually loaded on editor.html - importing this module elsewhere (tests,
+// or page-editor.js importing our exported helpers) never triggers real
+// auth/Firebase/DOM side effects on its own. Gated on 'existingContent'
+// rather than 'dslInput', since page-editor.html has its own #dslInput too
+// and would otherwise also trip this block, double-running our main().
+if (document.getElementById('existingContent')) {
   (async () => {
     const isAuthenticated = await window.teacherAuth.requireAuth();
     if (!isAuthenticated) {
