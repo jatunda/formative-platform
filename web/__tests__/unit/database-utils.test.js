@@ -479,7 +479,7 @@ describe('database-utils', () => {
   });
 
   describe('insertDayAt', () => {
-    it('should insert day at specified index', async () => {
+    it('should insert an empty day at the index and shift later days up by one', async () => {
       const mockDb = {};
       initializeDatabase(mockDb);
       mockData.schedule = {
@@ -489,11 +489,61 @@ describe('database-utils', () => {
           2: ['hash3'],
         },
       };
-      
+
       await insertDayAt('class1', 1, 2);
-      
-      // Should have shifted days 1 and 2 up
-      expect(mockSet).toHaveBeenCalled();
+
+      expect(mockData.schedule.class1).toEqual({
+        0: ['hash1'],
+        1: [],
+        2: ['hash2'],
+        3: ['hash3'],
+      });
+    });
+
+    it('should read the schedule once and issue all shifted writes in parallel, not one round-trip per day', async () => {
+      const mockDb = {};
+      initializeDatabase(mockDb);
+      mockData.schedule = {
+        class1: {
+          0: ['hash1'],
+          1: ['hash2'],
+          2: ['hash3'],
+        },
+      };
+
+      await insertDayAt('class1', 0, 2);
+
+      // One read for the whole schedule subtree, not one per shifted day -
+      // this is the regression guard for the old read-one/write-one loop.
+      const scheduleReads = mockGet.mock.calls.filter(([ref]) => ref.path === 'schedule/class1');
+      expect(scheduleReads).toHaveLength(1);
+      expect(mockData.schedule.class1).toEqual({
+        0: [],
+        1: ['hash1'],
+        2: ['hash2'],
+        3: ['hash3'],
+      });
+    });
+
+    it('should backfill a gap day (no prior schedule entry) as empty when shifted', async () => {
+      const mockDb = {};
+      initializeDatabase(mockDb);
+      mockData.schedule = {
+        class1: {
+          0: ['hash1'],
+          // day 1 is a gap - no entry at all
+          2: ['hash3'],
+        },
+      };
+
+      await insertDayAt('class1', 1, 2);
+
+      expect(mockData.schedule.class1).toEqual({
+        0: ['hash1'],
+        1: [],
+        2: [],
+        3: ['hash3'],
+      });
     });
   });
 

@@ -273,19 +273,22 @@ export async function setClassDateOffset(classId, offset) {
  * @throws {Error} If database is not initialized or operation fails
  */
 export async function insertDayAt(classId, index, maxDayIndex) {
-  // Shift all days >= index up by 1
+  // Read all schedule data in one round-trip, then issue every shifted
+  // day's write in parallel - mirrors deleteDayAt's shape below, rather
+  // than the previous read-one-day/write-one-day loop, which took two
+  // sequential network round-trips per shifted day.
+  const scheduleSnap = await get(ref(db, `schedule/${classId}`));
+  const scheduleData = scheduleSnap.exists() ? scheduleSnap.val() : {};
+
+  const writeOperations = [];
   for (let i = maxDayIndex; i >= index; i--) {
-    const fromRef = ref(db, `schedule/${classId}/${i}`);
-    const toRef = ref(db, `schedule/${classId}/${i + 1}`);
-    const snap = await get(fromRef);
-    if (snap.exists()) {
-      await set(toRef, snap.val());
-    } else {
-      await set(toRef, []);
-    }
+    const dayData = scheduleData[i] !== undefined ? scheduleData[i] : [];
+    writeOperations.push(set(ref(db, `schedule/${classId}/${i + 1}`), dayData));
   }
   // Set the new day to empty
-  await set(ref(db, `schedule/${classId}/${index}`), []);
+  writeOperations.push(set(ref(db, `schedule/${classId}/${index}`), []));
+
+  await Promise.all(writeOperations);
 }
 
 /**
