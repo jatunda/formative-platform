@@ -1231,7 +1231,6 @@ ol.lesson-list {
 .collapsible-content {
   padding: var(--spacing-md) var(--spacing-lg);
   padding-top: 0px;
-  padding-left: calc(var(--spacing-lg));
 }
 
 /* Nested collapsibles - each level already gets its own .collapsible-content
@@ -1474,12 +1473,6 @@ ol.lesson-list {
   button {
     font-size: 1rem;
     padding: 0.8rem;
-  }
-
-  /* Nested collapsibles' per-level indentation compounds with depth;
-     shrink the increment so deep nesting doesn't eat the narrow viewport. */
-  .collapsible-content {
-    padding-left: var(--spacing-sm);
   }
 
   .lesson-collapsible .lesson-collapsible {
