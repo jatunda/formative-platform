@@ -47,6 +47,32 @@
 
     "backlinks": {
       ".write": true
+    },
+
+    "questions": {
+      ".write": true
+    },
+
+    "questionSlugIndex": {
+      ".write": true,
+      "$slug": {
+        ".validate": "(!newData.exists() || !data.exists() || newData.val() === data.val()) && (!newData.exists() || newData.isString())"
+      }
+    },
+
+    "questionBacklinks": {
+      ".write": true
+    },
+
+    "practiceSets": {
+      ".write": true
+    },
+
+    "practiceSetSlugIndex": {
+      ".write": true,
+      "$slug": {
+        ".validate": "(!newData.exists() || !data.exists() || newData.val() === data.val()) && (!newData.exists() || newData.isString())"
+      }
     }
   }
 }

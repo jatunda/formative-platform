@@ -23,6 +23,13 @@ describe('createDslCheatSheetPanel', () => {
     expect(codeCells.some((text) => text.includes('[[#Header Text]]'))).toBe(true);
   });
 
+  it('documents the Question Link syntax, but not the full Question grammar', () => {
+    const panel = createDslCheatSheetPanel();
+    const codeCells = [...panel.querySelectorAll('td code')].map((el) => el.textContent);
+    expect(codeCells.some((text) => text.includes('[[q:slug]]'))).toBe(true);
+    expect(codeCells.some((text) => text.includes('Explanation:'))).toBe(false);
+  });
+
   it('creates a fresh element each call rather than sharing one node', () => {
     const first = createDslCheatSheetPanel();
     const second = createDslCheatSheetPanel();

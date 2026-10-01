@@ -112,6 +112,14 @@ describe('extractPageLinkSlugs', () => {
     const content = { title: 'T', blocks: [{ type: 'question', content: [{ type: 'text', value: 'plain text' }] }] };
     expect(extractPageLinkSlugs(content)).toEqual([]);
   });
+
+  it('ignores [[q:slug]] Question Link syntax', () => {
+    const content = {
+      title: 'T',
+      blocks: [{ type: 'question', content: [{ type: 'text', value: 'See [[q:loops-1]] and [[syllabus]].' }] }]
+    };
+    expect(extractPageLinkSlugs(content)).toEqual(['syllabus']);
+  });
 });
 
 describe('rewriteSlugInContent', () => {

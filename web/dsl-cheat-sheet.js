@@ -15,6 +15,7 @@ const CHEAT_SHEET_ENTRIES = [
   { syntax: '[text](url)', description: 'A link to any URL.' },
   { syntax: '[[slug]]\n[[slug|Display Text]]', description: 'A Page Link - links to another Page by its URL slug.' },
   { syntax: '[[#Header Text]]\n[[#Header Text|Display Text]]', description: 'A Section Link - jumps to a heading on this same page.' },
+  { syntax: '[[q:slug]]\n[[q:slug|Display Text]]', description: 'A Question Link - embeds a live practice question by its Question Slug (a separate namespace from Page Slugs). Always renders as its own block, even mid-sentence.' },
 ];
 
 /**

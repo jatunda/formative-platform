@@ -45,7 +45,12 @@ export function extractPageLinkSlugs(parsedContent) {
     walkTextValues(block.content, (text) => {
       for (const match of text.matchAll(PAGE_LINK_PATTERN)) {
         const { slug } = parsePageLinkMatch(match[1], match[2], match[3]);
-        if (slug) slugs.add(slug);
+        // [[q:slug]] is Question Link syntax (question-links.js), not a Page
+        // Link - PAGE_LINK_PATTERN's slug group has no way to exclude it
+        // itself (it would otherwise be treated as a literal slug of
+        // "q:slug", which isValidSlugFormat rejects anyway, but skip it
+        // explicitly here rather than relying on that incidental rejection).
+        if (slug && !slug.startsWith("q:")) slugs.add(slug);
       }
     });
   }

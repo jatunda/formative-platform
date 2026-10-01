@@ -1187,3 +1187,58 @@ describe('renderMultipleContent', () => {
   });
 });
 
+describe('Question Link placeholders', () => {
+  let container;
+
+  beforeEach(() => {
+    container = document.createElement('div');
+  });
+
+  it('renders a [[q:slug]] Question Link as its own placeholder block, not a plain link', () => {
+    const data = {
+      title: 'T',
+      blocks: [{ type: 'question', content: [{ type: 'text', value: 'Try this: [[q:loops-1]]' }] }]
+    };
+    renderContent(data, container);
+
+    const placeholder = container.querySelector('.question-embed-placeholder');
+    expect(placeholder).toBeTruthy();
+    expect(placeholder.dataset.questionSlug).toBe('loops-1');
+    expect(container.querySelector('a[href^="/p/q:"]')).toBeNull();
+  });
+
+  it('splits surrounding text into separate paragraphs before and after the embed', () => {
+    const data = {
+      title: 'T',
+      blocks: [{ type: 'question', content: [{ type: 'text', value: 'Before text [[q:loops-1]] after text' }] }]
+    };
+    renderContent(data, container);
+
+    const paragraphs = [...container.querySelectorAll('.lesson-text')].map((p) => p.textContent.trim());
+    expect(paragraphs).toEqual(['Before text', 'after text']);
+    expect(container.querySelector('.question-embed-placeholder')).toBeTruthy();
+  });
+
+  it('renders multiple Question Links on the same line as separate placeholders', () => {
+    const data = {
+      title: 'T',
+      blocks: [{ type: 'question', content: [{ type: 'text', value: '[[q:loops-1]] and [[q:loops-2]]' }] }]
+    };
+    renderContent(data, container);
+
+    const placeholders = [...container.querySelectorAll('.question-embed-placeholder')].map((el) => el.dataset.questionSlug);
+    expect(placeholders).toEqual(['loops-1', 'loops-2']);
+  });
+
+  it('does not confuse a Question Link with a Page Link on the same line', () => {
+    const data = {
+      title: 'T',
+      blocks: [{ type: 'question', content: [{ type: 'text', value: 'See [[syllabus]] and try [[q:loops-1]]' }] }]
+    };
+    renderContent(data, container);
+
+    expect(container.querySelector('a[href="/p/syllabus"]')).toBeTruthy();
+    expect(container.querySelector('.question-embed-placeholder').dataset.questionSlug).toBe('loops-1');
+  });
+});
+

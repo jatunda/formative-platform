@@ -12,6 +12,10 @@
         "function": "pageSSR"
       },
       {
+        "source": "/practice/**",
+        "function": "practiceSetSSR"
+      },
+      {
         "source": "/teacher.html",
         "destination": "/teacher.html"
       },
@@ -36,6 +40,22 @@
         "destination": "/page-editor.html"
       },
       {
+        "source": "/question-bank-manager.html",
+        "destination": "/question-bank-manager.html"
+      },
+      {
+        "source": "/question-editor.html",
+        "destination": "/question-editor.html"
+      },
+      {
+        "source": "/practice-set-manager.html",
+        "destination": "/practice-set-manager.html"
+      },
+      {
+        "source": "/practice-set-editor.html",
+        "destination": "/practice-set-editor.html"
+      },
+      {
         "source": "**",
         "destination": "/index.html"
       }
@@ -46,5 +66,20 @@
   },
   "functions": {
     "source": "functions"
+  },
+  "emulators": {
+    "hosting": {
+      "port": 5000
+    },
+    "functions": {
+      "port": 5001
+    },
+    "database": {
+      "port": 9000
+    },
+    "ui": {
+      "enabled": true,
+      "port": 4000
+    }
   }
 }

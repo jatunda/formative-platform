@@ -13,7 +13,9 @@ const PAGES = [
   { key: "teacher", href: "teacher.html", label: "Full Schedule", linkId: "backToScheduleLink" },
   { key: "lesson-planning", href: "lesson-planning.html", label: "Lesson Planning", linkId: "goToLessonPlanningLink" },
   { key: "editor", href: "editor.html", label: "Content Editor", linkId: "goToEditorLink" },
-  { key: "pages", href: "page-manager.html", label: "Pages", linkId: "goToPageManagerLink" }
+  { key: "pages", href: "page-manager.html", label: "Pages", linkId: "goToPageManagerLink" },
+  { key: "questions", href: "question-bank-manager.html", label: "Question Bank", linkId: "goToQuestionBankLink" },
+  { key: "practice-sets", href: "practice-set-manager.html", label: "Practice Sets", linkId: "goToPracticeSetManagerLink" }
 ];
 
 /**

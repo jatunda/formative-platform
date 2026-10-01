@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Question Bank</title>
+	<link rel="icon" type="image/x-icon" href="favicon.ico">
+	<link rel="stylesheet" href="style.css">
+	<script type="module" src="teacher-auth.js"></script>
+	<script type="module" src="question-bank-manager.js"></script>
+</head>
+
+<body data-teacher-page="true">
+	<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+		<h1>Question Bank</h1>
+		<button onclick="window.teacherAuth.logout()" style="width: auto; padding: 0.3rem 1rem; background-color: #e53e3e; border-color: #e53e3e; color: white;">Logout</button>
+	</div>
+
+	<div id="teacherNav"></div>
+
+	<p>Questions are reusable multiple-choice items - link to one from a Lesson or Page, or add it to a Practice Set.</p>
+
+	<div style="margin: 20px 0;">
+		<button id="newQuestionBtn" class="schedule-action-btn">New Question</button>
+	</div>
+
+	<div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 20px;">
+		<label for="classFilter">Class:</label>
+		<select id="classFilter">
+			<option value="">All classes</option>
+		</select>
+		<label for="topicFilter">Topic:</label>
+		<input id="topicFilter" type="text" placeholder="Filter by topic...">
+	</div>
+
+	<div id="questionList"></div>
+</body>
+
+</html>

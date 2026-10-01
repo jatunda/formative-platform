@@ -20,6 +20,14 @@ export const DEFAULT_PAGE_TITLE = "Empty Page";
 export const UNTITLED_PAGE_LOWERCASE = "(untitled)";
 export const PAGE_NOT_FOUND = "Page not found.";
 
+// Question-related constants
+export const QUESTION_NOT_FOUND = "Question not found.";
+
+// Practice Set-related constants
+export const DEFAULT_PRACTICE_SET_TITLE = "Empty Practice Set";
+export const UNTITLED_PRACTICE_SET_LOWERCASE = "(untitled)";
+export const PRACTICE_SET_NOT_FOUND = "Practice set not found.";
+
 // Database path constants
 export const DB_PATHS = {
 	SCHEDULE: "schedule/",

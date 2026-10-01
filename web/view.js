@@ -3,8 +3,12 @@ import { ref, get } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-dat
 import { db } from './firebase-config.js';
 import { initializeDateUtils, getTodayDayIndex } from './date-utils.js';
 import { renderContent, renderMultipleContent } from './content-renderer.js';
+import { initializeQuestionDatabase } from './question-database-utils.js';
+import { mountQuestionEmbeds } from './question-embed.js';
 import { NO_CONTENT_FOR_TODAY } from './constants.js';
 import { showErrorState, showSlowConnectionMessage, withConnectionTimeout } from './error-ui-utils.js';
+
+initializeQuestionDatabase(db);
 
 // Initialize date utilities with database
 initializeDateUtils(db);
@@ -56,6 +60,7 @@ export async function loadContent(classId, dayIndex, contentEl) {
   const pageCache = await fetchPages(pageIds);
   const contentData = pageIds.map(pageId => pageCache[pageId]).filter(data => data);
   renderMultipleContent(contentData, contentEl);
+  await mountQuestionEmbeds(contentEl);
 }
 
 /**

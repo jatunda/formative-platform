@@ -15,6 +15,7 @@ let fetchClassesError = null;
 vi.mock('https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js', () => ({
   initializeApp: () => ({}),
   getDatabase: () => ({}),
+  connectDatabaseEmulator: () => {},
   ref: (db, path) => ({ path }),
   get: async (ref) => {
     if (ref.path === 'classes' && fetchClassesError) {

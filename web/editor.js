@@ -35,6 +35,9 @@ import {
 } from "./database-utils.js";
 import { renderTeacherNav } from "./teacher-nav.js";
 import { createDslCheatSheetPanel } from "./dsl-cheat-sheet.js";
+import { initializeQuestionDatabase } from "./question-database-utils.js";
+import { mountQuestionEmbeds } from "./question-embed.js";
+import { showQuestionLinkPicker } from "./question-link-picker.js";
 
 import {
 	AI_CONFIG,
@@ -54,6 +57,15 @@ export function getQueryParams() {
   return params;
 }
 
+// Debounce timer for mounting live Question Link previews - shared across
+// every updatePreview call site (both the Lesson editor and, via its import
+// of this function, the Page editor), so a single ~400ms-after-last-keystroke
+// delay applies everywhere rather than needing to be wired at each call site.
+// Debounced (not run on every keystroke) because, unlike the rest of
+// updatePreview, mounting a Question embed means real Firebase reads - see
+// the implementation plan's decision C.
+let embedMountTimer = null;
+
 export function updatePreview(dslText, previewEl) {
   try {
     const parsed = parseDSL(dslText);
@@ -68,6 +80,9 @@ export function updatePreview(dslText, previewEl) {
   } catch (err) {
     previewEl.innerHTML = getErrorExplanation(err, dslText);
   }
+
+  clearTimeout(embedMountTimer);
+  embedMountTimer = setTimeout(() => mountQuestionEmbeds(previewEl), 400);
 }
 
 /**
@@ -415,6 +430,7 @@ export async function handleExistingPageContext(params, contentIdEl, dslInputEl,
 export async function main() {
   // Initialize database utilities
   initializeDatabase(db);
+  initializeQuestionDatabase(db);
 
   // Initialize the lesson search module with database reference
   initializeLessonSearch(db);
@@ -440,6 +456,7 @@ export async function main() {
   const duplicateBtn = document.getElementById("duplicateBtn");
   const deleteBtn = document.getElementById("deleteBtn");
   const searchLessonBtn = document.getElementById("searchLessonBtn");
+  const insertQuestionLinkBtn = document.getElementById("insertQuestionLinkBtn");
   const existingContentSelect = document.getElementById("existingContent");
   const unsavedIndicator = document.getElementById("unsavedIndicator");
 
@@ -511,6 +528,17 @@ export async function main() {
         if (found) setEditingEnabled(true);
         markClean();
         previousSelectedValue = existingContentSelect.value;
+      }
+    });
+  };
+
+  insertQuestionLinkBtn.onclick = () => {
+    showQuestionLinkPicker({
+      onSelect: ({ slug, label }) => {
+        const snippet = `[[q:${slug}|${label}]]`;
+        const result = computeInsertAtCursor(dslInput.value, dslInput.selectionStart, dslInput.selectionEnd, snippet);
+        applyComputedEdit(dslInput, result);
+        dslInput.focus();
       }
     });
   };

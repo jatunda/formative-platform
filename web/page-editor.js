@@ -10,6 +10,7 @@ import { showNotification } from './notification-utils.js';
 import { withWorkingIndicator } from './ui-components.js';
 import { createDslCheatSheetPanel } from './dsl-cheat-sheet.js';
 import { showPageLinkPicker } from './page-link-picker.js';
+import { showQuestionLinkPicker } from './question-link-picker.js';
 import {
   getQueryParams,
   updatePreview,
@@ -31,6 +32,10 @@ import {
   getBacklinks,
   updateBacklinksForPage
 } from './page-database-utils.js';
+import {
+  initializeQuestionDatabase,
+  updateQuestionBacklinksForPage
+} from './question-database-utils.js';
 import { DEFAULT_PAGE_TITLE } from './constants.js';
 
 /**
@@ -107,6 +112,7 @@ async function refreshSlugList(pageId, slugListEl) {
 
 export async function main() {
   initializePageDatabase(db);
+  initializeQuestionDatabase(db);
   renderTeacherNav('pages');
 
   const params = getQueryParams();
@@ -128,6 +134,7 @@ export async function main() {
   const addSlugBtn = document.getElementById('addSlugBtn');
   const unsavedIndicator = document.getElementById('unsavedIndicator');
   const insertPageLinkBtn = document.getElementById('insertPageLinkBtn');
+  const insertQuestionLinkBtn = document.getElementById('insertQuestionLinkBtn');
   const cheatSheetContainer = document.getElementById('cheatSheetContainer');
 
   cheatSheetContainer.appendChild(createDslCheatSheetPanel());
@@ -187,6 +194,17 @@ export async function main() {
     });
   };
 
+  insertQuestionLinkBtn.onclick = () => {
+    showQuestionLinkPicker({
+      onSelect: ({ slug, label }) => {
+        const snippet = `[[q:${slug}|${label}]]`;
+        const result = computeInsertAtCursor(dslInput.value, dslInput.selectionStart, dslInput.selectionEnd, snippet);
+        applyComputedEdit(dslInput, result);
+        dslInput.focus();
+      }
+    });
+  };
+
   saveBtn.onclick = async () => {
     const parsed = parseDSL(dslInput.value);
     if (!parsed.title || !parsed.blocks) {
@@ -195,6 +213,7 @@ export async function main() {
     }
     await savePage(pageId, parsed);
     await updateBacklinksForPage(pageId, parsed);
+    await updateQuestionBacklinksForPage(pageId, parsed);
     showNotification(`"${parsed.title}" saved successfully at ${new Date().toLocaleString()}`, 'success');
     markClean();
   };

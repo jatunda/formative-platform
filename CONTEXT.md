@@ -16,7 +16,7 @@ A standalone piece of DSL-authored content reachable directly by URL, independen
 _Avoid_: Static Page (redundant — "Page" already implies this), Content (same reasoning as Lesson — leaks storage shape).
 
 **Slug**:
-The human-chosen identifier that makes a Page reachable at a URL. A Page can have more than one Slug pointing to it; each Slug resolves to exactly one Page. Distinct from a Lesson's id, which is an opaque generated hash the teacher never chooses or sees. A Page Link (below) elsewhere in the app can embed a Slug's text directly; removing that Slug without a Slug Rename leaves those Page Links pointing nowhere — they still render as normal links, they just lead to the site's "Page not found" page on click.
+The human-chosen identifier that makes a Page, Question, or Practice Set reachable at a URL. Each kind keeps its own Slug namespace — a Page and a Question may validly share the same Slug text, since each is only ever resolved within its own kind's URL space and Link syntax. A Page (or Question, or Practice Set) can have more than one Slug pointing to it; each Slug resolves to exactly one of that kind. Distinct from a Lesson's id, which is an opaque generated hash the teacher never chooses or sees. A Page Link or Question Link (below) elsewhere in the app can embed a Slug's text directly; removing that Slug without a Slug Rename leaves those links pointing nowhere — they still render as normal links, they just lead to a "not found" page on click.
 _Avoid_: URL, path, permalink — Slug refers specifically to the chosen identifier, not the resulting address.
 
 **Slug Rename**:
@@ -56,3 +56,34 @@ For a given Class, the small run of consecutive Day Indices — starting at Toda
 
 **Prompt Profile**:
 Per-Class configuration used only when generating AI-assisted questions in the Content Editor: subject, grade level, and (optionally) class-specific prompting instructions and example questions. Hard-coded in `ai-generator.js`, keyed by Class id. Distinct from the Class record itself in Firebase — a new Class has no Prompt Profile until one is added there, and generation falls back to generic subject/grade-level defaults in that case (surfaced as a notice in the AI Generation modal, not a silent guess).
+
+**Question**:
+A single multiple-choice item — one stem and a set of Options, exactly one of which is correct — stored as its own entity, independent of any Lesson or Practice Set that references it. Reachable by its own Slug so the same Question can be linked from many places without being copied. Tagged with a Class and a free-text topic for organization. Unlike a Lesson (placed into a Schedule) or a Page (linked directly), a Question is never viewed on its own — it's only ever encountered embedded in a Lesson/Page via a Question Link, or as part of a Practice Set.
+_Avoid_: MCQ, quiz question — "Question" is the canonical noun; the multiple-choice shape is a property of it, not a different concept.
+
+**Option**:
+One selectable choice within a Question. Exactly one Option per Question is correct. Every Option, correct or not, carries its own Explanation; incorrect Options additionally carry a Mistake Category.
+
+**Explanation**:
+The text shown after a student picks a given Option, specific to that Option rather than the Question as a whole — a Question with four Options has four Explanations, not one. Explains why that particular choice is right, or why it's wrong.
+
+**Mistake Category**:
+A short label on an incorrect Option classifying the kind of error it represents (e.g. calculation error, misconception, skill gap), recorded at authoring time alongside that Option's Explanation. Not used anywhere in the delivery flow today — it exists so a future per-student breakdown ("what kind of mistakes is this student making") doesn't require retroactively re-editing every Question.
+
+**Question Link**:
+A `[[q:slug]]` reference inside a Lesson or Page's DSL content pointing at a Question, the Question equivalent of a Page Link. Uses the Question Slug namespace, kept separate from Page Slugs, and is visually distinct from a Page Link in the DSL source. A Question is never authored inline in Lesson/Page content — only ever linked to by Question Link.
+_Avoid_: embedded question, inline question — Questions are always separate entities; nothing about them is inline.
+
+**Practice Set**:
+An ordered list of Questions, reachable directly by URL like a Page, that a student works through in order via a Question Link-free, student-facing delivery flow. A Practice Set holds no question content of its own — only an ordered list of references — so the same Question can appear in many Practice Sets. Assembled by picking existing Questions, not authored as DSL content.
+_Avoid_: Quiz, Assessment, Practice Quiz — "Practice Set" is the canonical term for this delivered, ordered collection.
+
+**Attempt**:
+One submitted Option selection for a Question, made by a student working through a Practice Set. A student gets at most two Attempts per Question: a correct Attempt finishes the Question immediately, and a second wrong Attempt also finishes it, auto-revealing the correct Option and its Explanation.
+
+**Frontier**:
+For a student working through a Practice Set, the first Question they have not yet finished (see Attempt). A student may freely navigate back and forth among every Question up to and including the Frontier, but cannot advance past it; finishing the Frontier's Question advances the Frontier to the next Question in the set.
+_Avoid_: current question, progress — Frontier specifically names the forward boundary of what's navigable, not simply whichever Question happens to be on screen (a student can be reviewing an earlier one while the Frontier sits further ahead).
+
+**Question Outcome**:
+The one of three results a Question ends in for a given student, once finished: First-Try Correct (right on the first Attempt), Second-Try Correct (wrong once, then right), or Missed (wrong twice, auto-revealed). Tallied into a Practice Set's end-of-set summary; held only in the browser for that session, never written to the database.

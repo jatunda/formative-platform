@@ -25,6 +25,7 @@ const mockData = {};
 vi.mock('https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js', () => ({
   initializeApp: () => ({}),
   getDatabase: () => ({}),
+  connectDatabaseEmulator: () => {},
   ref: (db, path) => ({ path }),
   get: async (ref) => {
     const value = mockData[ref.path];
@@ -40,10 +41,20 @@ vi.mock('../../content-renderer.js', () => ({
   }),
 }));
 
+vi.mock('../../question-database-utils.js', () => ({
+  initializeQuestionDatabase: vi.fn(),
+}));
+
+const mockMountQuestionEmbeds = vi.fn();
+vi.mock('../../question-embed.js', () => ({
+  mountQuestionEmbeds: (...args) => mockMountQuestionEmbeds(...args),
+}));
+
 describe('view', () => {
   beforeEach(() => {
     for (const key of Object.keys(mockData)) delete mockData[key];
     capturedTimeoutOptions = undefined;
+    mockMountQuestionEmbeds.mockReset();
   });
 
   describe('resolveDayIndex', () => {

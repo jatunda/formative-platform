@@ -7,6 +7,7 @@ import { PAGE_NOT_FOUND } from '../../constants.js';
 vi.mock('https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js', () => ({
   initializeApp: () => ({}),
   getDatabase: () => ({}),
+  connectDatabaseEmulator: () => {},
 }));
 
 const mockResolveSlugToPageId = vi.fn();
@@ -22,6 +23,15 @@ const mockRenderContent = vi.fn((data, el) => {
 });
 vi.mock('../../content-renderer.js', () => ({
   renderContent: (...args) => mockRenderContent(...args),
+}));
+
+vi.mock('../../question-database-utils.js', () => ({
+  initializeQuestionDatabase: vi.fn(),
+}));
+
+const mockMountQuestionEmbeds = vi.fn();
+vi.mock('../../question-embed.js', () => ({
+  mountQuestionEmbeds: (...args) => mockMountQuestionEmbeds(...args),
 }));
 
 describe('getSlugFromPath', () => {
@@ -45,6 +55,7 @@ describe('initializePage', () => {
     mockResolveSlugToPageId.mockReset();
     mockGetPageFromDB.mockReset();
     mockRenderContent.mockClear();
+    mockMountQuestionEmbeds.mockReset();
   });
 
   it('renders the page when the slug resolves', async () => {
@@ -57,6 +68,7 @@ describe('initializePage', () => {
     expect(mockResolveSlugToPageId).toHaveBeenCalledWith('syllabus');
     expect(mockGetPageFromDB).toHaveBeenCalledWith('abc123');
     expect(document.getElementById('content').textContent).toBe('rendered:Syllabus');
+    expect(mockMountQuestionEmbeds).toHaveBeenCalledWith(document.getElementById('content'));
   });
 
   it('shows Page not found when the slug does not resolve', async () => {

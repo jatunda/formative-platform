@@ -5,6 +5,8 @@ import {
   resolveSlugToPageId,
   getPageFromDB
 } from './page-database-utils.js';
+import { initializeQuestionDatabase } from './question-database-utils.js';
+import { mountQuestionEmbeds } from './question-embed.js';
 import { PAGE_NOT_FOUND } from './constants.js';
 
 /**
@@ -17,6 +19,7 @@ export function getSlugFromPath(pathname) {
 
 export async function initializePage() {
   initializePageDatabase(db);
+  initializeQuestionDatabase(db);
 
   const contentEl = document.getElementById('content');
   // The production /p/<slug> path is served by the pageSSR Cloud Function,
@@ -39,6 +42,7 @@ export async function initializePage() {
 
   const data = await getPageFromDB(pageId);
   renderContent(data, contentEl);
+  await mountQuestionEmbeds(contentEl);
 }
 
 if (document.getElementById('content')) {

@@ -51,6 +51,17 @@ vi.mock('../../page-link-picker.js', () => ({
   showPageLinkPicker: (...args) => mockShowPageLinkPicker(...args),
 }));
 
+const mockShowQuestionLinkPicker = vi.fn();
+vi.mock('../../question-link-picker.js', () => ({
+  showQuestionLinkPicker: (...args) => mockShowQuestionLinkPicker(...args),
+}));
+
+const mockUpdateQuestionBacklinksForPage = vi.fn();
+vi.mock('../../question-database-utils.js', () => ({
+  initializeQuestionDatabase: vi.fn(),
+  updateQuestionBacklinksForPage: (...args) => mockUpdateQuestionBacklinksForPage(...args),
+}));
+
 const mockGetPageFromDB = vi.fn();
 const mockSavePage = vi.fn();
 const mockDeletePageAndSlugs = vi.fn();
@@ -85,6 +96,7 @@ function renderEditorDom() {
     <button id="saveBtn"></button>
     <button id="deleteBtn"></button>
     <button id="insertPageLinkBtn"></button>
+    <button id="insertQuestionLinkBtn"></button>
     <div id="cheatSheetContainer"></div>
     <ul id="slugList"></ul>
     <input id="newSlugInput" />
@@ -107,6 +119,8 @@ describe('page-editor', () => {
     mockGetBacklinks.mockReset().mockResolvedValue([]);
     mockUpdateBacklinksForPage.mockReset().mockResolvedValue(undefined);
     mockShowPageLinkPicker.mockReset();
+    mockShowQuestionLinkPicker.mockReset();
+    mockUpdateQuestionBacklinksForPage.mockReset().mockResolvedValue(undefined);
     mockParseDSL.mockReset().mockReturnValue({ title: 'Parsed Title', blocks: [{ type: 'question', content: [] }] });
     mockGenerateDSLFromContent.mockClear();
     global.alert.mockClear();
@@ -211,6 +225,7 @@ describe('page-editor', () => {
 
         expect(mockSavePage).toHaveBeenCalledWith('abc123', { title: 'Parsed Title', blocks: [{ type: 'question', content: [] }] });
         expect(mockUpdateBacklinksForPage).toHaveBeenCalledWith('abc123', { title: 'Parsed Title', blocks: [{ type: 'question', content: [] }] });
+        expect(mockUpdateQuestionBacklinksForPage).toHaveBeenCalledWith('abc123', { title: 'Parsed Title', blocks: [{ type: 'question', content: [] }] });
         expect(showNotification).toHaveBeenCalledWith(expect.stringContaining('Parsed Title'), 'success');
       });
 
@@ -369,6 +384,23 @@ describe('page-editor', () => {
         document.getElementById('insertPageLinkBtn').onclick();
 
         expect(dslInput.value).toBe('before [[syllabus|Syllabus]]after');
+      });
+    });
+
+    describe('insert question link', () => {
+      it('inserts [[q:slug|Label]] at the cursor when a question is picked', async () => {
+        await main();
+        const dslInput = document.getElementById('dslInput');
+        dslInput.value = 'before after';
+        dslInput.selectionStart = dslInput.selectionEnd = 7;
+
+        mockShowQuestionLinkPicker.mockImplementation(({ onSelect }) => {
+          onSelect({ slug: 'loops-1', label: 'What is a loop?' });
+        });
+
+        document.getElementById('insertQuestionLinkBtn').onclick();
+
+        expect(dslInput.value).toBe('before [[q:loops-1|What is a loop?]]after');
       });
     });
   });

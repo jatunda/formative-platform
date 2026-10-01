@@ -2,6 +2,7 @@
 // Used by both view.js and editor.js for consistent rendering
 import { CONTENT_NOT_FOUND } from './constants.js';
 import { PAGE_LINK_PATTERN, parsePageLinkMatch } from './page-links.js';
+import { QUESTION_LINK_PATTERN, parseQuestionLinkMatch } from './question-links.js';
 
 /**
  * Turn heading text into a URL-safe id fragment for Section Link targets.
@@ -174,6 +175,41 @@ function processInlineCode(text, headingIds = new Map()) {
  * @param {string[]} [headingIdQueue] - idsInOrder from collectHeadingIds, consumed one per heading rendered
  * @private
  */
+/**
+ * Split a text item's raw lines on any [[q:slug]] Question Link occurrences,
+ * replacing each match with a placeholder marker object interspersed between
+ * the surrounding plain-text lines. A Question Link always renders as its
+ * own block (see docs/adr/0010 and the implementation plan's decision C) -
+ * it mounts a live, stateful, interactive widget via question-embed.js,
+ * which a synchronous string substitution (like a Page Link's static <a>)
+ * can't produce - so even a Question Link in the middle of a sentence breaks
+ * that line into separate text-before / embed / text-after pieces.
+ * @param {string[]} rawLines
+ * @returns {Array<string|{type: "questionLink", slug: string}>}
+ * @private
+ */
+function expandQuestionLinkLines(rawLines) {
+	const expanded = [];
+	for (const rawLine of rawLines) {
+		const matches = [...rawLine.matchAll(QUESTION_LINK_PATTERN)];
+		if (matches.length === 0) {
+			expanded.push(rawLine);
+			continue;
+		}
+		let cursor = 0;
+		for (const match of matches) {
+			const before = rawLine.slice(cursor, match.index);
+			if (before.trim() !== '') expanded.push(before);
+			const { slug } = parseQuestionLinkMatch(match[1], match[2]);
+			expanded.push({ type: 'questionLink', slug });
+			cursor = match.index + match[0].length;
+		}
+		const after = rawLine.slice(cursor);
+		if (after.trim() !== '') expanded.push(after);
+	}
+	return expanded;
+}
+
 function renderContentItems(contentItems, containerEl, headingIds = new Map(), headingIdQueue = []) {
 	// Stack to track list hierarchy (separate from parent list stack)
 	const listStack = [];
@@ -181,8 +217,10 @@ function renderContentItems(contentItems, containerEl, headingIds = new Map(), h
 	
 	contentItems.forEach(item => {
 		if (item.type === "text") {
-			// Split text into lines to process each separately
-			const lines = item.value.split('\n');
+			// Split text into lines to process each separately, expanding out
+			// any [[q:slug]] Question Links into their own placeholder markers
+			// first (see expandQuestionLinkLines above).
+			const lines = expandQuestionLinkLines(item.value.split('\n'));
 			
 			/**
 			 * Calculate nesting depth from indentation
@@ -256,8 +294,23 @@ function renderContentItems(contentItems, containerEl, headingIds = new Map(), h
 			}
 			
 			lines.forEach(line => {
+				if (line && typeof line === "object" && line.type === "questionLink") {
+					// A Question Link always renders as its own block (see
+					// expandQuestionLinkLines's doc comment) - reset list/heading
+					// state the same way a heading does, then mount a placeholder
+					// for question-embed.js to hydrate asynchronously afterward.
+					listStack.length = 0;
+					indentUnit = null;
+
+					const placeholder = document.createElement("div");
+					placeholder.className = "question-embed-placeholder";
+					placeholder.dataset.questionSlug = line.slug;
+					containerEl.appendChild(placeholder);
+					return;
+				}
+
 				const headingMatch = line.match(/^(#{1,6})\s+(.+)$/);
-				
+
 				if (headingMatch) {
 					listStack.length = 0;
 					indentUnit = null;
@@ -461,5 +514,6 @@ function renderMultipleContent(dataArray, containerEl) {
 export {
 	renderContent,
 	renderMultipleContent,
-	processInlineCode
+	processInlineCode,
+	renderContentItems
 };

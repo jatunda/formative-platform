@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Practice Set Editor</title>
+	<link rel="icon" type="image/x-icon" href="favicon.ico">
+	<link rel="stylesheet" href="style.css">
+	<script type="module" src="teacher-auth.js"></script>
+	<script type="module" src="practice-set-editor.js"></script>
+</head>
+
+<body data-teacher-page="true">
+	<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+		<h1>Practice Set Editor</h1>
+		<button onclick="window.teacherAuth.logout()" style="width: auto; padding: 0.3rem 1rem; background-color: #e53e3e; border-color: #e53e3e; color: white;">Logout</button>
+	</div>
+
+	<div id="teacherNav"></div>
+
+	<div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 20px 0;">
+		<label for="titleInput">Title:</label>
+		<input id="titleInput" type="text" placeholder="e.g. Unit 3 Review" style="flex: 1; min-width: 200px; max-width: 400px;">
+	</div>
+
+	<div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 20px 0;">
+		<button id="saveBtn" class="schedule-action-btn">Save</button>
+		<button id="deleteBtn" class="schedule-action-btn delete-btn">Delete</button>
+		<span id="unsavedIndicator" class="unsaved-indicator" style="display: none;">● Unsaved changes</span>
+	</div>
+
+	<h3>Questions</h3>
+	<p>Students answer these in this exact order.</p>
+	<ol id="questionList"></ol>
+	<div style="margin: 10px 0;">
+		<button id="addQuestionBtn" class="schedule-action-btn">Add Question</button>
+	</div>
+
+	<h3>URL</h3>
+	<p>A practice set with no URL assigned exists but isn't reachable by students. It can have more than one.</p>
+	<ul id="slugList"></ul>
+	<div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center;">
+		<label for="newSlugInput">/practice/</label>
+		<input id="newSlugInput" type="text" placeholder="unit-3-review" style="flex: 1; min-width: 150px; max-width: 300px;">
+		<button id="addSlugBtn" class="schedule-action-btn">Add URL</button>
+	</div>
+</body>
+
+</html>

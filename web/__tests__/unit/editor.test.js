@@ -26,6 +26,7 @@ const mockData = {};
 vi.mock('https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js', () => ({
   initializeApp: () => ({}),
   getDatabase: () => ({}),
+  connectDatabaseEmulator: () => {},
   ref: (db, path) => ({ path }),
   get: async (ref) => {
     const value = mockData[ref.path];
@@ -81,6 +82,20 @@ vi.mock('../../ai-config.js', () => ({
 
 vi.mock('../../notification-utils.js', () => ({
   showNotification: vi.fn(),
+}));
+
+vi.mock('../../question-database-utils.js', () => ({
+  initializeQuestionDatabase: vi.fn(),
+}));
+
+const mockMountQuestionEmbeds = vi.fn();
+vi.mock('../../question-embed.js', () => ({
+  mountQuestionEmbeds: (...args) => mockMountQuestionEmbeds(...args),
+}));
+
+const mockShowQuestionLinkPicker = vi.fn();
+vi.mock('../../question-link-picker.js', () => ({
+  showQuestionLinkPicker: (...args) => mockShowQuestionLinkPicker(...args),
 }));
 
 global.alert = vi.fn();
