@@ -152,6 +152,45 @@ describe('question-editor', () => {
       expect(document.getElementById('questionDslInput').value).toContain('Write your question stem here.');
     });
 
+    it('defaults options and topic to empty when loading a question missing those fields', async () => {
+      mockGetQuestionFromDB.mockResolvedValue({ stem: SAMPLE_PARSED.stem, classId: 'c1' });
+
+      await main();
+
+      expect(mockGetClasses).toHaveBeenCalled();
+    });
+
+    describe('preview rendering', () => {
+      it('renders a wrong option with missing Explanation/Mistake as "(missing)", and missing Tags as placeholders', async () => {
+        mockParseQuestionDSL.mockReturnValue({
+          stem: [{ type: 'text', value: 'Stem' }],
+          options: [
+            { text: 'A', correct: true, explanation: 'Right.', mistakeCategory: null },
+            { text: 'B', correct: false, explanation: null, mistakeCategory: null },
+          ],
+          className: null,
+          topic: null,
+        });
+
+        await main();
+
+        const preview = document.getElementById('preview').innerHTML;
+        expect(preview).toContain('✗ Wrong: B');
+        expect(preview).toContain('Explanation: (missing)');
+        expect(preview).toContain('Mistake: (missing)');
+        expect(preview).toContain('(no class)');
+        expect(preview).toContain('(no topic)');
+      });
+
+      it('shows the error explanation when parsing throws', async () => {
+        mockParseQuestionDSL.mockImplementation(() => { throw new Error('boom'); });
+
+        await main();
+
+        expect(document.getElementById('preview').innerHTML).toContain('boom');
+      });
+    });
+
     describe('save', () => {
       it('validates, resolves the Class name, and saves', async () => {
         const { showNotification } = await import('../../notification-utils.js');
@@ -213,6 +252,26 @@ describe('question-editor', () => {
 
         expect(mockDeleteQuestionAndSlugs).not.toHaveBeenCalled();
       });
+
+      it('mentions a single affected page in the singular when deleting with exactly one backlink', async () => {
+        mockGetQuestionBacklinks.mockResolvedValue(['page1']);
+        await main();
+
+        document.getElementById('deleteBtn').onclick();
+        await new Promise((resolve) => setTimeout(resolve, 0));
+
+        expect(global.confirm).toHaveBeenCalledWith(expect.stringContaining('1 page currently links'));
+      });
+
+      it('mentions multiple affected pages in the plural when deleting with more than one backlink', async () => {
+        mockGetQuestionBacklinks.mockResolvedValue(['page1', 'page2']);
+        await main();
+
+        document.getElementById('deleteBtn').onclick();
+        await new Promise((resolve) => setTimeout(resolve, 0));
+
+        expect(global.confirm).toHaveBeenCalledWith(expect.stringContaining('2 pages currently link'));
+      });
     });
 
     describe('slug list', () => {
@@ -239,6 +298,27 @@ describe('question-editor', () => {
         expect(mockAssignQuestionSlug).toHaveBeenCalledWith('abc123', 'loops-1');
       });
 
+      it('does nothing when the new Question Link input is blank', async () => {
+        await main();
+        document.getElementById('newSlugInput').value = '   ';
+
+        document.getElementById('addSlugBtn').onclick();
+        await new Promise((resolve) => setTimeout(resolve, 0));
+
+        expect(mockAssignQuestionSlug).not.toHaveBeenCalled();
+      });
+
+      it('alerts when assigning a Question Link fails', async () => {
+        mockAssignQuestionSlug.mockRejectedValue(new Error('already in use'));
+        await main();
+        document.getElementById('newSlugInput').value = 'taken';
+
+        document.getElementById('addSlugBtn').onclick();
+        await new Promise((resolve) => setTimeout(resolve, 0));
+
+        expect(global.alert).toHaveBeenCalledWith('already in use');
+      });
+
       it('removes a slug when its Remove button is clicked and confirmed', async () => {
         mockGetAllQuestionSlugs.mockResolvedValue({ 'loops-1': 'abc123' });
         await main();
@@ -248,6 +328,17 @@ describe('question-editor', () => {
 
         expect(global.confirm).toHaveBeenCalledWith(expect.stringContaining('[[q:loops-1]]'));
         expect(mockRemoveQuestionSlug).toHaveBeenCalledWith('loops-1');
+      });
+
+      it('does not remove a slug when the confirmation is cancelled', async () => {
+        mockGetAllQuestionSlugs.mockResolvedValue({ 'loops-1': 'abc123' });
+        global.confirm.mockReturnValue(false);
+        await main();
+
+        document.querySelector('#slugList .delete-btn').onclick();
+        await new Promise((resolve) => setTimeout(resolve, 0));
+
+        expect(mockRemoveQuestionSlug).not.toHaveBeenCalled();
       });
 
       it('renames a slug via the Rename button', async () => {
@@ -261,6 +352,33 @@ describe('question-editor', () => {
         await new Promise((resolve) => setTimeout(resolve, 0));
 
         expect(mockRenameQuestionSlug).toHaveBeenCalledWith('abc123', 'old-slug', 'new-slug');
+      });
+
+      it('does nothing when Rename is cancelled or left as the same slug', async () => {
+        mockGetAllQuestionSlugs.mockResolvedValue({ 'old-slug': 'abc123' });
+        global.prompt.mockReturnValue(null);
+        await main();
+
+        const renameBtn = [...document.querySelectorAll('#slugList button')]
+          .find((btn) => btn.textContent === 'Rename');
+        renameBtn.onclick();
+        await new Promise((resolve) => setTimeout(resolve, 0));
+
+        expect(mockRenameQuestionSlug).not.toHaveBeenCalled();
+      });
+
+      it('alerts when renaming a slug fails', async () => {
+        mockGetAllQuestionSlugs.mockResolvedValue({ 'old-slug': 'abc123' });
+        mockRenameQuestionSlug.mockRejectedValue(new Error('already in use'));
+        global.prompt.mockReturnValue('new-slug');
+        await main();
+
+        const renameBtn = [...document.querySelectorAll('#slugList button')]
+          .find((btn) => btn.textContent === 'Rename');
+        renameBtn.onclick();
+        await new Promise((resolve) => setTimeout(resolve, 0));
+
+        expect(global.alert).toHaveBeenCalledWith('already in use');
       });
     });
   });

@@ -34,12 +34,9 @@ export default defineConfig({
         '**/ai-config.template.js',
       ],
       // A ratcheting floor, not an aspirational target: set just under
-      // today's actual coverage (~57%) rather than the previous 70%, which
-      // no run has ever actually met - large UI entry points (editor.js,
-      // teacher.js, teacher-auth.js, landing.js, view.js, lesson-planning.js,
-      // teacher-nav.js) currently sit at 0%. Raise these numbers as real
-      // coverage work lands, so this catches regressions without leaving
-      // CI permanently red in the meantime.
+      // today's actual coverage (~89.7%), so this catches regressions
+      // without leaving CI permanently red. Raise these numbers as real
+      // coverage work lands.
       thresholds: {
         lines: 86,
         functions: 84,
