@@ -242,23 +242,23 @@ describe('TeacherAuth', () => {
       expect(auth.isDevBypassActive()).toBe(false);
     });
 
-    it('?devAuth=off persists the bypass, applied at construction time', () => {
-      mockLocation.search = '?devAuth=off';
+    it('?devAuth=on persists the bypass, applied at construction time', () => {
+      mockLocation.search = '?devAuth=on';
       const bypassedAuth = new TeacherAuth();
       expect(bypassedAuth.isDevBypassActive()).toBe(true);
       expect(localStorage.getItem(bypassedAuth.devBypassKey)).toBe('true');
     });
 
-    it('?devAuth=on clears a previously-set bypass', () => {
+    it('?devAuth=off clears a previously-set bypass', () => {
       localStorage.setItem(auth.devBypassKey, 'true');
-      mockLocation.search = '?devAuth=on';
+      mockLocation.search = '?devAuth=off';
       const clearedAuth = new TeacherAuth();
       expect(clearedAuth.isDevBypassActive()).toBe(false);
     });
 
-    it('ignores ?devAuth off of localhost', () => {
+    it('ignores ?devAuth on off of localhost', () => {
       mockLocation.hostname = 'formative-platform.example.com';
-      mockLocation.search = '?devAuth=off';
+      mockLocation.search = '?devAuth=on';
       const notBypassedAuth = new TeacherAuth();
       expect(localStorage.getItem(notBypassedAuth.devBypassKey)).toBeNull();
     });
@@ -287,6 +287,20 @@ describe('TeacherAuth', () => {
       await auth.authenticate();
 
       expect(document.querySelectorAll('#devAuthBypassBanner')).toHaveLength(1);
+    });
+
+    it('reserves the banner\'s height as extra body padding so it does not cover page content', async () => {
+      const originalOffsetHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetHeight');
+      Object.defineProperty(HTMLElement.prototype, 'offsetHeight', { configurable: true, value: 32 });
+
+      try {
+        localStorage.setItem(auth.devBypassKey, 'true');
+        await auth.authenticate();
+
+        expect(document.body.style.paddingBottom).toBe('32px');
+      } finally {
+        Object.defineProperty(HTMLElement.prototype, 'offsetHeight', originalOffsetHeight);
+      }
     });
   });
 

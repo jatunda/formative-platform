@@ -23,14 +23,15 @@ export class TeacherAuth {
     return ['localhost', '127.0.0.1'].includes(window.location.hostname);
   }
 
-  // Reads ?devAuth=off|on from the URL (only honored on localhost) and
+  // Reads ?devAuth=on|off from the URL (only honored on localhost) and
   // persists the choice, so it survives navigating to a plain URL afterward.
+  // "on" means the bypass is on (auth is skipped); "off" turns it back off.
   applyDevBypassParam() {
     if (!this.isDevEnvironment()) return;
     const devAuthParam = new URLSearchParams(window.location.search).get('devAuth');
-    if (devAuthParam === 'off') {
+    if (devAuthParam === 'on') {
       localStorage.setItem(this.devBypassKey, 'true');
-    } else if (devAuthParam === 'on') {
+    } else if (devAuthParam === 'off') {
       localStorage.removeItem(this.devBypassKey);
     }
   }
@@ -68,6 +69,13 @@ export class TeacherAuth {
     `;
     banner.addEventListener('click', () => this.disableDevBypass());
     document.body.appendChild(banner);
+
+    // The banner is fixed to the viewport bottom, so without this it
+    // overlaps whatever's at the bottom of the page. Reserve exactly its
+    // rendered height as extra body padding, added on top of the existing
+    // padding rather than replacing it.
+    const existingPaddingBottom = parseFloat(getComputedStyle(document.body).paddingBottom) || 0;
+    document.body.style.paddingBottom = `${existingPaddingBottom + banner.offsetHeight}px`;
   }
 
   // Hash a password using SHA-256
