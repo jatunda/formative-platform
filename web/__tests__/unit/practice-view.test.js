@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { getSlugFromPath, tallyOutcomes, startPracticeSet, initializePage } from '../../practice-view.js';
+import { getSlugFromPath, tallyOutcomes, summarizeOutcomes, letterGradeFor, startPracticeSet, initializePage } from '../../practice-view.js';
 import { PRACTICE_SET_NOT_FOUND } from '../../constants.js';
 
 vi.mock('https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js', () => ({
@@ -68,6 +68,40 @@ describe('tallyOutcomes', () => {
   });
 });
 
+describe('letterGradeFor', () => {
+  it('maps percentages onto the standard A-F scale with inclusive lower bounds', () => {
+    expect(letterGradeFor(100)).toBe('A');
+    expect(letterGradeFor(90)).toBe('A');
+    expect(letterGradeFor(80)).toBe('B');
+    expect(letterGradeFor(70)).toBe('C');
+    expect(letterGradeFor(60)).toBe('D');
+    expect(letterGradeFor(59.9)).toBe('F');
+    expect(letterGradeFor(0)).toBe('F');
+  });
+
+  it('does not round up: 89.6% is a B', () => {
+    expect(letterGradeFor(89.6)).toBe('B');
+  });
+});
+
+describe('summarizeOutcomes', () => {
+  it('computes each percentage out of the total and grades on first-try accuracy only', () => {
+    const stats = summarizeOutcomes({ firstTry: 3, secondTry: 1, missed: 1 });
+    expect(stats.total).toBe(5);
+    expect(stats.firstTryPercent).toBe(60);
+    expect(stats.secondTryPercent).toBe(20);
+    expect(stats.missedPercent).toBe(20);
+    expect(stats.withinTwoTriesPercent).toBe(80);
+    expect(stats.expectedGrade).toBe('D');
+  });
+
+  it('handles an empty tally without dividing by zero', () => {
+    const stats = summarizeOutcomes({ firstTry: 0, secondTry: 0, missed: 0 });
+    expect(stats.firstTryPercent).toBe(0);
+    expect(stats.expectedGrade).toBe('F');
+  });
+});
+
 function radios(container) {
   return [...container.querySelectorAll('input[type="radio"]')];
 }
@@ -78,7 +112,7 @@ function backBtn(root) {
   return [...root.querySelectorAll('button')].find((b) => b.textContent.includes('Back'));
 }
 function nextBtn(root) {
-  return [...root.querySelectorAll('button')].find((b) => b.textContent.includes('Next'));
+  return root.querySelector('.practice-next-btn');
 }
 
 describe('startPracticeSet (Frontier navigation)', () => {
@@ -89,22 +123,50 @@ describe('startPracticeSet (Frontier navigation)', () => {
     document.body.appendChild(root);
   });
 
-  it('mounts the first question with Back disabled and Next disabled (frontier not yet finished)', () => {
+  it('mounts the first question with Back disabled and Next hidden (frontier not yet finished)', () => {
     startPracticeSet(root, [{ id: 'q1', data: Q1 }, { id: 'q2', data: Q2 }]);
 
     expect(root.textContent).toContain('Stem for right1');
     expect(backBtn(root).disabled).toBe(true);
-    expect(nextBtn(root).disabled).toBe(true);
+    expect(nextBtn(root).hidden).toBe(true);
   });
 
-  it('enables Next once the current (frontier) question is finished, without auto-advancing', () => {
+  it('shows Next once the current (frontier) question is finished, without auto-advancing', () => {
     startPracticeSet(root, [{ id: 'q1', data: Q1 }, { id: 'q2', data: Q2 }]);
 
     radios(root)[0].click();
     submitBtn(root).click();
 
     expect(root.textContent).toContain('Stem for right1'); // still on Q1 - no auto-advance
-    expect(nextBtn(root).disabled).toBe(false);
+    expect(nextBtn(root).hidden).toBe(false);
+    expect(nextBtn(root).textContent).toContain('Enter');
+  });
+
+  it('keeps Next hidden after a first wrong attempt (question not finished yet)', () => {
+    startPracticeSet(root, [{ id: 'q1', data: Q1 }, { id: 'q2', data: Q2 }]);
+
+    radios(root)[1].click();
+    submitBtn(root).click();
+
+    expect(nextBtn(root).hidden).toBe(true);
+  });
+
+  it('focuses Next after finishing so Enter advances', () => {
+    startPracticeSet(root, [{ id: 'q1', data: Q1 }, { id: 'q2', data: Q2 }]);
+
+    radios(root)[0].click();
+    submitBtn(root).click();
+
+    expect(document.activeElement).toBe(nextBtn(root));
+  });
+
+  it('labels Next as "See results" on the last question', () => {
+    startPracticeSet(root, [{ id: 'q1', data: Q1 }]);
+
+    radios(root)[0].click();
+    submitBtn(root).click();
+
+    expect(nextBtn(root).textContent).toContain('See results');
   });
 
   it('moves to the next question when Next is clicked after finishing', () => {
@@ -141,7 +203,7 @@ describe('startPracticeSet (Frontier navigation)', () => {
     submitBtn(root).click();
     nextBtn(root).onclick(); // viewing Q2, frontier still at Q2 (unfinished)
 
-    expect(nextBtn(root).disabled).toBe(true);
+    expect(nextBtn(root).hidden).toBe(true);
   });
 
   it('shows the end-of-set summary with correct tallies once every question is finished', () => {
@@ -158,9 +220,24 @@ describe('startPracticeSet (Frontier navigation)', () => {
     nextBtn(root).onclick();
 
     expect(root.textContent).toContain("You're done!");
-    expect(root.textContent).toContain('First-try correct: 1');
-    expect(root.textContent).toContain('Second-try correct: 1');
-    expect(root.textContent).toContain('Missed: 0');
+    const rows = Object.fromEntries([...root.querySelectorAll('.practice-summary-table tr')]
+      .map((tr) => [tr.querySelector('th').textContent, [...tr.querySelectorAll('td')].map((td) => td.textContent)]));
+    expect(rows['Correct on first try']).toEqual(['1 of 2', '50%']);
+    expect(rows['Correct on second try']).toEqual(['1 of 2', '50%']);
+    expect(rows['Correct within two tries']).toEqual(['2 of 2', '100%']);
+    expect(rows['Missed']).toEqual(['0 of 2', '0%']);
+    expect(root.querySelector('.practice-grade-letter').textContent).toBe('F');
+  });
+
+  it('hides Next on the results page', () => {
+    startPracticeSet(root, [{ id: 'q1', data: Q1 }]);
+
+    radios(root)[0].click();
+    submitBtn(root).click();
+    nextBtn(root).onclick();
+
+    expect(root.textContent).toContain("You're done!");
+    expect(nextBtn(root).hidden).toBe(true);
   });
 });
 

@@ -23,6 +23,12 @@
   --accent-blue-hover: rgba(99, 179, 237, 0.1);
   --accent-blue-focus: rgba(99, 179, 237, 0.2);
   --accent-blue-drop: #2b6cb0;
+
+  /* Primary call-to-action (student-facing Submit/Next). White text on this
+     blue is ~5.2:1 contrast (WCAG AA). */
+  --primary-btn-bg: #2563eb;
+  --primary-btn-bg-hover: #1d4ed8;
+  --primary-btn-text: #ffffff;
   
   --accent-mint: #42ffc2;
   --accent-yellow: #ffd942;
@@ -1522,6 +1528,88 @@ ol.lesson-list {
   color: var(--text-secondary);
 }
 
+/* Primary action button: Submit (question-widget.js) and Next
+   (practice-view.js). Overrides the generic full-width gray button. */
+.primary-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  width: auto;
+  padding: var(--spacing-sm) var(--spacing-xl);
+  font-weight: 600;
+  color: var(--primary-btn-text);
+  background-color: var(--primary-btn-bg);
+  border: 1px solid var(--primary-btn-bg);
+  border-radius: var(--radius-xl);
+}
+
+.primary-action-btn:hover:not(:disabled) {
+  background-color: var(--primary-btn-bg-hover);
+  border-color: var(--primary-btn-bg-hover);
+}
+
+.primary-action-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.primary-action-btn[hidden] {
+  display: none;
+}
+
+.key-hint {
+  font-family: var(--font-sans);
+  font-size: 0.75em;
+  font-weight: 500;
+  padding: 0 var(--spacing-xs);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: var(--radius-sm);
+  opacity: 0.9;
+}
+
+/* Correct-answer celebration (celebration.js) */
+.question-widget-option {
+  position: relative;
+}
+
+.question-widget-celebrate {
+  animation: question-widget-pop 0.45s ease-out;
+}
+
+@keyframes question-widget-pop {
+  0% { transform: scale(1); box-shadow: 0 0 0 0 color-mix(in srgb, var(--success-green) 70%, transparent); }
+  40% { transform: scale(1.03); }
+  100% { transform: scale(1); box-shadow: 0 0 0 14px transparent; }
+}
+
+.confetti-burst {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.confetti-piece {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  animation: confetti-fly 0.9s cubic-bezier(0.2, 0.7, 0.4, 1) forwards;
+}
+
+@keyframes confetti-fly {
+  0% { transform: translate(0, 0) rotate(0deg); opacity: 1; }
+  100% { transform: translate(var(--dx), calc(var(--dy) + 40px)) rotate(var(--rot)); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .question-widget-celebrate {
+    animation: none;
+  }
+}
+
 /* Practice Set student delivery (practice-view.js) */
 .practice-nav-bar {
   display: flex;
@@ -1530,9 +1618,61 @@ ol.lesson-list {
   margin-bottom: var(--spacing-md);
 }
 
-.practice-summary-list {
-  list-style: none;
-  padding: 0;
+.practice-next-btn {
+  margin-top: var(--spacing-md);
+}
+
+.practice-grade-card {
+  display: inline-block;
+  text-align: center;
+  padding: var(--spacing-lg) var(--spacing-xl);
+  margin-bottom: var(--spacing-lg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-xl);
+  background-color: var(--bg-secondary);
+}
+
+.practice-grade-label {
+  color: var(--text-secondary);
+  font-size: 0.9em;
+}
+
+.practice-grade-letter {
+  font-size: 3rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.practice-grade-a,
+.practice-grade-b { color: var(--accent-mint); }
+.practice-grade-c { color: var(--accent-yellow); }
+.practice-grade-d { color: var(--accent-orange); }
+.practice-grade-f { color: var(--accent-pink); }
+
+.practice-grade-note {
+  color: var(--text-secondary);
+  font-size: 0.85em;
+  max-width: 28em;
+}
+
+.practice-summary-table {
+  border-collapse: collapse;
+}
+
+.practice-summary-table th,
+.practice-summary-table td {
+  padding: var(--spacing-xs) var(--spacing-md);
+  border-bottom: 1px solid var(--border-color);
+  text-align: left;
+}
+
+.practice-summary-table th {
+  font-weight: normal;
+}
+
+.practice-summary-percent {
+  font-weight: 600;
+  text-align: right;
 }
 
 /* ========================================

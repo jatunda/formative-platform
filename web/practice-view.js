@@ -1,7 +1,7 @@
 // Student-facing Practice Set delivery. Mirrors page-view.js's resolve ->
 // fetch -> render shape for /practice/<slug>, but owns a real interaction
 // state machine on top: the Frontier navigation controller (see CONTEXT.md's
-// Frontier entry) and the end-of-set summary. Nothing here is persisted to
+// Frontier entry) and the end-of-set summary (with an expected test grade). Nothing here is persisted to
 // the database (docs/adr/0012) - frontierIndex, viewingIndex, and
 // perQuestionState all live only in memory for this page load.
 import { db } from './firebase-config.js';
@@ -37,26 +37,91 @@ export function tallyOutcomes(perQuestionState) {
   return tally;
 }
 
+// Expected test grade is estimated from first-try accuracy alone: a real
+// test gives one attempt, so second-try recoveries don't count toward it.
+// Standard US scale; minimum percent (inclusive) for each letter.
+export const GRADE_SCALE = [
+  { letter: 'A', min: 90 },
+  { letter: 'B', min: 80 },
+  { letter: 'C', min: 70 },
+  { letter: 'D', min: 60 },
+  { letter: 'F', min: 0 },
+];
+
+/**
+ * Map a 0-100 percentage to a letter grade using GRADE_SCALE. Compares the
+ * unrounded value, so 89.6% is a B, not an A.
+ */
+export function letterGradeFor(percent) {
+  const entry = GRADE_SCALE.find((g) => percent >= g.min);
+  return entry ? entry.letter : GRADE_SCALE[GRADE_SCALE.length - 1].letter;
+}
+
+/**
+ * Derive the end-of-set summary stats from a tally (see tallyOutcomes).
+ * Every percentage is out of the total number of questions.
+ */
+export function summarizeOutcomes(tally) {
+  const total = tally.firstTry + tally.secondTry + tally.missed;
+  const pct = (n) => (total === 0 ? 0 : (n / total) * 100);
+  const firstTryPercent = pct(tally.firstTry);
+  return {
+    total,
+    firstTryPercent,
+    secondTryPercent: pct(tally.secondTry),
+    missedPercent: pct(tally.missed),
+    withinTwoTriesPercent: pct(tally.firstTry + tally.secondTry),
+    expectedGrade: letterGradeFor(firstTryPercent),
+  };
+}
+
 function renderSummary(containerEl, perQuestionState) {
   const tally = tallyOutcomes(perQuestionState);
+  const stats = summarizeOutcomes(tally);
+  const fmt = (p) => `${Math.round(p)}%`;
   containerEl.innerHTML = '';
 
   const heading = document.createElement('h2');
   heading.textContent = "You're done!";
   containerEl.appendChild(heading);
 
-  const list = document.createElement('ul');
-  list.className = 'practice-summary-list';
+  const gradeCard = document.createElement('div');
+  gradeCard.className = 'practice-grade-card';
+  const gradeLabel = document.createElement('div');
+  gradeLabel.className = 'practice-grade-label';
+  gradeLabel.textContent = 'Expected test grade';
+  const gradeLetter = document.createElement('div');
+  gradeLetter.className = `practice-grade-letter practice-grade-${stats.expectedGrade.toLowerCase()}`;
+  gradeLetter.textContent = stats.expectedGrade;
+  const gradeNote = document.createElement('div');
+  gradeNote.className = 'practice-grade-note';
+  gradeNote.textContent = `Based on your first-try accuracy (${fmt(stats.firstTryPercent)}), since a test only gives you one try.`;
+  gradeCard.append(gradeLabel, gradeLetter, gradeNote);
+  containerEl.appendChild(gradeCard);
+
+  const table = document.createElement('table');
+  table.className = 'practice-summary-table';
+  const tbody = document.createElement('tbody');
   [
-    [`First-try correct`, tally.firstTry],
-    [`Second-try correct`, tally.secondTry],
-    [`Missed`, tally.missed],
-  ].forEach(([label, count]) => {
-    const li = document.createElement('li');
-    li.textContent = `${label}: ${count}`;
-    list.appendChild(li);
+    ['Correct on first try', tally.firstTry, stats.firstTryPercent],
+    ['Correct on second try', tally.secondTry, stats.secondTryPercent],
+    ['Correct within two tries', tally.firstTry + tally.secondTry, stats.withinTwoTriesPercent],
+    ['Missed', tally.missed, stats.missedPercent],
+  ].forEach(([label, count, percent]) => {
+    const tr = document.createElement('tr');
+    const th = document.createElement('th');
+    th.scope = 'row';
+    th.textContent = label;
+    const countTd = document.createElement('td');
+    countTd.textContent = `${count} of ${stats.total}`;
+    const pctTd = document.createElement('td');
+    pctTd.className = 'practice-summary-percent';
+    pctTd.textContent = fmt(percent);
+    tr.append(th, countTd, pctTd);
+    tbody.appendChild(tr);
   });
-  containerEl.appendChild(list);
+  table.appendChild(tbody);
+  containerEl.appendChild(table);
 }
 
 /**
@@ -77,21 +142,33 @@ export function startPracticeSet(rootEl, questions) {
   backBtn.type = 'button';
   backBtn.className = 'schedule-action-btn';
   backBtn.textContent = '← Back';
-  const nextBtn = document.createElement('button');
-  nextBtn.type = 'button';
-  nextBtn.className = 'schedule-action-btn';
-  nextBtn.textContent = 'Next →';
   navBar.appendChild(backBtn);
-  navBar.appendChild(nextBtn);
 
   const questionContainer = document.createElement('div');
 
+  // Lives below the question (where Submit was) rather than in the top nav
+  // bar, and only exists on screen once moving forward is actually allowed:
+  // the viewed question is finished (viewingIndex < frontierIndex) and
+  // there's somewhere to go (never on the summary).
+  const nextBtn = document.createElement('button');
+  nextBtn.type = 'button';
+  nextBtn.className = 'primary-action-btn practice-next-btn';
+
   rootEl.appendChild(navBar);
   rootEl.appendChild(questionContainer);
+  rootEl.appendChild(nextBtn);
 
   function updateNavControls() {
     backBtn.disabled = viewingIndex === 0;
-    nextBtn.disabled = !(viewingIndex < frontierIndex);
+    const canAdvance = viewingIndex < questions.length && viewingIndex < frontierIndex;
+    nextBtn.hidden = !canAdvance;
+    nextBtn.textContent = '';
+    nextBtn.append(viewingIndex === questions.length - 1 ? 'See results → ' : 'Next → ');
+    const hint = document.createElement('kbd');
+    hint.className = 'key-hint';
+    hint.textContent = 'Enter ↵';
+    nextBtn.appendChild(hint);
+    nextBtn.title = 'Shortcut: Enter';
   }
 
   function showQuestion(index) {
@@ -117,8 +194,15 @@ export function startPracticeSet(rootEl, questions) {
           frontierIndex += 1;
         }
         updateNavControls();
+        // Focusing Next makes the same Enter key that submitted the answer
+        // also advance on its next press (native button activation).
+        if (!nextBtn.hidden) nextBtn.focus({ preventScroll: true });
       },
     });
+
+    // Reviewing an earlier, already-finished question: Next is already
+    // showing, so let Enter advance from here too.
+    if (!nextBtn.hidden) nextBtn.focus({ preventScroll: true });
   }
 
   backBtn.onclick = () => showQuestion(viewingIndex - 1);

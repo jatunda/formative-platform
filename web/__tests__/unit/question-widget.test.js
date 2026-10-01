@@ -168,6 +168,56 @@ describe('renderQuestionWidget', () => {
       expect(widget.getState().finished).toBe(true);
     });
 
+    it('submits on Enter even after focus has dropped to <body> (re-render removed the focused radio)', () => {
+      const widget = renderQuestionWidget(container, QUESTION);
+      radios(container)[0].click();
+
+      document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+
+      expect(widget.getState().finished).toBe(true);
+    });
+
+    it('only the most recently used widget responds when several are on the page', () => {
+      const other = document.createElement('div');
+      document.body.appendChild(other);
+      const first = renderQuestionWidget(container, QUESTION);
+      const second = renderQuestionWidget(other, QUESTION);
+
+      radios(container)[0].click(); // interacting with the first makes it active
+      document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+
+      expect(first.getState().finished).toBe(true);
+      expect(second.getState().finished).toBe(false);
+    });
+
+    it('ignores Enter aimed at a focused button (lets the button handle it)', () => {
+      const widget = renderQuestionWidget(container, QUESTION);
+      radios(container)[0].click();
+      const otherButton = document.createElement('button');
+      document.body.appendChild(otherButton);
+
+      otherButton.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+
+      expect(widget.getState().finished).toBe(false);
+    });
+
+    it('stops listening after destroy', () => {
+      const widget = renderQuestionWidget(container, QUESTION);
+      radios(container)[0].click();
+      const stateBefore = widget.getState();
+      widget.destroy();
+
+      document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+
+      expect(stateBefore.finished).toBe(false);
+      expect(container.innerHTML).toBe('');
+    });
+
+    it('advertises the Enter shortcut on the Submit button', () => {
+      renderQuestionWidget(container, QUESTION);
+      expect(submitBtn(container).textContent).toContain('Enter');
+    });
+
     it('does nothing on Enter when nothing is selected yet', () => {
       const widget = renderQuestionWidget(container, QUESTION);
 
@@ -175,6 +225,34 @@ describe('renderQuestionWidget', () => {
 
       expect(widget.getState().finished).toBe(false);
     });
+  });
+
+  it('gives each widget its own radio group so embedded questions do not uncheck each other', () => {
+    const other = document.createElement('div');
+    document.body.appendChild(other);
+    renderQuestionWidget(container, QUESTION);
+    renderQuestionWidget(other, QUESTION);
+
+    expect(radios(container)[0].name).not.toBe(radios(other)[0].name);
+  });
+
+  it('adds the celebration effect to the correct option on a correct answer', () => {
+    renderQuestionWidget(container, QUESTION);
+    radios(container)[0].click();
+    submitBtn(container).click();
+
+    const correctRow = radios(container)[0].closest('.question-widget-option');
+    expect(correctRow.classList.contains('question-widget-celebrate')).toBe(true);
+  });
+
+  it('does not celebrate a missed question', () => {
+    renderQuestionWidget(container, QUESTION);
+    radios(container)[1].click();
+    submitBtn(container).click();
+    radios(container)[2].click();
+    submitBtn(container).click();
+
+    expect(container.querySelector('.question-widget-celebrate')).toBeNull();
   });
 
   describe('restoreState fidelity', () => {

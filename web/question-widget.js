@@ -7,6 +7,25 @@
 // once onOutcome fires; an embedded single question in a Lesson/Page has
 // nothing further to show at all.
 import { renderContentItems } from './content-renderer.js';
+import { celebrate, playCorrectSound } from './celebration.js';
+
+// Enter-to-submit is handled at the document level, not on containerEl:
+// every interaction re-renders the widget, which removes the focused radio
+// from the DOM and drops focus to <body>, so a keydown listener on the
+// container would never see the keypress. With several widgets on one page
+// (multiple Question Links in a Lesson), only the one the student most
+// recently created or interacted with responds.
+let widgetCounter = 0;
+let activeWidgetId = null;
+
+const ENTER_IGNORED_TAGS = new Set(['BUTTON', 'A', 'TEXTAREA', 'SELECT']);
+
+function isTypingOrActivating(target) {
+  if (!target || !target.tagName) return false;
+  if (ENTER_IGNORED_TAGS.has(target.tagName)) return true;
+  if (target.isContentEditable) return true;
+  return target.tagName === 'INPUT' && target.type !== 'radio';
+}
 
 /**
  * Mount an interactive Question into containerEl.
@@ -16,6 +35,12 @@ import { renderContentItems } from './content-renderer.js';
  * @returns {{getState: () => object, destroy: () => void}}
  */
 export function renderQuestionWidget(containerEl, questionData, { restoreState, onOutcome } = {}) {
+  widgetCounter += 1;
+  const widgetId = widgetCounter;
+  // Unique per widget so radios in two embedded Questions on the same page
+  // don't share one browser radio group and uncheck each other.
+  const radioName = `question-widget-option-${widgetId}`;
+  activeWidgetId = widgetId;
   const state = restoreState
     ? { ...restoreState }
     : {
@@ -51,6 +76,8 @@ export function renderQuestionWidget(containerEl, questionData, { restoreState, 
       state.outcome = state.attemptCount === 0 ? "firstTry" : "secondTry";
       state.lastSubmittedWrongIndex = null;
       render();
+      playCorrectSound();
+      celebrate(containerEl.querySelector('.question-widget-option-correct'));
       if (onOutcome) onOutcome(state.outcome);
       return;
     }
@@ -72,10 +99,24 @@ export function renderQuestionWidget(containerEl, questionData, { restoreState, 
   }
 
   function handleKeydown(event) {
-    if (event.key === "Enter") submit();
+    if (event.key !== "Enter" || activeWidgetId !== widgetId) return;
+    if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
+    if (state.finished || state.selectedIndex === null) return;
+    // Let a focused button/link/text field handle its own Enter natively.
+    if (isTypingOrActivating(event.target)) return;
+    event.preventDefault();
+    submit();
+  }
+
+  function markActive() {
+    activeWidgetId = widgetId;
   }
 
   function render() {
+    // Re-rendering destroys the focused radio; remember whether focus was
+    // inside this widget so it can be put back on the selected option, which
+    // keeps arrow-key option switching working between renders.
+    const hadFocus = containerEl.contains(document.activeElement);
     containerEl.innerHTML = "";
 
     const stemEl = document.createElement("div");
@@ -93,10 +134,13 @@ export function renderQuestionWidget(containerEl, questionData, { restoreState, 
       const label = document.createElement("label");
       const input = document.createElement("input");
       input.type = "radio";
-      input.name = "question-widget-option";
+      input.name = radioName;
       input.checked = state.selectedIndex === index;
       input.disabled = state.finished;
-      input.addEventListener("change", () => selectOption(index));
+      input.addEventListener("change", () => {
+        markActive();
+        selectOption(index);
+      });
 
       label.appendChild(input);
       label.appendChild(document.createTextNode(option.text));
@@ -124,21 +168,37 @@ export function renderQuestionWidget(containerEl, questionData, { restoreState, 
     if (!state.finished) {
       const submitBtn = document.createElement("button");
       submitBtn.type = "button";
-      submitBtn.className = "schedule-action-btn question-widget-submit";
-      submitBtn.textContent = "Submit";
+      submitBtn.className = "primary-action-btn question-widget-submit";
+      submitBtn.append("Submit ");
+      const hint = document.createElement("kbd");
+      hint.className = "key-hint";
+      hint.textContent = "Enter ↵";
+      submitBtn.appendChild(hint);
+      submitBtn.title = "Submit (shortcut: Enter)";
       submitBtn.disabled = state.selectedIndex === null;
       submitBtn.onclick = submit;
       containerEl.appendChild(submitBtn);
     }
+
+    if (hadFocus) {
+      const radios = containerEl.querySelectorAll('input[type="radio"]');
+      const toFocus = radios[state.selectedIndex];
+      if (toFocus && !toFocus.disabled) toFocus.focus();
+    }
   }
 
-  containerEl.addEventListener("keydown", handleKeydown);
+  document.addEventListener("keydown", handleKeydown);
+  containerEl.addEventListener("pointerdown", markActive);
+  containerEl.addEventListener("focusin", markActive);
   render();
 
   return {
     getState: () => ({ ...state }),
     destroy: () => {
-      containerEl.removeEventListener("keydown", handleKeydown);
+      document.removeEventListener("keydown", handleKeydown);
+      containerEl.removeEventListener("pointerdown", markActive);
+      containerEl.removeEventListener("focusin", markActive);
+      if (activeWidgetId === widgetId) activeWidgetId = null;
       containerEl.innerHTML = "";
     },
   };

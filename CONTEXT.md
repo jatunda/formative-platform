@@ -87,3 +87,6 @@ _Avoid_: current question, progress — Frontier specifically names the forward 
 
 **Question Outcome**:
 The one of three results a Question ends in for a given student, once finished: First-Try Correct (right on the first Attempt), Second-Try Correct (wrong once, then right), or Missed (wrong twice, auto-revealed). Tallied into a Practice Set's end-of-set summary; held only in the browser for that session, never written to the database.
+
+**Expected Test Grade**:
+A letter grade (A–F, standard 90/80/70/60 cutoffs) shown on a Practice Set's end-of-set summary, estimated from the student's First-Try Correct percentage only — a real test gives one Attempt, so Second-Try Correct doesn't count toward it. A motivational estimate, not a recorded grade; like Question Outcomes it is never written to the database.
