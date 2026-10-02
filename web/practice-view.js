@@ -149,6 +149,13 @@ export function startPracticeSet(rootEl, questions) {
   backBtn.textContent = '← Back';
   navBar.appendChild(backBtn);
 
+  // Subtle reminder that the whole Practice Set - choosing an option,
+  // submitting, and advancing - is doable without a mouse.
+  const keyboardHint = document.createElement('div');
+  keyboardHint.className = 'practice-keyboard-hint';
+  keyboardHint.textContent = '↑↓ to choose · Enter to continue';
+  navBar.appendChild(keyboardHint);
+
   const questionContainer = document.createElement('div');
 
   // Lives below the question (where Submit was) rather than in the top nav
@@ -169,9 +176,11 @@ export function startPracticeSet(rootEl, questions) {
     nextBtn.hidden = !canAdvance;
     nextBtn.textContent = '';
     nextBtn.append(viewingIndex === questions.length - 1 ? 'See results ' : 'Next ');
-    const hint = document.createElement('span');
-    hint.className = 'practice-next-btn-hint';
-    hint.textContent = '(press enter)';
+    // Matches Submit's own "Enter ↵" key-hint pill (question-widget.js), so
+    // the two primary-action buttons read as one consistent control.
+    const hint = document.createElement('kbd');
+    hint.className = 'key-hint';
+    hint.textContent = 'Enter ↵';
     nextBtn.appendChild(hint);
     nextBtn.title = 'Shortcut: Enter';
   }
@@ -193,6 +202,10 @@ export function startPracticeSet(rootEl, questions) {
 
     currentWidget = renderQuestionWidget(questionContainer, questions[viewingIndex].data, {
       restoreState: perQuestionState[viewingIndex] || undefined,
+      // Keeps a fresh question keyboard-navigable from the moment it
+      // appears, so arrow keys work immediately without first clicking an
+      // option - the Frontier can be driven end-to-end without a mouse.
+      autoFocus: true,
       onOutcome: () => {
         perQuestionState[viewingIndex] = currentWidget.getState();
         if (viewingIndex === frontierIndex) {

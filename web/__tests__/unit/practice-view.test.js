@@ -131,6 +131,48 @@ describe('startPracticeSet (Frontier navigation)', () => {
     expect(nextBtn(root).hidden).toBe(true);
   });
 
+  it('shows a subtle hint that the whole set is keyboard-navigable', () => {
+    startPracticeSet(root, [{ id: 'q1', data: Q1 }]);
+
+    const hint = root.querySelector('.practice-keyboard-hint');
+    expect(hint).not.toBeNull();
+    expect(hint.textContent).toContain('Enter');
+  });
+
+  it('focuses the first option as soon as a fresh question mounts, so arrow keys work immediately', () => {
+    startPracticeSet(root, [{ id: 'q1', data: Q1 }]);
+
+    expect(document.activeElement).toBe(radios(root)[0]);
+  });
+
+  it('is fully drivable by arrow keys and Enter alone, across multiple questions', () => {
+    startPracticeSet(root, [{ id: 'q1', data: Q1 }, { id: 'q2', data: Q2 }]);
+
+    // Q1: arrow-select the correct option (native radio-group behavior
+    // moves focus AND checks the option - simulated here since jsdom
+    // doesn't implement native radio arrow-key cycling), then Enter submits.
+    const q1Correct = radios(root)[0];
+    q1Correct.checked = true;
+    q1Correct.focus();
+    q1Correct.dispatchEvent(new Event('change', { bubbles: true }));
+    document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+
+    // Enter on the now-focused Next advances to Q2.
+    expect(document.activeElement).toBe(nextBtn(root));
+    document.activeElement.click();
+
+    expect(root.textContent).toContain('Stem for right2');
+    expect(document.activeElement).toBe(radios(root)[0]); // auto-focused again
+
+    const q2Correct = radios(root)[0];
+    q2Correct.checked = true;
+    q2Correct.dispatchEvent(new Event('change', { bubbles: true }));
+    document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+
+    expect(document.activeElement).toBe(nextBtn(root));
+    expect(nextBtn(root).textContent).toContain('See results');
+  });
+
   it('shows Next once the current (frontier) question is finished, without auto-advancing', () => {
     startPracticeSet(root, [{ id: 'q1', data: Q1 }, { id: 'q2', data: Q2 }]);
 
@@ -139,7 +181,7 @@ describe('startPracticeSet (Frontier navigation)', () => {
 
     expect(root.textContent).toContain('Stem for right1'); // still on Q1 - no auto-advance
     expect(nextBtn(root).hidden).toBe(false);
-    expect(nextBtn(root).textContent).toContain('(press enter)');
+    expect(nextBtn(root).textContent).toContain('Enter');
   });
 
   it('keeps Next hidden after a first wrong attempt (question not finished yet)', () => {
@@ -169,17 +211,16 @@ describe('startPracticeSet (Frontier navigation)', () => {
     expect(nextBtn(root).textContent).toContain('See results');
   });
 
-  it('says "press enter" in a visually de-emphasized hint, separate from the main label', () => {
+  it('shows the same "Enter ↵" key-hint pill as Submit, for visual consistency between the two', () => {
     startPracticeSet(root, [{ id: 'q1', data: Q1 }, { id: 'q2', data: Q2 }]);
 
     radios(root)[0].click();
     submitBtn(root).click();
 
     expect(nextBtn(root).textContent).toContain('Next');
-    expect(nextBtn(root).textContent).toContain('(press enter)');
-    const hint = nextBtn(root).querySelector('.practice-next-btn-hint');
+    const hint = nextBtn(root).querySelector('kbd.key-hint');
     expect(hint).not.toBeNull();
-    expect(hint.textContent).toBe('(press enter)');
+    expect(hint.textContent).toBe('Enter ↵');
   });
 
   it('moves to the next question when Next is clicked after finishing', () => {

@@ -1613,6 +1613,7 @@ ol.lesson-list {
 /* Practice Set student delivery (practice-view.js) */
 .practice-nav-bar {
   display: flex;
+  align-items: center;
   justify-content: space-between;
   gap: var(--spacing-sm);
   margin-bottom: var(--spacing-md);
@@ -1622,9 +1623,9 @@ ol.lesson-list {
   margin-top: var(--spacing-md);
 }
 
-.practice-next-btn-hint {
+.practice-keyboard-hint {
   font-size: 0.75em;
-  font-weight: 400;
+  color: var(--text-secondary);
   opacity: 0.75;
 }
 

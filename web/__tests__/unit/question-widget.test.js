@@ -91,7 +91,7 @@ describe('renderQuestionWidget', () => {
       expect(container.textContent).toContain('Correct, 2 + 2 is 4.');
     });
 
-    it('clears the stale wrong-explanation once a different option is picked before resubmitting', () => {
+    it('keeps showing the wrong explanation after a different option is picked, before resubmitting', () => {
       renderQuestionWidget(container, QUESTION);
 
       radios(container)[1].click();
@@ -99,7 +99,11 @@ describe('renderQuestionWidget', () => {
       expect(container.textContent).toContain('Off by one.');
 
       radios(container)[2].click(); // picks "22" without submitting yet
-      expect(container.textContent).not.toContain('Off by one.');
+      expect(container.textContent).toContain('Off by one.');
+
+      const wrongRow = radios(container)[1].closest('.question-widget-option');
+      expect(wrongRow.classList.contains('question-widget-option-wrong')).toBe(true);
+      expect(radios(container)[2].checked).toBe(true); // the new pick is still selected
     });
 
     it('allows resubmitting the exact same wrong option again', () => {
@@ -328,6 +332,36 @@ describe('renderQuestionWidget', () => {
     radios(container)[1].dispatchEvent(new Event('change', { bubbles: true }));
 
     expect(widget.getState()).toEqual(stateBefore);
+  });
+
+  describe('autoFocus option', () => {
+    it('focuses the first option on mount when autoFocus is set', () => {
+      renderQuestionWidget(container, QUESTION, { autoFocus: true });
+
+      expect(document.activeElement).toBe(radios(container)[0]);
+    });
+
+    it('does not focus anything on mount by default (e.g. embedded Questions in a Lesson)', () => {
+      renderQuestionWidget(container, QUESTION);
+
+      expect(document.activeElement).not.toBe(radios(container)[0]);
+    });
+
+    it('focuses the restored selection instead of the first option, when restoring a mid-retry state', () => {
+      const restoreState = { selectedIndex: 1, lastSubmittedWrongIndex: 1, attemptCount: 1, finished: false, outcome: null };
+
+      renderQuestionWidget(container, QUESTION, { restoreState, autoFocus: true });
+
+      expect(document.activeElement).toBe(radios(container)[1]);
+    });
+
+    it('does not focus a disabled radio when restoring an already-finished state', () => {
+      const restoreState = { selectedIndex: 0, lastSubmittedWrongIndex: null, attemptCount: 0, finished: true, outcome: 'firstTry' };
+
+      renderQuestionWidget(container, QUESTION, { restoreState, autoFocus: true });
+
+      expect(document.activeElement).not.toBe(radios(container)[0]);
+    });
   });
 
   describe('focus retention across re-renders', () => {

@@ -31,10 +31,10 @@ function isTypingOrActivating(target) {
  * Mount an interactive Question into containerEl.
  * @param {HTMLElement} containerEl
  * @param {{stem: Array, options: Array<{text: string, correct: boolean, explanation: string, mistakeCategory: string|null}>}} questionData
- * @param {{restoreState?: object, onOutcome?: (outcome: "firstTry"|"secondTry"|"missed") => void}} [options]
+ * @param {{restoreState?: object, onOutcome?: (outcome: "firstTry"|"secondTry"|"missed") => void, autoFocus?: boolean}} [options]
  * @returns {{getState: () => object, destroy: () => void}}
  */
-export function renderQuestionWidget(containerEl, questionData, { restoreState, onOutcome } = {}) {
+export function renderQuestionWidget(containerEl, questionData, { restoreState, onOutcome, autoFocus } = {}) {
   widgetCounter += 1;
   const widgetId = widgetCounter;
   // Unique per widget so radios in two embedded Questions on the same page
@@ -46,9 +46,11 @@ export function renderQuestionWidget(containerEl, questionData, { restoreState, 
     : {
       selectedIndex: null,
       // Which option's wrong-Explanation is currently displayed, mid-retry
-      // (before the question is finished). Distinct from selectedIndex: if
-      // the student picks a *different* option after a wrong attempt but
-      // hasn't resubmitted yet, the stale feedback for the old pick clears.
+      // (before the question is finished). Distinct from selectedIndex and
+      // deliberately sticky: picking a *different* option afterward, to
+      // compare it, doesn't clear this - the Explanation for the
+      // already-submitted wrong pick stays up until an actual resubmission
+      // (submit()) replaces or clears it.
       lastSubmittedWrongIndex: null,
       attemptCount: 0,
       finished: false,
@@ -58,12 +60,10 @@ export function renderQuestionWidget(containerEl, questionData, { restoreState, 
   function selectOption(index) {
     if (state.finished) return;
     state.selectedIndex = index;
-    // Picking a different option than the one just-submitted-wrong clears
-    // its stale Explanation - that feedback belongs to a specific submitted
-    // attempt, not to whatever happens to be selected right now.
-    if (index !== state.lastSubmittedWrongIndex) {
-      state.lastSubmittedWrongIndex = null;
-    }
+    // lastSubmittedWrongIndex is deliberately left alone here: the wrong
+    // Explanation stays visible on that option even after the student picks
+    // something else to compare it against, until they actually resubmit
+    // (submit() is what clears/replaces it, on a real new attempt).
     render();
   }
 
@@ -192,6 +192,16 @@ export function renderQuestionWidget(containerEl, questionData, { restoreState, 
   containerEl.addEventListener("pointerdown", markActive);
   containerEl.addEventListener("focusin", markActive);
   render();
+
+  // Mount-time only (not on every re-render): gives arrow keys something to
+  // act on immediately, without requiring a first click. Native radio-group
+  // behavior then takes over - arrow keys move AND select among options
+  // sharing radioName. Skipped once finished (nothing left to focus into).
+  if (autoFocus && !state.finished) {
+    const radios = containerEl.querySelectorAll('input[type="radio"]');
+    const toFocus = radios[state.selectedIndex] || radios[0];
+    if (toFocus) toFocus.focus({ preventScroll: true });
+  }
 
   return {
     getState: () => ({ ...state }),
