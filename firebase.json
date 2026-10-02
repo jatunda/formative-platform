@@ -56,6 +56,10 @@
         "destination": "/practice-set-editor.html"
       },
       {
+        "source": "/robotics/robotics.html",
+        "destination": "/robotics/robotics.html"
+      },
+      {
         "source": "**",
         "destination": "/index.html"
       }

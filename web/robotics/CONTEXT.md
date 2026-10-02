@@ -1,0 +1,106 @@
+# Robotics Tournament
+
+A single-device, client-side control panel for running an in-class VEX-style robotics tournament: a Qualification Round where every Team plays multiple matches, followed by an optional single-elimination Bracket. One Tournament exists at a time — there is no history of past Tournaments.
+
+See `CONTEXT-MAP.md` at the repo root for how this context relates to the unrelated Formative Platform context (`CONTEXT.md`).
+
+## Language
+
+**Tournament**:
+The single current competition: a Team roster, a Qualification Round, and an optional Elimination Bracket. Only one Tournament exists at a time — starting a new one (see New Tournament) discards the previous one entirely rather than archiving it.
+
+**Team**:
+A competing entry with a name and an ordered list of Member names. Members are display-only (shown on roster lists and match cards so students can tell who's on which Team) — no stats are tracked per Member, only per Team.
+
+**Member**:
+A student name within a Team's roster. Free-form, addable/removable at any time. Not a tracked entity on its own — Members exist only as part of a Team's roster.
+
+**Qualification Round**:
+The phase where every Team plays a teacher-configured number of Qualification Matches before the Elimination Bracket begins. Teams are ranked by Standings during and after this phase.
+_Avoid_: Swiss Round — "swiss" is a reasonable informal description of the pairing style, but Qualification Round is the canonical term, matching standard VEX terminology.
+
+**Qualification Match**:
+One match during the Qualification Round, pairing two Match Alliances (four Teams total). Each Match Alliance has a Score. Scheduled at a Match Time. Can be marked complete (or edited after completion) regardless of schedule order — there is no requirement that earlier matches be completed first.
+
+**Match Alliance**:
+The two-Team pairing formed for exactly one Qualification Match, generated fresh each match by the Pairing Draw. Distinct from Playoff Alliance (below) — a Match Alliance does not persist beyond its one match, and the same two Teams are not guaranteed to be paired together again.
+_Avoid_: Alliance alone — always specify Match Alliance or Playoff Alliance; the bare term is ambiguous between the two.
+
+**Pairing Draw**:
+The process that generates every Qualification Match's Match Alliances and matchups for the Qualification Round, following the Pairing Rules. Re-running the Pairing Draw ("Regenerate Matchups") discards all existing Qualification Match assignments and is only permitted while zero Qualification Matches are complete — once any is complete, Reset Results must be used first.
+
+**Pairing Rules**:
+The fairness goals the Pairing Draw targets, best-effort rather than exhaustively guaranteed:
+1. A Team should not share a Match Alliance with the same Team twice, nor face the same opposing Team twice, across its Qualification Matches.
+2. A Team's Qualification Matches should be spread across the full span of the Qualification Round rather than clustered together.
+3. A Team should not be scheduled into too many consecutive Qualification Matches without a gap to recover between them.
+
+These are satisfied greedily, in roughly the priority listed — a rule is only violated when the number of Teams and configured match count make satisfying it mathematically impossible.
+
+**No-Show**:
+A flag on one Team within one Match (Qualification or Elimination) recording that the Team did not participate. Counts as a loss for that Team alone; its Match Alliance (or Playoff Alliance) partner is unaffected and can still win the Match on its own merit.
+
+**Score**:
+The points value recorded for one Match Alliance (or Playoff Alliance) within one Match — shared equally as that side's result by both of its Teams.
+
+**Standings**:
+Teams ranked by win/loss record (accumulated from Qualification Matches), with ties broken by cumulative Score. Meaningful only for the Qualification Round — the Elimination Bracket uses Seeds, not Standings, once it begins.
+
+**Match Timeline**:
+The tournament-wide timing configuration used to compute every Match's Match Time, in one of two modes:
+- *Forward*: a Start Time plus a Match Duration and Gap, computed forward through the Qualification Round and then the Elimination Bracket.
+- *Backward*: a target End Time, from which a Start Time is back-calculated using an Estimated Bracket Size and whether a Third-Place Match is included, to determine the total match count. Changing the actual Bracket Size later does not re-target the original End Time — it only recalculates forward from the current time.
+Recalculating the Match Timeline ("Recalculate Match Times") never alters recorded results and is always available, distinct from the (destructive) Pairing Draw.
+
+**Match Time**:
+The computed scheduled time for one Qualification Match or Elimination Match, derived from the Match Timeline.
+
+**Field Count**:
+How many Matches run concurrently per time slot. Set once per Tournament and not changed mid-Tournament; feeds only the Match Timeline's calculations, and never restricts which Match can be marked complete or edited.
+
+**Current Match**:
+The Qualification Match spotlighted in the live Qualification Round view. Defaults to the Inferred Current Match, but can be overridden by Pinning.
+
+**Inferred Current Match**:
+The automatic default for Current Match: the first not-yet-complete Qualification Match in Match Time order.
+
+**Pinned Match**:
+A Qualification Match explicitly designated as the Current Match via "Set as Current," overriding the Inferred Current Match. The pin clears automatically once the Pinned Match itself is marked complete, at which point Current Match reverts to being Inferred.
+
+**Up Next**:
+The first not-yet-complete Qualification Match after the Current Match, in Match Time order. Always Inferred — Up Next cannot be pinned, only Current Match can.
+
+**Alliance Selection**:
+The teacher manually forming Playoff Alliances once the Qualification Round ends, by typing in which two Teams form each Alliance.
+_Avoid_: auto-pairing, seeding alliances — Playoff Alliances are always formed by explicit teacher choice, never derived automatically from Standings.
+
+**Playoff Alliance**:
+A two-Team pairing formed once via Alliance Selection, fixed for the remainder of the Tournament. Distinct from Match Alliance (above) — a Playoff Alliance persists across every Elimination Match it plays.
+
+**Elimination Bracket**:
+The single-elimination bracket of Playoff Alliances played after Alliance Selection. Fixed once generated — Bracket Slots are not reseeded between rounds.
+
+**Bracket Size**:
+The number of Playoff Alliances the teacher chooses to enter into the Elimination Bracket — any positive integer, not restricted to a power of two.
+
+**Bracket Slot**:
+One seeded position within the Elimination Bracket. If Bracket Size isn't a power of two, the bracket pads to the next power of two, with the extra Bracket Slots resolved as Byes for the top Seeds.
+
+**Seed**:
+The rank-order position assigned to a Playoff Alliance within the Elimination Bracket. Auto-filled from Standings by default, but every Bracket Slot's Seed is manually overridable.
+
+**Bye**:
+An automatic advancement past Round 1 of the Elimination Bracket, given to a top Seed when Bracket Size is padded to the next power of two.
+
+**Elimination Match**:
+A match between two Playoff Alliances within the Elimination Bracket. A Score is recorded for the record, and only win/loss by Score determines advancement — a No-Show here (as everywhere) only affects that Team's own record, never which Playoff Alliance advances.
+
+**Third-Place Match**:
+An optional Elimination Match between the two Semifinal-round losers. Can be toggled on or off at any time until the Third-Place Match itself is marked complete.
+
+**Reset Results**:
+The action that clears the Qualification Round, all Match results, and the Elimination Bracket, while preserving the Team roster. Re-enables the Pairing Draw. Takes effect instantly, with no confirmation step.
+
+**New Tournament**:
+The action that clears everything — Team roster included — starting completely over. Takes effect instantly, with no confirmation step.
+_Avoid_: Reset — ambiguous between this and Reset Results; always say which one.
