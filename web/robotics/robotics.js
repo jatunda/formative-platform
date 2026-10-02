@@ -125,41 +125,54 @@ export function renderTeamsTab(state, dispatch) {
   const nameInput = el('input', { placeholder: 'Team name' });
   const membersInput = el('input', { placeholder: 'Members (comma-separated)' });
   const addBtn = el('button', {
+    className: 'robotics-btn robotics-btn-primary',
     onClick: () => {
       if (!nameInput.value.trim()) return;
       const members = membersInput.value.split(',').map((m) => m.trim()).filter(Boolean);
       dispatch((s) => addTeam(s, { name: nameInput.value.trim(), members }));
     },
   }, ['Add Team']);
-  section.appendChild(el('div', { className: 'robotics-card' }, [nameInput, membersInput, addBtn]));
+  section.appendChild(el('div', { className: 'robotics-card' }, [
+    el('h3', { className: 'robotics-card-title' }, ['Add a Team']),
+    el('div', { className: 'robotics-form-row' }, [nameInput, membersInput, addBtn]),
+  ]));
 
   const list = el('div', { className: 'robotics-card' });
+  list.appendChild(el('h3', { className: 'robotics-card-title' }, [`Roster (${state.teams.length})`]));
+  if (state.teams.length === 0) {
+    list.appendChild(el('p', { className: 'robotics-empty' }, ['No teams yet — add one above.']));
+  }
   state.teams.forEach((team) => {
-    const row = el('div', { className: 'robotics-match-row' }, [
-      el('strong', {}, [team.name]),
-      el('span', {}, [team.members.join(', ')]),
-      el('button', { onClick: () => dispatch((s) => removeTeam(s, team.id)) }, ['Remove']),
+    const row = el('div', { className: 'robotics-match-row robotics-team-row' }, [
+      el('strong', { className: 'robotics-team-name' }, [team.name]),
+      el('span', { className: 'robotics-team-members' }, [team.members.join(', ')]),
+      el('button', { className: 'robotics-btn robotics-btn-danger robotics-btn-sm', onClick: () => dispatch((s) => removeTeam(s, team.id)) }, ['Remove']),
     ]);
     list.appendChild(row);
   });
   section.appendChild(list);
 
   const config = el('div', { className: 'robotics-card' });
+  config.appendChild(el('h3', { className: 'robotics-card-title' }, ['Tournament Settings']));
   const matchesPerTeamInput = el('input', { type: 'number', value: state.qualification.matchesPerTeam });
   matchesPerTeamInput.addEventListener('change', () => {
     dispatch((s) => setMatchesPerTeam(s, parseInt(matchesPerTeamInput.value, 10) || 1));
   });
-  config.appendChild(el('label', {}, ['Matches per team: ', matchesPerTeamInput]));
+  config.appendChild(el('label', { className: 'robotics-field' }, ['Matches per team: ', matchesPerTeamInput]));
 
   const regenerateBtn = el('button', {
+    className: 'robotics-btn robotics-btn-secondary',
     onClick: () => dispatch((s) => regenerateMatchups(s)),
   }, ['Regenerate Matchups']);
   regenerateBtn.disabled = !canRegenerateMatchups(state);
   config.appendChild(regenerateBtn);
 
-  config.appendChild(el('button', { onClick: () => dispatch((s) => resetResults(s)) }, ['Reset Results']));
-  config.appendChild(el('button', { onClick: () => dispatch((s) => newTournament(s)) }, ['New Tournament']));
-  config.appendChild(el('button', { onClick: () => copyToClipboard(exportRosterMarkdown(state.teams)) }, ['Copy Roster to Clipboard']));
+  const dangerRow = el('div', { className: 'robotics-form-row' }, [
+    el('button', { className: 'robotics-btn robotics-btn-danger', onClick: () => dispatch((s) => resetResults(s)) }, ['Reset Results']),
+    el('button', { className: 'robotics-btn robotics-btn-danger', onClick: () => dispatch((s) => newTournament(s)) }, ['New Tournament']),
+    el('button', { className: 'robotics-btn robotics-btn-ghost', onClick: () => copyToClipboard(exportRosterMarkdown(state.teams)) }, ['Copy Roster to Clipboard']),
+  ]);
+  config.appendChild(dangerRow);
 
   section.appendChild(config);
   return section;
@@ -179,25 +192,34 @@ function renderMatchRow(state, dispatch, entry, { currentIndex, upNextIndex }) {
   if (match.completed) classNames.push('is-complete');
 
   const row = el('div', { className: classNames.join(' ') });
-  row.appendChild(el('span', {}, [formatTime(computeMatchTime(state.timeline, entry.globalIndex))]));
-  row.appendChild(el('span', {}, [allianceTeamNames(state, match.allianceA)]));
-  const scoreA = el('input', { type: 'number', className: 'robotics-score-input', value: match.scoreA ?? '' });
-  row.appendChild(scoreA);
-  row.appendChild(el('span', {}, ['vs']));
-  const scoreB = el('input', { type: 'number', className: 'robotics-score-input', value: match.scoreB ?? '' });
-  row.appendChild(scoreB);
-  row.appendChild(el('span', {}, [allianceTeamNames(state, match.allianceB)]));
 
+  row.appendChild(el('span', { className: 'robotics-match-time' }, [formatTime(computeMatchTime(state.timeline, entry.globalIndex))]));
+
+  const scoreA = el('input', { type: 'number', className: 'robotics-score-input', value: match.scoreA ?? '' });
+  const scoreB = el('input', { type: 'number', className: 'robotics-score-input', value: match.scoreB ?? '' });
+  const matchup = el('div', { className: 'robotics-match-teams' }, [
+    el('span', { className: 'robotics-match-alliance' }, [allianceTeamNames(state, match.allianceA)]),
+    scoreA,
+    el('span', { className: 'robotics-match-vs' }, ['vs']),
+    scoreB,
+    el('span', { className: 'robotics-match-alliance' }, [allianceTeamNames(state, match.allianceB)]),
+  ]);
+  row.appendChild(matchup);
+
+  const noShowGroup = el('div', { className: 'robotics-match-noshow' });
   match.allianceA.concat(match.allianceB).forEach((teamId) => {
     const checkbox = el('input', { type: 'checkbox' });
     checkbox.checked = !!match.noShow[teamId];
     checkbox.addEventListener('change', () => {
       dispatch((s) => setQualificationNoShow(s, qualIndex, teamId, checkbox.checked));
     });
-    row.appendChild(el('label', {}, [checkbox, `${teamName(state, teamId)} no-show`]));
+    noShowGroup.appendChild(el('label', { className: 'robotics-field robotics-checkbox-field' }, [checkbox, `${teamName(state, teamId)} no-show`]));
   });
+  row.appendChild(noShowGroup);
 
-  row.appendChild(el('button', {
+  const actions = el('div', { className: 'robotics-match-actions' });
+  actions.appendChild(el('button', {
+    className: 'robotics-btn robotics-btn-secondary robotics-btn-sm',
     onClick: () => dispatch((s) => recordQualificationResult(s, qualIndex, {
       scoreA: parseInt(scoreA.value, 10) || 0,
       scoreB: parseInt(scoreB.value, 10) || 0,
@@ -205,16 +227,17 @@ function renderMatchRow(state, dispatch, entry, { currentIndex, upNextIndex }) {
   }, [match.completed ? 'Save Edit' : 'Mark Complete']));
 
   if (match.completed) {
-    row.appendChild(el('span', { className: 'robotics-complete-badge' }, ['✓ Complete']));
+    actions.appendChild(el('span', { className: 'robotics-complete-badge' }, ['✓ Complete']));
   }
 
   if (!match.completed && !isCurrent) {
-    row.appendChild(el('button', { onClick: () => dispatch((s) => pinCurrentMatch(s, qualIndex)) }, ['Set as Current']));
+    actions.appendChild(el('button', { className: 'robotics-btn robotics-btn-ghost robotics-btn-sm', onClick: () => dispatch((s) => pinCurrentMatch(s, qualIndex)) }, ['Set as Current']));
   }
 
   if (isCurrent && state.qualification.pinnedMatchIndex === qualIndex) {
-    row.appendChild(el('button', { onClick: () => dispatch((s) => clearPinnedMatch(s)) }, ['Clear Pin (back to automatic)']));
+    actions.appendChild(el('button', { className: 'robotics-btn robotics-btn-ghost robotics-btn-sm', onClick: () => dispatch((s) => clearPinnedMatch(s)) }, ['Clear Pin (back to automatic)']));
   }
+  row.appendChild(actions);
 
   return row;
 }
@@ -222,7 +245,8 @@ function renderMatchRow(state, dispatch, entry, { currentIndex, upNextIndex }) {
 export function renderScheduleTab(state, dispatch) {
   const section = el('div', { className: 'robotics-section' });
 
-  const timelineCard = el('div', { className: 'robotics-card' });
+  const timelineCard = el('div', { className: 'robotics-card robotics-settings-grid' });
+  timelineCard.appendChild(el('h3', { className: 'robotics-card-title' }, ['Match Timeline']));
   const modeSelect = el('select', {});
   ['forward', 'backward'].forEach((mode) => {
     const opt = el('option', { value: mode }, [mode === 'forward' ? 'Forward (start time)' : 'Backward (end time)']);
@@ -230,20 +254,21 @@ export function renderScheduleTab(state, dispatch) {
     modeSelect.appendChild(opt);
   });
   modeSelect.addEventListener('change', () => dispatch((s) => setTimelineConfig(s, { mode: modeSelect.value })));
-  timelineCard.appendChild(el('label', {}, ['Mode: ', modeSelect]));
+  timelineCard.appendChild(el('label', { className: 'robotics-field' }, ['Mode: ', modeSelect]));
 
   if (state.timeline.mode === 'forward') {
     const startInput = el('input', { type: 'datetime-local' });
     startInput.addEventListener('change', () => {
       dispatch((s) => setTimelineConfig(s, { startTime: new Date(startInput.value).getTime() }));
     });
-    timelineCard.appendChild(el('label', {}, ['Start time: ', startInput]));
+    timelineCard.appendChild(el('label', { className: 'robotics-field' }, ['Start time: ', startInput]));
   } else {
     const endInput = el('input', { type: 'datetime-local' });
     const estBracketInput = el('input', { type: 'number', value: state.timeline.estimatedBracketSize });
     const estThirdInput = el('input', { type: 'checkbox' });
     estThirdInput.checked = state.timeline.estimatedThirdPlace;
     const applyBtn = el('button', {
+      className: 'robotics-btn robotics-btn-primary',
       onClick: () => {
         const endTime = new Date(endInput.value).getTime();
         const estimatedBracketSize = parseInt(estBracketInput.value, 10) || 2;
@@ -257,9 +282,9 @@ export function renderScheduleTab(state, dispatch) {
         dispatch((s) => setTimelineConfig(s, { endTime, estimatedBracketSize, estimatedThirdPlace, startTime }));
       },
     }, ['Apply']);
-    timelineCard.appendChild(el('label', {}, ['End time: ', endInput]));
-    timelineCard.appendChild(el('label', {}, ['Estimated bracket size: ', estBracketInput]));
-    timelineCard.appendChild(el('label', {}, [estThirdInput, 'Estimated third-place match']));
+    timelineCard.appendChild(el('label', { className: 'robotics-field' }, ['End time: ', endInput]));
+    timelineCard.appendChild(el('label', { className: 'robotics-field' }, ['Estimated bracket size: ', estBracketInput]));
+    timelineCard.appendChild(el('label', { className: 'robotics-field robotics-checkbox-field' }, [estThirdInput, 'Estimated third-place match']));
     timelineCard.appendChild(applyBtn);
   }
 
@@ -269,20 +294,25 @@ export function renderScheduleTab(state, dispatch) {
   gapInput.addEventListener('change', () => dispatch((s) => setTimelineConfig(s, { gapMin: parseInt(gapInput.value, 10) || 0 })));
   const fieldInput = el('input', { type: 'number', value: state.timeline.fieldCount });
   fieldInput.addEventListener('change', () => dispatch((s) => setTimelineConfig(s, { fieldCount: parseInt(fieldInput.value, 10) || 1 })));
-  timelineCard.appendChild(el('label', {}, ['Match duration (min): ', durationInput]));
-  timelineCard.appendChild(el('label', {}, ['Gap (min): ', gapInput]));
-  timelineCard.appendChild(el('label', {}, ['Field count: ', fieldInput]));
+  timelineCard.appendChild(el('label', { className: 'robotics-field' }, ['Match duration (min): ', durationInput]));
+  timelineCard.appendChild(el('label', { className: 'robotics-field' }, ['Gap (min): ', gapInput]));
+  timelineCard.appendChild(el('label', { className: 'robotics-field' }, ['Field count: ', fieldInput]));
   section.appendChild(timelineCard);
 
   const currentIndex = getCurrentMatchIndex(state.qualification.matches, state.qualification.pinnedMatchIndex);
   const upNextIndex = getUpNextMatchIndex(state.qualification.matches, currentIndex);
 
   const matchList = el('div', { className: 'robotics-card' });
+  matchList.appendChild(el('h3', { className: 'robotics-card-title' }, ['Qualification Matches']));
   const entries = getAllMatchesInScheduleOrder(state).filter((e) => e.kind === 'qualification');
+  if (entries.length === 0) {
+    matchList.appendChild(el('p', { className: 'robotics-empty' }, ['No matches scheduled yet — add teams and regenerate matchups from the Teams tab.']));
+  }
   entries.forEach((entry) => matchList.appendChild(renderMatchRow(state, dispatch, entry, { currentIndex, upNextIndex })));
   section.appendChild(matchList);
 
   section.appendChild(el('button', {
+    className: 'robotics-btn robotics-btn-ghost',
     onClick: () => copyToClipboard(exportMatchesMarkdown(state.qualification.matches, state.teams)),
   }, ['Copy Match Data to Clipboard']));
 
@@ -295,21 +325,35 @@ export function renderStandingsTab(state) {
   const section = el('div', { className: 'robotics-section' });
   const standings = computeStandings(state.teams, state.qualification.matches);
 
-  const table = el('table');
-  table.appendChild(el('tr', {}, ['Rank', 'Team', 'Members', 'W-L', 'Points'].map((h) => el('th', {}, [h]))));
-  standings.forEach((entry, i) => {
-    const team = state.teams.find((t) => t.id === entry.teamId);
-    table.appendChild(el('tr', {}, [
-      el('td', {}, [String(i + 1)]),
-      el('td', {}, [team?.name ?? '(unknown)']),
-      el('td', {}, [(team?.members ?? []).join(', ')]),
-      el('td', {}, [`${entry.wins}-${entry.losses}`]),
-      el('td', {}, [String(entry.points)]),
+  const card = el('div', { className: 'robotics-card' });
+  card.appendChild(el('h3', { className: 'robotics-card-title' }, ['Standings']));
+
+  if (standings.length === 0) {
+    card.appendChild(el('p', { className: 'robotics-empty' }, ['No results yet — standings will appear once matches are completed.']));
+  } else {
+    const table = el('table', { className: 'robotics-table' });
+    table.appendChild(el('thead', {}, [
+      el('tr', {}, ['Rank', 'Team', 'Members', 'W-L', 'Points'].map((h) => el('th', {}, [h]))),
     ]));
-  });
-  section.appendChild(table);
+    const tbody = el('tbody');
+    standings.forEach((entry, i) => {
+      const team = state.teams.find((t) => t.id === entry.teamId);
+      tbody.appendChild(el('tr', {}, [
+        el('td', { className: 'robotics-rank-cell' }, [String(i + 1)]),
+        el('td', {}, [team?.name ?? '(unknown)']),
+        el('td', {}, [(team?.members ?? []).join(', ')]),
+        el('td', {}, [`${entry.wins}-${entry.losses}`]),
+        el('td', {}, [String(entry.points)]),
+      ]));
+    });
+    table.appendChild(tbody);
+    card.appendChild(el('div', { className: 'robotics-table-wrap' }, [table]));
+  }
+
+  section.appendChild(card);
 
   section.appendChild(el('button', {
+    className: 'robotics-btn robotics-btn-ghost',
     onClick: () => copyToClipboard(exportStandingsMarkdown(standings, state.teams)),
   }, ['Copy Standings to Clipboard']));
 
@@ -320,19 +364,25 @@ export function renderStandingsTab(state) {
 
 function renderBracketMatch(state, dispatch, match) {
   const sides = resolveMatchSides(state.elimination.bracket, match.id);
-  const card = el('div', { className: 'robotics-card' });
+  const card = el('div', { className: 'robotics-card robotics-bracket-match' });
   if (match.isBye) {
-    card.appendChild(el('div', {}, [`BYE → ${playoffAllianceLabel(state, sides.allianceA ?? sides.allianceB)}`]));
+    card.appendChild(el('div', { className: 'robotics-bracket-bye' }, [`BYE → ${playoffAllianceLabel(state, sides.allianceA ?? sides.allianceB)}`]));
     return card;
   }
-  card.appendChild(el('div', {}, [sides.allianceA ? playoffAllianceLabel(state, sides.allianceA) : 'TBD']));
+
   const scoreA = el('input', { type: 'number', className: 'robotics-score-input', value: match.scoreA ?? '' });
   const scoreB = el('input', { type: 'number', className: 'robotics-score-input', value: match.scoreB ?? '' });
-  card.appendChild(scoreA);
-  card.appendChild(el('span', {}, ['vs']));
-  card.appendChild(scoreB);
-  card.appendChild(el('div', {}, [sides.allianceB ? playoffAllianceLabel(state, sides.allianceB) : 'TBD']));
+  card.appendChild(el('div', { className: 'robotics-bracket-side' }, [
+    el('span', { className: 'robotics-match-alliance' }, [sides.allianceA ? playoffAllianceLabel(state, sides.allianceA) : 'TBD']),
+    scoreA,
+  ]));
+  card.appendChild(el('div', { className: 'robotics-match-vs' }, ['vs']));
+  card.appendChild(el('div', { className: 'robotics-bracket-side' }, [
+    el('span', { className: 'robotics-match-alliance' }, [sides.allianceB ? playoffAllianceLabel(state, sides.allianceB) : 'TBD']),
+    scoreB,
+  ]));
 
+  const noShowGroup = el('div', { className: 'robotics-match-noshow' });
   [sides.allianceA, sides.allianceB].filter(Boolean).forEach((allianceId) => {
     playoffAllianceTeamIds(state, allianceId).forEach((teamId) => {
       const checkbox = el('input', { type: 'checkbox' });
@@ -340,17 +390,21 @@ function renderBracketMatch(state, dispatch, match) {
       checkbox.addEventListener('change', () => {
         dispatch((s) => setEliminationNoShow(s, match.id, teamId, checkbox.checked));
       });
-      card.appendChild(el('label', {}, [checkbox, `${teamName(state, teamId)} no-show`]));
+      noShowGroup.appendChild(el('label', { className: 'robotics-field robotics-checkbox-field' }, [checkbox, `${teamName(state, teamId)} no-show`]));
     });
   });
+  card.appendChild(noShowGroup);
 
-  card.appendChild(el('button', {
+  const actions = el('div', { className: 'robotics-match-actions' });
+  actions.appendChild(el('button', {
+    className: 'robotics-btn robotics-btn-secondary robotics-btn-sm',
     onClick: () => dispatch((s) => recordEliminationResult(s, match.id, {
       scoreA: parseInt(scoreA.value, 10) || 0,
       scoreB: parseInt(scoreB.value, 10) || 0,
     })),
   }, [match.completed ? 'Save Edit' : 'Mark Complete']));
-  if (match.completed) card.appendChild(el('span', { className: 'robotics-complete-badge' }, ['✓ Complete']));
+  if (match.completed) actions.appendChild(el('span', { className: 'robotics-complete-badge' }, ['✓ Complete']));
+  card.appendChild(actions);
   return card;
 }
 
@@ -370,7 +424,7 @@ function renderBracket(state, dispatch) {
   });
   const winner = getMatchWinner(bracket, bracket.matches.find((m) => m.round === 'final').id);
   if (winner) {
-    container.appendChild(el('div', { className: 'robotics-card' }, [`🏆 Champion: ${playoffAllianceLabel(state, winner)}`]));
+    container.appendChild(el('div', { className: 'robotics-champion-banner' }, [`🏆 Champion: ${playoffAllianceLabel(state, winner)}`]));
   }
   return container;
 }
@@ -382,6 +436,7 @@ export function renderFinalsTab(state, dispatch) {
   const available = state.teams.filter((t) => !usedTeamIds.has(t.id));
 
   const selectionCard = el('div', { className: 'robotics-card' });
+  selectionCard.appendChild(el('h3', { className: 'robotics-card-title' }, ['Form a Playoff Alliance']));
   const selectA = el('select', {});
   const selectB = el('select', {});
   available.forEach((team, i) => {
@@ -390,38 +445,49 @@ export function renderFinalsTab(state, dispatch) {
     if (i === 1) optionB.setAttribute('selected', 'selected');
     selectB.appendChild(optionB);
   });
-  selectionCard.appendChild(el('label', {}, ['Team A: ', selectA]));
-  selectionCard.appendChild(el('label', {}, ['Team B: ', selectB]));
-  selectionCard.appendChild(el('button', {
-    onClick: () => {
-      if (!selectA.value || !selectB.value || selectA.value === selectB.value) return;
-      dispatch((s) => formPlayoffAlliance(s, selectA.value, selectB.value));
-    },
-  }, ['Form Alliance']));
+  const selectionRow = el('div', { className: 'robotics-form-row' }, [
+    el('label', { className: 'robotics-field' }, ['Team A: ', selectA]),
+    el('label', { className: 'robotics-field' }, ['Team B: ', selectB]),
+    el('button', {
+      className: 'robotics-btn robotics-btn-primary',
+      onClick: () => {
+        if (!selectA.value || !selectB.value || selectA.value === selectB.value) return;
+        dispatch((s) => formPlayoffAlliance(s, selectA.value, selectB.value));
+      },
+    }, ['Form Alliance']),
+  ]);
+  selectionCard.appendChild(selectionRow);
   section.appendChild(selectionCard);
 
   const alliancesCard = el('div', { className: 'robotics-card' });
+  alliancesCard.appendChild(el('h3', { className: 'robotics-card-title' }, ['Playoff Alliances']));
+  if (state.elimination.alliances.length === 0) {
+    alliancesCard.appendChild(el('p', { className: 'robotics-empty' }, ['No alliances formed yet.']));
+  }
   state.elimination.alliances.forEach((alliance) => {
-    alliancesCard.appendChild(el('div', { className: 'robotics-match-row' }, [
-      el('span', {}, [allianceTeamNames(state, alliance.teamIds)]),
-      el('button', { onClick: () => dispatch((s) => removePlayoffAlliance(s, alliance.id)) }, ['Remove']),
+    alliancesCard.appendChild(el('div', { className: 'robotics-match-row robotics-team-row' }, [
+      el('span', { className: 'robotics-team-name' }, [allianceTeamNames(state, alliance.teamIds)]),
+      el('button', { className: 'robotics-btn robotics-btn-danger robotics-btn-sm', onClick: () => dispatch((s) => removePlayoffAlliance(s, alliance.id)) }, ['Remove']),
     ]));
   });
   section.appendChild(alliancesCard);
 
-  const bracketConfigCard = el('div', { className: 'robotics-card' });
+  const bracketConfigCard = el('div', { className: 'robotics-card robotics-settings-grid' });
+  bracketConfigCard.appendChild(el('h3', { className: 'robotics-card-title' }, ['Bracket Configuration']));
   const sizeInput = el('input', { type: 'number', min: '2', value: state.elimination.bracketSize ?? '' });
   const thirdPlaceInput = el('input', { type: 'checkbox' });
   thirdPlaceInput.checked = state.elimination.includeThirdPlace;
-  bracketConfigCard.appendChild(el('label', {}, ['Bracket size: ', sizeInput]));
-  bracketConfigCard.appendChild(el('label', {}, [thirdPlaceInput, 'Include third-place match']));
+  bracketConfigCard.appendChild(el('label', { className: 'robotics-field' }, ['Bracket size: ', sizeInput]));
+  bracketConfigCard.appendChild(el('label', { className: 'robotics-field robotics-checkbox-field' }, [thirdPlaceInput, 'Include third-place match']));
   bracketConfigCard.appendChild(el('button', {
+    className: 'robotics-btn robotics-btn-secondary',
     onClick: () => dispatch((s) => setBracketConfig(s, { bracketSize: parseInt(sizeInput.value, 10) || null, includeThirdPlace: thirdPlaceInput.checked })),
   }, ['Save Bracket Config']));
   section.appendChild(bracketConfigCard);
 
   if (state.elimination.bracketSize) {
-    const seedsCard = el('div', { className: 'robotics-card' });
+    const seedsCard = el('div', { className: 'robotics-card robotics-settings-grid' });
+    seedsCard.appendChild(el('h3', { className: 'robotics-card-title' }, ['Seeds']));
     for (let seedNum = 1; seedNum <= state.elimination.bracketSize; seedNum++) {
       const select = el('select', {});
       select.appendChild(el('option', { value: '' }, ['(unassigned)']));
@@ -431,10 +497,13 @@ export function renderFinalsTab(state, dispatch) {
         select.appendChild(opt);
       });
       select.addEventListener('change', () => dispatch((s) => setSeed(s, seedNum, select.value || null)));
-      seedsCard.appendChild(el('label', {}, [`Seed ${seedNum}: `, select]));
+      seedsCard.appendChild(el('label', { className: 'robotics-field' }, [`Seed ${seedNum}: `, select]));
     }
-    seedsCard.appendChild(el('button', { onClick: () => dispatch((s) => autoFillSeedsFromStandings(s)) }, ['Auto-fill Seeds from Standings']));
-    seedsCard.appendChild(el('button', { onClick: () => dispatch((s) => generateBracket(s)) }, ['Generate Bracket']));
+    const seedActions = el('div', { className: 'robotics-form-row' }, [
+      el('button', { className: 'robotics-btn robotics-btn-secondary', onClick: () => dispatch((s) => autoFillSeedsFromStandings(s)) }, ['Auto-fill Seeds from Standings']),
+      el('button', { className: 'robotics-btn robotics-btn-primary', onClick: () => dispatch((s) => generateBracket(s)) }, ['Generate Bracket']),
+    ]);
+    seedsCard.appendChild(seedActions);
     section.appendChild(seedsCard);
   }
 
@@ -449,10 +518,16 @@ export function renderFinalsTab(state, dispatch) {
 
 export function renderApp(state, dispatch, activeTab, setActiveTab) {
   const app = el('div', { className: 'robotics-app' });
+
+  app.appendChild(el('header', { className: 'robotics-header' }, [
+    el('h1', { className: 'robotics-title' }, ['Robotics Tournament Control Panel']),
+  ]));
+
   const tabs = el('nav', { className: 'robotics-tabs' });
   TABS.forEach(({ key, label }) => {
     const btn = el('button', {
       className: `robotics-tab-btn${key === activeTab ? ' active' : ''}`,
+      'data-tab-key': key,
       onClick: () => setActiveTab(key),
     }, [label]);
     tabs.appendChild(btn);
