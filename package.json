@@ -2,6 +2,9 @@
   "name": "formative-platform",
   "version": "1.0.0",
   "description": "Educational platform for lesson content and scheduling",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "build": "node build.js",
     "clean": "rimraf dist",

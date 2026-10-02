@@ -2,7 +2,7 @@
   "name": "functions",
   "description": "Server-rendered link-preview metadata for /p/** Pages. See docs/adr/0004-page-rendering-and-link-previews.md.",
   "engines": {
-    "node": "20"
+    "node": "22"
   },
   "main": "index.js",
   "dependencies": {
