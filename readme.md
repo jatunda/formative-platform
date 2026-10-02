@@ -120,18 +120,12 @@ describe('myFunction', () => {
 
 ### Test Coverage
 
-Coverage reports are generated in the `coverage/` directory when running `npm run test:coverage`. The project aims for:
-- 70% minimum coverage for lines, functions, branches, and statements
-- Higher coverage (80%+) for critical utility functions
-
-**Current Test Count:** 201 tests across 15 test files
-- Unit tests: 193 tests
-- Integration tests: 8 tests
+Coverage reports are generated in the `coverage/` directory when running `npm run test:coverage`. Thresholds are enforced in `vitest.config.js` (`coverage.thresholds`) as a ratcheting floor just under current actual coverage, not a fixed target — see `CLAUDE.md` for what to do before considering a change complete.
 
 ### CI/CD Integration
 
 Tests automatically run on every push and pull request via GitHub Actions (`.github/workflows/test.yml`). The workflow:
-- Runs tests on Node.js 18.x and 20.x
+- Runs tests on Node.js 22.x and 24.x
 - Generates coverage reports
 - Uploads coverage artifacts for review
 

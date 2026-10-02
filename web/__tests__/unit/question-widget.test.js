@@ -201,6 +201,27 @@ describe('renderQuestionWidget', () => {
       expect(widget.getState().finished).toBe(false);
     });
 
+    it('ignores Enter aimed at a focused text input (lets it handle its own Enter)', () => {
+      const widget = renderQuestionWidget(container, QUESTION);
+      radios(container)[0].click();
+      const textInput = document.createElement('input');
+      textInput.type = 'text';
+      document.body.appendChild(textInput);
+
+      textInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+
+      expect(widget.getState().finished).toBe(false);
+    });
+
+    it('ignores Enter held with a modifier key (e.g. Ctrl+Enter)', () => {
+      const widget = renderQuestionWidget(container, QUESTION);
+      radios(container)[0].click();
+
+      container.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true }));
+
+      expect(widget.getState().finished).toBe(false);
+    });
+
     it('stops listening after destroy', () => {
       const widget = renderQuestionWidget(container, QUESTION);
       radios(container)[0].click();
@@ -296,6 +317,52 @@ describe('renderQuestionWidget', () => {
     const btn = submitBtn(container);
     expect(btn).not.toBeNull();
     expect(btn.disabled).toBe(true);
+  });
+
+  it('ignores a change event on an option once finished (defensive no-op against synthetic events)', () => {
+    const widget = renderQuestionWidget(container, QUESTION);
+    radios(container)[0].click();
+    submitBtn(container).click(); // finishes, firstTry correct
+    const stateBefore = widget.getState();
+
+    radios(container)[1].dispatchEvent(new Event('change', { bubbles: true }));
+
+    expect(widget.getState()).toEqual(stateBefore);
+  });
+
+  describe('focus retention across re-renders', () => {
+    it('moves focus onto the newly selected radio when focus was already inside the widget', () => {
+      renderQuestionWidget(container, QUESTION);
+      const radio = radios(container)[0];
+      radio.checked = true;
+      radio.focus();
+      radio.dispatchEvent(new Event('change', { bubbles: true }));
+
+      expect(document.activeElement).toBe(radios(container)[0]);
+    });
+
+    it('does not pull focus into the widget on re-render when focus was elsewhere', () => {
+      const outside = document.createElement('button');
+      document.body.appendChild(outside);
+      renderQuestionWidget(container, QUESTION);
+      outside.focus();
+
+      const radio = radios(container)[0];
+      radio.checked = true;
+      radio.dispatchEvent(new Event('change', { bubbles: true }));
+
+      expect(document.activeElement).toBe(outside);
+    });
+
+    it('does not refocus a radio that becomes disabled by the render triggered by finishing', () => {
+      renderQuestionWidget(container, QUESTION);
+      radios(container)[0].click();
+      radios(container)[0].focus();
+
+      submitBtn(container).click(); // finishes; re-render disables all radios
+
+      expect(document.activeElement).not.toBe(radios(container)[0]);
+    });
   });
 
   describe('destroy', () => {
