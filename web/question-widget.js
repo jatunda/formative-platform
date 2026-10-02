@@ -165,20 +165,21 @@ export function renderQuestionWidget(containerEl, questionData, { restoreState, 
 
     containerEl.appendChild(optionsEl);
 
-    if (!state.finished) {
-      const submitBtn = document.createElement("button");
-      submitBtn.type = "button";
-      submitBtn.className = "primary-action-btn question-widget-submit";
-      submitBtn.append("Submit ");
-      const hint = document.createElement("kbd");
-      hint.className = "key-hint";
-      hint.textContent = "Enter ↵";
-      submitBtn.appendChild(hint);
-      submitBtn.title = "Submit (shortcut: Enter)";
-      submitBtn.disabled = state.selectedIndex === null;
-      submitBtn.onclick = submit;
-      containerEl.appendChild(submitBtn);
-    }
+    // Stays mounted (grayed out via :disabled) rather than disappearing once
+    // finished, so the transition to Next reads as "this control is now
+    // done" instead of an abrupt layout jump.
+    const submitBtn = document.createElement("button");
+    submitBtn.type = "button";
+    submitBtn.className = "primary-action-btn question-widget-submit";
+    submitBtn.append("Submit ");
+    const hint = document.createElement("kbd");
+    hint.className = "key-hint";
+    hint.textContent = "Enter ↵";
+    submitBtn.appendChild(hint);
+    submitBtn.title = "Submit (shortcut: Enter)";
+    submitBtn.disabled = state.finished || state.selectedIndex === null;
+    submitBtn.onclick = submit;
+    containerEl.appendChild(submitBtn);
 
     if (hadFocus) {
       const radios = containerEl.querySelectorAll('input[type="radio"]');

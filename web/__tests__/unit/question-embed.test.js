@@ -93,4 +93,26 @@ describe('mountQuestionEmbeds', () => {
 
     expect(mockRenderQuestionWidget).toHaveBeenCalledTimes(2);
   });
+
+  it('destroys widgets from a previous mount before mounting new ones into the same container', async () => {
+    const firstDestroy = vi.fn();
+    mockRenderQuestionWidget.mockReturnValueOnce({ destroy: firstDestroy });
+    mockGetAllQuestionSlugs.mockResolvedValue({ 'loops-1': 'q1' });
+    mockGetQuestionFromDB.mockResolvedValue({ stem: [], options: [] });
+
+    container.appendChild(placeholder('loops-1'));
+    await mountQuestionEmbeds(container);
+    expect(firstDestroy).not.toHaveBeenCalled();
+
+    // Simulates the editor's updatePreview wiping and re-rendering the same
+    // preview pane (a new DSL parse) before the debounced re-mount fires.
+    const secondDestroy = vi.fn();
+    mockRenderQuestionWidget.mockReturnValueOnce({ destroy: secondDestroy });
+    container.innerHTML = '';
+    container.appendChild(placeholder('loops-1'));
+    await mountQuestionEmbeds(container);
+
+    expect(firstDestroy).toHaveBeenCalledTimes(1);
+    expect(secondDestroy).not.toHaveBeenCalled();
+  });
 });

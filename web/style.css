@@ -25,9 +25,9 @@
   --accent-blue-drop: #2b6cb0;
 
   /* Primary call-to-action (student-facing Submit/Next). White text on this
-     blue is ~5.2:1 contrast (WCAG AA). */
-  --primary-btn-bg: #2563eb;
-  --primary-btn-bg-hover: #1d4ed8;
+     blue is ~4.65:1 contrast (WCAG AA); hover darkens to the old base tone. */
+  --primary-btn-bg: #2f6cef;
+  --primary-btn-bg-hover: #2563eb;
   --primary-btn-text: #ffffff;
   
   --accent-mint: #42ffc2;
@@ -1620,6 +1620,12 @@ ol.lesson-list {
 
 .practice-next-btn {
   margin-top: var(--spacing-md);
+}
+
+.practice-next-btn-hint {
+  font-size: 0.75em;
+  font-weight: 400;
+  opacity: 0.75;
 }
 
 .practice-grade-card {

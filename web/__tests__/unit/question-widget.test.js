@@ -53,7 +53,7 @@ describe('renderQuestionWidget', () => {
       expect(widget.getState()).toMatchObject({ finished: true, outcome: 'firstTry', attemptCount: 0 });
       expect(outcomes).toEqual(['firstTry']);
       expect(container.textContent).toContain('Correct, 2 + 2 is 4.');
-      expect(container.querySelector('.question-widget-submit')).toBeNull();
+      expect(submitBtn(container).disabled).toBe(true);
     });
 
     it('disables all radios once finished', () => {
@@ -152,8 +152,8 @@ describe('renderQuestionWidget', () => {
       submitBtn(container).click();
       radios(container)[2].click();
       submitBtn(container).click();
-      // question is finished now; no submit button exists to click again
-      expect(container.querySelector('.question-widget-submit')).toBeNull();
+      // question is finished now; Submit stays visible but grayed out/disabled
+      expect(submitBtn(container).disabled).toBe(true);
       expect(outcomes).toHaveLength(1);
     });
   });
@@ -263,7 +263,7 @@ describe('renderQuestionWidget', () => {
       renderQuestionWidget(container, QUESTION, { restoreState, onOutcome: (o) => outcomes.push(o) });
 
       expect(container.textContent).toContain('Correct, 2 + 2 is 4.');
-      expect(container.querySelector('.question-widget-submit')).toBeNull();
+      expect(submitBtn(container).disabled).toBe(true);
       expect(outcomes).toEqual([]); // restoring must not re-fire onOutcome
     });
 
@@ -286,6 +286,16 @@ describe('renderQuestionWidget', () => {
       const wrongRow = radios(container)[2].closest('.question-widget-option');
       expect(wrongRow.classList.contains('question-widget-option-wrong')).toBe(true);
     });
+  });
+
+  it('keeps Submit visible but grayed out once finished, rather than removing it', () => {
+    renderQuestionWidget(container, QUESTION);
+    radios(container)[0].click();
+    submitBtn(container).click();
+
+    const btn = submitBtn(container);
+    expect(btn).not.toBeNull();
+    expect(btn.disabled).toBe(true);
   });
 
   describe('destroy', () => {

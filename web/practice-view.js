@@ -79,6 +79,11 @@ function renderSummary(containerEl, perQuestionState) {
   const tally = tallyOutcomes(perQuestionState);
   const stats = summarizeOutcomes(tally);
   const fmt = (p) => `${Math.round(p)}%`;
+  // letterGradeFor compares the unrounded percent (see its doc comment), so
+  // rounding this one to the nearest percent can display e.g. "70%" next to
+  // a D badge for a 69.565% score. Floor instead: the shown number then
+  // never implies a bracket the raw score didn't actually reach.
+  const fmtForGrade = (p) => `${Math.floor(p)}%`;
   containerEl.innerHTML = '';
 
   const heading = document.createElement('h2');
@@ -95,7 +100,7 @@ function renderSummary(containerEl, perQuestionState) {
   gradeLetter.textContent = stats.expectedGrade;
   const gradeNote = document.createElement('div');
   gradeNote.className = 'practice-grade-note';
-  gradeNote.textContent = `Based on your first-try accuracy (${fmt(stats.firstTryPercent)}), since a test only gives you one try.`;
+  gradeNote.textContent = `Based on your first-try accuracy (${fmtForGrade(stats.firstTryPercent)}), since a test only gives you one try.`;
   gradeCard.append(gradeLabel, gradeLetter, gradeNote);
   containerEl.appendChild(gradeCard);
 
@@ -163,10 +168,10 @@ export function startPracticeSet(rootEl, questions) {
     const canAdvance = viewingIndex < questions.length && viewingIndex < frontierIndex;
     nextBtn.hidden = !canAdvance;
     nextBtn.textContent = '';
-    nextBtn.append(viewingIndex === questions.length - 1 ? 'See results → ' : 'Next → ');
-    const hint = document.createElement('kbd');
-    hint.className = 'key-hint';
-    hint.textContent = 'Enter ↵';
+    nextBtn.append(viewingIndex === questions.length - 1 ? 'See results ' : 'Next ');
+    const hint = document.createElement('span');
+    hint.className = 'practice-next-btn-hint';
+    hint.textContent = '(press enter)';
     nextBtn.appendChild(hint);
     nextBtn.title = 'Shortcut: Enter';
   }

@@ -10,6 +10,15 @@ import { getAllQuestionSlugs, getQuestionFromDB } from './question-database-util
 import { renderQuestionWidget } from './question-widget.js';
 import { QUESTION_NOT_FOUND } from './constants.js';
 
+// renderQuestionWidget's returned handle must be destroy()ed to drop its
+// document-level keydown listener. Callers like editor.js's updatePreview
+// re-render the same containerEl's content (wiping the old placeholder DOM)
+// and call this function again on a debounce, with no chance to destroy the
+// widgets from the previous call themselves - so track them here, keyed by
+// containerEl, and destroy the previous batch on the next mount into that
+// same container.
+const widgetsByContainer = new WeakMap();
+
 /**
  * Find every Question Link placeholder inside containerEl and mount the
  * interactive widget for it, fetching all distinct referenced Questions in
@@ -18,6 +27,12 @@ import { QUESTION_NOT_FOUND } from './constants.js';
  * @returns {Promise<void>}
  */
 export async function mountQuestionEmbeds(containerEl) {
+  const previousWidgets = widgetsByContainer.get(containerEl);
+  if (previousWidgets) {
+    previousWidgets.forEach((widget) => widget.destroy());
+    widgetsByContainer.delete(containerEl);
+  }
+
   const placeholders = [...containerEl.querySelectorAll('.question-embed-placeholder')];
   if (placeholders.length === 0) return;
 
@@ -30,6 +45,7 @@ export async function mountQuestionEmbeds(containerEl) {
     questionDataBySlug[slug] = questionId ? await getQuestionFromDB(questionId) : null;
   }));
 
+  const widgets = [];
   for (const placeholder of placeholders) {
     const data = questionDataBySlug[placeholder.dataset.questionSlug];
     if (!data) {
@@ -37,6 +53,7 @@ export async function mountQuestionEmbeds(containerEl) {
       placeholder.classList.add('question-embed-not-found');
       continue;
     }
-    renderQuestionWidget(placeholder, data);
+    widgets.push(renderQuestionWidget(placeholder, data));
   }
+  widgetsByContainer.set(containerEl, widgets);
 }

@@ -139,7 +139,7 @@ describe('startPracticeSet (Frontier navigation)', () => {
 
     expect(root.textContent).toContain('Stem for right1'); // still on Q1 - no auto-advance
     expect(nextBtn(root).hidden).toBe(false);
-    expect(nextBtn(root).textContent).toContain('Enter');
+    expect(nextBtn(root).textContent).toContain('(press enter)');
   });
 
   it('keeps Next hidden after a first wrong attempt (question not finished yet)', () => {
@@ -169,6 +169,19 @@ describe('startPracticeSet (Frontier navigation)', () => {
     expect(nextBtn(root).textContent).toContain('See results');
   });
 
+  it('says "press enter" in a visually de-emphasized hint, separate from the main label', () => {
+    startPracticeSet(root, [{ id: 'q1', data: Q1 }, { id: 'q2', data: Q2 }]);
+
+    radios(root)[0].click();
+    submitBtn(root).click();
+
+    expect(nextBtn(root).textContent).toContain('Next');
+    expect(nextBtn(root).textContent).toContain('(press enter)');
+    const hint = nextBtn(root).querySelector('.practice-next-btn-hint');
+    expect(hint).not.toBeNull();
+    expect(hint.textContent).toBe('(press enter)');
+  });
+
   it('moves to the next question when Next is clicked after finishing', () => {
     startPracticeSet(root, [{ id: 'q1', data: Q1 }, { id: 'q2', data: Q2 }]);
 
@@ -193,7 +206,7 @@ describe('startPracticeSet (Frontier navigation)', () => {
 
     expect(root.textContent).toContain('Stem for right1');
     expect(root.textContent).toContain('Explanation for right1');
-    expect(root.querySelector('.question-widget-submit')).toBeNull(); // still finished, not reset
+    expect(submitBtn(root).disabled).toBe(true); // still finished, not reset
   });
 
   it('does not allow Next to skip past the frontier while reviewing an earlier question', () => {
@@ -227,6 +240,34 @@ describe('startPracticeSet (Frontier navigation)', () => {
     expect(rows['Correct within two tries']).toEqual(['2 of 2', '100%']);
     expect(rows['Missed']).toEqual(['0 of 2', '0%']);
     expect(root.querySelector('.practice-grade-letter').textContent).toBe('F');
+  });
+
+  it('never shows a rounded first-try percentage that implies a higher grade bracket than the badge', () => {
+    // 16/23 first-try-correct = 69.565...% - rounds to "70%" but the badge
+    // (computed from the unrounded value) is a D, not a C.
+    const total = 23;
+    const firstTryCount = 16;
+    const questions = Array.from({ length: total }, (_, i) => ({ id: `q${i}`, data: Q1 }));
+    startPracticeSet(root, questions);
+
+    for (let i = 0; i < total; i += 1) {
+      if (i < firstTryCount) {
+        radios(root)[0].click();
+        submitBtn(root).click();
+      } else {
+        radios(root)[1].click();
+        submitBtn(root).click();
+        radios(root)[1].click();
+        submitBtn(root).click();
+      }
+      nextBtn(root).onclick();
+    }
+
+    const letter = root.querySelector('.practice-grade-letter').textContent;
+    const noteText = root.querySelector('.practice-grade-note').textContent;
+    const shownPercent = Number(noteText.match(/\((\d+)%\)/)[1]);
+    expect(letter).toBe('D');
+    expect(letterGradeFor(shownPercent)).toBe(letter);
   });
 
   it('hides Next on the results page', () => {
