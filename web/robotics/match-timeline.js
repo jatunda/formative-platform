@@ -52,3 +52,35 @@ export function computeTotalDurationMinutes(timeline, totalMatchCount) {
 export function computeStartTimeFromEndTime(timeline, totalDurationMinutes) {
   return timeline.endTime - totalDurationMinutes * MINUTE_MS;
 }
+
+/**
+ * One-line summary of a Match Timeline for its collapsed panel, e.g.
+ * `Forward · starts 1:00 PM · 4 + 1 min · 2 fields · ends ~2:10 PM`.
+ * Forward mode leads with the Start Time and projects the end; Backward mode
+ * leads with the target End Time and shows the start it last applied - the
+ * stored Start Time every Match Time derives from, so the summary never
+ * disagrees with the schedule even before the teacher re-applies.
+ * @param {{mode: 'forward'|'backward', startTime: number|null, endTime: number|null, matchDurationMin: number, gapMin: number, fieldCount: number}} timeline
+ * @param {number} totalMatchCount - matches the schedule currently spans
+ * @param {(epochMs: number) => string} formatClock - renders a time of day
+ * @returns {string}
+ */
+export function formatTimelineSummary(timeline, totalMatchCount, formatClock) {
+  const pacing = [
+    `${timeline.matchDurationMin} + ${timeline.gapMin} min`,
+    `${timeline.fieldCount} field${timeline.fieldCount === 1 ? '' : 's'}`,
+  ];
+  if (timeline.mode === 'backward') {
+    if (timeline.endTime == null) return ['Backward', 'no end time', ...pacing].join(' · ');
+    const parts = ['Backward', `ends ${formatClock(timeline.endTime)}`, ...pacing];
+    if (timeline.startTime != null) parts.push(`starts ~${formatClock(timeline.startTime)}`);
+    return parts.join(' · ');
+  }
+  if (timeline.startTime == null) return ['Forward', 'no start time', ...pacing].join(' · ');
+  const parts = ['Forward', `starts ${formatClock(timeline.startTime)}`, ...pacing];
+  if (totalMatchCount > 0) {
+    const endTime = timeline.startTime + computeTotalDurationMinutes(timeline, totalMatchCount) * MINUTE_MS;
+    parts.push(`ends ~${formatClock(endTime)}`);
+  }
+  return parts.join(' · ');
+}

@@ -30,7 +30,7 @@ import {
   revealNextPlacement,
   replayReveal,
 } from './state.js';
-import { computeMatchTime, computeTotalDurationMinutes, computeStartTimeFromEndTime, estimateEliminationMatchCount } from './match-timeline.js';
+import { computeMatchTime, computeTotalDurationMinutes, computeStartTimeFromEndTime, estimateEliminationMatchCount, formatTimelineSummary } from './match-timeline.js';
 import { computeStandings } from './standings.js';
 import { resolveMatchSides, getMatchWinner, isBracketComplete, countUndecidedMatches, getPlacements } from './bracket.js';
 import { launchConfetti } from './confetti.js';
@@ -457,11 +457,21 @@ function renderMatchRow(state, dispatch, entry, { currentIndex, upNextIndex }) {
   return row;
 }
 
-export function renderScheduleTab(state, dispatch) {
-  const section = el('div', { className: 'robotics-section' });
+/** Every match the schedule spans: Qualification Matches plus actual (or, before a bracket exists, estimated) Elimination Matches. */
+function getScheduledMatchCount(state) {
+  const eliminationCount = state.elimination.bracket
+    ? state.elimination.bracket.matches.filter((m) => !m.isBye).length
+    : estimateEliminationMatchCount(state.timeline.estimatedBracketSize, state.timeline.estimatedThirdPlace);
+  return state.qualification.matches.length + eliminationCount;
+}
 
-  const timelineCard = el('div', { className: 'robotics-card robotics-settings-grid' });
-  timelineCard.appendChild(el('h3', { className: 'robotics-card-title' }, ['Match Timeline']));
+function formatClock(epochMs) {
+  return new Date(epochMs).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+}
+
+function renderTimelineControls(state, dispatch) {
+  const panel = el('div', { className: 'robotics-timeline-panel', id: 'robotics-timeline-panel' });
+
   const modeSelect = el('select', {});
   ['forward', 'backward'].forEach((mode) => {
     const opt = el('option', { value: mode }, [mode === 'forward' ? 'Forward (start time)' : 'Backward (end time)']);
@@ -469,37 +479,28 @@ export function renderScheduleTab(state, dispatch) {
     modeSelect.appendChild(opt);
   });
   modeSelect.addEventListener('change', () => dispatch((s) => setTimelineConfig(s, { mode: modeSelect.value })));
-  timelineCard.appendChild(el('label', { className: 'robotics-field' }, ['Mode: ', modeSelect]));
+  panel.appendChild(el('label', { className: 'robotics-field robotics-timeline-mode' }, ['Mode', modeSelect]));
 
-  if (state.timeline.mode === 'forward') {
-    const startInput = el('input', { type: 'time', value: timeOfDayInputValue(state.timeline.startTime) });
-    const applyBtn = el('button', {
-      className: 'robotics-btn robotics-btn-primary',
-      onClick: () => {
-        const startTime = timeOfDayToEpochMs(startInput.value);
+  const isForward = state.timeline.mode === 'forward';
+  const timeInput = el('input', { type: 'time', value: timeOfDayInputValue(isForward ? state.timeline.startTime : state.timeline.endTime) });
+  const applyBtn = el('button', {
+    className: 'robotics-btn robotics-btn-primary',
+    onClick: () => {
+      if (isForward) {
+        const startTime = timeOfDayToEpochMs(timeInput.value);
         dispatch((s) => setTimelineConfig(s, { startTime }));
-      },
-    }, ['Apply']);
-    timelineCard.appendChild(el('label', { className: 'robotics-field' }, ['Start time: ', startInput]));
-    timelineCard.appendChild(applyBtn);
-  } else {
-    const endInput = el('input', { type: 'time', value: timeOfDayInputValue(state.timeline.endTime) });
-    const applyBtn = el('button', {
-      className: 'robotics-btn robotics-btn-primary',
-      onClick: () => {
-        const endTime = timeOfDayToEpochMs(endInput.value);
-        const eliminationCount = state.elimination.bracket
-          ? state.elimination.bracket.matches.filter((m) => !m.isBye).length
-          : estimateEliminationMatchCount(state.timeline.estimatedBracketSize, state.timeline.estimatedThirdPlace);
-        const totalMatches = state.qualification.matches.length + eliminationCount;
-        const totalMinutes = computeTotalDurationMinutes(state.timeline, totalMatches);
-        const startTime = computeStartTimeFromEndTime({ endTime }, totalMinutes);
-        dispatch((s) => setTimelineConfig(s, { endTime, startTime }));
-      },
-    }, ['Apply']);
-    timelineCard.appendChild(el('label', { className: 'robotics-field' }, ['End time: ', endInput]));
-    timelineCard.appendChild(applyBtn);
-  }
+        return;
+      }
+      const endTime = timeOfDayToEpochMs(timeInput.value);
+      const totalMinutes = computeTotalDurationMinutes(state.timeline, getScheduledMatchCount(state));
+      const startTime = computeStartTimeFromEndTime({ endTime }, totalMinutes);
+      dispatch((s) => setTimelineConfig(s, { endTime, startTime }));
+    },
+  }, ['Apply']);
+  panel.appendChild(el('div', { className: 'robotics-timeline-time' }, [
+    el('label', { className: 'robotics-field' }, [isForward ? 'Start time' : 'End time', timeInput]),
+    applyBtn,
+  ]));
 
   const durationInput = el('input', { type: 'number', value: state.timeline.matchDurationMin });
   durationInput.addEventListener('change', () => dispatch((s) => setTimelineConfig(s, { matchDurationMin: parseInt(durationInput.value, 10) || 1 })));
@@ -507,10 +508,51 @@ export function renderScheduleTab(state, dispatch) {
   gapInput.addEventListener('change', () => dispatch((s) => setTimelineConfig(s, { gapMin: parseInt(gapInput.value, 10) || 0 })));
   const fieldInput = el('input', { type: 'number', value: state.timeline.fieldCount });
   fieldInput.addEventListener('change', () => dispatch((s) => setTimelineConfig(s, { fieldCount: parseInt(fieldInput.value, 10) || 1 })));
-  timelineCard.appendChild(el('label', { className: 'robotics-field' }, ['Match duration (min): ', durationInput]));
-  timelineCard.appendChild(el('label', { className: 'robotics-field' }, ['Gap (min): ', gapInput]));
-  timelineCard.appendChild(el('label', { className: 'robotics-field' }, ['Field count: ', fieldInput]));
-  section.appendChild(timelineCard);
+  panel.appendChild(el('div', { className: 'robotics-timeline-pacing' }, [
+    el('label', { className: 'robotics-field' }, ['Duration (min)', durationInput]),
+    el('label', { className: 'robotics-field' }, ['Gap (min)', gapInput]),
+    el('label', { className: 'robotics-field' }, ['Field count', fieldInput]),
+  ]));
+  return panel;
+}
+
+/**
+ * The Match Timeline as a compact panel: a one-line summary that toggles the controls open in place.
+ * Toggling only flips the DOM (keeping focus on the button) and reports the choice via onToggle.
+ */
+function renderMatchTimeline(state, dispatch, { expanded, onToggle }) {
+  const card = el('div', { className: `robotics-card robotics-timeline${expanded ? ' is-expanded' : ''}` });
+  const panel = renderTimelineControls(state, dispatch);
+  panel.hidden = !expanded;
+  const toggle = el('button', {
+    type: 'button',
+    className: 'robotics-timeline-toggle',
+    'aria-expanded': String(expanded),
+    'aria-controls': panel.id,
+    onClick: () => {
+      const next = toggle.getAttribute('aria-expanded') !== 'true';
+      toggle.setAttribute('aria-expanded', String(next));
+      panel.hidden = !next;
+      card.classList.toggle('is-expanded', next);
+      onToggle(next);
+    },
+  }, [
+    el('span', { className: 'robotics-timeline-chevron', 'aria-hidden': 'true' }, ['▸']),
+    el('span', { className: 'robotics-timeline-heading' }, [
+      el('span', { className: 'robotics-card-title' }, ['Match Timeline']),
+      el('span', { className: 'robotics-timeline-summary' }, [
+        formatTimelineSummary(state.timeline, getScheduledMatchCount(state), formatClock),
+      ]),
+    ]),
+  ]);
+  // Accordion pattern: the heading wraps the button (a button may not contain a heading).
+  card.appendChild(el('h3', { className: 'robotics-timeline-header' }, [toggle]));
+  card.appendChild(panel);
+  return card;
+}
+
+export function renderScheduleTab(state, dispatch) {
+  const section = el('div', { className: 'robotics-section' });
 
   const currentIndex = getCurrentMatchIndex(state.qualification.matches);
   const upNextIndex = getUpNextMatchIndex(state.qualification.matches, currentIndex);
@@ -597,13 +639,18 @@ export function renderStandingsTab(state) {
   return section;
 }
 
-/** Matches on the left, Standings in a narrow sticky column on the right; they stack on narrow screens. */
-export function renderScheduleAndStandingsTab(state, dispatch) {
+/** Matches in the wide column; the Match Timeline above Standings in the narrow one (Timeline first when stacked). */
+export function renderScheduleAndStandingsTab(state, dispatch, { ui }) {
   const matches = renderScheduleTab(state, dispatch);
   matches.classList.add('robotics-schedule-matches');
+  const timeline = renderMatchTimeline(state, dispatch, {
+    expanded: ui.prefs.timelineExpanded === true,
+    onToggle: (expanded) => ui.setPref('timelineExpanded', expanded),
+  });
   const standings = renderStandingsTab(state);
   standings.classList.add('robotics-schedule-standings');
-  return el('div', { className: 'robotics-schedule-layout' }, [matches, standings]);
+  const side = el('div', { className: 'robotics-schedule-side' }, [timeline, standings]);
+  return el('div', { className: 'robotics-schedule-layout' }, [matches, side]);
 }
 
 // ---- Tab: Finals ----
@@ -953,7 +1000,7 @@ function updateLiveStatus(root, state, now) {
 // Only one control panel runs per page; initialising another stops the previous clock and Space handler.
 let stopActiveClock = null;
 
-export function renderApp(state, dispatch, activeTab, setActiveTab) {
+export function renderApp(state, dispatch, activeTab, setActiveTab, ui) {
   const app = el('div', { className: 'robotics-app' });
 
   app.appendChild(renderStatusHeader(state));
@@ -975,13 +1022,13 @@ export function renderApp(state, dispatch, activeTab, setActiveTab) {
     finals: renderFinalsTab,
     results: renderResultsTab,
   };
-  app.appendChild(renderers[activeTab](state, dispatch, { setActiveTab }));
+  app.appendChild(renderers[activeTab](state, dispatch, { setActiveTab, ui }));
   app.appendChild(createToastContainer());
   app.appendChild(createConfirmDialogContainer());
   return app;
 }
 
-export function initRoboticsApp({ mountId = 'roboticsApp', storageKey = 'robotics-tournament-state' } = {}) {
+export function initRoboticsApp({ mountId = 'roboticsApp', storageKey = 'robotics-tournament-state', uiPrefsKey = 'robotics-ui-prefs' } = {}) {
   const mount = document.getElementById(mountId);
   if (!mount) return null;
 
@@ -989,9 +1036,20 @@ export function initRoboticsApp({ mountId = 'roboticsApp', storageKey = 'robotic
   let state = storage.load() ?? createInitialState();
   let activeTab = 'teams';
 
+  // UI preferences (e.g. whether the Match Timeline is open) persist under their own key,
+  // so Reset Results / New Tournament never touch them.
+  const uiStorage = createLocalStorageAdapter(uiPrefsKey);
+  const ui = {
+    prefs: uiStorage.load() ?? {},
+    setPref(key, value) {
+      ui.prefs = { ...ui.prefs, [key]: value };
+      uiStorage.save(ui.prefs);
+    },
+  };
+
   function render() {
     mount.innerHTML = '';
-    mount.appendChild(renderApp(state, dispatch, activeTab, setActiveTab));
+    mount.appendChild(renderApp(state, dispatch, activeTab, setActiveTab, ui));
   }
 
   function dispatch(updater) {

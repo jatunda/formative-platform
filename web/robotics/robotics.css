@@ -219,15 +219,126 @@ body {
   gap: var(--spacing-lg);
 }
 
-/* Schedule & Standings: matches and Standings stack on narrow screens and sit
-   side by side on wide ones (see Responsive). */
+/* Schedule & Standings: on narrow screens the side column dissolves so the
+   Match Timeline leads the stack, then matches, then Standings; on wide ones
+   matches sit beside a column of Timeline above Standings (see Responsive). */
 .robotics-schedule-layout {
   display: grid;
   gap: var(--spacing-lg);
 }
 
-.robotics-schedule-layout > * {
+.robotics-schedule-layout > *,
+.robotics-schedule-side > * {
   min-width: 0;
+}
+
+.robotics-schedule-side {
+  display: contents;
+}
+
+.robotics-schedule-side > .robotics-timeline {
+  order: -1;
+}
+
+/* Match Timeline: a one-line summary button that opens the controls in place. */
+.robotics-timeline {
+  padding: var(--spacing-sm) var(--spacing-lg);
+}
+
+.robotics-timeline-header {
+  margin: 0;
+  font: inherit;
+}
+
+.robotics-timeline-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  width: 100%;
+  padding: var(--spacing-xs) 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.robotics-timeline-toggle:focus-visible {
+  outline: none;
+  border-radius: var(--radius-md);
+  box-shadow: var(--arena-focus);
+}
+
+.robotics-timeline-chevron {
+  flex: none;
+  color: var(--arena-text-muted);
+  font-size: 1.25rem;
+  line-height: 1;
+  transition: transform var(--transition-fast);
+}
+
+.robotics-timeline.is-expanded .robotics-timeline-chevron {
+  transform: rotate(90deg);
+}
+
+.robotics-timeline-heading {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.robotics-timeline .robotics-card-title {
+  display: block;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-size: 1rem;
+}
+
+/* Wraps rather than truncates: in the narrow column an ellipsis would hide the end time. */
+.robotics-timeline-summary {
+  color: var(--arena-text-muted);
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.robotics-timeline-panel {
+  display: grid;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-sm);
+  padding-top: var(--spacing-sm);
+  border-top: 1px solid var(--arena-border);
+}
+
+.robotics-timeline-panel[hidden] {
+  display: none;
+}
+
+.robotics-timeline-panel .robotics-field {
+  align-items: stretch;
+  min-width: 0;
+  font-size: 0.875rem;
+}
+
+/* Fit the narrow column: drop the shared 140px input floor. */
+.robotics-timeline-panel .robotics-field select,
+.robotics-timeline-panel .robotics-field input:not([type="checkbox"]) {
+  min-width: 0;
+}
+
+.robotics-timeline-time {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--spacing-sm);
+  align-items: end;
+}
+
+.robotics-timeline-pacing {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--spacing-sm);
+  align-items: end;
 }
 
 /* Teams: Add a Team, Roster, Tournament Settings stack in that order on narrow
@@ -1284,7 +1395,7 @@ body {
 
 /* ---- Responsive ---- */
 
-/* Wide: matches take the remaining space, Standings a narrow column that stays
+/* Wide: matches take the remaining space, Timeline + Standings a narrow column that stays
    in view while the match list scrolls (scrolling itself if it outgrows the
    viewport). */
 @media (min-width: 1100px) {
@@ -1293,7 +1404,9 @@ body {
     align-items: start;
   }
 
-  .robotics-schedule-standings {
+  .robotics-schedule-side {
+    display: grid;
+    gap: var(--spacing-lg);
     position: sticky;
     top: var(--spacing-md);
     max-height: calc(100vh - 2 * var(--spacing-md));

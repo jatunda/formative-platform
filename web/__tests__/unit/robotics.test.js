@@ -937,7 +937,7 @@ describe('initRoboticsApp', () => {
       expect([...freshRoot.querySelectorAll('button')].some((b) => b.textContent === 'Copy Standings to Clipboard')).toBe(true);
     });
 
-    it('lays out matches and Standings as two columns, each keeping its own copy button', () => {
+    it('lays out matches beside a narrow column of Match Timeline above Standings, each keeping its own copy button', () => {
       const app = initRoboticsApp();
       const root = document.getElementById('roboticsApp');
       ['Alpha', 'Bravo', 'Charlie', 'Delta'].forEach((name) => addTeamViaForm(root, name));
@@ -946,20 +946,109 @@ describe('initRoboticsApp', () => {
       const layout = document.querySelector('.robotics-schedule-layout');
       expect(layout).toBeTruthy();
 
-      const [matchesCol, standingsCol] = layout.children;
+      const [matchesCol, sideCol] = layout.children;
       expect(layout.children).toHaveLength(2);
       expect(matchesCol.classList.contains('robotics-schedule-matches')).toBe(true);
+      expect(sideCol.classList.contains('robotics-schedule-side')).toBe(true);
+      const [timelineCard, standingsCol] = sideCol.children;
+      expect(timelineCard.classList.contains('robotics-timeline')).toBe(true);
       expect(standingsCol.classList.contains('robotics-schedule-standings')).toBe(true);
 
       const titlesIn = (col) => [...col.querySelectorAll('.robotics-card-title')].map((h) => h.textContent);
       const buttonsIn = (col) => [...col.querySelectorAll('button')].map((b) => b.textContent);
-      expect(titlesIn(matchesCol)).toEqual(['Match Timeline', 'Qualification Matches']);
+      expect(titlesIn(matchesCol)).toEqual(['Qualification Matches']);
       expect(matchesCol.querySelectorAll('.robotics-match-row').length).toBeGreaterThan(0);
       expect(buttonsIn(matchesCol)).toContain('Copy Match Data to Clipboard');
       expect(buttonsIn(matchesCol)).not.toContain('Copy Standings to Clipboard');
 
-      expect(titlesIn(standingsCol)).toEqual(['Standings']);
+      expect(titlesIn(sideCol)).toEqual(['Match Timeline', 'Standings']);
       expect(buttonsIn(standingsCol)).toEqual(['Copy Standings to Clipboard']);
+    });
+  });
+
+  describe('collapsible Match Timeline', () => {
+    function openScheduleWithMatches() {
+      const app = initRoboticsApp();
+      const root = document.getElementById('roboticsApp');
+      ['Alpha', 'Bravo', 'Charlie', 'Delta'].forEach((name) => addTeamViaForm(root, name));
+      app.dispatch((s) => setMatchesPerTeam(s, 2));
+      app.dispatch((s) => regenerateMatchups(s));
+      app.setActiveTab('schedule');
+      return app;
+    }
+    const toggle = () => document.querySelector('.robotics-timeline-toggle');
+    const panel = () => document.getElementById(toggle().getAttribute('aria-controls'));
+
+    it('is collapsed by default into a one-line summary of the current configuration', () => {
+      openScheduleWithMatches();
+      expect(toggle().tagName).toBe('BUTTON');
+      expect(toggle().getAttribute('type')).toBe('button');
+      expect(toggle().parentElement.tagName).toBe('H3');
+      expect(toggle().getAttribute('aria-expanded')).toBe('false');
+      expect(panel().hidden).toBe(true);
+      expect(document.querySelector('.robotics-timeline-summary').textContent)
+        .toBe('Forward · no start time · 4 + 1 min · 1 field');
+    });
+
+    it('summarises the applied start time with a projected end time', () => {
+      const app = openScheduleWithMatches();
+      const start = new Date();
+      start.setHours(13, 0, 0, 0);
+      app.dispatch((s) => setTimelineConfig(s, { startTime: start.getTime(), fieldCount: 2 }));
+      const summary = document.querySelector('.robotics-timeline-summary').textContent;
+      expect(summary).toMatch(/^Forward · starts .+ · 4 \+ 1 min · 2 fields · ends ~.+$/);
+    });
+
+    it('expands and collapses in place when the summary is clicked', () => {
+      openScheduleWithMatches();
+      const btn = toggle();
+      btn.click();
+      expect(btn.getAttribute('aria-expanded')).toBe('true');
+      expect(panel().hidden).toBe(false);
+      expect(document.querySelector('.robotics-timeline').classList.contains('is-expanded')).toBe(true);
+      expect(panel().querySelector('select')).toBeTruthy();
+      expect(panel().querySelector('input[type="time"]')).toBeTruthy();
+      expect([...panel().querySelectorAll('button')].map((b) => b.textContent)).toContain('Apply');
+      expect(panel().querySelectorAll('input[type="number"]')).toHaveLength(3);
+      // Toggled in place, so keyboard focus is not lost to a re-render.
+      expect(toggle()).toBe(btn);
+
+      btn.click();
+      expect(btn.getAttribute('aria-expanded')).toBe('false');
+      expect(panel().hidden).toBe(true);
+    });
+
+    it('remembers the open/closed choice across reloads', () => {
+      openScheduleWithMatches();
+      toggle().click();
+      initRoboticsApp().setActiveTab('schedule');
+      expect(toggle().getAttribute('aria-expanded')).toBe('true');
+      expect(panel().hidden).toBe(false);
+
+      toggle().click();
+      initRoboticsApp().setActiveTab('schedule');
+      expect(toggle().getAttribute('aria-expanded')).toBe('false');
+    });
+
+    it('stays open after a Tournament change re-renders the tab', () => {
+      const app = openScheduleWithMatches();
+      toggle().click();
+      app.dispatch((s) => setTimelineConfig(s, { gapMin: 2 }));
+      expect(toggle().getAttribute('aria-expanded')).toBe('true');
+    });
+
+    it('keeps the preference out of Tournament state, so New Tournament does not reset it', async () => {
+      const app = openScheduleWithMatches();
+      toggle().click();
+      expect(localStorage.getItem('robotics-tournament-state')).not.toContain('xpanded');
+
+      app.setActiveTab('teams');
+      let root = document.getElementById('roboticsApp');
+      clickButtonWithText(root, 'Reset Everything / New Tournament');
+      root = document.getElementById('roboticsApp');
+      await clickDialogButton(root, 'Reset Everything');
+      app.setActiveTab('schedule');
+      expect(toggle().getAttribute('aria-expanded')).toBe('true');
     });
   });
 
