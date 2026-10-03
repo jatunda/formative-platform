@@ -99,6 +99,16 @@ A match between two Playoff Alliances within the Elimination Bracket. A Score is
 **Third-Place Match**:
 An optional Elimination Match between the two Semifinal-round losers. Can be toggled on or off at any time until the Third-Place Match itself is marked complete.
 
+**Placement**:
+A decided 1st / 2nd / 3rd finishing position in the Elimination Bracket, held by one Playoff Alliance. 1st and 2nd come from the Final; 3rd exists only when a Third-Place Match is included and complete.
+
+**Podium**:
+The Results tab's display of the Placements, revealed one Placement at a time (3rd → 2nd → 1st) by the teacher for the class. Whether the Podium has been revealed is part of the Tournament and is cleared by Reset Results.
+_Avoid_: Standings for this — Standings are Qualification Round rankings only.
+
+**Schedule Drift**:
+How far the Tournament is running behind (or ahead of) the Match Timeline: the gap between the current wall-clock time and the Current Match's Match Time. Display-only — it never changes Match Times (Recalculating the Match Timeline does that).
+
 **Reset Results**:
 The action that clears the Qualification Round, all Match results, and the Elimination Bracket, while preserving the Team roster. Re-enables the Pairing Draw. Requires confirming a dialog (naming what is cleared and that the Team roster is kept) before it takes effect.
 
