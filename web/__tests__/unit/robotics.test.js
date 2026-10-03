@@ -966,6 +966,134 @@ describe('initRoboticsApp', () => {
     });
   });
 
+  describe('Now Playing card', () => {
+    function openSchedule(app, matchesPerTeam) {
+      const root = document.getElementById('roboticsApp');
+      addTeamViaForm(root, 'Alpha', 'Ana, Abe');
+      ['Bravo', 'Charlie', 'Delta'].forEach((name) => addTeamViaForm(root, name));
+      app.dispatch((s) => setMatchesPerTeam(s, matchesPerTeam));
+      app.dispatch((s) => regenerateMatchups(s));
+      app.setActiveTab('schedule');
+    }
+    const card = () => document.querySelector('.robotics-now-playing');
+    const names = (state, ids) => ids.map((id) => state.teams.find((t) => t.id === id).name);
+
+    it('sits at the top of the matches column and spotlights the Current Match, which stays highlighted in the list', () => {
+      const app = initRoboticsApp();
+      openSchedule(app, 3);
+      const matchesCol = document.querySelector('.robotics-schedule-matches');
+      expect(matchesCol.firstElementChild.classList.contains('robotics-now-playing-layout')).toBe(true);
+      expect(card().querySelector('.robotics-now-playing-kicker').textContent).toBe('Now Playing');
+
+      const match = app.getState().qualification.matches[0];
+      const sideNames = (color) => [...card().querySelectorAll(`.robotics-now-playing-side.is-${color} .robotics-now-playing-team-name`)].map((n) => n.textContent);
+      expect(sideNames('red')).toEqual(names(app.getState(), match.allianceA));
+      expect(sideNames('blue')).toEqual(names(app.getState(), match.allianceB));
+      expect(document.querySelectorAll('.robotics-match-row.is-current')).toHaveLength(1);
+    });
+
+    it('shows each Team\'s Members under its name, and nothing for a Team without Members', () => {
+      const app = initRoboticsApp();
+      openSchedule(app, 3);
+      const teams = [...card().querySelectorAll('.robotics-now-playing-team')];
+      const alpha = teams.find((t) => t.querySelector('.robotics-now-playing-team-name').textContent === 'Alpha');
+      const bravo = teams.find((t) => t.querySelector('.robotics-now-playing-team-name').textContent === 'Bravo');
+      expect(alpha.querySelector('.robotics-now-playing-members').textContent).toBe('Ana, Abe');
+      expect(bravo.querySelector('.robotics-now-playing-members')).toBeNull();
+    });
+
+    it('shows the Match Time ("--" before a Start Time is set) and the Field only when more than one runs', () => {
+      const app = initRoboticsApp();
+      openSchedule(app, 3);
+      expect(card().querySelector('.robotics-now-playing-time').textContent).toBe('--');
+      expect(card().querySelector('.robotics-now-playing-field')).toBeNull();
+
+      const start = new Date(2026, 9, 3, 14, 5).getTime();
+      app.dispatch((s) => setTimelineConfig(s, { startTime: start, fieldCount: 2 }));
+      expect(card().querySelector('.robotics-now-playing-time').textContent)
+        .toBe(new Date(start).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }));
+      expect(card().querySelector('.robotics-now-playing-field').textContent).toBe('Field 1');
+    });
+
+    it('keeps draft scores and No-Shows in sync with the Current Match row', () => {
+      const app = initRoboticsApp();
+      openSchedule(app, 3);
+      const [cardScoreA] = card().querySelectorAll('.robotics-score-input');
+      cardScoreA.value = '42';
+      cardScoreA.dispatchEvent(new Event('change'));
+      card().querySelectorAll('.robotics-score-input')[1].value = '7';
+      card().querySelectorAll('.robotics-score-input')[1].dispatchEvent(new Event('change'));
+
+      const rowInputs = document.querySelector('.robotics-match-row.is-current').querySelectorAll('.robotics-score-input');
+      expect([rowInputs[0].value, rowInputs[1].value]).toEqual(['42', '7']);
+
+      // ...and the other way: an edit in the row shows up in the card.
+      rowInputs[0].value = '50';
+      rowInputs[0].dispatchEvent(new Event('change'));
+      expect(card().querySelectorAll('.robotics-score-input')[0].value).toBe('50');
+
+      const match = app.getState().qualification.matches[0];
+      card().querySelector('.robotics-now-playing-team-name').click();
+      expect(app.getState().qualification.matches[0].noShow[match.allianceA[0]]).toBe(true);
+      expect(card().querySelector('.robotics-now-playing-team-name').classList.contains('is-no-show')).toBe(true);
+      expect(card().querySelector('.robotics-now-playing-team-name').title).toBe('Click to mark present');
+      expect(document.querySelector('.robotics-match-row.is-current .robotics-team-toggle').classList.contains('is-no-show')).toBe(true);
+    });
+
+    it('Mark Complete records the result and moves the card on to the next match', () => {
+      const app = initRoboticsApp();
+      openSchedule(app, 3);
+      const [scoreA, scoreB] = card().querySelectorAll('.robotics-score-input');
+      scoreA.value = '30';
+      scoreB.value = '20';
+      card().querySelector('.robotics-now-playing-complete').click();
+      const [first, second] = app.getState().qualification.matches;
+      expect(first).toMatchObject({ completed: true, scoreA: 30, scoreB: 20 });
+      const redNames = [...card().querySelectorAll('.robotics-now-playing-side.is-red .robotics-now-playing-team-name')].map((n) => n.textContent);
+      expect(redNames).toEqual(names(app.getState(), second.allianceA));
+    });
+
+    it('shows a read-only Up Next preview of the following match', () => {
+      const app = initRoboticsApp();
+      openSchedule(app, 3);
+      const upNext = document.querySelector('.robotics-up-next');
+      const next = app.getState().qualification.matches[1];
+      expect(upNext.querySelector('.robotics-now-playing-kicker').textContent).toBe('Up Next');
+      expect(upNext.querySelector('.robotics-up-next-teams.is-red').textContent).toBe(names(app.getState(), next.allianceA).join(' & '));
+      expect(upNext.querySelector('.robotics-up-next-teams.is-blue').textContent).toBe(names(app.getState(), next.allianceB).join(' & '));
+      expect(upNext.querySelector('.robotics-up-next-meta .robotics-now-playing-time')).toBeTruthy();
+      expect(upNext.querySelectorAll('input, button')).toHaveLength(0);
+    });
+
+    it('omits Up Next when the Current Match is the last one left', () => {
+      const app = initRoboticsApp();
+      openSchedule(app, 1);
+      expect(app.getState().qualification.matches).toHaveLength(1);
+      expect(card()).toBeTruthy();
+      expect(document.querySelector('.robotics-up-next')).toBeNull();
+    });
+
+    it('says the Qualification Round is complete once every match is, with a button on to Finals', () => {
+      const app = initRoboticsApp();
+      openSchedule(app, 1);
+      app.dispatch((s) => recordQualificationResult(s, 0, { scoreA: 1, scoreB: 0 }));
+      expect(card().classList.contains('is-finished')).toBe(true);
+      expect(card().querySelector('.robotics-now-playing-message').textContent).toBe('Qualification Round complete');
+      expect(card().querySelector('.robotics-score-input')).toBeNull();
+      clickButtonWithText(card(), 'On to Finals →');
+      expect(document.querySelector('.robotics-tab-btn.active').dataset.tabKey).toBe('finals');
+    });
+
+    it('shows an empty state before any Qualification Matches exist', () => {
+      const app = initRoboticsApp();
+      app.setActiveTab('schedule');
+      expect(card().classList.contains('is-idle')).toBe(true);
+      expect(card().classList.contains('is-finished')).toBe(false);
+      expect(card().querySelector('.robotics-now-playing-message').textContent).toBe('No Qualification Matches scheduled yet.');
+      expect(card().querySelector('button')).toBeNull();
+    });
+  });
+
   describe('collapsible Match Timeline', () => {
     function openScheduleWithMatches() {
       const app = initRoboticsApp();

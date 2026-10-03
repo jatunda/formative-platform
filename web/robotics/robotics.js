@@ -383,30 +383,14 @@ export function renderTeamsTab(state, dispatch) {
 
 // ---- Tab: Schedule / Swiss Live ----
 
-function renderMatchRow(state, dispatch, entry, { currentIndex, upNextIndex }) {
-  const { match, qualIndex } = entry;
-  const isQual = entry.kind === 'qualification';
-  const isCurrent = isQual && qualIndex === currentIndex;
-  const isUpNext = isQual && qualIndex === upNextIndex;
+/** The Field a match plays on, or null when only one Field runs (so there is nothing to show). */
+function matchField(state, globalIndex) {
+  const { fieldCount } = state.timeline;
+  return fieldCount > 1 ? (globalIndex % fieldCount) + 1 : null;
+}
 
-  const hasField = state.timeline.fieldCount > 1;
-  const classNames = ['robotics-match-row', 'robotics-match-grid'];
-  if (hasField) classNames.push('has-field');
-  if (isCurrent) classNames.push('is-current');
-  if (isUpNext) classNames.push('is-up-next');
-  if (match.completed) classNames.push('is-complete');
-
-  const row = el('div', { className: classNames.join(' ') });
-
-  row.appendChild(el('span', { className: 'robotics-match-time' }, [formatTime(computeMatchTime(state.timeline, entry.globalIndex))]));
-
-  if (hasField) {
-    const field = (entry.globalIndex % state.timeline.fieldCount) + 1;
-    row.appendChild(el('span', { className: 'robotics-match-field' }, [`Field ${field}`]));
-  }
-
-  row.appendChild(el('span', { className: `robotics-current-label${isCurrent ? '' : ' is-placeholder'}` }, ['Current Match']));
-
+/** Draft-score inputs for one Qualification Match: each edit is saved as a draft (re-rendering every view of the match). */
+function renderQualificationScoreInputs(dispatch, match, qualIndex) {
   const scoreA = el('input', { type: 'number', className: 'robotics-score-input is-red', value: match.scoreA ?? '' });
   const scoreB = el('input', { type: 'number', className: 'robotics-score-input is-blue', value: match.scoreB ?? '' });
   scoreA.addEventListener('change', () => {
@@ -415,6 +399,44 @@ function renderMatchRow(state, dispatch, entry, { currentIndex, upNextIndex }) {
   scoreB.addEventListener('change', () => {
     dispatch((s) => setQualificationDraftScore(s, qualIndex, 'scoreB', scoreB.value === '' ? null : parseInt(scoreB.value, 10) || 0));
   });
+  return { scoreA, scoreB };
+}
+
+function renderMarkQualificationCompleteButton(dispatch, match, qualIndex, { scoreA, scoreB }, className) {
+  return el('button', {
+    className,
+    onClick: () => dispatch((s) => recordQualificationResult(s, qualIndex, {
+      scoreA: parseInt(scoreA.value, 10) || 0,
+      scoreB: parseInt(scoreB.value, 10) || 0,
+    })),
+  }, [match.completed ? 'Save Edit' : 'Mark Complete']);
+}
+
+function renderMatchRow(state, dispatch, entry, { currentIndex, upNextIndex }) {
+  const { match, qualIndex } = entry;
+  const isQual = entry.kind === 'qualification';
+  const isCurrent = isQual && qualIndex === currentIndex;
+  const isUpNext = isQual && qualIndex === upNextIndex;
+
+  const field = matchField(state, entry.globalIndex);
+  const classNames = ['robotics-match-row', 'robotics-match-grid'];
+  if (field) classNames.push('has-field');
+  if (isCurrent) classNames.push('is-current');
+  if (isUpNext) classNames.push('is-up-next');
+  if (match.completed) classNames.push('is-complete');
+
+  const row = el('div', { className: classNames.join(' ') });
+
+  row.appendChild(el('span', { className: 'robotics-match-time' }, [formatTime(computeMatchTime(state.timeline, entry.globalIndex))]));
+
+  if (field) {
+    row.appendChild(el('span', { className: 'robotics-match-field' }, [`Field ${field}`]));
+  }
+
+  row.appendChild(el('span', { className: `robotics-current-label${isCurrent ? '' : ' is-placeholder'}` }, ['Current Match']));
+
+  const scores = renderQualificationScoreInputs(dispatch, match, qualIndex);
+  const { scoreA, scoreB } = scores;
   const winningSide = match.completed && match.scoreA !== match.scoreB
     ? (match.scoreA > match.scoreB ? 'A' : 'B')
     : null;
@@ -426,13 +448,7 @@ function renderMatchRow(state, dispatch, entry, { currentIndex, upNextIndex }) {
   row.appendChild(renderAllianceSide(state, match.allianceB, match.noShow, toggleQualificationNoShow, winningSide === 'B', 'blue'));
 
   const actions = el('div', { className: 'robotics-match-actions' });
-  actions.appendChild(el('button', {
-    className: 'robotics-btn robotics-btn-secondary robotics-btn-sm',
-    onClick: () => dispatch((s) => recordQualificationResult(s, qualIndex, {
-      scoreA: parseInt(scoreA.value, 10) || 0,
-      scoreB: parseInt(scoreB.value, 10) || 0,
-    })),
-  }, [match.completed ? 'Save Edit' : 'Mark Complete']));
+  actions.appendChild(renderMarkQualificationCompleteButton(dispatch, match, qualIndex, scores, 'robotics-btn robotics-btn-secondary robotics-btn-sm'));
 
   if (match.completed) {
     actions.appendChild(el('span', { className: 'robotics-complete-badge' }, ['✓ Complete']));
@@ -551,11 +567,110 @@ function renderMatchTimeline(state, dispatch, { expanded, onToggle }) {
   return card;
 }
 
-export function renderScheduleTab(state, dispatch) {
+// ---- Now Playing ----
+
+function formatMatchClock(epochMs) {
+  return epochMs == null ? '--' : formatClock(epochMs);
+}
+
+/** "2:05 PM · Field 2" (Field only when more than one runs). */
+function renderMatchMeta(state, entry, className) {
+  const field = matchField(state, entry.globalIndex);
+  return el('div', { className }, [
+    el('span', { className: 'robotics-now-playing-time' }, [formatMatchClock(computeMatchTime(state.timeline, entry.globalIndex))]),
+    ...(field ? [el('span', { className: 'robotics-now-playing-field' }, [`Field ${field}`])] : []),
+  ]);
+}
+
+/** One side of the Current Match at display scale: each Team name (a No-Show toggle) over its Members. */
+function renderNowPlayingSide(state, match, teamIds, onToggleNoShow, color) {
+  return el('div', { className: `robotics-now-playing-side is-${color}` }, teamIds.map((teamId) => {
+    const team = state.teams.find((t) => t.id === teamId);
+    const isNoShow = !!match.noShow[teamId];
+    return el('div', { className: 'robotics-now-playing-team' }, [
+      el('span', {
+        className: `robotics-team-toggle robotics-now-playing-team-name${isNoShow ? ' is-no-show' : ''}`,
+        title: isNoShow ? 'Click to mark present' : 'Click to mark No-Show',
+        onClick: () => onToggleNoShow(teamId, !isNoShow),
+      }, [teamName(state, teamId)]),
+      ...(team?.members.length ? [el('div', { className: 'robotics-now-playing-members' }, [team.members.join(', ')])] : []),
+    ]);
+  }));
+}
+
+/** Read-only preview of the Up Next match: its time and who plays. */
+function renderUpNext(state, entry) {
+  const { match } = entry;
+  return el('aside', { className: 'robotics-up-next' }, [
+    el('div', { className: 'robotics-now-playing-kicker' }, ['Up Next']),
+    renderMatchMeta(state, entry, 'robotics-up-next-meta'),
+    el('div', { className: 'robotics-up-next-teams is-red' }, [allianceTeamNames(state, match.allianceA)]),
+    el('div', { className: 'robotics-match-vs' }, ['vs']),
+    el('div', { className: 'robotics-up-next-teams is-blue' }, [allianceTeamNames(state, match.allianceB)]),
+  ]);
+}
+
+/** The card shown in place of a Current Match: nothing scheduled yet, or every Qualification Match done. */
+function renderNowPlayingEmpty(state, setActiveTab) {
+  const card = el('div', { className: 'robotics-now-playing is-idle' });
+  if (state.qualification.matches.length === 0) {
+    card.appendChild(el('div', { className: 'robotics-now-playing-kicker' }, ['Now Playing']));
+    card.appendChild(el('p', { className: 'robotics-now-playing-message' }, ['No Qualification Matches scheduled yet.']));
+    return card;
+  }
+  card.classList.add('is-finished');
+  card.appendChild(el('p', { className: 'robotics-now-playing-message' }, ['Qualification Round complete']));
+  card.appendChild(el('button', {
+    className: 'robotics-btn robotics-btn-primary',
+    onClick: () => setActiveTab('finals'),
+  }, ['On to Finals →']));
+  return card;
+}
+
+/**
+ * The Current Match spotlighted for the projected audience, beside an Up Next
+ * preview. Its score inputs and No-Show toggles dispatch the same actions as
+ * the Current Match's list row, so both always show the same draft.
+ */
+function renderNowPlaying(state, dispatch, { currentIndex, upNextIndex, setActiveTab }) {
+  const wrap = el('div', { className: 'robotics-now-playing-layout' });
+  if (currentIndex === null) {
+    wrap.appendChild(renderNowPlayingEmpty(state, setActiveTab));
+    return wrap;
+  }
+
+  const entries = getAllMatchesInScheduleOrder(state);
+  const current = entries[currentIndex];
+  const { match } = current;
+  const toggleNoShow = (teamId, next) => dispatch((s) => setQualificationNoShow(s, currentIndex, teamId, next));
+  const scores = renderQualificationScoreInputs(dispatch, match, currentIndex);
+
+  wrap.appendChild(el('section', { className: 'robotics-now-playing', 'aria-label': 'Now Playing' }, [
+    el('div', { className: 'robotics-now-playing-header' }, [
+      el('div', { className: 'robotics-now-playing-kicker' }, ['Now Playing']),
+      renderMatchMeta(state, current, 'robotics-now-playing-meta'),
+    ]),
+    el('div', { className: 'robotics-now-playing-arena' }, [
+      renderNowPlayingSide(state, match, match.allianceA, toggleNoShow, 'red'),
+      scores.scoreA,
+      el('div', { className: 'robotics-match-vs' }, ['vs']),
+      scores.scoreB,
+      renderNowPlayingSide(state, match, match.allianceB, toggleNoShow, 'blue'),
+    ]),
+    renderMarkQualificationCompleteButton(dispatch, match, currentIndex, scores, 'robotics-btn robotics-btn-primary robotics-now-playing-complete'),
+  ]));
+
+  if (upNextIndex !== null) wrap.appendChild(renderUpNext(state, entries[upNextIndex]));
+  return wrap;
+}
+
+export function renderScheduleTab(state, dispatch, { setActiveTab }) {
   const section = el('div', { className: 'robotics-section' });
 
   const currentIndex = getCurrentMatchIndex(state.qualification.matches);
   const upNextIndex = getUpNextMatchIndex(state.qualification.matches, currentIndex);
+
+  section.appendChild(renderNowPlaying(state, dispatch, { currentIndex, upNextIndex, setActiveTab }));
 
   const matchList = el('div', { className: 'robotics-card' });
   matchList.appendChild(el('h3', { className: 'robotics-card-title' }, ['Qualification Matches']));
@@ -640,8 +755,8 @@ export function renderStandingsTab(state) {
 }
 
 /** Matches in the wide column; the Match Timeline above Standings in the narrow one (Timeline first when stacked). */
-export function renderScheduleAndStandingsTab(state, dispatch, { ui }) {
-  const matches = renderScheduleTab(state, dispatch);
+export function renderScheduleAndStandingsTab(state, dispatch, { ui, setActiveTab }) {
+  const matches = renderScheduleTab(state, dispatch, { setActiveTab });
   matches.classList.add('robotics-schedule-matches');
   const timeline = renderMatchTimeline(state, dispatch, {
     expanded: ui.prefs.timelineExpanded === true,

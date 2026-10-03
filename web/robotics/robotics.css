@@ -240,6 +240,229 @@ body {
   order: -1;
 }
 
+/* Now Playing: the Current Match at display scale (readable from the back of a
+   classroom), with the Up Next preview beside it on wide lists, below on narrow. */
+.robotics-schedule-matches {
+  container-type: inline-size;
+}
+
+.robotics-now-playing-layout {
+  display: grid;
+  gap: var(--spacing-md);
+}
+
+@container (min-width: 56rem) {
+  .robotics-now-playing-layout:has(> .robotics-up-next) {
+    grid-template-columns: minmax(0, 1fr) minmax(14rem, 22%);
+    align-items: stretch;
+  }
+}
+
+.robotics-now-playing,
+.robotics-up-next {
+  min-width: 0;
+  padding: var(--spacing-lg);
+  border: 1px solid var(--arena-border);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(180deg, var(--arena-surface-raised), var(--arena-surface));
+  box-shadow: var(--arena-shadow);
+}
+
+.robotics-now-playing {
+  display: grid;
+  gap: var(--spacing-md);
+  border-color: var(--arena-live);
+  box-shadow: var(--arena-glow), var(--arena-shadow);
+}
+
+.robotics-now-playing.is-idle {
+  justify-items: center;
+  text-align: center;
+  border-color: var(--arena-border);
+  box-shadow: var(--arena-shadow);
+}
+
+.robotics-now-playing.is-finished {
+  border-color: var(--arena-success);
+}
+
+.robotics-now-playing-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--spacing-sm) var(--spacing-lg);
+}
+
+.robotics-now-playing-kicker {
+  color: var(--arena-live);
+  font-family: var(--arena-font-display);
+  font-size: 1rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.robotics-now-playing-meta,
+.robotics-up-next-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--spacing-md);
+}
+
+.robotics-now-playing-time {
+  color: var(--arena-text);
+  font-family: var(--arena-font-display);
+  font-size: clamp(1.5rem, 2.5vw, 2.25rem);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.robotics-now-playing-field {
+  color: var(--arena-text-muted);
+  font-family: var(--arena-font-display);
+  font-size: 1.1rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.robotics-now-playing-arena {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.robotics-now-playing-side {
+  align-self: stretch;
+  display: grid;
+  align-content: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+  border-radius: var(--radius-md);
+}
+
+.robotics-now-playing-side.is-red {
+  border-left: 6px solid var(--arena-red);
+  background-color: var(--arena-red-soft);
+}
+
+.robotics-now-playing-side.is-blue {
+  border-right: 6px solid var(--arena-blue);
+  background-color: var(--arena-blue-soft);
+  text-align: right;
+}
+
+.robotics-now-playing-team-name {
+  color: var(--arena-text);
+  font-family: var(--arena-font-display);
+  font-size: clamp(1.5rem, 2.6vw, 2.5rem);
+  font-weight: 700;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+
+.robotics-now-playing-members {
+  color: var(--arena-text-muted);
+  font-size: clamp(0.9rem, 1.1vw, 1.1rem);
+}
+
+.robotics-app .robotics-now-playing-arena > input.robotics-score-input {
+  width: clamp(5rem, 8vw, 8rem);
+  flex: none;
+  padding-block: var(--spacing-sm);
+  font-size: clamp(2.5rem, 5vw, 4.5rem);
+  line-height: 1;
+}
+
+.robotics-now-playing-arena > .robotics-match-vs {
+  font-family: var(--arena-font-display);
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.robotics-app .robotics-now-playing-complete {
+  justify-self: end;
+  padding: var(--spacing-sm) var(--spacing-xl);
+  font-size: 1.15rem;
+}
+
+.robotics-now-playing-message {
+  margin: 0;
+  color: var(--arena-text);
+  font-family: var(--arena-font-display);
+  font-size: clamp(1.5rem, 2.6vw, 2.5rem);
+  font-weight: 700;
+}
+
+.robotics-now-playing.is-idle:not(.is-finished) .robotics-now-playing-message {
+  color: var(--arena-text-muted);
+  font-size: 1.25rem;
+}
+
+.robotics-up-next {
+  display: grid;
+  align-content: center;
+  gap: var(--spacing-sm);
+  border-style: dashed;
+  border-color: var(--arena-accent);
+}
+
+.robotics-up-next .robotics-now-playing-kicker {
+  color: var(--arena-accent);
+}
+
+.robotics-up-next .robotics-now-playing-time {
+  font-size: 1.5rem;
+}
+
+.robotics-up-next-teams {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--radius-md);
+  color: var(--arena-text);
+  font-family: var(--arena-font-display);
+  font-size: 1.3rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.robotics-up-next-teams.is-red {
+  border-left: 4px solid var(--arena-red);
+  background-color: var(--arena-red-soft);
+}
+
+.robotics-up-next-teams.is-blue {
+  border-left: 4px solid var(--arena-blue);
+  background-color: var(--arena-blue-soft);
+}
+
+/* Narrow list: each side stacks over its score, vs between. */
+@container (max-width: 40rem) {
+  .robotics-now-playing-arena {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .robotics-now-playing-arena > .robotics-now-playing-side.is-blue {
+    grid-area: 3 / 1;
+    text-align: left;
+    border-right: 0;
+    border-left: 6px solid var(--arena-blue);
+  }
+
+  .robotics-now-playing-arena > .robotics-score-input.is-blue { grid-area: 3 / 2; }
+
+  .robotics-now-playing-arena > .robotics-match-vs {
+    grid-column: 1 / -1;
+    justify-self: center;
+  }
+
+  .robotics-app .robotics-now-playing-complete {
+    justify-self: stretch;
+  }
+}
+
 /* Match Timeline: a one-line summary button that opens the controls in place. */
 .robotics-timeline {
   padding: var(--spacing-sm) var(--spacing-lg);
