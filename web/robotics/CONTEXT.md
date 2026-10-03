@@ -103,7 +103,7 @@ An optional Elimination Match between the two Semifinal-round losers. Can be tog
 A decided 1st / 2nd / 3rd finishing position in the Elimination Bracket, held by one Playoff Alliance. 1st and 2nd come from the Final; 3rd exists only when a Third-Place Match is included and complete.
 
 **Podium**:
-The Results tab's display of the Placements, revealed one Placement at a time (3rd → 2nd → 1st) by the teacher for the class. Whether the Podium has been revealed is part of the Tournament and is cleared by Reset Results.
+The Results tab's display of the Placements, revealed one Placement at a time (3rd → 2nd → 1st, or 2nd → 1st with no Third-Place Match) by the teacher for the class. Shown only once every Elimination Match (Third-Place Match included) has a winner — until then the Results tab says the results are not decided yet. How far the Podium has been revealed is part of the Tournament: it stays revealed across visits, "Replay reveal" re-covers it, and Reset Results and New Tournament clear it.
 _Avoid_: Standings for this — Standings are Qualification Round rankings only.
 
 **Schedule Drift**:

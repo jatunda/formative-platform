@@ -1,5 +1,5 @@
 import { generateQualificationMatches } from './pairing-draw.js';
-import { buildBracket } from './bracket.js';
+import { buildBracket, isBracketComplete, getPlacements } from './bracket.js';
 
 let idCounter = 0;
 function generateId(prefix) {
@@ -36,6 +36,10 @@ export function createInitialState() {
       alliances: [],
       seeds: {},
       bracket: null,
+    },
+    podium: {
+      revealedCount: 0,
+      revealedFor: null,
     },
   };
 }
@@ -215,7 +219,8 @@ export function generateBracket(state) {
     seedList.push(seeds[i]);
   }
   const bracket = buildBracket({ bracketSize, seeds: seedList, includeThirdPlace });
-  return { ...state, elimination: { ...state.elimination, bracket } };
+  // A new bracket has new Placements, so any earlier Podium reveal no longer applies.
+  return { ...state, elimination: { ...state.elimination, bracket }, podium: createInitialState().podium };
 }
 
 export function recordEliminationResult(state, matchId, { scoreA, scoreB }) {
@@ -251,6 +256,57 @@ export function setEliminationNoShow(state, matchId, teamId, flag) {
     }),
   };
   return { ...state, elimination: { ...state.elimination, bracket } };
+}
+
+// ---- Podium reveal ----
+
+/** Identifies who holds each Placement, so a reveal can tell when an edited result has changed them. */
+function placementsKey(bracket) {
+  return getPlacements(bracket).map((p) => `${p.place}:${p.allianceId}`).join('|');
+}
+
+/** Places in reveal order: 3rd -> 2nd -> 1st, or 2nd -> 1st with no Third-Place Match. */
+function revealOrder(bracket) {
+  return getPlacements(bracket).map((p) => p.place).reverse();
+}
+
+/**
+ * How many Placements are uncovered on the Podium. 0 until the bracket is
+ * complete, and back to 0 if an edited result has changed the Placements
+ * since they were revealed (or for a state saved before the Podium existed).
+ */
+export function getRevealedCount(state) {
+  const { bracket } = state.elimination;
+  if (!state.podium || !isBracketComplete(bracket) || state.podium.revealedFor !== placementsKey(bracket)) return 0;
+  return state.podium.revealedCount;
+}
+
+/** @returns {Set<number>} the places currently uncovered on the Podium */
+export function getRevealedPlaces(state) {
+  const { bracket } = state.elimination;
+  if (!isBracketComplete(bracket)) return new Set();
+  return new Set(revealOrder(bracket).slice(0, getRevealedCount(state)));
+}
+
+/** @returns {number|null} the place the next reveal uncovers, or null when nothing is left to reveal (or the bracket isn't complete) */
+export function getNextPlaceToReveal(state) {
+  const { bracket } = state.elimination;
+  if (!isBracketComplete(bracket)) return null;
+  return revealOrder(bracket)[getRevealedCount(state)] ?? null;
+}
+
+/** Uncover the next Placement on the Podium; a no-op when getNextPlaceToReveal is null. */
+export function revealNextPlacement(state) {
+  if (getNextPlaceToReveal(state) === null) return state;
+  return {
+    ...state,
+    podium: { revealedCount: getRevealedCount(state) + 1, revealedFor: placementsKey(state.elimination.bracket) },
+  };
+}
+
+/** Replay reveal: re-cover every Podium block so the reveal can run again. */
+export function replayReveal(state) {
+  return { ...state, podium: createInitialState().podium };
 }
 
 // ---- Resets ----

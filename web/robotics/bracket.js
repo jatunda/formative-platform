@@ -167,3 +167,38 @@ export function getBracketWinner(bracket) {
   const final = bracket.matches.find((m) => m.round === 'final');
   return final ? getMatchWinner(bracket, final.id) : null;
 }
+
+/** Elimination Matches actually played - Byes occupy no slot and never complete. */
+export function getPlayedEliminationMatches(bracket) {
+  return bracket.matches.filter((m) => !m.isBye);
+}
+
+/**
+ * How many played Elimination Matches (Third-Place Match included) are still
+ * undecided. A match marked complete with a tie (or with a side still TBD)
+ * has no winner, so it isn't decided.
+ */
+export function countUndecidedMatches(bracket) {
+  return getPlayedEliminationMatches(bracket).filter((m) => getMatchWinner(bracket, m.id) == null).length;
+}
+
+/** Whether every played Elimination Match has a winner, so every Placement is decided. */
+export function isBracketComplete(bracket) {
+  return !!bracket && countUndecidedMatches(bracket) === 0;
+}
+
+/**
+ * The decided Placements, in place order: 1st and 2nd from the Final, 3rd
+ * from the Third-Place Match (only when one is included and decided).
+ * @returns {{place: number, allianceId: string}[]}
+ */
+export function getPlacements(bracket) {
+  const finalMatch = bracket.matches.find((m) => m.round === 'final');
+  const thirdPlaceMatch = bracket.matches.find((m) => m.round === 'third-place');
+  const candidates = [
+    { place: 1, allianceId: getMatchWinner(bracket, finalMatch.id) },
+    { place: 2, allianceId: getMatchLoser(bracket, finalMatch.id) },
+    { place: 3, allianceId: thirdPlaceMatch ? getMatchWinner(bracket, thirdPlaceMatch.id) : null },
+  ];
+  return candidates.filter((p) => p.allianceId);
+}

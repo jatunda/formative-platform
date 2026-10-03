@@ -25,10 +25,15 @@ import {
   setEliminationDraftScore,
   resetResults,
   newTournament,
+  getRevealedPlaces,
+  getNextPlaceToReveal,
+  revealNextPlacement,
+  replayReveal,
 } from './state.js';
 import { computeMatchTime, computeTotalDurationMinutes, computeStartTimeFromEndTime, estimateEliminationMatchCount } from './match-timeline.js';
 import { computeStandings } from './standings.js';
-import { resolveMatchSides, getMatchWinner, getMatchLoser } from './bracket.js';
+import { resolveMatchSides, getMatchWinner, isBracketComplete, countUndecidedMatches, getPlacements } from './bracket.js';
+import { launchConfetti } from './confetti.js';
 import { getCurrentMatchIndex, getUpNextMatchIndex } from './current-match.js';
 import { exportStandingsMarkdown, exportMatchesMarkdown, exportRosterMarkdown, exportPlacementsMarkdown } from './markdown-export.js';
 import { createToastContainer, showToast } from './toast.js';
@@ -39,6 +44,7 @@ const TABS = [
   { key: 'teams', label: 'Teams' },
   { key: 'schedule', label: 'Schedule & Standings' },
   { key: 'finals', label: 'Finals' },
+  { key: 'results', label: 'Results' },
 ];
 
 // ---- Selectors ----
@@ -690,45 +696,10 @@ function renderBracket(state, dispatch) {
 
   const finalMatch = bracket.matches.find((m) => m.round === 'final');
   container.appendChild(renderBracketRoundColumn(state, dispatch, [finalMatch], 'Final'));
-
-  const winner = getMatchWinner(bracket, finalMatch.id);
-  if (winner) {
-    container.appendChild(el('div', { className: 'robotics-champion-banner' }, [`🏆 Champion: ${playoffAllianceLabel(state, winner)}`]));
-  }
-
-  const runnerUp = getMatchLoser(bracket, finalMatch.id);
-  if (runnerUp) {
-    container.appendChild(el('div', { className: 'robotics-second-place-banner' }, [`🥈 2nd Place: ${playoffAllianceLabel(state, runnerUp)}`]));
-  }
-
-  if (thirdPlaceMatch) {
-    const thirdPlaceWinner = getMatchWinner(bracket, thirdPlaceMatch.id);
-    if (thirdPlaceWinner) {
-      container.appendChild(el('div', { className: 'robotics-third-place-banner' }, [`🥉 3rd Place: ${playoffAllianceLabel(state, thirdPlaceWinner)}`]));
-    }
-  }
   return container;
 }
 
-/** Decided placements (1st/2nd/3rd) for the current Elimination Bracket, each with its Playoff Alliance's Team ids. */
-function computeBracketPlacements(state) {
-  const bracket = state.elimination.bracket;
-  if (!bracket) return [];
-  const finalMatch = bracket.matches.find((m) => m.round === 'final');
-  const placements = [];
-  const champion = getMatchWinner(bracket, finalMatch.id);
-  if (champion) placements.push({ place: 1, teamIds: playoffAllianceTeamIds(state, champion) });
-  const runnerUp = getMatchLoser(bracket, finalMatch.id);
-  if (runnerUp) placements.push({ place: 2, teamIds: playoffAllianceTeamIds(state, runnerUp) });
-  const thirdPlaceMatch = bracket.matches.find((m) => m.round === 'third-place');
-  if (thirdPlaceMatch) {
-    const thirdPlaceWinner = getMatchWinner(bracket, thirdPlaceMatch.id);
-    if (thirdPlaceWinner) placements.push({ place: 3, teamIds: playoffAllianceTeamIds(state, thirdPlaceWinner) });
-  }
-  return placements;
-}
-
-export function renderFinalsTab(state, dispatch) {
+export function renderFinalsTab(state, dispatch, { setActiveTab }) {
   const section = el('div', { className: 'robotics-section' });
 
   const usedTeamIds = new Set(state.elimination.alliances.flatMap((a) => a.teamIds));
@@ -820,10 +791,120 @@ export function renderFinalsTab(state, dispatch) {
     section.appendChild(renderBracket(state, dispatch));
   }
 
-  section.appendChild(el('button', {
+  if (isBracketComplete(state.elimination.bracket)) {
+    section.appendChild(el('button', {
+      className: 'robotics-btn robotics-btn-primary robotics-reveal-results-btn',
+      onClick: () => setActiveTab('results'),
+    }, ['Reveal Results →']));
+  }
+
+  return section;
+}
+
+// ---- Tab: Results ----
+
+const PLACE_LABELS = { 1: '1st', 2: '2nd', 3: '3rd' };
+// Podium blocks left to right: 1st in the middle, flanked by 2nd and 3rd.
+const PODIUM_LAYOUT = [2, 1, 3];
+
+/** The Results tab before the bracket is complete: how many Elimination Matches remain, or that there is no bracket yet. */
+function renderResultsNotDecided(state) {
+  const { bracket } = state.elimination;
+  let detail = 'Generate the Elimination Bracket on the Finals tab to start the playoffs.';
+  if (bracket) {
+    const remaining = countUndecidedMatches(bracket);
+    detail = remaining === 1 ? '1 Elimination Match remains.' : `${remaining} Elimination Matches remain.`;
+  }
+  return el('div', { className: 'robotics-card robotics-results-pending' }, [
+    el('h3', { className: 'robotics-card-title' }, ['Results not decided yet']),
+    el('p', { className: 'robotics-empty' }, [detail]),
+  ]);
+}
+
+/** One Podium block; a covered block shows only its pedestal, so no names leak before the reveal. */
+function renderPodiumBlock(state, { place, allianceId }, isRevealed) {
+  const block = el('div', {
+    className: `robotics-podium-block is-place-${place} ${isRevealed ? 'is-revealed' : 'is-covered'}`,
+    'data-place': String(place),
+  });
+  const reveal = el('div', { className: 'robotics-podium-reveal' });
+  if (isRevealed) {
+    playoffAllianceTeamIds(state, allianceId).forEach((teamId) => {
+      const team = state.teams.find((t) => t.id === teamId);
+      reveal.appendChild(el('div', { className: 'robotics-podium-team' }, [
+        el('div', { className: 'robotics-podium-team-name' }, [teamName(state, teamId)]),
+        ...(team?.members.length ? [el('div', { className: 'robotics-podium-members' }, [team.members.join(', ')])] : []),
+      ]));
+    });
+  } else {
+    reveal.appendChild(el('div', { className: 'robotics-podium-mystery' }, ['?']));
+  }
+  block.appendChild(reveal);
+  block.appendChild(el('div', { className: 'robotics-podium-step' }, [
+    el('span', { className: 'robotics-podium-place' }, [PLACE_LABELS[place]]),
+  ]));
+  return block;
+}
+
+/**
+ * The Podium: 2nd | 1st | 3rd, revealed 3rd -> 2nd -> 1st by clicking it
+ * (or Space, wired up in initRoboticsApp). Reveal progress lives in state; the
+ * rise animation and confetti are applied to the freshly rendered block only
+ * when it is revealed here, so revisiting the tab doesn't replay them.
+ */
+export function renderResultsTab(state, dispatch) {
+  const section = el('div', { className: 'robotics-section robotics-results' });
+  const { bracket } = state.elimination;
+  if (!isBracketComplete(bracket)) {
+    section.appendChild(renderResultsNotDecided(state));
+    return section;
+  }
+
+  const placements = getPlacements(bracket);
+  const revealed = getRevealedPlaces(state);
+  const nextPlace = getNextPlaceToReveal(state);
+
+  const card = el('div', { className: 'robotics-card robotics-podium-card' });
+  card.appendChild(el('h3', { className: 'robotics-card-title' }, ['Podium']));
+  if (nextPlace) {
+    card.appendChild(el('p', { className: 'robotics-podium-hint' }, [`Click the podium or press Space to reveal ${PLACE_LABELS[nextPlace]} place`]));
+  }
+
+  const revealNext = () => {
+    dispatch(revealNextPlacement);
+    // dispatch re-rendered the app synchronously, so look up the new block for this place.
+    const block = document.querySelector(`.robotics-podium-block[data-place="${nextPlace}"]`);
+    block?.classList.add('is-rising');
+    if (nextPlace === 1) launchConfetti(block);
+  };
+  const podium = nextPlace
+    ? el('div', {
+      className: 'robotics-podium is-revealable',
+      role: 'button',
+      tabindex: '0',
+      'aria-label': `Reveal ${PLACE_LABELS[nextPlace]} place`,
+      onClick: revealNext,
+      // Space is handled app-wide in initRoboticsApp; Enter only while the podium has focus.
+      onKeydown: (e) => { if (e.key === 'Enter') revealNext(); },
+    })
+    : el('div', { className: 'robotics-podium' });
+  PODIUM_LAYOUT.forEach((place) => {
+    const placement = placements.find((p) => p.place === place);
+    if (placement) podium.appendChild(renderPodiumBlock(state, placement, revealed.has(place)));
+  });
+  card.appendChild(podium);
+  section.appendChild(card);
+
+  const actions = el('div', { className: 'robotics-form-row' });
+  if (revealed.size > 0) {
+    actions.appendChild(el('button', { className: 'robotics-btn robotics-btn-secondary', onClick: () => dispatch(replayReveal) }, ['Replay reveal']));
+  }
+  const placementsForExport = placements.map(({ place, allianceId }) => ({ place, teamIds: playoffAllianceTeamIds(state, allianceId) }));
+  actions.appendChild(el('button', {
     className: 'robotics-btn robotics-btn-ghost',
-    onClick: () => copyToClipboard(exportPlacementsMarkdown(computeBracketPlacements(state), state.teams), 'Placements copied to clipboard.'),
+    onClick: () => copyToClipboard(exportPlacementsMarkdown(placementsForExport, state.teams), 'Placements copied to clipboard.'),
   }, ['Copy Placements to Clipboard']));
+  section.appendChild(actions);
 
   return section;
 }
@@ -863,7 +944,7 @@ function updateLiveStatus(root, state, now) {
   driftEl.dataset.drift = drift?.status ?? '';
 }
 
-// Only one control panel runs per page; initialising another stops the previous clock.
+// Only one control panel runs per page; initialising another stops the previous clock and Space handler.
 let stopActiveClock = null;
 
 export function renderApp(state, dispatch, activeTab, setActiveTab) {
@@ -886,8 +967,9 @@ export function renderApp(state, dispatch, activeTab, setActiveTab) {
     teams: renderTeamsTab,
     schedule: renderScheduleAndStandingsTab,
     finals: renderFinalsTab,
+    results: renderResultsTab,
   };
-  app.appendChild(renderers[activeTab](state, dispatch));
+  app.appendChild(renderers[activeTab](state, dispatch, { setActiveTab }));
   app.appendChild(createToastContainer());
   app.appendChild(createConfirmDialogContainer());
   return app;
@@ -921,8 +1003,22 @@ export function initRoboticsApp({ mountId = 'roboticsApp', storageKey = 'robotic
 
   stopActiveClock?.();
   const clockTimer = setInterval(() => updateLiveStatus(mount, state, Date.now()), CLOCK_TICK_MS);
+
+  // Space reveals the next Placement on the Results tab, unless it's meant for a focused control.
+  // A held-down Space repeats; ignore repeats so one press is one reveal.
+  function onKeydown(e) {
+    if (activeTab !== 'results' || e.key !== ' ' || e.repeat) return;
+    if (e.target.closest?.('input, textarea, select, button, [contenteditable]')) return;
+    const podium = mount.querySelector('.robotics-podium.is-revealable');
+    if (!podium) return;
+    e.preventDefault();
+    podium.click();
+  }
+  document.addEventListener('keydown', onKeydown);
+
   function destroy() {
     clearInterval(clockTimer);
+    document.removeEventListener('keydown', onKeydown);
     if (stopActiveClock === destroy) stopActiveClock = null;
   }
   stopActiveClock = destroy;

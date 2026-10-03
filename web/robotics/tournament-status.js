@@ -1,6 +1,6 @@
 import { computeMatchTime, MINUTE_MS } from './match-timeline.js';
 import { getCurrentMatchIndex } from './current-match.js';
-import { getMatchWinner } from './bracket.js';
+import { getPlayedEliminationMatches, countUndecidedMatches, isBracketComplete } from './bracket.js';
 
 export const PHASE_LABELS = {
   setup: 'Setup',
@@ -9,19 +9,6 @@ export const PHASE_LABELS = {
   elimination: 'Elimination',
   complete: 'Complete',
 };
-
-/** Elimination Matches actually played - Byes occupy no slot and never complete. */
-function playedEliminationMatches(bracket) {
-  return bracket.matches.filter((m) => !m.isBye);
-}
-
-/**
- * How many played Elimination Matches are decided. A match marked complete
- * with a tie (or with a side still TBD) has no winner, so it isn't decided.
- */
-function decidedEliminationCount(bracket) {
-  return playedEliminationMatches(bracket).filter((m) => getMatchWinner(bracket, m.id) != null).length;
-}
 
 /**
  * The Tournament's phase, derived purely from state: Setup (no matches) ->
@@ -33,7 +20,7 @@ function decidedEliminationCount(bracket) {
 export function getTournamentPhase(state) {
   const { bracket } = state.elimination;
   if (bracket) {
-    return decidedEliminationCount(bracket) === playedEliminationMatches(bracket).length ? 'complete' : 'elimination';
+    return isBracketComplete(bracket) ? 'complete' : 'elimination';
   }
   const matches = state.qualification.matches;
   if (matches.length === 0) return 'setup';
@@ -56,7 +43,8 @@ export function getMatchProgress(state, phase = getTournamentPhase(state)) {
   }
   if (phase === 'elimination') {
     const { bracket } = state.elimination;
-    return `Elimination ${decidedEliminationCount(bracket) + 1} of ${playedEliminationMatches(bracket).length}`;
+    const played = getPlayedEliminationMatches(bracket).length;
+    return `Elimination ${played - countUndecidedMatches(bracket) + 1} of ${played}`;
   }
   return null;
 }

@@ -5,7 +5,21 @@ import {
   getAllMatchesInScheduleOrder,
   autoFillSeedsFromStandings,
 } from '../../robotics/robotics.js';
-import { createInitialState, addTeam, setMatchesPerTeam, regenerateMatchups, recordQualificationResult, setTimelineConfig } from '../../robotics/state.js';
+import {
+  createInitialState,
+  addTeam,
+  setMatchesPerTeam,
+  regenerateMatchups,
+  recordQualificationResult,
+  setTimelineConfig,
+  formPlayoffAlliance,
+  setBracketConfig,
+  setSeed,
+  generateBracket,
+  recordEliminationResult,
+  revealNextPlacement,
+  getRevealedCount,
+} from '../../robotics/state.js';
 
 function setClipboardMock() {
   const writeText = vi.fn();
@@ -1042,7 +1056,7 @@ describe('initRoboticsApp', () => {
       expect(root.querySelector('.robotics-bracket')).toBeTruthy();
     });
 
-    it('records an elimination result and shows the champion once the final completes', () => {
+    it('records an elimination result and offers Reveal Results (no Champion banner) once the final completes', () => {
       const app = initRoboticsApp();
       setupFourTeams(app);
       app.setActiveTab('finals');
@@ -1065,7 +1079,12 @@ describe('initRoboticsApp', () => {
       scoreInputs[1].value = '20';
       clickButtonWithText(root, 'Mark Complete');
 
-      expect(document.getElementById('roboticsApp').textContent).toContain('Champion');
+      root = document.getElementById('roboticsApp');
+      expect(root.textContent).not.toContain('Champion');
+      expect(root.querySelector('.robotics-champion-banner')).toBeFalsy();
+      clickButtonWithText(root, 'Reveal Results →');
+      expect(document.querySelector('.robotics-tab-btn.active').dataset.tabKey).toBe('results');
+      expect(document.querySelector('.robotics-podium')).toBeTruthy();
     });
 
     it('marks the winning side of a completed elimination match with is-winner, and the card as is-complete', () => {
@@ -1213,27 +1232,7 @@ describe('initRoboticsApp', () => {
       clickButtonWithText(root, 'Generate Bracket');
     }
 
-    it('shows a 2nd place banner once the Final completes, with no 3rd place banner when there is no Third-Place Match', () => {
-      const app = initRoboticsApp();
-      setupFourTeams(app);
-      app.setActiveTab('finals');
-      let root = document.getElementById('roboticsApp');
-      setupTwoAlliancesWithBracketSize(root, 2);
-
-      root = document.getElementById('roboticsApp');
-      const scoreInputs = root.querySelectorAll('.robotics-bracket .robotics-score-input');
-      scoreInputs[0].value = '80';
-      scoreInputs[1].value = '20';
-      clickButtonWithText(root, 'Mark Complete');
-
-      root = document.getElementById('roboticsApp');
-      expect(root.querySelector('.robotics-champion-banner')).toBeTruthy();
-      expect(root.querySelector('.robotics-second-place-banner')?.textContent).toContain('2nd Place');
-      expect(root.querySelector('.robotics-third-place-banner')).toBeFalsy();
-    });
-
-    it('shows a 3rd place banner only once the Third-Place Match completes, and copies all three decided places', () => {
-      const writeText = setClipboardMock();
+    it('shows no Reveal Results button while the Third-Place Match is still undecided, and no place banners at any point', () => {
       const app = initRoboticsApp();
       const setupRoot = document.getElementById('roboticsApp');
       ['Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo', 'Foxtrot', 'Golf', 'Hotel'].forEach((name) => addTeamViaForm(setupRoot, name));
@@ -1253,86 +1252,256 @@ describe('initRoboticsApp', () => {
       root = document.getElementById('roboticsApp');
       clickButtonWithText(root, 'Generate Bracket');
 
-      // Complete both semifinals so the Third-Place Match's sides resolve.
-      root = document.getElementById('roboticsApp');
-      let scoreInputs = root.querySelectorAll('.robotics-bracket .robotics-score-input');
-      scoreInputs[0].value = '80';
-      scoreInputs[1].value = '20';
-      let completeBtn = [...root.querySelectorAll('button')].find((b) => b.textContent === 'Mark Complete');
-      completeBtn.click();
+      // Semis (inputs 0-3), then the Final (inputs 6-7), leaving the Third-Place Match (inputs 4-5).
+      for (const [a, b] of [[0, 1], [2, 3], [6, 7]]) {
+        root = document.getElementById('roboticsApp');
+        const scoreInputs = root.querySelectorAll('.robotics-bracket .robotics-score-input');
+        scoreInputs[a].value = '80';
+        scoreInputs[b].value = '20';
+        scoreInputs[a].closest('.robotics-bracket-match').querySelector('.robotics-match-actions button').click();
+      }
 
       root = document.getElementById('roboticsApp');
-      scoreInputs = root.querySelectorAll('.robotics-bracket .robotics-score-input');
-      scoreInputs[2].value = '70';
-      scoreInputs[3].value = '30';
-      completeBtn = [...root.querySelectorAll('button')].find((b) => b.textContent === 'Mark Complete');
-      completeBtn.click();
+      expect(app.getState().elimination.bracket.matches.find((m) => m.round === 'final').completed).toBe(true);
+      expect(root.querySelector('.robotics-reveal-results-btn')).toBeFalsy();
+      expect(root.querySelector('.robotics-champion-banner, .robotics-second-place-banner, .robotics-third-place-banner')).toBeFalsy();
 
-      root = document.getElementById('roboticsApp');
-      expect(root.querySelector('.robotics-third-place-banner')).toBeFalsy();
-
-      // Now complete the Third-Place Match itself.
-      scoreInputs = root.querySelectorAll('.robotics-bracket .robotics-score-input');
+      const scoreInputs = root.querySelectorAll('.robotics-bracket .robotics-score-input');
       scoreInputs[4].value = '50';
       scoreInputs[5].value = '40';
-      completeBtn = [...root.querySelectorAll('button')].find((b) => b.textContent === 'Mark Complete');
-      completeBtn.click();
+      scoreInputs[4].closest('.robotics-bracket-match').querySelector('.robotics-match-actions button').click();
 
       root = document.getElementById('roboticsApp');
-      expect(root.querySelector('.robotics-third-place-banner')?.textContent).toContain('3rd Place');
-      expect(root.querySelector('.robotics-champion-banner')).toBeFalsy();
+      expect(root.querySelector('.robotics-reveal-results-btn')?.textContent).toBe('Reveal Results →');
+      expect(root.querySelector('.robotics-third-place-banner')).toBeFalsy();
+      expect([...root.querySelectorAll('button')].some((b) => b.textContent === 'Copy Placements to Clipboard')).toBe(false);
+    });
+  });
 
-      clickButtonWithText(root, 'Copy Placements to Clipboard');
-      expect(writeText).toHaveBeenCalledTimes(1);
-      const copied = writeText.mock.calls[0][0];
-      expect(copied).toContain('3rd Place:');
-      expect(copied).not.toContain('1st Place:');
-      expect(copied).not.toContain('2nd Place:');
+  describe('results tab', () => {
+    const originalMatchMedia = window.matchMedia;
+
+    afterEach(() => {
+      window.matchMedia = originalMatchMedia;
     });
 
-    it('copies an empty placements list when no bracket has been generated yet', () => {
-      const writeText = setClipboardMock();
+    /**
+     * Seed localStorage with a Tournament whose bracket is generated from
+     * single-Team Playoff Alliances, Seed n = the nth Team. `winners` lists,
+     * per played match in bracket order, whether side A wins (true), side B
+     * wins (false), or it is left unplayed (undefined); `revealedCount`
+     * Placements start revealed on the Podium.
+     */
+    function seedTournament({ teams, includeThirdPlace = false, winners = [], revealedCount = 0 }) {
+      let s = createInitialState();
+      teams.forEach(([name, members]) => { s = addTeam(s, { name, members }); });
+      s.teams.forEach((t) => { s = formPlayoffAlliance(s, t.id, t.id); });
+      s = setBracketConfig(s, { bracketSize: teams.length, includeThirdPlace });
+      s.elimination.alliances.forEach((a, i) => { s = setSeed(s, i + 1, a.id); });
+      s = generateBracket(s);
+      const played = s.elimination.bracket.matches.filter((m) => !m.isBye);
+      winners.forEach((aWins, i) => {
+        if (aWins === undefined) return;
+        s = recordEliminationResult(s, played[i].id, aWins ? { scoreA: 9, scoreB: 1 } : { scoreA: 1, scoreB: 9 });
+      });
+      for (let i = 0; i < revealedCount; i++) s = revealNextPlacement(s);
+      localStorage.setItem('robotics-tournament-state', JSON.stringify(s));
+    }
+
+    // Semis: Alpha v Delta, Bravo v Charlie. Alpha + Bravo win, Alpha wins the Final, Charlie takes 3rd.
+    const FOUR_TEAMS = [['Alpha', ['Ann']], ['Bravo', ['Bea', 'Bo']], ['Charlie', ['Cy']], ['Delta', ['Di']]];
+    const seedCompleteFour = (extra = {}) => seedTournament({ teams: FOUR_TEAMS, includeThirdPlace: true, winners: [true, true, true, false], ...extra });
+
+    const openResults = () => {
       const app = initRoboticsApp();
-      setupFourTeams(app);
-      app.setActiveTab('finals');
+      app.setActiveTab('results');
+      return app;
+    };
+    const podium = () => document.querySelector('.robotics-podium');
+    const block = (place) => document.querySelector(`.robotics-podium-block[data-place="${place}"]`);
+    const pressSpace = (target = document.body) => {
+      const event = new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true });
+      target.dispatchEvent(event);
+      return event;
+    };
+
+    it('is always in the nav, after Finals', () => {
+      initRoboticsApp();
+      const keys = [...document.querySelectorAll('.robotics-tab-btn')].map((b) => b.dataset.tabKey);
+      expect(keys).toEqual(['teams', 'schedule', 'finals', 'results']);
+      expect(document.querySelector('[data-tab-key="results"]').textContent).toBe('Results');
+    });
+
+    it('shows "Results not decided yet" before any bracket exists', () => {
+      openResults();
       const root = document.getElementById('roboticsApp');
-      clickButtonWithText(root, 'Copy Placements to Clipboard');
-      expect(writeText).toHaveBeenCalledWith('');
+      expect(root.textContent).toContain('Results not decided yet');
+      expect(root.textContent).toContain('Generate the Elimination Bracket');
+      expect(podium()).toBeFalsy();
     });
 
-    it('copies an empty placements list when the bracket exists but nothing is decided yet', () => {
-      const writeText = setClipboardMock();
-      const app = initRoboticsApp();
-      setupFourTeams(app);
-      app.setActiveTab('finals');
-      let root = document.getElementById('roboticsApp');
-      setupTwoAlliancesWithBracketSize(root, 2);
-
-      root = document.getElementById('roboticsApp');
-      clickButtonWithText(root, 'Copy Placements to Clipboard');
-      expect(writeText).toHaveBeenCalledWith('');
+    it('shows how many Elimination Matches remain while the bracket is undecided', () => {
+      seedTournament({ teams: FOUR_TEAMS, includeThirdPlace: true, winners: [true] });
+      openResults();
+      expect(document.getElementById('roboticsApp').textContent).toContain('3 Elimination Matches remain');
+      expect(podium()).toBeFalsy();
     });
 
-    it('copies 1st and 2nd place with team members listed once the Final completes', () => {
-      const writeText = setClipboardMock();
-      const app = initRoboticsApp();
-      setupFourTeams(app);
+    it('says "1 Elimination Match remains" in the singular', () => {
+      seedTournament({ teams: FOUR_TEAMS.slice(0, 2) });
+      openResults();
+      expect(document.getElementById('roboticsApp').textContent).toContain('1 Elimination Match remains');
+    });
+
+    it('lays out 2nd | 1st | 3rd, all covered, with no names showing', () => {
+      seedCompleteFour();
+      openResults();
+      const blocks = [...podium().querySelectorAll('.robotics-podium-block')];
+      expect(blocks.map((b) => b.dataset.place)).toEqual(['2', '1', '3']);
+      expect(blocks.every((b) => b.classList.contains('is-covered'))).toBe(true);
+      expect(podium().textContent).not.toContain('Alpha');
+      expect(document.querySelector('.robotics-podium-hint').textContent).toContain('3rd place');
+    });
+
+    it('reveals 3rd, 2nd, then 1st on each podium click, listing Teams and Members', () => {
+      window.matchMedia = vi.fn(() => ({ matches: false }));
+      seedCompleteFour();
+      const app = openResults();
+
+      podium().click();
+      expect(block(3).classList.contains('is-revealed')).toBe(true);
+      expect(block(3).textContent).toContain('Charlie');
+      expect(block(3).textContent).toContain('Cy');
+      expect(block(2).classList.contains('is-covered')).toBe(true);
+      expect(block(3).classList.contains('is-rising')).toBe(true);
+
+      podium().click();
+      expect(block(2).textContent).toContain('Bravo');
+      expect(block(2).textContent).toContain('Bea, Bo');
+      expect(block(1).classList.contains('is-covered')).toBe(true);
+      expect(document.querySelector('.robotics-confetti')).toBeFalsy();
+
+      podium().click();
+      expect(block(1).classList.contains('is-revealed')).toBe(true);
+      expect(block(1).textContent).toContain('Alpha');
+      expect(block(1).querySelector('.robotics-confetti')).toBeTruthy();
+      expect(document.querySelector('.robotics-podium-hint')).toBeFalsy();
+      expect(getRevealedCount(app.getState())).toBe(3);
+
+      // Fully revealed: further clicks change nothing.
+      podium().click();
+      expect(getRevealedCount(app.getState())).toBe(3);
+    });
+
+    it('reveals with Space, but not on another tab or while typing in a field', () => {
+      seedCompleteFour();
+      const app = openResults();
+      const event = pressSpace();
+      expect(event.defaultPrevented).toBe(true);
+      expect(getRevealedCount(app.getState())).toBe(1);
+
+      const input = document.createElement('input');
+      document.getElementById('roboticsApp').appendChild(input);
+      pressSpace(input);
+      expect(getRevealedCount(app.getState())).toBe(1);
+
+      pressSpace(document.querySelector('.robotics-tab-btn'));
+      expect(getRevealedCount(app.getState())).toBe(1);
+
       app.setActiveTab('finals');
-      let root = document.getElementById('roboticsApp');
-      setupTwoAlliancesWithBracketSize(root, 2);
+      expect(pressSpace().defaultPrevented).toBe(false);
+      expect(getRevealedCount(app.getState())).toBe(1);
+    });
 
-      root = document.getElementById('roboticsApp');
-      const scoreInputs = root.querySelectorAll('.robotics-bracket .robotics-score-input');
-      scoreInputs[0].value = '80';
-      scoreInputs[1].value = '20';
-      clickButtonWithText(root, 'Mark Complete');
+    it('ignores held-down (repeating) Space so one press reveals one Placement', () => {
+      seedCompleteFour();
+      const app = openResults();
+      document.body.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', repeat: true, bubbles: true, cancelable: true }));
+      expect(getRevealedCount(app.getState())).toBe(0);
+    });
 
-      root = document.getElementById('roboticsApp');
-      clickButtonWithText(root, 'Copy Placements to Clipboard');
+    it('reveals with Enter on the focused podium, ignoring other keys', () => {
+      seedCompleteFour();
+      const app = openResults();
+      podium().dispatchEvent(new KeyboardEvent('keydown', { key: 'a', bubbles: true }));
+      expect(getRevealedCount(app.getState())).toBe(0);
+      podium().dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+      expect(getRevealedCount(app.getState())).toBe(1);
+    });
+
+    it('ignores Space on the Results tab while results are undecided', () => {
+      const app = openResults();
+      expect(pressSpace().defaultPrevented).toBe(false);
+      expect(getRevealedCount(app.getState())).toBe(0);
+    });
+
+    it('skips 3rd when there is no Third-Place Match', () => {
+      seedTournament({ teams: FOUR_TEAMS.slice(0, 2), winners: [false] });
+      openResults();
+      expect([...podium().querySelectorAll('.robotics-podium-block')].map((b) => b.dataset.place)).toEqual(['2', '1']);
+      expect(document.querySelector('.robotics-podium-hint').textContent).toContain('2nd place');
+      podium().click();
+      expect(block(2).textContent).toContain('Alpha');
+      podium().click();
+      expect(block(1).textContent).toContain('Bravo');
+    });
+
+    it('launches no confetti under prefers-reduced-motion', () => {
+      window.matchMedia = vi.fn(() => ({ matches: true }));
+      seedCompleteFour({ revealedCount: 2 });
+      openResults();
+      podium().click();
+      expect(block(1).classList.contains('is-revealed')).toBe(true);
+      expect(document.querySelector('.robotics-confetti')).toBeFalsy();
+    });
+
+    it('keeps revealed Placements when revisiting the tab, without replaying the rise', () => {
+      seedCompleteFour();
+      const app = openResults();
+      podium().click();
+      app.setActiveTab('teams');
+      app.setActiveTab('results');
+      expect(block(3).classList.contains('is-revealed')).toBe(true);
+      expect(block(3).classList.contains('is-rising')).toBe(false);
+    });
+
+    it('Replay reveal re-covers every block', () => {
+      seedCompleteFour({ revealedCount: 3 });
+      const app = openResults();
+      expect(block(1).classList.contains('is-revealed')).toBe(true);
+      clickButtonWithText(document.getElementById('roboticsApp'), 'Replay reveal');
+      expect(getRevealedCount(app.getState())).toBe(0);
+      expect(block(1).classList.contains('is-covered')).toBe(true);
+    });
+
+    it('offers no Replay reveal before anything is revealed', () => {
+      seedCompleteFour();
+      openResults();
+      expect([...document.querySelectorAll('button')].some((b) => b.textContent === 'Replay reveal')).toBe(false);
+    });
+
+    it('Reset Results clears reveal progress', async () => {
+      seedCompleteFour({ revealedCount: 3 });
+      const app = initRoboticsApp();
+      clickButtonWithText(document.getElementById('roboticsApp'), 'Reset Results');
+      await clickDialogButton(document.getElementById('roboticsApp'), 'Reset Results');
+      expect(getRevealedCount(app.getState())).toBe(0);
+    });
+
+    it('copies all decided Placements with Members from the Results tab', () => {
+      const writeText = setClipboardMock();
+      seedCompleteFour();
+      openResults();
+      clickButtonWithText(document.getElementById('roboticsApp'), 'Copy Placements to Clipboard');
       const copied = writeText.mock.calls[0][0];
-      expect(copied).toContain('1st Place:');
-      expect(copied).toContain('2nd Place:');
-      expect(copied).toContain('Members:');
+      expect(copied).toContain('1st Place:\nAlpha\n  Members: Ann');
+      expect(copied).toContain('2nd Place:\nBravo');
+      expect(copied).toContain('3rd Place:\nCharlie');
+    });
+
+    it('offers no Copy Placements while results are undecided', () => {
+      openResults();
+      expect([...document.querySelectorAll('button')].some((b) => b.textContent === 'Copy Placements to Clipboard')).toBe(false);
     });
   });
 
