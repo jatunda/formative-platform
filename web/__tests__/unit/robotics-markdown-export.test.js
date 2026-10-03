@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { exportStandingsMarkdown, exportMatchesMarkdown, exportRosterMarkdown } from '../../robotics/markdown-export.js';
+import { exportStandingsMarkdown, exportMatchesMarkdown, exportRosterMarkdown, exportPlacementsMarkdown } from '../../robotics/markdown-export.js';
 
 const teams = [
   { id: 't1', name: 'Alpha', members: ['Ann', 'Al'] },
@@ -50,5 +50,33 @@ describe('exportRosterMarkdown', () => {
   it('handles a team with no members', () => {
     const md = exportRosterMarkdown([{ id: 't3', name: 'Charlie', members: [] }]);
     expect(md).toContain('Charlie:');
+  });
+});
+
+describe('exportPlacementsMarkdown', () => {
+  it('renders each decided place with every team\'s name and members listed underneath', () => {
+    const placements = [
+      { place: 1, teamIds: ['t1'] },
+      { place: 2, teamIds: ['t2'] },
+    ];
+    const md = exportPlacementsMarkdown(placements, teams);
+    expect(md).toContain('1st Place:');
+    expect(md).toContain('Alpha');
+    expect(md).toContain('Members: Ann, Al');
+    expect(md).toContain('2nd Place:');
+    expect(md).toContain('Bravo');
+    expect(md).toContain('Members: Bea');
+  });
+
+  it('lists every team in a multi-team alliance placement', () => {
+    const placements = [{ place: 3, teamIds: ['t1', 't2'] }];
+    const md = exportPlacementsMarkdown(placements, teams);
+    expect(md).toContain('3rd Place:');
+    expect(md).toContain('Alpha');
+    expect(md).toContain('Bravo');
+  });
+
+  it('returns an empty string when no placements are decided', () => {
+    expect(exportPlacementsMarkdown([], teams)).toBe('');
   });
 });

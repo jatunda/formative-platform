@@ -20,16 +20,12 @@ describe('getInferredCurrentMatchIndex', () => {
 });
 
 describe('getCurrentMatchIndex', () => {
-  it('uses the inferred match when no pin is set', () => {
-    expect(getCurrentMatchIndex(matches([true, false, false]), null)).toBe(1);
+  it('is always the inferred match - there is no override', () => {
+    expect(getCurrentMatchIndex(matches([true, false, false]))).toBe(1);
   });
 
-  it('uses the pinned index when a pin is set', () => {
-    expect(getCurrentMatchIndex(matches([false, false, false]), 2)).toBe(2);
-  });
-
-  it('falls back to inferred if the pinned match is already complete', () => {
-    expect(getCurrentMatchIndex(matches([true, false, true]), 0)).toBe(1);
+  it('returns null when every match is complete', () => {
+    expect(getCurrentMatchIndex(matches([true, true]))).toBeNull();
   });
 });
 

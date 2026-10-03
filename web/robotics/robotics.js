@@ -7,10 +7,13 @@ import {
   setMatchesPerTeam,
   canRegenerateMatchups,
   regenerateMatchups,
+  hasEvenMatchCounts,
+  suggestEvenMatchesPerTeam,
   recordQualificationResult,
   setQualificationNoShow,
-  pinCurrentMatch,
-  clearPinnedMatch,
+  setQualificationDraftScore,
+  canMoveQualificationMatch,
+  reorderQualificationMatch,
   setTimelineConfig,
   formPlayoffAlliance,
   removePlayoffAlliance,
@@ -19,19 +22,21 @@ import {
   generateBracket,
   recordEliminationResult,
   setEliminationNoShow,
+  setEliminationDraftScore,
   resetResults,
   newTournament,
 } from './state.js';
 import { computeMatchTime, computeTotalDurationMinutes, computeStartTimeFromEndTime, estimateEliminationMatchCount } from './match-timeline.js';
 import { computeStandings } from './standings.js';
-import { resolveMatchSides, getMatchWinner } from './bracket.js';
+import { resolveMatchSides, getMatchWinner, getMatchLoser } from './bracket.js';
 import { getCurrentMatchIndex, getUpNextMatchIndex } from './current-match.js';
-import { exportStandingsMarkdown, exportMatchesMarkdown, exportRosterMarkdown } from './markdown-export.js';
+import { exportStandingsMarkdown, exportMatchesMarkdown, exportRosterMarkdown, exportPlacementsMarkdown } from './markdown-export.js';
+import { createToastContainer, showToast } from './toast.js';
+import { createConfirmDialogContainer, showConfirm } from './confirm-dialog.js';
 
 const TABS = [
   { key: 'teams', label: 'Teams' },
-  { key: 'schedule', label: 'Schedule / Swiss Live' },
-  { key: 'standings', label: 'Standings' },
+  { key: 'schedule', label: 'Schedule & Standings' },
   { key: 'finals', label: 'Finals' },
 ];
 
@@ -52,6 +57,25 @@ function playoffAllianceTeamIds(state, allianceId) {
 function playoffAllianceLabel(state, allianceId) {
   const teamIds = playoffAllianceTeamIds(state, allianceId);
   return teamIds.length ? allianceTeamNames(state, teamIds) : '(unassigned)';
+}
+
+/**
+ * One side of a match (Qualification alliance or Elimination playoff alliance):
+ * each team's name is its own click target toggling that team's No-Show flag,
+ * joined with " & "; the whole side gets `is-winner` once the match is decided.
+ */
+function renderAllianceSide(state, teamIds, noShow, onToggleNoShow, isWinner) {
+  const children = [];
+  teamIds.forEach((teamId, i) => {
+    if (i > 0) children.push(' & ');
+    const isNoShow = !!noShow[teamId];
+    children.push(el('span', {
+      className: `robotics-team-toggle${isNoShow ? ' is-no-show' : ''}`,
+      title: isNoShow ? 'Click to mark present' : 'Click to mark No-Show',
+      onClick: () => onToggleNoShow(teamId, !isNoShow),
+    }, [teamName(state, teamId)]));
+  });
+  return el('span', { className: `robotics-match-alliance${isWinner ? ' is-winner' : ''}` }, children);
 }
 
 /**
@@ -93,10 +117,15 @@ export function autoFillSeedsFromStandings(state) {
   return next;
 }
 
-function copyToClipboard(text) {
-  if (navigator.clipboard?.writeText) {
-    navigator.clipboard.writeText(text);
+function copyToClipboard(text, successMessage = 'Copied to clipboard.') {
+  if (!navigator.clipboard?.writeText) {
+    showToast('Clipboard unavailable — copy failed.', { isError: true });
+    return;
   }
+  Promise.resolve(navigator.clipboard.writeText(text)).then(
+    () => showToast(successMessage),
+    () => showToast('Copy failed.', { isError: true }),
+  );
 }
 
 function formatTime(epochMs) {
@@ -117,21 +146,110 @@ function el(tag, props = {}, children = []) {
   return node;
 }
 
+// A Match Timeline Start/End Time is a time-of-day only (the Tournament runs in one sitting) —
+// combine it with today's date to get the epoch-ms the rest of the app works in.
+function timeOfDayInputValue(epochMs) {
+  if (epochMs == null) return '';
+  const d = new Date(epochMs);
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+function timeOfDayToEpochMs(timeStr) {
+  if (!timeStr) return null;
+  const [hours, minutes] = timeStr.split(':').map(Number);
+  const d = new Date();
+  d.setHours(hours, minutes, 0, 0);
+  return d.getTime();
+}
+
 // ---- Tab: Teams ----
+
+function renderRegenerateMatchupsButton(state, dispatch) {
+  const locked = !canRegenerateMatchups(state);
+  const lockHint = 'Locked — a Qualification Match is already complete. Use Reset Results or Reset Everything / New Tournament first.';
+  const regenerateLabel = state.qualification.matches.length === 0 ? 'Generate Matchups' : 'Regenerate Matchups';
+  const regenerateBtn = el('button', {
+    className: 'robotics-btn robotics-btn-secondary',
+    onClick: () => {
+      if (locked) {
+        showToast(lockHint, { isError: true });
+        return;
+      }
+      if (hasEvenMatchCounts(state.teams.length, state.qualification.matchesPerTeam)) {
+        dispatch((s) => regenerateMatchups(s));
+        return;
+      }
+      const suggestions = suggestEvenMatchesPerTeam(state.teams.length, state.qualification.matchesPerTeam);
+      const suggestionText = suggestions.length > 0
+        ? ` Try ${suggestions.join(' or ')} matches per team instead for an even split.`
+        : '';
+      showConfirm({
+        title: 'Uneven Match Counts?',
+        message: `With ${state.teams.length} Teams and ${state.qualification.matchesPerTeam} matches per team, some Teams will play one more Qualification Match than others.${suggestionText} Proceed anyway?`,
+        confirmLabel: 'Generate Anyway',
+      }).then((confirmed) => {
+        if (confirmed) dispatch((s) => regenerateMatchups(s));
+      });
+    },
+  }, [regenerateLabel]);
+  if (locked) {
+    regenerateBtn.setAttribute('aria-disabled', 'true');
+    regenerateBtn.title = lockHint;
+    regenerateBtn.classList.add('is-locked');
+  }
+  return regenerateBtn;
+}
 
 export function renderTeamsTab(state, dispatch) {
   const section = el('div', { className: 'robotics-section' });
 
+  const locked = !canRegenerateMatchups(state);
+  const lockHint = 'Locked — a Qualification Match is already complete. Use Reset Results or Reset Everything / New Tournament first.';
+
   const nameInput = el('input', { placeholder: 'Team name' });
   const membersInput = el('input', { placeholder: 'Members (comma-separated)' });
+  const addTeamFromForm = () => {
+    if (locked) {
+      showToast(lockHint, { isError: true });
+      return;
+    }
+    if (!nameInput.value.trim()) {
+      showToast('Team name is required.', { isError: true });
+      return;
+    }
+    const members = membersInput.value.split(',').map((m) => m.trim()).filter(Boolean);
+    dispatch((s) => addTeam(s, { name: nameInput.value.trim(), members }));
+  };
   const addBtn = el('button', {
     className: 'robotics-btn robotics-btn-primary',
-    onClick: () => {
-      if (!nameInput.value.trim()) return;
-      const members = membersInput.value.split(',').map((m) => m.trim()).filter(Boolean);
-      dispatch((s) => addTeam(s, { name: nameInput.value.trim(), members }));
-    },
+    onClick: addTeamFromForm,
   }, ['Add Team']);
+  nameInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      addTeamFromForm();
+    }
+  });
+  membersInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      addTeamFromForm();
+      // dispatch() re-renders and replaces the whole subtree on success, so the
+      // closed-over nameInput may already be detached — look up the live one.
+      document.querySelector('input[placeholder="Team name"]')?.focus();
+    }
+  });
+  if (locked) {
+    [nameInput, membersInput].forEach((input) => {
+      input.readOnly = true;
+      input.title = lockHint;
+      input.classList.add('robotics-locked-field');
+      input.addEventListener('click', () => showToast(lockHint, { isError: true }));
+    });
+    addBtn.setAttribute('aria-disabled', 'true');
+    addBtn.title = lockHint;
+    addBtn.classList.add('is-locked');
+  }
   section.appendChild(el('div', { className: 'robotics-card' }, [
     el('h3', { className: 'robotics-card-title' }, ['Add a Team']),
     el('div', { className: 'robotics-form-row' }, [nameInput, membersInput, addBtn]),
@@ -143,9 +261,51 @@ export function renderTeamsTab(state, dispatch) {
     list.appendChild(el('p', { className: 'robotics-empty' }, ['No teams yet — add one above.']));
   }
   state.teams.forEach((team) => {
+    const nameInput = el('input', { type: 'text', className: 'robotics-team-name-input', value: team.name });
+    nameInput.addEventListener('change', () => {
+      const trimmed = nameInput.value.trim();
+      if (!trimmed) {
+        nameInput.value = team.name;
+        return;
+      }
+      dispatch((s) => updateTeam(s, team.id, { name: trimmed }));
+    });
+
+    const membersEdit = el('div', { className: 'robotics-team-members-edit' });
+    team.members.forEach((member, i) => {
+      membersEdit.appendChild(el('span', { className: 'robotics-member-chip' }, [
+        member,
+        el('button', {
+          type: 'button',
+          className: 'robotics-member-remove',
+          'aria-label': `Remove ${member}`,
+          onClick: () => dispatch((s) => updateTeam(s, team.id, { members: team.members.filter((_, idx) => idx !== i) })),
+        }, ['×']),
+      ]));
+    });
+
+    const addMemberInput = el('input', { type: 'text', className: 'robotics-member-add-input', placeholder: 'Add member' });
+    const addMember = () => {
+      const value = addMemberInput.value.trim();
+      if (!value) return;
+      dispatch((s) => updateTeam(s, team.id, { members: [...team.members, value] }));
+    };
+    addMemberInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        addMember();
+      }
+    });
+    const addMemberBtn = el('button', {
+      type: 'button',
+      className: 'robotics-btn robotics-btn-ghost robotics-btn-sm',
+      onClick: addMember,
+    }, ['Add member']);
+
     const row = el('div', { className: 'robotics-match-row robotics-team-row' }, [
-      el('strong', { className: 'robotics-team-name' }, [team.name]),
-      el('span', { className: 'robotics-team-members' }, [team.members.join(', ')]),
+      nameInput,
+      membersEdit,
+      el('div', { className: 'robotics-member-add-row' }, [addMemberInput, addMemberBtn]),
       el('button', { className: 'robotics-btn robotics-btn-danger robotics-btn-sm', onClick: () => dispatch((s) => removeTeam(s, team.id)) }, ['Remove']),
     ]);
     list.appendChild(row);
@@ -160,17 +320,51 @@ export function renderTeamsTab(state, dispatch) {
   });
   config.appendChild(el('label', { className: 'robotics-field' }, ['Matches per team: ', matchesPerTeamInput]));
 
-  const regenerateBtn = el('button', {
-    className: 'robotics-btn robotics-btn-secondary',
-    onClick: () => dispatch((s) => regenerateMatchups(s)),
-  }, ['Regenerate Matchups']);
-  regenerateBtn.disabled = !canRegenerateMatchups(state);
-  config.appendChild(regenerateBtn);
+  const estBracketInput = el('input', { type: 'number', value: state.timeline.estimatedBracketSize });
+  estBracketInput.addEventListener('change', () => {
+    dispatch((s) => setTimelineConfig(s, { estimatedBracketSize: parseInt(estBracketInput.value, 10) || 2 }));
+  });
+  config.appendChild(el('label', { className: 'robotics-field' }, ['Estimated bracket size: ', estBracketInput]));
 
-  const dangerRow = el('div', { className: 'robotics-form-row' }, [
-    el('button', { className: 'robotics-btn robotics-btn-danger', onClick: () => dispatch((s) => resetResults(s)) }, ['Reset Results']),
-    el('button', { className: 'robotics-btn robotics-btn-danger', onClick: () => dispatch((s) => newTournament(s)) }, ['New Tournament']),
-    el('button', { className: 'robotics-btn robotics-btn-ghost', onClick: () => copyToClipboard(exportRosterMarkdown(state.teams)) }, ['Copy Roster to Clipboard']),
+  const estThirdInput = el('input', { type: 'checkbox' });
+  estThirdInput.checked = state.timeline.estimatedThirdPlace;
+  estThirdInput.addEventListener('change', () => {
+    dispatch((s) => setTimelineConfig(s, { estimatedThirdPlace: estThirdInput.checked }));
+  });
+  config.appendChild(el('label', { className: 'robotics-field robotics-checkbox-field' }, [estThirdInput, 'Estimated third-place match']));
+
+  config.appendChild(renderRegenerateMatchupsButton(state, dispatch));
+
+  const resetResultsBtn = el('button', {
+    className: 'robotics-btn robotics-btn-danger',
+    onClick: () => {
+      showConfirm({
+        title: 'Reset Results?',
+        message: 'This clears the Qualification Round, all Match results, and the Elimination Bracket. The Team roster is kept.',
+        confirmLabel: 'Reset Results',
+      }).then((confirmed) => {
+        if (confirmed) dispatch((s) => resetResults(s));
+      });
+    },
+  }, ['Reset Results']);
+
+  const newTournamentBtn = el('button', {
+    className: 'robotics-btn robotics-btn-danger',
+    onClick: () => {
+      showConfirm({
+        title: 'Reset Everything?',
+        message: 'This discards everything, including the Team roster, and starts a brand-new Tournament.',
+        confirmLabel: 'Reset Everything',
+      }).then((confirmed) => {
+        if (confirmed) dispatch((s) => newTournament(s));
+      });
+    },
+  }, ['Reset Everything / New Tournament']);
+
+  const dangerRow = el('div', { className: 'robotics-form-row robotics-danger-row' }, [
+    resetResultsBtn,
+    newTournamentBtn,
+    el('button', { className: 'robotics-btn robotics-btn-ghost', onClick: () => copyToClipboard(exportRosterMarkdown(state.teams), 'Roster copied to clipboard.') }, ['Copy Roster to Clipboard']),
   ]);
   config.appendChild(dangerRow);
 
@@ -195,27 +389,33 @@ function renderMatchRow(state, dispatch, entry, { currentIndex, upNextIndex }) {
 
   row.appendChild(el('span', { className: 'robotics-match-time' }, [formatTime(computeMatchTime(state.timeline, entry.globalIndex))]));
 
+  if (state.timeline.fieldCount > 1) {
+    const field = (entry.globalIndex % state.timeline.fieldCount) + 1;
+    row.appendChild(el('span', { className: 'robotics-match-field' }, [`Field ${field}`]));
+  }
+
+  row.appendChild(el('span', { className: `robotics-current-label${isCurrent ? '' : ' is-placeholder'}` }, ['Current Match']));
+
   const scoreA = el('input', { type: 'number', className: 'robotics-score-input', value: match.scoreA ?? '' });
   const scoreB = el('input', { type: 'number', className: 'robotics-score-input', value: match.scoreB ?? '' });
+  scoreA.addEventListener('change', () => {
+    dispatch((s) => setQualificationDraftScore(s, qualIndex, 'scoreA', scoreA.value === '' ? null : parseInt(scoreA.value, 10) || 0));
+  });
+  scoreB.addEventListener('change', () => {
+    dispatch((s) => setQualificationDraftScore(s, qualIndex, 'scoreB', scoreB.value === '' ? null : parseInt(scoreB.value, 10) || 0));
+  });
+  const winningSide = match.completed && match.scoreA !== match.scoreB
+    ? (match.scoreA > match.scoreB ? 'A' : 'B')
+    : null;
+  const toggleQualificationNoShow = (teamId, next) => dispatch((s) => setQualificationNoShow(s, qualIndex, teamId, next));
   const matchup = el('div', { className: 'robotics-match-teams' }, [
-    el('span', { className: 'robotics-match-alliance' }, [allianceTeamNames(state, match.allianceA)]),
+    renderAllianceSide(state, match.allianceA, match.noShow, toggleQualificationNoShow, winningSide === 'A'),
     scoreA,
     el('span', { className: 'robotics-match-vs' }, ['vs']),
     scoreB,
-    el('span', { className: 'robotics-match-alliance' }, [allianceTeamNames(state, match.allianceB)]),
+    renderAllianceSide(state, match.allianceB, match.noShow, toggleQualificationNoShow, winningSide === 'B'),
   ]);
   row.appendChild(matchup);
-
-  const noShowGroup = el('div', { className: 'robotics-match-noshow' });
-  match.allianceA.concat(match.allianceB).forEach((teamId) => {
-    const checkbox = el('input', { type: 'checkbox' });
-    checkbox.checked = !!match.noShow[teamId];
-    checkbox.addEventListener('change', () => {
-      dispatch((s) => setQualificationNoShow(s, qualIndex, teamId, checkbox.checked));
-    });
-    noShowGroup.appendChild(el('label', { className: 'robotics-field robotics-checkbox-field' }, [checkbox, `${teamName(state, teamId)} no-show`]));
-  });
-  row.appendChild(noShowGroup);
 
   const actions = el('div', { className: 'robotics-match-actions' });
   actions.appendChild(el('button', {
@@ -228,14 +428,21 @@ function renderMatchRow(state, dispatch, entry, { currentIndex, upNextIndex }) {
 
   if (match.completed) {
     actions.appendChild(el('span', { className: 'robotics-complete-badge' }, ['✓ Complete']));
-  }
-
-  if (!match.completed && !isCurrent) {
-    actions.appendChild(el('button', { className: 'robotics-btn robotics-btn-ghost robotics-btn-sm', onClick: () => dispatch((s) => pinCurrentMatch(s, qualIndex)) }, ['Set as Current']));
-  }
-
-  if (isCurrent && state.qualification.pinnedMatchIndex === qualIndex) {
-    actions.appendChild(el('button', { className: 'robotics-btn robotics-btn-ghost robotics-btn-sm', onClick: () => dispatch((s) => clearPinnedMatch(s)) }, ['Clear Pin (back to automatic)']));
+  } else {
+    const moveUpBtn = el('button', {
+      className: 'robotics-btn robotics-btn-ghost robotics-btn-sm',
+      'aria-label': 'Move match up',
+      onClick: () => dispatch((s) => reorderQualificationMatch(s, qualIndex, -1)),
+    }, ['↑']);
+    moveUpBtn.disabled = !canMoveQualificationMatch(state.qualification.matches, qualIndex, -1);
+    const moveDownBtn = el('button', {
+      className: 'robotics-btn robotics-btn-ghost robotics-btn-sm',
+      'aria-label': 'Move match down',
+      onClick: () => dispatch((s) => reorderQualificationMatch(s, qualIndex, 1)),
+    }, ['↓']);
+    moveDownBtn.disabled = !canMoveQualificationMatch(state.qualification.matches, qualIndex, 1);
+    actions.appendChild(moveUpBtn);
+    actions.appendChild(moveDownBtn);
   }
   row.appendChild(actions);
 
@@ -257,34 +464,32 @@ export function renderScheduleTab(state, dispatch) {
   timelineCard.appendChild(el('label', { className: 'robotics-field' }, ['Mode: ', modeSelect]));
 
   if (state.timeline.mode === 'forward') {
-    const startInput = el('input', { type: 'datetime-local' });
-    startInput.addEventListener('change', () => {
-      dispatch((s) => setTimelineConfig(s, { startTime: new Date(startInput.value).getTime() }));
-    });
-    timelineCard.appendChild(el('label', { className: 'robotics-field' }, ['Start time: ', startInput]));
-  } else {
-    const endInput = el('input', { type: 'datetime-local' });
-    const estBracketInput = el('input', { type: 'number', value: state.timeline.estimatedBracketSize });
-    const estThirdInput = el('input', { type: 'checkbox' });
-    estThirdInput.checked = state.timeline.estimatedThirdPlace;
+    const startInput = el('input', { type: 'time', value: timeOfDayInputValue(state.timeline.startTime) });
     const applyBtn = el('button', {
       className: 'robotics-btn robotics-btn-primary',
       onClick: () => {
-        const endTime = new Date(endInput.value).getTime();
-        const estimatedBracketSize = parseInt(estBracketInput.value, 10) || 2;
-        const estimatedThirdPlace = estThirdInput.checked;
+        const startTime = timeOfDayToEpochMs(startInput.value);
+        dispatch((s) => setTimelineConfig(s, { startTime }));
+      },
+    }, ['Apply']);
+    timelineCard.appendChild(el('label', { className: 'robotics-field' }, ['Start time: ', startInput]));
+    timelineCard.appendChild(applyBtn);
+  } else {
+    const endInput = el('input', { type: 'time', value: timeOfDayInputValue(state.timeline.endTime) });
+    const applyBtn = el('button', {
+      className: 'robotics-btn robotics-btn-primary',
+      onClick: () => {
+        const endTime = timeOfDayToEpochMs(endInput.value);
         const eliminationCount = state.elimination.bracket
           ? state.elimination.bracket.matches.filter((m) => !m.isBye).length
-          : estimateEliminationMatchCount(estimatedBracketSize, estimatedThirdPlace);
+          : estimateEliminationMatchCount(state.timeline.estimatedBracketSize, state.timeline.estimatedThirdPlace);
         const totalMatches = state.qualification.matches.length + eliminationCount;
         const totalMinutes = computeTotalDurationMinutes(state.timeline, totalMatches);
         const startTime = computeStartTimeFromEndTime({ endTime }, totalMinutes);
-        dispatch((s) => setTimelineConfig(s, { endTime, estimatedBracketSize, estimatedThirdPlace, startTime }));
+        dispatch((s) => setTimelineConfig(s, { endTime, startTime }));
       },
     }, ['Apply']);
     timelineCard.appendChild(el('label', { className: 'robotics-field' }, ['End time: ', endInput]));
-    timelineCard.appendChild(el('label', { className: 'robotics-field' }, ['Estimated bracket size: ', estBracketInput]));
-    timelineCard.appendChild(el('label', { className: 'robotics-field robotics-checkbox-field' }, [estThirdInput, 'Estimated third-place match']));
     timelineCard.appendChild(applyBtn);
   }
 
@@ -299,11 +504,12 @@ export function renderScheduleTab(state, dispatch) {
   timelineCard.appendChild(el('label', { className: 'robotics-field' }, ['Field count: ', fieldInput]));
   section.appendChild(timelineCard);
 
-  const currentIndex = getCurrentMatchIndex(state.qualification.matches, state.qualification.pinnedMatchIndex);
+  const currentIndex = getCurrentMatchIndex(state.qualification.matches);
   const upNextIndex = getUpNextMatchIndex(state.qualification.matches, currentIndex);
 
   const matchList = el('div', { className: 'robotics-card' });
   matchList.appendChild(el('h3', { className: 'robotics-card-title' }, ['Qualification Matches']));
+  matchList.appendChild(renderRegenerateMatchupsButton(state, dispatch));
   const entries = getAllMatchesInScheduleOrder(state).filter((e) => e.kind === 'qualification');
   if (entries.length === 0) {
     matchList.appendChild(el('p', { className: 'robotics-empty' }, ['No matches scheduled yet — add teams and regenerate matchups from the Teams tab.']));
@@ -313,7 +519,7 @@ export function renderScheduleTab(state, dispatch) {
 
   section.appendChild(el('button', {
     className: 'robotics-btn robotics-btn-ghost',
-    onClick: () => copyToClipboard(exportMatchesMarkdown(state.qualification.matches, state.teams)),
+    onClick: () => copyToClipboard(exportMatchesMarkdown(state.qualification.matches, state.teams), 'Match data copied to clipboard.'),
   }, ['Copy Match Data to Clipboard']));
 
   return section;
@@ -331,20 +537,35 @@ export function renderStandingsTab(state) {
   if (standings.length === 0) {
     card.appendChild(el('p', { className: 'robotics-empty' }, ['No results yet — standings will appear once matches are completed.']));
   } else {
+    const isRateMode = standings[0].rankingMode === 'rate';
+    if (isRateMode) {
+      card.appendChild(el('p', { className: 'robotics-standings-note' }, [
+        'Teams have played an uneven number of Qualification Matches — ranked by win % and average points per match instead of raw totals.',
+      ]));
+    }
+    const headers = isRateMode
+      ? ['Rank', 'Team', 'Members', 'W-L', 'Win %', 'Avg Pts/Match']
+      : ['Rank', 'Team', 'Members', 'W-L', 'Points'];
     const table = el('table', { className: 'robotics-table' });
     table.appendChild(el('thead', {}, [
-      el('tr', {}, ['Rank', 'Team', 'Members', 'W-L', 'Points'].map((h) => el('th', {}, [h]))),
+      el('tr', {}, headers.map((h) => el('th', {}, [h]))),
     ]));
     const tbody = el('tbody');
     standings.forEach((entry, i) => {
       const team = state.teams.find((t) => t.id === entry.teamId);
-      tbody.appendChild(el('tr', {}, [
+      const cells = [
         el('td', { className: 'robotics-rank-cell' }, [String(i + 1)]),
         el('td', {}, [team?.name ?? '(unknown)']),
         el('td', {}, [(team?.members ?? []).join(', ')]),
         el('td', {}, [`${entry.wins}-${entry.losses}`]),
-        el('td', {}, [String(entry.points)]),
-      ]));
+      ];
+      if (isRateMode) {
+        cells.push(el('td', {}, [`${Math.round(entry.winRate * 100)}%`]));
+        cells.push(el('td', {}, [entry.avgPoints.toFixed(1)]));
+      } else {
+        cells.push(el('td', {}, [String(entry.points)]));
+      }
+      tbody.appendChild(el('tr', {}, cells));
     });
     table.appendChild(tbody);
     card.appendChild(el('div', { className: 'robotics-table-wrap' }, [table]));
@@ -354,9 +575,16 @@ export function renderStandingsTab(state) {
 
   section.appendChild(el('button', {
     className: 'robotics-btn robotics-btn-ghost',
-    onClick: () => copyToClipboard(exportStandingsMarkdown(standings, state.teams)),
+    onClick: () => copyToClipboard(exportStandingsMarkdown(standings, state.teams), 'Standings copied to clipboard.'),
   }, ['Copy Standings to Clipboard']));
 
+  return section;
+}
+
+export function renderScheduleAndStandingsTab(state, dispatch) {
+  const section = el('div', { className: 'robotics-section' });
+  section.appendChild(renderScheduleTab(state, dispatch));
+  section.appendChild(renderStandingsTab(state));
   return section;
 }
 
@@ -364,36 +592,38 @@ export function renderStandingsTab(state) {
 
 function renderBracketMatch(state, dispatch, match) {
   const sides = resolveMatchSides(state.elimination.bracket, match.id);
-  const card = el('div', { className: 'robotics-card robotics-bracket-match' });
+  const cardClassNames = ['robotics-card', 'robotics-bracket-match'];
+  if (match.completed) cardClassNames.push('is-complete');
+  const card = el('div', { className: cardClassNames.join(' ') });
   if (match.isBye) {
     card.appendChild(el('div', { className: 'robotics-bracket-bye' }, [`BYE → ${playoffAllianceLabel(state, sides.allianceA ?? sides.allianceB)}`]));
     return card;
   }
 
+  const winner = getMatchWinner(state.elimination.bracket, match.id);
+  const toggleEliminationNoShow = (teamId, next) => dispatch((s) => setEliminationNoShow(s, match.id, teamId, next));
+
   const scoreA = el('input', { type: 'number', className: 'robotics-score-input', value: match.scoreA ?? '' });
   const scoreB = el('input', { type: 'number', className: 'robotics-score-input', value: match.scoreB ?? '' });
+  scoreA.addEventListener('change', () => {
+    dispatch((s) => setEliminationDraftScore(s, match.id, 'scoreA', scoreA.value === '' ? null : parseInt(scoreA.value, 10) || 0));
+  });
+  scoreB.addEventListener('change', () => {
+    dispatch((s) => setEliminationDraftScore(s, match.id, 'scoreB', scoreB.value === '' ? null : parseInt(scoreB.value, 10) || 0));
+  });
   card.appendChild(el('div', { className: 'robotics-bracket-side' }, [
-    el('span', { className: 'robotics-match-alliance' }, [sides.allianceA ? playoffAllianceLabel(state, sides.allianceA) : 'TBD']),
+    sides.allianceA
+      ? renderAllianceSide(state, playoffAllianceTeamIds(state, sides.allianceA), match.noShow, toggleEliminationNoShow, winner === sides.allianceA)
+      : el('span', { className: 'robotics-match-alliance' }, ['TBD']),
     scoreA,
   ]));
   card.appendChild(el('div', { className: 'robotics-match-vs' }, ['vs']));
   card.appendChild(el('div', { className: 'robotics-bracket-side' }, [
-    el('span', { className: 'robotics-match-alliance' }, [sides.allianceB ? playoffAllianceLabel(state, sides.allianceB) : 'TBD']),
+    sides.allianceB
+      ? renderAllianceSide(state, playoffAllianceTeamIds(state, sides.allianceB), match.noShow, toggleEliminationNoShow, winner === sides.allianceB)
+      : el('span', { className: 'robotics-match-alliance' }, ['TBD']),
     scoreB,
   ]));
-
-  const noShowGroup = el('div', { className: 'robotics-match-noshow' });
-  [sides.allianceA, sides.allianceB].filter(Boolean).forEach((allianceId) => {
-    playoffAllianceTeamIds(state, allianceId).forEach((teamId) => {
-      const checkbox = el('input', { type: 'checkbox' });
-      checkbox.checked = !!match.noShow[teamId];
-      checkbox.addEventListener('change', () => {
-        dispatch((s) => setEliminationNoShow(s, match.id, teamId, checkbox.checked));
-      });
-      noShowGroup.appendChild(el('label', { className: 'robotics-field robotics-checkbox-field' }, [checkbox, `${teamName(state, teamId)} no-show`]));
-    });
-  });
-  card.appendChild(noShowGroup);
 
   const actions = el('div', { className: 'robotics-match-actions' });
   actions.appendChild(el('button', {
@@ -408,25 +638,83 @@ function renderBracketMatch(state, dispatch, match) {
   return card;
 }
 
+// A bracket-tree column centers each match between the two matches feeding it by
+// surrounding every match with flex spacers in a 1 : 2 : 2 : ... : 2 : 1 ratio: the
+// leftover space a shorter column gets stretched into (relative to round 1, which
+// has the most matches and so defines the bracket's overall height) is distributed
+// so each match lands at the midpoint of its two feeders, recursively.
+function renderBracketSpacer(grow) {
+  return el('div', { className: 'robotics-bracket-spacer', style: `flex-grow: ${grow};` });
+}
+
+function renderBracketRoundColumn(state, dispatch, matches, title) {
+  const col = el('div', { className: 'robotics-bracket-round' }, [el('h4', {}, [title])]);
+  const sorted = [...matches].sort((a, b) => a.slot - b.slot);
+  col.appendChild(renderBracketSpacer(1));
+  sorted.forEach((match, i) => {
+    col.appendChild(renderBracketMatch(state, dispatch, match));
+    if (i < sorted.length - 1) col.appendChild(renderBracketSpacer(2));
+  });
+  col.appendChild(renderBracketSpacer(1));
+  return col;
+}
+
 function renderBracket(state, dispatch) {
   const bracket = state.elimination.bracket;
   const container = el('div', { className: 'robotics-bracket' });
-  const roundKeys = [...new Set(bracket.matches.map((m) => m.round))].sort((a, b) => {
-    const order = { 'third-place': Infinity - 1, final: Infinity };
-    const aKey = typeof a === 'number' ? a : order[a];
-    const bKey = typeof b === 'number' ? b : order[b];
-    return aKey - bKey;
+
+  const numericRounds = [...new Set(
+    bracket.matches.map((m) => m.round).filter((round) => typeof round === 'number'),
+  )].sort((a, b) => a - b);
+
+  numericRounds.forEach((round) => {
+    const roundMatches = bracket.matches.filter((m) => m.round === round);
+    container.appendChild(renderBracketRoundColumn(state, dispatch, roundMatches, `Round ${round}`));
   });
-  roundKeys.forEach((round) => {
-    const col = el('div', { className: 'robotics-bracket-round' }, [el('h4', {}, [round === 'final' ? 'Final' : round === 'third-place' ? 'Third Place' : `Round ${round}`])]);
-    bracket.matches.filter((m) => m.round === round).forEach((m) => col.appendChild(renderBracketMatch(state, dispatch, m)));
-    container.appendChild(col);
-  });
-  const winner = getMatchWinner(bracket, bracket.matches.find((m) => m.round === 'final').id);
+
+  const thirdPlaceMatch = bracket.matches.find((m) => m.round === 'third-place');
+  if (thirdPlaceMatch) {
+    container.appendChild(renderBracketRoundColumn(state, dispatch, [thirdPlaceMatch], 'Third Place'));
+  }
+
+  const finalMatch = bracket.matches.find((m) => m.round === 'final');
+  container.appendChild(renderBracketRoundColumn(state, dispatch, [finalMatch], 'Final'));
+
+  const winner = getMatchWinner(bracket, finalMatch.id);
   if (winner) {
     container.appendChild(el('div', { className: 'robotics-champion-banner' }, [`🏆 Champion: ${playoffAllianceLabel(state, winner)}`]));
   }
+
+  const runnerUp = getMatchLoser(bracket, finalMatch.id);
+  if (runnerUp) {
+    container.appendChild(el('div', { className: 'robotics-second-place-banner' }, [`🥈 2nd Place: ${playoffAllianceLabel(state, runnerUp)}`]));
+  }
+
+  if (thirdPlaceMatch) {
+    const thirdPlaceWinner = getMatchWinner(bracket, thirdPlaceMatch.id);
+    if (thirdPlaceWinner) {
+      container.appendChild(el('div', { className: 'robotics-third-place-banner' }, [`🥉 3rd Place: ${playoffAllianceLabel(state, thirdPlaceWinner)}`]));
+    }
+  }
   return container;
+}
+
+/** Decided placements (1st/2nd/3rd) for the current Elimination Bracket, each with its Playoff Alliance's Team ids. */
+function computeBracketPlacements(state) {
+  const bracket = state.elimination.bracket;
+  if (!bracket) return [];
+  const finalMatch = bracket.matches.find((m) => m.round === 'final');
+  const placements = [];
+  const champion = getMatchWinner(bracket, finalMatch.id);
+  if (champion) placements.push({ place: 1, teamIds: playoffAllianceTeamIds(state, champion) });
+  const runnerUp = getMatchLoser(bracket, finalMatch.id);
+  if (runnerUp) placements.push({ place: 2, teamIds: playoffAllianceTeamIds(state, runnerUp) });
+  const thirdPlaceMatch = bracket.matches.find((m) => m.round === 'third-place');
+  if (thirdPlaceMatch) {
+    const thirdPlaceWinner = getMatchWinner(bracket, thirdPlaceMatch.id);
+    if (thirdPlaceWinner) placements.push({ place: 3, teamIds: playoffAllianceTeamIds(state, thirdPlaceWinner) });
+  }
+  return placements;
 }
 
 export function renderFinalsTab(state, dispatch) {
@@ -451,7 +739,17 @@ export function renderFinalsTab(state, dispatch) {
     el('button', {
       className: 'robotics-btn robotics-btn-primary',
       onClick: () => {
-        if (!selectA.value || !selectB.value || selectA.value === selectB.value) return;
+        if (!selectA.value || !selectB.value) return;
+        if (selectA.value === selectB.value) {
+          showConfirm({
+            title: 'Form a Single-Team Alliance?',
+            message: 'Team A and Team B are the same Team. This forms a Playoff Alliance containing just that one Team.',
+            confirmLabel: 'Form Alliance',
+          }).then((confirmed) => {
+            if (confirmed) dispatch((s) => formPlayoffAlliance(s, selectA.value, selectB.value));
+          });
+          return;
+        }
         dispatch((s) => formPlayoffAlliance(s, selectA.value, selectB.value));
       },
     }, ['Form Alliance']),
@@ -511,6 +809,11 @@ export function renderFinalsTab(state, dispatch) {
     section.appendChild(renderBracket(state, dispatch));
   }
 
+  section.appendChild(el('button', {
+    className: 'robotics-btn robotics-btn-ghost',
+    onClick: () => copyToClipboard(exportPlacementsMarkdown(computeBracketPlacements(state), state.teams), 'Placements copied to clipboard.'),
+  }, ['Copy Placements to Clipboard']));
+
   return section;
 }
 
@@ -536,11 +839,12 @@ export function renderApp(state, dispatch, activeTab, setActiveTab) {
 
   const renderers = {
     teams: renderTeamsTab,
-    schedule: renderScheduleTab,
-    standings: renderStandingsTab,
+    schedule: renderScheduleAndStandingsTab,
     finals: renderFinalsTab,
   };
   app.appendChild(renderers[activeTab](state, dispatch));
+  app.appendChild(createToastContainer());
+  app.appendChild(createConfirmDialogContainer());
   return app;
 }
 

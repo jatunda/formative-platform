@@ -10,22 +10,20 @@ export function getInferredCurrentMatchIndex(matches) {
 }
 
 /**
- * The Current Match: the Pinned Match if one is set and not yet complete,
- * otherwise the Inferred Current Match.
+ * The Current Match: always the Inferred Current Match - there is no
+ * override. Schedule order itself is manually reorderable (see
+ * reorderQualificationMatch in state.js), which is how the teacher controls
+ * which match ends up here.
  * @param {{completed: boolean}[]} matches
- * @param {number|null} pinnedIndex
  * @returns {number|null}
  */
-export function getCurrentMatchIndex(matches, pinnedIndex) {
-  if (pinnedIndex !== null && matches[pinnedIndex] && !matches[pinnedIndex].completed) {
-    return pinnedIndex;
-  }
+export function getCurrentMatchIndex(matches) {
   return getInferredCurrentMatchIndex(matches);
 }
 
 /**
  * Up Next: the first not-yet-complete match after the Current Match, in
- * schedule order. Always automatic - never pinnable.
+ * schedule order.
  * @param {{completed: boolean}[]} matches
  * @param {number|null} currentIndex
  * @returns {number|null}

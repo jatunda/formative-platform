@@ -19,7 +19,6 @@ export function createInitialState() {
     qualification: {
       matchesPerTeam: 3,
       matches: [],
-      pinnedMatchIndex: null,
     },
     timeline: {
       mode: 'forward',
@@ -29,7 +28,7 @@ export function createInitialState() {
       gapMin: 1,
       fieldCount: 1,
       estimatedBracketSize: 8,
-      estimatedThirdPlace: true,
+      estimatedThirdPlace: false,
     },
     elimination: {
       bracketSize: null,
@@ -70,6 +69,31 @@ export function canRegenerateMatchups(state) {
   return state.qualification.matches.every((m) => !m.completed);
 }
 
+/** Whether every Team would play the same number of Qualification Matches for this roster size and matchesPerTeam. */
+export function hasEvenMatchCounts(teamCount, matchesPerTeam) {
+  return (teamCount * matchesPerTeam) % 4 === 0;
+}
+
+/**
+ * Nearby matchesPerTeam values (excluding the current one) that would give every
+ * Team an equal match count for this roster size, nearest first.
+ * @param {number} teamCount
+ * @param {number} matchesPerTeam
+ * @param {number} [limit]
+ * @returns {number[]}
+ */
+export function suggestEvenMatchesPerTeam(teamCount, matchesPerTeam, limit = 2) {
+  const suggestions = [];
+  for (let delta = 1; suggestions.length < limit && delta <= 4 * (teamCount + matchesPerTeam + 1); delta++) {
+    const lower = matchesPerTeam - delta;
+    const higher = matchesPerTeam + delta;
+    if (lower > 0 && hasEvenMatchCounts(teamCount, lower)) suggestions.push(lower);
+    if (suggestions.length >= limit) break;
+    if (hasEvenMatchCounts(teamCount, higher)) suggestions.push(higher);
+  }
+  return suggestions.sort((a, b) => a - b);
+}
+
 export function regenerateMatchups(state, { random } = {}) {
   if (!canRegenerateMatchups(state)) {
     throw new Error('Cannot regenerate matchups once a Qualification Match is complete. Reset results first.');
@@ -84,15 +108,22 @@ export function regenerateMatchups(state, { random } = {}) {
     completed: false,
     noShow: {},
   }));
-  return { ...state, qualification: { ...state.qualification, matches, pinnedMatchIndex: null } };
+  return { ...state, qualification: { ...state.qualification, matches } };
 }
 
 export function recordQualificationResult(state, matchIndex, { scoreA, scoreB }) {
   const matches = state.qualification.matches.map((m, i) =>
     i === matchIndex ? { ...m, scoreA, scoreB, completed: true } : m
   );
-  const pinnedMatchIndex = state.qualification.pinnedMatchIndex === matchIndex ? null : state.qualification.pinnedMatchIndex;
-  return { ...state, qualification: { ...state.qualification, matches, pinnedMatchIndex } };
+  return { ...state, qualification: { ...state.qualification, matches } };
+}
+
+/** Persists an in-progress (not yet "Mark Complete"-d) score so it survives a No-Show toggle's re-render. */
+export function setQualificationDraftScore(state, matchIndex, field, value) {
+  const matches = state.qualification.matches.map((m, i) =>
+    i === matchIndex ? { ...m, [field]: value } : m
+  );
+  return { ...state, qualification: { ...state.qualification, matches } };
 }
 
 export function setQualificationNoShow(state, matchIndex, teamId, flag) {
@@ -106,12 +137,28 @@ export function setQualificationNoShow(state, matchIndex, teamId, flag) {
   return { ...state, qualification: { ...state.qualification, matches } };
 }
 
-export function pinCurrentMatch(state, matchIndex) {
-  return { ...state, qualification: { ...state.qualification, pinnedMatchIndex: matchIndex } };
+/**
+ * Whether the match at qualIndex can swap with its neighbor in the given
+ * direction (-1 for up, +1 for down) - both must exist and be not-yet-complete.
+ * @param {{completed: boolean}[]} matches
+ * @param {number} qualIndex
+ * @param {number} direction
+ * @returns {boolean}
+ */
+export function canMoveQualificationMatch(matches, qualIndex, direction) {
+  const other = qualIndex + direction;
+  if (other < 0 || other >= matches.length) return false;
+  return !matches[qualIndex].completed && !matches[other].completed;
 }
 
-export function clearPinnedMatch(state) {
-  return { ...state, qualification: { ...state.qualification, pinnedMatchIndex: null } };
+/** Swaps the match at qualIndex with its neighbor (direction -1 up, +1 down); a no-op if canMoveQualificationMatch would be false. */
+export function reorderQualificationMatch(state, qualIndex, direction) {
+  const matches = state.qualification.matches;
+  if (!canMoveQualificationMatch(matches, qualIndex, direction)) return state;
+  const other = qualIndex + direction;
+  const reordered = [...matches];
+  [reordered[qualIndex], reordered[other]] = [reordered[other], reordered[qualIndex]];
+  return { ...state, qualification: { ...state.qualification, matches: reordered } };
 }
 
 // ---- Timeline ----
@@ -123,11 +170,12 @@ export function setTimelineConfig(state, patch) {
 // ---- Elimination ----
 
 export function formPlayoffAlliance(state, teamIdA, teamIdB) {
+  const teamIds = teamIdA === teamIdB ? [teamIdA] : [teamIdA, teamIdB];
   const alreadyUsed = new Set(state.elimination.alliances.flatMap((a) => a.teamIds));
-  if (alreadyUsed.has(teamIdA) || alreadyUsed.has(teamIdB)) {
+  if (teamIds.some((id) => alreadyUsed.has(id))) {
     throw new Error('A team can only belong to one Playoff Alliance.');
   }
-  const alliance = { id: generateId('alliance'), teamIds: [teamIdA, teamIdB] };
+  const alliance = { id: generateId('alliance'), teamIds };
   return { ...state, elimination: { ...state.elimination, alliances: [...state.elimination.alliances, alliance] } };
 }
 
@@ -175,6 +223,17 @@ export function recordEliminationResult(state, matchId, { scoreA, scoreB }) {
     ...state.elimination.bracket,
     matches: state.elimination.bracket.matches.map((m) =>
       m.id === matchId ? { ...m, scoreA, scoreB, completed: true } : m
+    ),
+  };
+  return { ...state, elimination: { ...state.elimination, bracket } };
+}
+
+/** Persists an in-progress (not yet "Mark Complete"-d) score so it survives a No-Show toggle's re-render. */
+export function setEliminationDraftScore(state, matchId, field, value) {
+  const bracket = {
+    ...state.elimination.bracket,
+    matches: state.elimination.bracket.matches.map((m) =>
+      m.id === matchId ? { ...m, [field]: value } : m
     ),
   };
   return { ...state, elimination: { ...state.elimination, bracket } };

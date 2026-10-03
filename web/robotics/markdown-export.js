@@ -45,3 +45,24 @@ export function exportMatchesMarkdown(matches, teams) {
 export function exportRosterMarkdown(teams) {
   return teams.map((team) => `${team.name}: ${team.members.join(', ')}`).join('\n');
 }
+
+const PLACE_LABELS = { 1: '1st', 2: '2nd', 3: '3rd' };
+
+/**
+ * Render decided tournament placements as markdown: one block per place,
+ * naming each Team with its Members listed on the line underneath.
+ * @param {{place: number, teamIds: string[]}[]} placements
+ * @param {{id: string, name: string, members: string[]}[]} teams
+ * @returns {string}
+ */
+export function exportPlacementsMarkdown(placements, teams) {
+  const blocks = placements.map(({ place, teamIds }) => {
+    const label = PLACE_LABELS[place] ?? `${place}th`;
+    const teamLines = teamIds.flatMap((teamId) => [
+      teamName(teams, teamId),
+      `  Members: ${(teams.find((t) => t.id === teamId)?.members ?? []).join(', ')}`,
+    ]);
+    return [`${label} Place:`, ...teamLines].join('\n');
+  });
+  return blocks.join('\n\n');
+}
