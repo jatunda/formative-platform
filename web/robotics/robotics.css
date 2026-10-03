@@ -88,15 +88,69 @@ body {
 
 .robotics-header {
   margin-bottom: var(--spacing-xl);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-md) var(--spacing-xl);
+  padding: var(--spacing-md) var(--spacing-lg);
+  background: linear-gradient(90deg, var(--arena-surface-raised), var(--arena-surface));
+  border: 1px solid var(--arena-border);
+  border-left: 4px solid var(--arena-live);
+  border-radius: var(--radius-2xl);
+  box-shadow: var(--arena-shadow);
 }
 
 .robotics-title {
-  margin: 0 0 var(--spacing-xs);
+  margin: 0;
   color: var(--arena-text);
   font-size: 2.2rem;
   line-height: 1.1;
   text-transform: uppercase;
   letter-spacing: 0.04em;
+}
+
+/* ---- Live status strip ---- */
+
+.robotics-status-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-sm) var(--spacing-lg);
+  font-family: var(--arena-font-display);
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
+}
+
+.robotics-status-strip > * + *:not([hidden])::before {
+  content: '';
+  display: inline-block;
+  width: 1px;
+  height: 1em;
+  margin-right: var(--spacing-lg);
+  vertical-align: -0.1em;
+  background: var(--arena-border-strong);
+}
+
+.robotics-status-phase {
+  color: var(--arena-live);
+}
+
+.robotics-status-progress {
+  color: var(--arena-text);
+}
+
+.robotics-status-drift[data-drift='on-schedule'] { color: var(--arena-success); }
+.robotics-status-drift[data-drift='behind'] { color: var(--arena-danger); }
+.robotics-status-drift[data-drift='ahead'] { color: var(--arena-accent); }
+
+.robotics-status-clock {
+  color: var(--arena-text);
+  font-size: 1.6rem;
+  font-weight: 700;
 }
 
 /* ---- Tabs ---- */

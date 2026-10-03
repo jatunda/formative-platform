@@ -1,4 +1,4 @@
-const MINUTE_MS = 60 * 1000;
+export const MINUTE_MS = 60 * 1000;
 
 /**
  * Total Elimination Matches a single-elimination bracket requires: every

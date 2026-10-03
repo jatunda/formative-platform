@@ -33,6 +33,7 @@ import { getCurrentMatchIndex, getUpNextMatchIndex } from './current-match.js';
 import { exportStandingsMarkdown, exportMatchesMarkdown, exportRosterMarkdown, exportPlacementsMarkdown } from './markdown-export.js';
 import { createToastContainer, showToast } from './toast.js';
 import { createConfirmDialogContainer, showConfirm } from './confirm-dialog.js';
+import { getTournamentPhase, PHASE_LABELS, getMatchProgress, getCurrentMatchTime, getScheduleDrift, formatScheduleDrift } from './tournament-status.js';
 
 const TABS = [
   { key: 'teams', label: 'Teams' },
@@ -819,12 +820,46 @@ export function renderFinalsTab(state, dispatch) {
 
 // ---- App shell ----
 
+const CLOCK_TICK_MS = 1000;
+
+/**
+ * Broadcast-style status strip: title, phase, match progress, and the live
+ * clock + Schedule Drift. The clock and drift are filled in (and kept ticking)
+ * by updateLiveStatus, so a tick never re-renders the rest of the app.
+ */
+function renderStatusHeader(state) {
+  const phase = getTournamentPhase(state);
+  const progress = getMatchProgress(state, phase);
+  const header = el('header', { className: 'robotics-header' }, [
+    el('h1', { className: 'robotics-title' }, ['Robotics Tournament']),
+    el('div', { className: 'robotics-status-strip' }, [
+      el('span', { className: 'robotics-status-phase' }, [PHASE_LABELS[phase]]),
+      ...(progress ? [el('span', { className: 'robotics-status-progress' }, [progress])] : []),
+      el('span', { className: 'robotics-status-drift' }),
+      el('span', { className: 'robotics-status-clock' }),
+    ]),
+  ]);
+  updateLiveStatus(header, state, Date.now());
+  return header;
+}
+
+/** Refresh only the clock and Schedule Drift elements under root; drift is hidden when there is none. */
+function updateLiveStatus(root, state, now) {
+  root.querySelector('.robotics-status-clock').textContent = new Date(now).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  const driftEl = root.querySelector('.robotics-status-drift');
+  const drift = getScheduleDrift(now, getCurrentMatchTime(state));
+  driftEl.hidden = !drift;
+  driftEl.textContent = formatScheduleDrift(drift) ?? '';
+  driftEl.dataset.drift = drift?.status ?? '';
+}
+
+// Only one control panel runs per page; initialising another stops the previous clock.
+let stopActiveClock = null;
+
 export function renderApp(state, dispatch, activeTab, setActiveTab) {
   const app = el('div', { className: 'robotics-app' });
 
-  app.appendChild(el('header', { className: 'robotics-header' }, [
-    el('h1', { className: 'robotics-title' }, ['Robotics Tournament Control Panel']),
-  ]));
+  app.appendChild(renderStatusHeader(state));
 
   const tabs = el('nav', { className: 'robotics-tabs' });
   TABS.forEach(({ key, label }) => {
@@ -873,7 +908,16 @@ export function initRoboticsApp({ mountId = 'roboticsApp', storageKey = 'robotic
   }
 
   render();
-  return { getState: () => state, dispatch, setActiveTab };
+
+  stopActiveClock?.();
+  const clockTimer = setInterval(() => updateLiveStatus(mount, state, Date.now()), CLOCK_TICK_MS);
+  function destroy() {
+    clearInterval(clockTimer);
+    if (stopActiveClock === destroy) stopActiveClock = null;
+  }
+  stopActiveClock = destroy;
+
+  return { getState: () => state, dispatch, setActiveTab, destroy };
 }
 
 if (typeof document !== 'undefined' && document.getElementById('roboticsApp')) {

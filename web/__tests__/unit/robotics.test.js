@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   initRoboticsApp,
   teamName,
@@ -1344,5 +1344,109 @@ describe('autoFillSeedsFromStandings', () => {
   it('is a no-op when there are no playoff alliances yet', () => {
     const state = createInitialState();
     expect(autoFillSeedsFromStandings(state).elimination.seeds).toEqual({});
+  });
+});
+
+describe('live status header', () => {
+  const START = new Date(2026, 9, 3, 9, 0, 0).getTime();
+  let app;
+
+  beforeEach(() => {
+    localStorage.clear();
+    document.body.innerHTML = '<div id="roboticsApp"></div>';
+    vi.useFakeTimers();
+    vi.setSystemTime(START);
+  });
+
+  afterEach(() => {
+    app?.destroy();
+    app = null;
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+  });
+
+  function scheduledApp({ startTime = START } = {}) {
+    app = initRoboticsApp();
+    ['Alpha', 'Bravo', 'Charlie', 'Delta'].forEach((name) => app.dispatch((s) => addTeam(s, { name, members: [] })));
+    app.dispatch((s) => setMatchesPerTeam(s, 2));
+    app.dispatch((s) => regenerateMatchups(s));
+    app.dispatch((s) => setTimelineConfig(s, { startTime, matchDurationMin: 5, gapMin: 0, fieldCount: 1 }));
+    return app;
+  }
+
+  const header = () => document.querySelector('.robotics-header');
+  const text = (selector) => header().querySelector(selector)?.textContent;
+
+  it('shows the title and Setup phase, with no progress or drift, before any matches exist', () => {
+    app = initRoboticsApp();
+    expect(text('.robotics-title')).toBe('Robotics Tournament');
+    expect(text('.robotics-status-phase')).toBe('Setup');
+    expect(header().querySelector('.robotics-status-progress')).toBeNull();
+    expect(header().querySelector('.robotics-status-drift').hidden).toBe(true);
+  });
+
+  it('shows Qualification phase, match progress and drift once matches are scheduled', () => {
+    scheduledApp();
+    app.dispatch((s) => recordQualificationResult(s, 0, { scoreA: 1, scoreB: 0 }));
+    expect(text('.robotics-status-phase')).toBe('Qualification');
+    expect(text('.robotics-status-progress')).toBe('Match 2 of 2');
+    // Match 2 is scheduled 5 min after Start Time, and it is still the Start Time.
+    expect(text('.robotics-status-drift')).toBe('5 min ahead');
+  });
+
+  it('hides drift when there is no Start Time', () => {
+    scheduledApp({ startTime: null });
+    expect(header().querySelector('.robotics-status-drift').hidden).toBe(true);
+  });
+
+  it('ticks the clock and drift each second without re-rendering the app', () => {
+    scheduledApp();
+    const appRoot = document.querySelector('.robotics-app');
+    const clock = header().querySelector('.robotics-status-clock');
+    const before = clock.textContent;
+    expect(text('.robotics-status-drift')).toBe('On schedule');
+
+    vi.advanceTimersByTime(4 * 60 * 1000);
+
+    expect(document.querySelector('.robotics-app')).toBe(appRoot);
+    expect(header().querySelector('.robotics-status-clock')).toBe(clock);
+    expect(clock.textContent).not.toBe(before);
+    expect(text('.robotics-status-drift')).toBe('4 min behind');
+  });
+
+  it('starts one clock interval per app, never another on re-render, and destroy() clears it', () => {
+    const setIntervalSpy = vi.spyOn(globalThis, 'setInterval');
+    const clearIntervalSpy = vi.spyOn(globalThis, 'clearInterval');
+    scheduledApp();
+    expect(setIntervalSpy).toHaveBeenCalledTimes(1);
+    app.setActiveTab('schedule');
+    app.setActiveTab('teams');
+    expect(setIntervalSpy).toHaveBeenCalledTimes(1);
+
+    const clockTimer = setIntervalSpy.mock.results[0].value;
+    app.destroy();
+    expect(clearIntervalSpy).toHaveBeenCalledWith(clockTimer);
+  });
+
+  it('stops the previous app clock when a new app is initialised', () => {
+    const setIntervalSpy = vi.spyOn(globalThis, 'setInterval');
+    const clearIntervalSpy = vi.spyOn(globalThis, 'clearInterval');
+    initRoboticsApp();
+    app = initRoboticsApp();
+    const [firstTimer, secondTimer] = setIntervalSpy.mock.results.map((r) => r.value);
+    expect(clearIntervalSpy).toHaveBeenCalledWith(firstTimer);
+    expect(clearIntervalSpy).not.toHaveBeenCalledWith(secondTimer);
+  });
+
+  it("leaves the newer app's clock running when a superseded app is destroyed", () => {
+    const setIntervalSpy = vi.spyOn(globalThis, 'setInterval');
+    const clearIntervalSpy = vi.spyOn(globalThis, 'clearInterval');
+    const superseded = initRoboticsApp();
+    app = initRoboticsApp();
+    const secondTimer = setIntervalSpy.mock.results[1].value;
+    superseded.destroy();
+    expect(clearIntervalSpy).not.toHaveBeenCalledWith(secondTimer);
+    app.destroy();
+    expect(clearIntervalSpy).toHaveBeenCalledWith(secondTimer);
   });
 });
