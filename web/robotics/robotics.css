@@ -1,16 +1,87 @@
-/* Robotics Tournament Control Panel — page-local overrides & layout.
-   Reuses the design tokens defined in ../style.css (colors, spacing,
-   radius, shadows) so this page matches the rest of the app. */
+/* Robotics Tournament Control Panel — "esports arena" theme.
+   Builds on the shared tokens in ../style.css (spacing, radius, transitions)
+   but layers robotics-local --arena-* tokens on top. This stylesheet is only
+   loaded by robotics.html, so the :root tokens and html/body overrides below
+   never reach the rest of Formative. */
 
+:root {
+  /* Surfaces — deep near-black navy, stepping lighter toward the viewer */
+  --arena-bg: #070b14;
+  --arena-surface: #0e1524;
+  --arena-surface-raised: #152036;
+  --arena-surface-sunken: #0a101c;
+  --arena-border: #22304a;
+  --arena-border-strong: #33476b;
+
+  /* Text */
+  --arena-text: #eef2fa;
+  --arena-text-muted: #8f9cb8;
+
+  /* Alliances (A = red, B = blue, as in VEX) */
+  --arena-red: #ff4d5e;
+  --arena-red-soft: rgba(255, 77, 94, 0.14);
+  --arena-blue: #3d9bff;
+  --arena-blue-soft: rgba(61, 155, 255, 0.14);
+  --arena-blue-hover: #2285f0;
+  --arena-on-solid: #ffffff; /* text on solid blue/red fills */
+
+  /* Accent + status */
+  --arena-accent: #ffc83d;
+  --arena-accent-soft: rgba(255, 200, 61, 0.14);
+  --arena-success: #3ddc84;
+  --arena-danger: #ff5c6c;
+
+  /* Medals — meant for the Podium only (standings rank colors are dropped in ticket 03) */
+  --arena-gold: var(--arena-accent);
+  --arena-silver: #c9d3e3;
+  --arena-bronze: #d98b4a;
+
+  /* Live glow */
+  --arena-live: #3ddcff;
+  --arena-glow: 0 0 0 1px rgba(61, 220, 255, 0.45), 0 0 24px rgba(61, 220, 255, 0.25);
+  --arena-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  --arena-focus: 0 0 0 3px rgba(61, 155, 255, 0.35);
+
+  /* Type — webfonts with system fallbacks so the page renders offline */
+  --arena-font-display: 'Rajdhani', 'Bahnschrift', 'Arial Narrow', 'Roboto Condensed', system-ui, sans-serif;
+  --arena-font-body: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+
+  --arena-gutter: clamp(12px, 2vw, 32px);
+}
+
+/* Bigger base size so it reads on a projector; rem-based spacing scales with it. */
+html {
+  font-size: 112.5%;
+  background-color: var(--arena-bg);
+}
+
+/* Fully fluid: override the shared stylesheet's 800px body (and the old 1200px cap). */
 body {
-  max-width: 1200px;
+  max-width: none;
+  margin: 0;
+  padding: var(--spacing-xl) var(--arena-gutter);
+  background-color: var(--arena-bg);
+  background-image: radial-gradient(ellipse at top, rgba(61, 155, 255, 0.08), transparent 60%);
+  background-attachment: fixed;
+  color: var(--arena-text);
+  font-family: var(--arena-font-body);
+  line-height: 1.45;
 }
 
 .robotics-app {
   max-width: none;
-  margin: 0 auto;
+  margin: 0;
   padding: 0;
-  font-family: var(--font-sans);
+  font-family: var(--arena-font-body);
+  color: var(--arena-text);
+}
+
+/* Condensed display face for headings. :where/:is keep this at element-level
+   specificity so class rules like .robotics-title can still override it. */
+:where(.robotics-app) :is(h1, h2, h3, h4) {
+  font-family: var(--arena-font-display);
+  font-weight: 700;
+  letter-spacing: 0.02em;
 }
 
 /* ---- Header ---- */
@@ -21,9 +92,11 @@ body {
 
 .robotics-title {
   margin: 0 0 var(--spacing-xs);
-  color: var(--accent-blue);
-  font-size: 1.6rem;
-  letter-spacing: -0.01em;
+  color: var(--arena-text);
+  font-size: 2.2rem;
+  line-height: 1.1;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 /* ---- Tabs ---- */
@@ -32,7 +105,7 @@ body {
   display: flex;
   gap: var(--spacing-xs);
   margin-bottom: var(--spacing-xl);
-  border-bottom: 1px solid var(--border-color);
+  box-shadow: inset 0 -2px 0 var(--arena-border);
   overflow-x: auto;
 }
 
@@ -44,12 +117,15 @@ body {
   margin: 0;
   padding: var(--spacing-sm) var(--spacing-lg);
   border: none;
-  border-bottom: 2px solid transparent;
+  border-bottom: 3px solid transparent;
   border-radius: var(--radius-md) var(--radius-md) 0 0;
   background: none;
-  color: var(--text-secondary);
-  font-size: 0.95rem;
-  font-weight: 500;
+  color: var(--arena-text-muted);
+  font-family: var(--arena-font-display);
+  font-size: 1.15rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
   white-space: nowrap;
   cursor: pointer;
   transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast);
@@ -66,19 +142,19 @@ body {
 .robotics-tab-btn[data-tab-key="finals"]::before { content: '🏆'; }
 
 .robotics-tab-btn:hover {
-  color: var(--text-primary);
-  background-color: var(--accent-blue-hover);
+  color: var(--arena-text);
+  background-color: var(--arena-blue-soft);
 }
 
 .robotics-tab-btn:focus-visible {
-  outline: 2px solid var(--accent-blue);
+  outline: 2px solid var(--arena-blue);
   outline-offset: -2px;
 }
 
 .robotics-tab-btn.active {
-  color: var(--accent-blue);
-  border-bottom-color: var(--accent-blue);
-  font-weight: 600;
+  color: var(--arena-text);
+  border-bottom-color: var(--arena-accent);
+  font-weight: 700;
 }
 
 /* ---- Layout ---- */
@@ -89,27 +165,27 @@ body {
 }
 
 .robotics-card {
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-xl);
-  background-color: var(--bg-secondary);
-  padding: var(--spacing-lg);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--arena-border);
+  border-radius: var(--radius-2xl);
+  background: linear-gradient(180deg, var(--arena-surface-raised), var(--arena-surface) 120px);
+  padding: var(--spacing-lg) var(--spacing-xl);
+  box-shadow: var(--arena-shadow);
 }
 
 .robotics-card-title {
   margin: 0 0 var(--spacing-md);
   padding-bottom: var(--spacing-sm);
-  border-bottom: 1px solid var(--border-color);
-  color: var(--accent-blue);
-  font-size: 0.95rem;
-  font-weight: 600;
+  border-bottom: 1px solid var(--arena-border);
+  color: var(--arena-text);
+  font-size: 1.25rem;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
 }
 
 .robotics-empty {
   margin: 0;
-  color: var(--text-secondary);
+  color: var(--arena-text-muted);
   font-style: italic;
   font-size: 0.9rem;
 }
@@ -151,15 +227,18 @@ body {
 .robotics-app input[type="number"],
 .robotics-app input[type="datetime-local"],
 .robotics-app input[type="time"],
-.robotics-app input:not([type]) {
+.robotics-app input:not([type]),
+.robotics-app select {
   width: 100%;
   box-sizing: border-box;
   padding: var(--spacing-sm) var(--spacing-md);
-  background-color: var(--bg-primary);
-  border: 1px solid var(--border-color);
+  background-color: var(--arena-surface-sunken);
+  border: 1px solid var(--arena-border);
   border-radius: var(--radius-lg);
-  color: var(--text-primary);
-  font-size: 0.95rem;
+  color: var(--arena-text);
+  font-family: var(--arena-font-body);
+  font-size: 1rem;
+  font-variant-numeric: tabular-nums;
   transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
@@ -167,21 +246,71 @@ body {
 .robotics-app input[type="number"]:focus,
 .robotics-app input[type="datetime-local"]:focus,
 .robotics-app input[type="time"]:focus,
-.robotics-app input:not([type]):focus {
+.robotics-app input:not([type]):focus,
+.robotics-app select:focus {
   outline: none;
-  border-color: var(--accent-blue);
-  box-shadow: var(--shadow-focus);
+  border-color: var(--arena-blue);
+  box-shadow: var(--arena-focus);
 }
 
+/* Custom checkbox: native box is too small and off-theme on a projector. */
 .robotics-app input[type="checkbox"] {
-  width: auto;
-  accent-color: var(--accent-blue);
+  appearance: none;
+  -webkit-appearance: none;
+  display: inline-grid;
+  place-content: center;
+  flex: 0 0 auto;
+  width: 1.25rem;
+  height: 1.25rem;
+  margin: 0;
+  border: 2px solid var(--arena-border-strong);
+  border-radius: var(--radius-md);
+  background-color: var(--arena-surface-sunken);
   cursor: pointer;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.robotics-app input[type="checkbox"]::after {
+  content: '';
+  width: 0.35rem;
+  height: 0.65rem;
+  margin-top: -0.15rem;
+  border: solid var(--arena-on-solid);
+  border-width: 0 2.5px 2.5px 0;
+  transform: rotate(45deg) scale(0);
+  transition: transform var(--transition-fast);
+}
+
+.robotics-app input[type="checkbox"]:checked {
+  border-color: var(--arena-blue);
+  background-color: var(--arena-blue);
+}
+
+.robotics-app input[type="checkbox"]:checked::after {
+  transform: rotate(45deg) scale(1);
+}
+
+.robotics-app input[type="checkbox"]:hover:not(:disabled) {
+  border-color: var(--arena-blue);
+}
+
+.robotics-app input[type="checkbox"]:focus-visible {
+  outline: none;
+  box-shadow: var(--arena-focus);
+}
+
+.robotics-app input[type="checkbox"]:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.robotics-app select:hover {
+  border-color: var(--arena-border-strong);
 }
 
 .robotics-app label {
-  color: var(--text-secondary);
-  font-size: 0.85rem;
+  color: var(--arena-text-muted);
+  font-size: 0.9rem;
 }
 
 .robotics-field {
@@ -197,15 +326,42 @@ body {
   min-width: 140px;
 }
 
+/* The whole label is the hit target, styled as a toggle chip. */
 .robotics-checkbox-field {
   flex-direction: row;
   align-items: center;
+  align-self: start;
+  justify-self: start;
   gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 1px solid var(--arena-border);
+  border-radius: var(--radius-lg);
+  background-color: var(--arena-surface-sunken);
+  cursor: pointer;
+  user-select: none;
+  transition: border-color var(--transition-fast), background-color var(--transition-fast);
 }
 
-.robotics-score-input {
-  width: 56px;
-  flex: 0 0 56px;
+.robotics-app .robotics-checkbox-field {
+  color: var(--arena-text);
+  font-size: 1rem;
+}
+
+.robotics-checkbox-field:hover {
+  border-color: var(--arena-border-strong);
+}
+
+.robotics-checkbox-field:has(input:checked) {
+  border-color: var(--arena-blue);
+  background-color: var(--arena-blue-soft);
+}
+.robotics-app input.robotics-score-input {
+  width: 64px;
+  flex: 0 0 64px;
+  padding-inline: var(--spacing-xs);
+  font-family: var(--arena-font-display);
+  font-size: 1.3rem;
+  font-weight: 700;
   text-align: center;
   appearance: textfield;
   -moz-appearance: textfield;
@@ -228,64 +384,73 @@ body {
   margin: 0;
   padding: var(--spacing-sm) var(--spacing-lg);
   border-radius: var(--radius-lg);
-  font-size: 0.9rem;
-  font-weight: 500;
+  font-family: var(--arena-font-display);
+  font-size: 1.05rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
   cursor: pointer;
-  transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.robotics-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--arena-focus);
 }
 
 .robotics-btn-primary {
-  border: 1px solid var(--primary-btn-bg);
-  background-color: var(--primary-btn-bg);
-  color: var(--primary-btn-text);
+  border: 1px solid var(--arena-blue);
+  background-color: var(--arena-blue);
+  color: var(--arena-on-solid);
 }
 
 .robotics-btn-primary:hover {
-  background-color: var(--primary-btn-bg-hover);
-  border-color: var(--primary-btn-bg-hover);
+  background-color: var(--arena-blue-hover);
+  border-color: var(--arena-blue-hover);
+  box-shadow: 0 0 16px rgba(61, 155, 255, 0.35);
 }
 
 .robotics-btn-secondary {
-  border: 1px solid var(--border-color);
-  background-color: var(--bg-primary);
-  color: var(--text-primary);
+  border: 1px solid var(--arena-border);
+  background-color: var(--arena-surface-sunken);
+  color: var(--arena-text);
 }
 
 .robotics-btn-secondary:hover {
-  border-color: var(--accent-blue);
-  color: var(--accent-blue);
+  border-color: var(--arena-border-strong);
+  background-color: var(--arena-surface-raised);
 }
 
 .robotics-btn-ghost {
   border: 1px solid transparent;
   background-color: transparent;
-  color: var(--accent-blue);
+  color: var(--arena-blue);
 }
 
 .robotics-btn-ghost:hover {
-  background-color: var(--accent-blue-hover);
+  background-color: var(--arena-blue-soft);
 }
 
 .robotics-btn-danger {
-  border: 1px solid var(--error-red);
+  border: 1px solid var(--arena-danger);
   background-color: transparent;
-  color: var(--error-text-light);
+  color: var(--arena-danger);
 }
 
 .robotics-btn-danger:hover {
-  background-color: var(--error-red);
-  color: white;
+  background-color: var(--arena-danger);
+  color: var(--arena-on-solid);
 }
 
 .robotics-btn-sm {
   padding: var(--spacing-xs) var(--spacing-md);
-  font-size: 0.8rem;
+  font-size: 0.9rem;
 }
 
 .robotics-btn:disabled {
-  background-color: var(--disabled-gray);
-  border-color: var(--disabled-gray);
-  color: var(--text-secondary);
+  background-color: var(--arena-border);
+  border-color: var(--arena-border);
+  color: var(--arena-text-muted);
   cursor: not-allowed;
 }
 
@@ -298,12 +463,12 @@ body {
 }
 
 .robotics-team-name {
-  color: var(--text-primary);
+  color: var(--arena-text);
 }
 
 .robotics-team-members {
   flex: 1;
-  color: var(--text-secondary);
+  color: var(--arena-text-muted);
   font-size: 0.85rem;
 }
 
@@ -325,17 +490,17 @@ body {
   align-items: center;
   gap: var(--spacing-xs);
   padding: var(--spacing-xs) var(--spacing-sm);
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--arena-border);
   border-radius: var(--radius-lg);
-  background-color: var(--bg-secondary);
-  color: var(--text-secondary);
+  background-color: var(--arena-surface);
+  color: var(--arena-text-muted);
   font-size: 0.85rem;
 }
 
 .robotics-member-remove {
   border: none;
   background: none;
-  color: var(--text-secondary);
+  color: var(--arena-text-muted);
   cursor: pointer;
   line-height: 1;
   padding: 0;
@@ -343,7 +508,7 @@ body {
 }
 
 .robotics-member-remove:hover {
-  color: var(--error-red);
+  color: var(--arena-danger);
 }
 
 .robotics-member-add-row {
@@ -366,10 +531,10 @@ body {
   align-items: center;
   gap: var(--spacing-md);
   padding: var(--spacing-md);
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--arena-border);
   border-radius: var(--radius-lg);
   margin-bottom: var(--spacing-sm);
-  background-color: var(--bg-primary);
+  background-color: var(--arena-surface-sunken);
   transition: background-color var(--transition-fast), border-color var(--transition-fast);
 }
 
@@ -378,14 +543,14 @@ body {
 }
 
 .robotics-match-row.is-current {
-  background-color: var(--accent-blue-focus);
-  border-color: var(--accent-blue);
-  border-left: 4px solid var(--accent-blue);
+  background-color: var(--arena-blue-soft);
+  border-color: var(--arena-blue);
+  border-left: 4px solid var(--arena-blue);
 }
 
 .robotics-match-row.is-up-next {
-  background-color: color-mix(in srgb, var(--warning-yellow) 14%, var(--bg-primary));
-  border-color: var(--warning-yellow);
+  background-color: color-mix(in srgb, var(--arena-accent) 14%, var(--arena-surface-sunken));
+  border-color: var(--arena-accent);
 }
 
 .robotics-match-row.is-complete {
@@ -393,21 +558,23 @@ body {
 }
 
 .robotics-match-row.is-complete .robotics-complete-badge {
-  color: var(--success-green);
+  color: var(--arena-success);
   font-weight: 600;
 }
 
 .robotics-match-time {
   flex: 0 0 auto;
   min-width: 90px;
-  color: var(--text-secondary);
-  font-size: 0.8rem;
-  font-family: var(--font-mono);
+  color: var(--arena-text-muted);
+  font-family: var(--arena-font-display);
+  font-size: 1.05rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 
 .robotics-match-field {
   flex: 0 0 auto;
-  color: var(--text-secondary);
+  color: var(--arena-text-muted);
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.02em;
@@ -417,8 +584,8 @@ body {
   flex: 0 0 auto;
   padding: 2px var(--spacing-sm);
   border-radius: var(--radius-lg);
-  background-color: var(--accent-blue);
-  color: var(--primary-btn-text);
+  background-color: var(--arena-blue);
+  color: var(--arena-on-solid);
   font-size: 0.7rem;
   font-weight: 600;
   text-transform: uppercase;
@@ -435,13 +602,13 @@ body {
 .robotics-match-alliance {
   flex: 1;
   min-width: 90px;
-  color: var(--text-primary);
+  color: var(--arena-text);
   font-size: 0.9rem;
 }
 
 .robotics-match-vs {
   flex: 0 0 auto;
-  color: var(--text-secondary);
+  color: var(--arena-text-muted);
   font-size: 0.8rem;
   text-transform: uppercase;
 }
@@ -475,36 +642,43 @@ body {
 .robotics-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.9rem;
+  font-size: 1rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.robotics-rank-cell {
+  font-family: var(--arena-font-display);
+  font-size: 1.15rem;
 }
 
 .robotics-table th,
 .robotics-table td {
   padding: var(--spacing-sm) var(--spacing-md);
   text-align: left;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--arena-border);
 }
 
 .robotics-table thead th {
-  color: var(--text-secondary);
-  font-size: 0.75rem;
+  color: var(--arena-text-muted);
+  font-family: var(--arena-font-display);
+  font-size: 0.95rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  border-bottom: 2px solid var(--border-color);
+  border-bottom: 2px solid var(--arena-border);
 }
 
 .robotics-table tbody tr:hover {
-  background-color: var(--accent-blue-hover);
+  background-color: var(--arena-blue-soft);
 }
 
-.robotics-table tbody tr:nth-child(1) .robotics-rank-cell { color: #ffd700; font-weight: 700; }
-.robotics-table tbody tr:nth-child(2) .robotics-rank-cell { color: #c0c0c0; font-weight: 700; }
-.robotics-table tbody tr:nth-child(3) .robotics-rank-cell { color: #cd7f32; font-weight: 700; }
+.robotics-table tbody tr:nth-child(1) .robotics-rank-cell { color: var(--arena-gold); font-weight: 700; }
+.robotics-table tbody tr:nth-child(2) .robotics-rank-cell { color: var(--arena-silver); font-weight: 700; }
+.robotics-table tbody tr:nth-child(3) .robotics-rank-cell { color: var(--arena-bronze); font-weight: 700; }
 
 /* ---- Standings adaptive-ranking note ---- */
 
 .robotics-standings-note {
-  color: var(--text-secondary);
+  color: var(--arena-text-muted);
   font-size: 0.85rem;
   margin: 0 0 var(--spacing-sm);
 }
@@ -513,6 +687,7 @@ body {
 
 .robotics-bracket {
   display: flex;
+  font-variant-numeric: tabular-nums;
   align-items: stretch;
   gap: var(--spacing-xl);
   overflow-x: auto;
@@ -528,7 +703,7 @@ body {
 
 .robotics-bracket-round h4 {
   margin: 0 0 var(--spacing-xs);
-  color: var(--accent-blue);
+  color: var(--arena-blue);
   font-size: 0.85rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -563,16 +738,16 @@ body {
 }
 
 .robotics-bracket-bye {
-  color: var(--text-secondary);
+  color: var(--arena-text-muted);
   font-style: italic;
 }
 
 .robotics-champion-banner {
   padding: var(--spacing-lg);
-  border: 1px solid var(--warning-yellow);
+  border: 1px solid var(--arena-accent);
   border-radius: var(--radius-xl);
-  background: linear-gradient(135deg, var(--warning-bg-light), var(--bg-secondary));
-  color: var(--warning-yellow);
+  background: linear-gradient(135deg, var(--arena-accent-soft), var(--arena-surface));
+  color: var(--arena-accent);
   font-size: 1.1rem;
   font-weight: 600;
   text-align: center;
@@ -584,9 +759,9 @@ body {
 .robotics-second-place-banner,
 .robotics-third-place-banner {
   padding: var(--spacing-lg);
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--arena-border);
   border-radius: var(--radius-xl);
-  background-color: var(--bg-secondary);
+  background-color: var(--arena-surface);
   font-size: 1rem;
   font-weight: 600;
   text-align: center;
@@ -594,11 +769,11 @@ body {
 }
 
 .robotics-second-place-banner {
-  color: #c0c0c0;
+  color: var(--arena-silver);
 }
 
 .robotics-third-place-banner {
-  color: #cd7f32;
+  color: var(--arena-bronze);
 }
 
 /* ---- Toast ---- */
@@ -608,13 +783,15 @@ body {
   right: var(--spacing-xl);
   bottom: var(--spacing-xl);
   z-index: 1000;
-  padding: var(--spacing-sm) var(--spacing-lg);
-  border: 1px solid var(--accent-blue);
+  padding: var(--spacing-md) var(--spacing-xl);
+  border: 1px solid var(--arena-border-strong);
+  border-left: 4px solid var(--arena-blue);
   border-radius: var(--radius-lg);
-  background-color: var(--bg-secondary);
-  color: var(--text-primary);
-  font-size: 0.9rem;
-  box-shadow: var(--shadow-popup);
+  background-color: var(--arena-surface-raised);
+  color: var(--arena-text);
+  font-size: 1rem;
+  font-weight: 500;
+  box-shadow: var(--arena-shadow);
   opacity: 0;
   visibility: hidden;
   transform: translateY(8px);
@@ -628,8 +805,8 @@ body {
 }
 
 .robotics-toast-error {
-  border-color: var(--error-red);
-  color: var(--error-text-light);
+  border-left-color: var(--arena-danger);
+  color: var(--arena-danger);
 }
 
 /* ---- Confirm dialog ---- */
@@ -641,7 +818,8 @@ body {
   display: none;
   align-items: center;
   justify-content: center;
-  background-color: rgba(0, 0, 0, 0.5);
+  background-color: rgba(3, 6, 12, 0.75);
+  backdrop-filter: blur(3px);
 }
 
 .robotics-confirm-overlay-visible {
@@ -650,24 +828,29 @@ body {
 
 .robotics-confirm-dialog {
   width: calc(100% - var(--spacing-xl) * 2);
-  max-width: 420px;
-  padding: var(--spacing-lg) var(--spacing-xl);
-  border-radius: var(--radius-lg);
-  background-color: var(--bg-secondary);
-  color: var(--text-primary);
-  box-shadow: var(--shadow-popup);
+  max-width: 480px;
+  padding: var(--spacing-xl) var(--spacing-2xl);
+  border: 1px solid var(--arena-border-strong);
+  border-radius: var(--radius-2xl);
+  background-color: var(--arena-surface-raised);
+  color: var(--arena-text);
+  box-shadow: var(--arena-shadow);
 }
 
 .robotics-confirm-title {
   margin: 0 0 var(--spacing-sm);
-  font-size: 1.1rem;
+  font-family: var(--arena-font-display);
+  font-size: 1.5rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .robotics-confirm-message {
   margin: 0 0 var(--spacing-lg);
-  color: var(--text-secondary);
-  font-size: 0.9rem;
-  line-height: 1.4;
+  color: var(--arena-text-muted);
+  font-size: 1rem;
+  line-height: 1.5;
 }
 
 .robotics-confirm-actions {
@@ -689,12 +872,12 @@ body {
 }
 
 .robotics-match-alliance.is-winner > .robotics-team-toggle:not(.is-no-show) {
-  color: var(--success-green);
+  color: var(--arena-success);
   font-weight: 700;
 }
 
 .robotics-team-toggle.is-no-show {
-  color: var(--error-text-light);
+  color: var(--arena-danger);
   text-decoration: line-through;
 }
 
@@ -712,20 +895,20 @@ body {
 .robotics-danger-row {
   margin-top: var(--spacing-xl);
   padding-top: var(--spacing-lg);
-  border-top: 1px solid var(--border-color);
+  border-top: 1px solid var(--arena-border);
 }
 
 .robotics-btn.is-locked {
-  background-color: var(--disabled-gray);
-  border-color: var(--disabled-gray);
-  color: var(--text-secondary);
+  background-color: var(--arena-border);
+  border-color: var(--arena-border);
+  color: var(--arena-text-muted);
   cursor: not-allowed;
 }
 
 .robotics-btn.is-locked:hover {
-  background-color: var(--disabled-gray);
-  border-color: var(--disabled-gray);
-  color: var(--text-secondary);
+  background-color: var(--arena-border);
+  border-color: var(--arena-border);
+  color: var(--arena-text-muted);
 }
 
 .robotics-locked-field {
