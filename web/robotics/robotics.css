@@ -218,6 +218,17 @@ body {
   gap: var(--spacing-lg);
 }
 
+/* Schedule & Standings: matches and Standings stack on narrow screens and sit
+   side by side on wide ones (see Responsive). */
+.robotics-schedule-layout {
+  display: grid;
+  gap: var(--spacing-lg);
+}
+
+.robotics-schedule-layout > * {
+  min-width: 0;
+}
+
 .robotics-card {
   border: 1px solid var(--arena-border);
   border-radius: var(--radius-2xl);
@@ -579,6 +590,7 @@ body {
 
 /* ---- Match rows ---- */
 
+/* Shared card look for list rows (Teams-tab rows reuse it too). */
 .robotics-match-row {
   display: flex;
   flex-wrap: wrap;
@@ -589,26 +601,65 @@ body {
   border-radius: var(--radius-lg);
   margin-bottom: var(--spacing-sm);
   background-color: var(--arena-surface-sunken);
-  transition: background-color var(--transition-fast), border-color var(--transition-fast);
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
 .robotics-match-row:last-child {
   margin-bottom: 0;
 }
 
+/* Qualification Match row: a fixed column grid so cells line up down the list.
+   Only the two alliance-team columns flex; everything else is fixed width. */
+.robotics-match-grid {
+  --match-col-time: 6.5rem;
+  --match-col-field: 4.5rem;
+  --match-col-label: 7.5rem;
+  --match-col-score: 4.5rem;
+  --match-col-actions: 14rem;
+  display: grid;
+  grid-template-columns:
+    var(--match-col-time) var(--match-col-label)
+    minmax(0, 1fr) var(--match-col-score) var(--match-col-score) minmax(0, 1fr)
+    var(--match-col-actions);
+  grid-template-areas: "time label red red-score blue-score blue actions";
+  gap: var(--spacing-sm);
+}
+
+.robotics-match-grid.has-field {
+  grid-template-columns:
+    var(--match-col-time) var(--match-col-field) var(--match-col-label)
+    minmax(0, 1fr) var(--match-col-score) var(--match-col-score) minmax(0, 1fr)
+    var(--match-col-actions);
+  grid-template-areas: "time field label red red-score blue-score blue actions";
+}
+
+.robotics-match-grid > .robotics-match-time { grid-area: time; }
+.robotics-match-grid > .robotics-match-field { grid-area: field; }
+.robotics-match-grid > .robotics-current-label { grid-area: label; justify-self: start; }
+.robotics-match-grid > .robotics-match-alliance.is-red { grid-area: red; }
+.robotics-match-grid > .robotics-match-alliance.is-blue { grid-area: blue; }
+.robotics-match-grid > .robotics-score-input.is-red { grid-area: red-score; }
+.robotics-match-grid > .robotics-score-input.is-blue { grid-area: blue-score; }
+.robotics-match-grid > .robotics-match-actions { grid-area: actions; }
+
+.robotics-app .robotics-match-grid > input.robotics-score-input {
+  width: 100%;
+}
+
 .robotics-match-row.is-current {
-  background-color: var(--arena-blue-soft);
-  border-color: var(--arena-blue);
-  border-left: 4px solid var(--arena-blue);
+  border-color: var(--arena-live);
+  background-color: color-mix(in srgb, var(--arena-live) 8%, var(--arena-surface-sunken));
+  box-shadow: var(--arena-glow);
 }
 
 .robotics-match-row.is-up-next {
-  background-color: color-mix(in srgb, var(--arena-accent) 14%, var(--arena-surface-sunken));
   border-color: var(--arena-accent);
+  border-style: dashed;
 }
 
 .robotics-match-row.is-complete {
-  opacity: 0.65;
+  border-color: color-mix(in srgb, var(--arena-success) 35%, var(--arena-border));
+  opacity: 0.7;
 }
 
 .robotics-match-row.is-complete .robotics-complete-badge {
@@ -617,47 +668,80 @@ body {
 }
 
 .robotics-match-time {
-  flex: 0 0 auto;
-  min-width: 90px;
   color: var(--arena-text-muted);
   font-family: var(--arena-font-display);
   font-size: 1.05rem;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.robotics-match-row.is-current .robotics-match-time {
+  color: var(--arena-text);
 }
 
 .robotics-match-field {
-  flex: 0 0 auto;
   color: var(--arena-text-muted);
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.02em;
+  white-space: nowrap;
 }
 
 .robotics-current-label {
-  flex: 0 0 auto;
   padding: 2px var(--spacing-sm);
   border-radius: var(--radius-lg);
-  background-color: var(--arena-blue);
-  color: var(--arena-on-solid);
+  background-color: var(--arena-live);
+  color: var(--arena-bg);
   font-size: 0.7rem;
-  font-weight: 600;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.03em;
-}
-
-.robotics-match-teams {
-  display: flex;
-  flex: 1 1 320px;
-  align-items: center;
-  gap: var(--spacing-sm);
+  white-space: nowrap;
 }
 
 .robotics-match-alliance {
-  flex: 1;
-  min-width: 90px;
+  min-width: 0;
   color: var(--arena-text);
-  font-size: 0.9rem;
+  font-size: 0.95rem;
+  overflow-wrap: anywhere;
+}
+
+/* ---- Alliance colors: side A is red, side B is blue (as in VEX) ---- */
+
+.robotics-match-grid > .robotics-match-alliance,
+.robotics-bracket-side {
+  align-self: stretch;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 0.3em;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--radius-md);
+}
+
+.robotics-match-grid > .robotics-match-alliance.is-red,
+.robotics-bracket-side.is-red {
+  border-left: 4px solid var(--arena-red);
+  background-color: var(--arena-red-soft);
+}
+
+.robotics-match-grid > .robotics-match-alliance.is-blue,
+.robotics-bracket-side.is-blue {
+  border-right: 4px solid var(--arena-blue);
+  background-color: var(--arena-blue-soft);
+}
+
+.robotics-app input.robotics-score-input.is-red {
+  border-color: var(--arena-red);
+  background-color: var(--arena-red-soft);
+  color: var(--arena-red);
+}
+
+.robotics-app input.robotics-score-input.is-blue {
+  border-color: var(--arena-blue);
+  background-color: var(--arena-blue-soft);
+  color: var(--arena-blue);
 }
 
 .robotics-match-vs {
@@ -667,19 +751,17 @@ body {
   text-transform: uppercase;
 }
 
-.robotics-match-noshow {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--spacing-md);
-  flex: 1 1 auto;
-}
-
 .robotics-match-actions {
   display: flex;
   align-items: center;
   gap: var(--spacing-sm);
   flex: 0 0 auto;
   margin-left: auto;
+}
+
+.robotics-match-grid > .robotics-match-actions {
+  justify-content: flex-end;
+  margin-left: 0;
 }
 
 .robotics-complete-badge {
@@ -725,9 +807,11 @@ body {
   background-color: var(--arena-blue-soft);
 }
 
-.robotics-table tbody tr:nth-child(1) .robotics-rank-cell { color: var(--arena-gold); font-weight: 700; }
-.robotics-table tbody tr:nth-child(2) .robotics-rank-cell { color: var(--arena-silver); font-weight: 700; }
-.robotics-table tbody tr:nth-child(3) .robotics-rank-cell { color: var(--arena-bronze); font-weight: 700; }
+.robotics-standings-members {
+  color: var(--arena-text-muted);
+  font-size: 0.75rem;
+  margin-top: 2px;
+}
 
 /* ---- Standings adaptive-ranking note ---- */
 
@@ -780,15 +864,9 @@ body {
 }
 
 .robotics-bracket-side {
-  display: flex;
-  align-items: center;
+  flex-wrap: nowrap;
   justify-content: space-between;
   gap: var(--spacing-sm);
-}
-
-.robotics-bracket-match .robotics-match-noshow {
-  flex-direction: column;
-  gap: var(--spacing-xs);
 }
 
 .robotics-bracket-bye {
@@ -930,9 +1008,11 @@ body {
   font-weight: 700;
 }
 
+/* Muted text with a danger-colored strike reads on both the red and blue tints
+   (danger-red text alone would disappear into the red side). */
 .robotics-team-toggle.is-no-show {
-  color: var(--arena-danger);
-  text-decoration: line-through;
+  color: var(--arena-text-muted);
+  text-decoration: line-through 2px var(--arena-danger);
 }
 
 .robotics-match-row.is-complete .robotics-team-toggle.is-no-show,
@@ -972,10 +1052,83 @@ body {
 
 /* ---- Responsive ---- */
 
+/* Wide: matches take the remaining space, Standings a narrow column that stays
+   in view while the match list scrolls (scrolling itself if it outgrows the
+   viewport). */
+@media (min-width: 1100px) {
+  .robotics-schedule-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 25%);
+    align-items: start;
+  }
+
+  .robotics-schedule-standings {
+    position: sticky;
+    top: var(--spacing-md);
+    max-height: calc(100vh - 2 * var(--spacing-md));
+    overflow-y: auto;
+    /* Room inside the scroll box for the card's shadow, which it would
+       otherwise clip; the negative margin keeps the column aligned. */
+    padding: 0 var(--spacing-lg) var(--spacing-lg);
+    margin: 0 calc(-1 * var(--spacing-lg));
+  }
+}
+
 @media (max-width: 640px) {
   .robotics-match-actions {
     margin-left: 0;
     width: 100%;
+    justify-content: flex-start;
+  }
+}
+
+/* The match grid stacks on the width of its own list, not the viewport, so it
+   also degrades cleanly when the list sits in a narrow side-by-side column. */
+.robotics-card:has(> .robotics-match-grid) {
+  container-type: inline-size;
+}
+
+/* Mid width: actions drop to their own line so the team columns keep their room. */
+@container (max-width: 66rem) {
+  .robotics-match-grid {
+    grid-template-columns:
+      var(--match-col-time) var(--match-col-label)
+      minmax(0, 1fr) var(--match-col-score) var(--match-col-score) minmax(0, 1fr);
+    grid-template-areas:
+      "time label red red-score blue-score blue"
+      "actions actions actions actions actions actions";
+  }
+
+  .robotics-match-grid.has-field {
+    grid-template-columns:
+      var(--match-col-time) var(--match-col-field) var(--match-col-label)
+      minmax(0, 1fr) var(--match-col-score) var(--match-col-score) minmax(0, 1fr);
+    grid-template-areas:
+      "time field label red red-score blue-score blue"
+      "actions actions actions actions actions actions actions";
+  }
+}
+
+@container (max-width: 44rem) {
+  /* Stack: meta on top, each side beside its score, actions at the bottom. */
+  .robotics-match-grid,
+  .robotics-match-grid.has-field {
+    grid-template-columns: auto auto minmax(0, 1fr) var(--match-col-score);
+    grid-template-areas:
+      "time label label label"
+      "red red red red-score"
+      "blue blue blue blue-score"
+      "actions actions actions actions";
+  }
+
+  .robotics-match-grid.has-field {
+    grid-template-areas:
+      "time field label label"
+      "red red red red-score"
+      "blue blue blue blue-score"
+      "actions actions actions actions";
+  }
+
+  .robotics-match-grid > .robotics-match-actions {
     justify-content: flex-start;
   }
 }

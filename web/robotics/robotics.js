@@ -64,8 +64,9 @@ function playoffAllianceLabel(state, allianceId) {
  * One side of a match (Qualification alliance or Elimination playoff alliance):
  * each team's name is its own click target toggling that team's No-Show flag,
  * joined with " & "; the whole side gets `is-winner` once the match is decided.
+ * `color` is the side's alliance color: 'red' for side A, 'blue' for side B (as in VEX).
  */
-function renderAllianceSide(state, teamIds, noShow, onToggleNoShow, isWinner) {
+function renderAllianceSide(state, teamIds, noShow, onToggleNoShow, isWinner, color) {
   const children = [];
   teamIds.forEach((teamId, i) => {
     if (i > 0) children.push(' & ');
@@ -76,7 +77,7 @@ function renderAllianceSide(state, teamIds, noShow, onToggleNoShow, isWinner) {
       onClick: () => onToggleNoShow(teamId, !isNoShow),
     }, [teamName(state, teamId)]));
   });
-  return el('span', { className: `robotics-match-alliance${isWinner ? ' is-winner' : ''}` }, children);
+  return el('span', { className: `robotics-match-alliance is-${color}${isWinner ? ' is-winner' : ''}` }, children);
 }
 
 /**
@@ -381,7 +382,9 @@ function renderMatchRow(state, dispatch, entry, { currentIndex, upNextIndex }) {
   const isCurrent = isQual && qualIndex === currentIndex;
   const isUpNext = isQual && qualIndex === upNextIndex;
 
-  const classNames = ['robotics-match-row'];
+  const hasField = state.timeline.fieldCount > 1;
+  const classNames = ['robotics-match-row', 'robotics-match-grid'];
+  if (hasField) classNames.push('has-field');
   if (isCurrent) classNames.push('is-current');
   if (isUpNext) classNames.push('is-up-next');
   if (match.completed) classNames.push('is-complete');
@@ -390,15 +393,15 @@ function renderMatchRow(state, dispatch, entry, { currentIndex, upNextIndex }) {
 
   row.appendChild(el('span', { className: 'robotics-match-time' }, [formatTime(computeMatchTime(state.timeline, entry.globalIndex))]));
 
-  if (state.timeline.fieldCount > 1) {
+  if (hasField) {
     const field = (entry.globalIndex % state.timeline.fieldCount) + 1;
     row.appendChild(el('span', { className: 'robotics-match-field' }, [`Field ${field}`]));
   }
 
   row.appendChild(el('span', { className: `robotics-current-label${isCurrent ? '' : ' is-placeholder'}` }, ['Current Match']));
 
-  const scoreA = el('input', { type: 'number', className: 'robotics-score-input', value: match.scoreA ?? '' });
-  const scoreB = el('input', { type: 'number', className: 'robotics-score-input', value: match.scoreB ?? '' });
+  const scoreA = el('input', { type: 'number', className: 'robotics-score-input is-red', value: match.scoreA ?? '' });
+  const scoreB = el('input', { type: 'number', className: 'robotics-score-input is-blue', value: match.scoreB ?? '' });
   scoreA.addEventListener('change', () => {
     dispatch((s) => setQualificationDraftScore(s, qualIndex, 'scoreA', scoreA.value === '' ? null : parseInt(scoreA.value, 10) || 0));
   });
@@ -409,14 +412,11 @@ function renderMatchRow(state, dispatch, entry, { currentIndex, upNextIndex }) {
     ? (match.scoreA > match.scoreB ? 'A' : 'B')
     : null;
   const toggleQualificationNoShow = (teamId, next) => dispatch((s) => setQualificationNoShow(s, qualIndex, teamId, next));
-  const matchup = el('div', { className: 'robotics-match-teams' }, [
-    renderAllianceSide(state, match.allianceA, match.noShow, toggleQualificationNoShow, winningSide === 'A'),
-    scoreA,
-    el('span', { className: 'robotics-match-vs' }, ['vs']),
-    scoreB,
-    renderAllianceSide(state, match.allianceB, match.noShow, toggleQualificationNoShow, winningSide === 'B'),
-  ]);
-  row.appendChild(matchup);
+  // Each side and each score is its own grid cell so columns line up down the list.
+  row.appendChild(renderAllianceSide(state, match.allianceA, match.noShow, toggleQualificationNoShow, winningSide === 'A', 'red'));
+  row.appendChild(scoreA);
+  row.appendChild(scoreB);
+  row.appendChild(renderAllianceSide(state, match.allianceB, match.noShow, toggleQualificationNoShow, winningSide === 'B', 'blue'));
 
   const actions = el('div', { className: 'robotics-match-actions' });
   actions.appendChild(el('button', {
@@ -528,6 +528,15 @@ export function renderScheduleTab(state, dispatch) {
 
 // ---- Tab: Standings ----
 
+/** Team name with its Members as a muted second line (omitted when there are none). */
+function renderStandingsTeamCell(team) {
+  const parts = [el('div', { className: 'robotics-standings-team-name' }, [team?.name ?? '(unknown)'])];
+  if (team?.members?.length) {
+    parts.push(el('div', { className: 'robotics-standings-members' }, [team.members.join(', ')]));
+  }
+  return parts;
+}
+
 export function renderStandingsTab(state) {
   const section = el('div', { className: 'robotics-section' });
   const standings = computeStandings(state.teams, state.qualification.matches);
@@ -545,8 +554,8 @@ export function renderStandingsTab(state) {
       ]));
     }
     const headers = isRateMode
-      ? ['Rank', 'Team', 'Members', 'W-L', 'Win %', 'Avg Pts/Match']
-      : ['Rank', 'Team', 'Members', 'W-L', 'Points'];
+      ? ['Rank', 'Team', 'W-L', 'Win %', 'Avg Pts/Match']
+      : ['Rank', 'Team', 'W-L', 'Points'];
     const table = el('table', { className: 'robotics-table' });
     table.appendChild(el('thead', {}, [
       el('tr', {}, headers.map((h) => el('th', {}, [h]))),
@@ -556,8 +565,7 @@ export function renderStandingsTab(state) {
       const team = state.teams.find((t) => t.id === entry.teamId);
       const cells = [
         el('td', { className: 'robotics-rank-cell' }, [String(i + 1)]),
-        el('td', {}, [team?.name ?? '(unknown)']),
-        el('td', {}, [(team?.members ?? []).join(', ')]),
+        el('td', {}, renderStandingsTeamCell(team)),
         el('td', {}, [`${entry.wins}-${entry.losses}`]),
       ];
       if (isRateMode) {
@@ -582,11 +590,13 @@ export function renderStandingsTab(state) {
   return section;
 }
 
+/** Matches on the left, Standings in a narrow sticky column on the right; they stack on narrow screens. */
 export function renderScheduleAndStandingsTab(state, dispatch) {
-  const section = el('div', { className: 'robotics-section' });
-  section.appendChild(renderScheduleTab(state, dispatch));
-  section.appendChild(renderStandingsTab(state));
-  return section;
+  const matches = renderScheduleTab(state, dispatch);
+  matches.classList.add('robotics-schedule-matches');
+  const standings = renderStandingsTab(state);
+  standings.classList.add('robotics-schedule-standings');
+  return el('div', { className: 'robotics-schedule-layout' }, [matches, standings]);
 }
 
 // ---- Tab: Finals ----
@@ -604,24 +614,24 @@ function renderBracketMatch(state, dispatch, match) {
   const winner = getMatchWinner(state.elimination.bracket, match.id);
   const toggleEliminationNoShow = (teamId, next) => dispatch((s) => setEliminationNoShow(s, match.id, teamId, next));
 
-  const scoreA = el('input', { type: 'number', className: 'robotics-score-input', value: match.scoreA ?? '' });
-  const scoreB = el('input', { type: 'number', className: 'robotics-score-input', value: match.scoreB ?? '' });
+  const scoreA = el('input', { type: 'number', className: 'robotics-score-input is-red', value: match.scoreA ?? '' });
+  const scoreB = el('input', { type: 'number', className: 'robotics-score-input is-blue', value: match.scoreB ?? '' });
   scoreA.addEventListener('change', () => {
     dispatch((s) => setEliminationDraftScore(s, match.id, 'scoreA', scoreA.value === '' ? null : parseInt(scoreA.value, 10) || 0));
   });
   scoreB.addEventListener('change', () => {
     dispatch((s) => setEliminationDraftScore(s, match.id, 'scoreB', scoreB.value === '' ? null : parseInt(scoreB.value, 10) || 0));
   });
-  card.appendChild(el('div', { className: 'robotics-bracket-side' }, [
+  card.appendChild(el('div', { className: 'robotics-bracket-side is-red' }, [
     sides.allianceA
-      ? renderAllianceSide(state, playoffAllianceTeamIds(state, sides.allianceA), match.noShow, toggleEliminationNoShow, winner === sides.allianceA)
+      ? renderAllianceSide(state, playoffAllianceTeamIds(state, sides.allianceA), match.noShow, toggleEliminationNoShow, winner === sides.allianceA, 'red')
       : el('span', { className: 'robotics-match-alliance' }, ['TBD']),
     scoreA,
   ]));
   card.appendChild(el('div', { className: 'robotics-match-vs' }, ['vs']));
-  card.appendChild(el('div', { className: 'robotics-bracket-side' }, [
+  card.appendChild(el('div', { className: 'robotics-bracket-side is-blue' }, [
     sides.allianceB
-      ? renderAllianceSide(state, playoffAllianceTeamIds(state, sides.allianceB), match.noShow, toggleEliminationNoShow, winner === sides.allianceB)
+      ? renderAllianceSide(state, playoffAllianceTeamIds(state, sides.allianceB), match.noShow, toggleEliminationNoShow, winner === sides.allianceB, 'blue')
       : el('span', { className: 'robotics-match-alliance' }, ['TBD']),
     scoreB,
   ]));

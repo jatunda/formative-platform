@@ -554,6 +554,28 @@ describe('initRoboticsApp', () => {
       const fieldLabels = [...root.querySelectorAll('.robotics-match-field')].map((el) => el.textContent);
       expect(fieldLabels[0]).toBe('Field 1');
       expect(fieldLabels[1]).toBe('Field 2');
+      expect(root.querySelector('.robotics-match-row').classList.contains('has-field')).toBe(true);
+    });
+
+    it('lays each match row out as flat grid cells: time, label, red side, red score, blue score, blue side, actions', () => {
+      const app = initRoboticsApp();
+      setupFourTeams(app);
+      app.dispatch((s) => setMatchesPerTeam(s, 3));
+      app.dispatch((s) => regenerateMatchups(s));
+      app.setActiveTab('schedule');
+      const row = document.querySelector('#roboticsApp .robotics-match-row');
+      expect(row.classList.contains('robotics-match-grid')).toBe(true);
+      expect(row.classList.contains('has-field')).toBe(false);
+      const cells = [...row.children].map((c) => c.className);
+      expect(cells).toEqual([
+        'robotics-match-time',
+        'robotics-current-label',
+        'robotics-match-alliance is-red',
+        'robotics-score-input is-red',
+        'robotics-score-input is-blue',
+        'robotics-match-alliance is-blue',
+        'robotics-match-actions',
+      ]);
     });
 
     it('does not show field assignments when field count is 1', () => {
@@ -814,7 +836,7 @@ describe('initRoboticsApp', () => {
       app.setActiveTab('schedule');
       const freshRoot = document.getElementById('roboticsApp');
       const headers = [...freshRoot.querySelectorAll('table thead th')].map((th) => th.textContent);
-      expect(headers).toEqual(['Rank', 'Team', 'Members', 'W-L', 'Points']);
+      expect(headers).toEqual(['Rank', 'Team', 'W-L', 'Points']);
       expect(freshRoot.querySelector('.robotics-standings-note')).toBeFalsy();
     });
 
@@ -830,8 +852,26 @@ describe('initRoboticsApp', () => {
       app.setActiveTab('schedule');
       const freshRoot = document.getElementById('roboticsApp');
       const headers = [...freshRoot.querySelectorAll('table thead th')].map((th) => th.textContent);
-      expect(headers).toEqual(['Rank', 'Team', 'Members', 'W-L', 'Win %', 'Avg Pts/Match']);
+      expect(headers).toEqual(['Rank', 'Team', 'W-L', 'Win %', 'Avg Pts/Match']);
       expect(freshRoot.querySelector('.robotics-standings-note')).toBeTruthy();
+    });
+
+    it('shows Members as a muted subline under the team name, omitted when a team has no Members', () => {
+      const app = initRoboticsApp();
+      const root = document.getElementById('roboticsApp');
+      addTeamViaForm(root, 'Alpha', 'Ann, Al');
+      ['Bravo', 'Charlie', 'Delta'].forEach((name) => addTeamViaForm(root, name));
+      app.dispatch((s) => setMatchesPerTeam(s, 2));
+      app.dispatch((s) => regenerateMatchups(s));
+      app.getState().qualification.matches.forEach((_, i) => {
+        app.dispatch((s) => recordQualificationResult(s, i, { scoreA: 10, scoreB: 5 }));
+      });
+      app.setActiveTab('schedule');
+      const freshRoot = document.getElementById('roboticsApp');
+      const teamCells = [...freshRoot.querySelectorAll('table tbody tr td:nth-child(2)')];
+      const byName = Object.fromEntries(teamCells.map((td) => [td.querySelector('.robotics-standings-team-name').textContent, td]));
+      expect(byName.Alpha.querySelector('.robotics-standings-members').textContent).toBe('Ann, Al');
+      expect(byName.Bravo.querySelector('.robotics-standings-members')).toBeNull();
     });
   });
 
@@ -851,6 +891,31 @@ describe('initRoboticsApp', () => {
       expect(freshRoot.querySelector('table.robotics-table')).toBeTruthy();
       expect([...freshRoot.querySelectorAll('button')].some((b) => b.textContent === 'Copy Match Data to Clipboard')).toBe(true);
       expect([...freshRoot.querySelectorAll('button')].some((b) => b.textContent === 'Copy Standings to Clipboard')).toBe(true);
+    });
+
+    it('lays out matches and Standings as two columns, each keeping its own copy button', () => {
+      const app = initRoboticsApp();
+      const root = document.getElementById('roboticsApp');
+      ['Alpha', 'Bravo', 'Charlie', 'Delta'].forEach((name) => addTeamViaForm(root, name));
+      app.dispatch((s) => regenerateMatchups(s));
+      app.setActiveTab('schedule');
+      const layout = document.querySelector('.robotics-schedule-layout');
+      expect(layout).toBeTruthy();
+
+      const [matchesCol, standingsCol] = layout.children;
+      expect(layout.children).toHaveLength(2);
+      expect(matchesCol.classList.contains('robotics-schedule-matches')).toBe(true);
+      expect(standingsCol.classList.contains('robotics-schedule-standings')).toBe(true);
+
+      const titlesIn = (col) => [...col.querySelectorAll('.robotics-card-title')].map((h) => h.textContent);
+      const buttonsIn = (col) => [...col.querySelectorAll('button')].map((b) => b.textContent);
+      expect(titlesIn(matchesCol)).toEqual(['Match Timeline', 'Qualification Matches']);
+      expect(matchesCol.querySelectorAll('.robotics-match-row').length).toBeGreaterThan(0);
+      expect(buttonsIn(matchesCol)).toContain('Copy Match Data to Clipboard');
+      expect(buttonsIn(matchesCol)).not.toContain('Copy Standings to Clipboard');
+
+      expect(titlesIn(standingsCol)).toEqual(['Standings']);
+      expect(buttonsIn(standingsCol)).toEqual(['Copy Standings to Clipboard']);
     });
   });
 
@@ -1029,6 +1094,9 @@ describe('initRoboticsApp', () => {
       root = document.getElementById('roboticsApp');
       const matchCard = root.querySelector('.robotics-bracket-match');
       expect(matchCard.classList.contains('is-complete')).toBe(true);
+      const sides = matchCard.querySelectorAll('.robotics-bracket-side');
+      expect(sides[0].classList.contains('is-red')).toBe(true);
+      expect(sides[1].classList.contains('is-blue')).toBe(true);
       const alliances = matchCard.querySelectorAll('.robotics-match-alliance');
       expect(alliances[0].classList.contains('is-winner')).toBe(true);
       expect(alliances[1].classList.contains('is-winner')).toBe(false);
