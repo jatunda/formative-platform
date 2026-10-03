@@ -230,6 +230,46 @@ body {
   min-width: 0;
 }
 
+/* Teams: Add a Team, Roster, Tournament Settings stack in that order on narrow
+   screens; on wide ones the Roster takes a wide column beside the other two. */
+.robotics-teams-layout {
+  display: grid;
+  grid-template-areas: "add" "roster" "settings";
+  gap: var(--spacing-lg);
+  align-items: start;
+}
+
+.robotics-teams-layout > * {
+  min-width: 0;
+}
+
+.robotics-teams-add { grid-area: add; }
+.robotics-teams-roster { grid-area: roster; }
+.robotics-teams-settings { grid-area: settings; }
+
+/* Finals: the setup cards stack on narrow screens and share an auto-fit row on
+   wide ones; the bracket follows at full width. */
+.robotics-finals-setup {
+  display: grid;
+  gap: var(--spacing-lg);
+  align-items: start;
+}
+
+.robotics-finals-setup > * {
+  min-width: 0;
+}
+
+/* A setup card can be a single settings column wide, where spanning two would
+   add an implicit column and push the card past its edge. */
+.robotics-finals-setup .robotics-settings-grid > .robotics-checkbox-field {
+  grid-column: 1 / -1;
+}
+
+/* Team A / Team B selects share the card's width instead of shrinking to fit. */
+.robotics-finals-setup .robotics-form-row > .robotics-field {
+  flex: 1 1 140px;
+}
+
 .robotics-card {
   border: 1px solid var(--arena-border);
   border-radius: var(--radius-2xl);
@@ -581,12 +621,18 @@ body {
   display: flex;
   align-items: center;
   gap: var(--spacing-xs);
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  min-width: 0;
 }
 
-.robotics-member-add-input {
-  width: 120px;
+/* Qualified with .robotics-app to beat the generic full-width text-input rule. */
+.robotics-app input.robotics-member-add-input {
+  width: 140px;
   min-width: 0;
+}
+
+.robotics-member-add-row > .robotics-btn {
+  white-space: nowrap;
 }
 
 /* ---- Match rows ---- */
@@ -824,28 +870,42 @@ body {
 
 /* ---- Bracket ---- */
 
+/* Round columns grow to fill the width; the bracket scrolls inside its own box
+   only when the rounds' minimum widths no longer fit. */
 .robotics-bracket {
   display: flex;
   font-variant-numeric: tabular-nums;
   align-items: stretch;
   gap: var(--spacing-xl);
   overflow-x: auto;
-  padding-bottom: var(--spacing-sm);
+  padding: var(--spacing-lg) var(--spacing-xl);
+  border: 1px solid var(--arena-border);
+  border-radius: var(--radius-2xl);
+  background-color: var(--arena-surface-sunken);
 }
 
 .robotics-bracket-round {
   display: flex;
-  flex: 0 0 auto;
+  flex: 1 0 260px;
   flex-direction: column;
-  width: 260px;
 }
 
 .robotics-bracket-round h4 {
-  margin: 0 0 var(--spacing-xs);
-  color: var(--arena-blue);
-  font-size: 0.85rem;
+  margin: 0 0 var(--spacing-sm);
+  padding-bottom: var(--spacing-xs);
+  border-bottom: 2px solid var(--arena-border-strong);
+  color: var(--arena-text-muted);
+  font-family: var(--arena-font-display);
+  font-size: 1.1rem;
+  font-weight: 700;
+  text-align: center;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.08em;
+}
+
+.robotics-bracket-round.is-final h4 {
+  border-bottom-color: var(--arena-gold);
+  color: var(--arena-gold);
 }
 
 /* Pure flex-grow spacers (no fixed size) so the ratio between them — not their
@@ -862,6 +922,33 @@ body {
   gap: var(--spacing-xs);
   padding: var(--spacing-md);
   margin: var(--spacing-xs) 0;
+  /* Rounds stretch to fill a wide bracket; the cards stay readable sizes. */
+  align-self: center;
+  width: 100%;
+  max-width: 380px;
+  box-sizing: border-box;
+  border-radius: var(--radius-xl);
+  background: var(--arena-surface);
+  transition: border-color var(--transition-fast);
+}
+
+.robotics-bracket-match.is-complete {
+  border-color: color-mix(in srgb, var(--arena-success) 35%, var(--arena-border));
+}
+
+.robotics-bracket-match .robotics-score-input {
+  font-family: var(--arena-font-display);
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.robotics-bracket-match .robotics-match-vs {
+  align-self: center;
+}
+
+.robotics-bracket-match .robotics-complete-badge {
+  color: var(--arena-success);
+  font-weight: 600;
 }
 
 .robotics-bracket-side {
@@ -1159,10 +1246,22 @@ body {
 
 /* ---- Teams-tab lock state ---- */
 
-.robotics-danger-row {
+.robotics-danger-zone {
   margin-top: var(--spacing-xl);
-  padding-top: var(--spacing-lg);
-  border-top: 1px solid var(--arena-border);
+  padding: var(--spacing-md) var(--spacing-lg) var(--spacing-lg);
+  border: 1px dashed color-mix(in srgb, var(--arena-danger) 55%, var(--arena-border));
+  border-radius: var(--radius-xl);
+  background-color: color-mix(in srgb, var(--arena-danger) 6%, transparent);
+}
+
+.robotics-danger-label {
+  margin: 0 0 var(--spacing-sm);
+  color: var(--arena-danger);
+  font-family: var(--arena-font-display);
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
 }
 
 .robotics-btn.is-locked {
@@ -1203,6 +1302,23 @@ body {
        otherwise clip; the negative margin keeps the column aligned. */
     padding: 0 var(--spacing-lg) var(--spacing-lg);
     margin: 0 calc(-1 * var(--spacing-lg));
+  }
+
+  .robotics-teams-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(340px, 30%);
+    grid-template-rows: auto 1fr;
+    grid-template-areas:
+      "roster add"
+      "roster settings";
+  }
+
+  /* Narrow column: give each Add a Team field the full width. */
+  .robotics-teams-add .robotics-form-row > input {
+    flex-basis: 100%;
+  }
+
+  .robotics-finals-setup {
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
   }
 }
 

@@ -372,9 +372,39 @@ describe('initRoboticsApp', () => {
     it('separates the matchup button from the danger-action row with the spacing class', () => {
       const app = initRoboticsApp();
       const root = setupFourTeams(app);
-      const dangerRow = root.querySelector('.robotics-danger-row');
-      expect(dangerRow).toBeTruthy();
-      expect(dangerRow.querySelector('button').textContent).toBe('Reset Results');
+      const dangerZone = root.querySelector('.robotics-danger-zone');
+      expect(dangerZone).toBeTruthy();
+      expect(dangerZone.querySelector('button').textContent).toBe('Reset Results');
+    });
+
+    it('lays out Add a Team, the Roster, and Tournament Settings as separate grid areas', () => {
+      const app = initRoboticsApp();
+      const root = setupFourTeams(app);
+      const layout = root.querySelector('.robotics-teams-layout');
+      expect(layout).toBeTruthy();
+
+      const areas = [...layout.children].map((card) => [
+        ['robotics-teams-add', 'robotics-teams-roster', 'robotics-teams-settings'].find((c) => card.classList.contains(c)),
+        card.querySelector('.robotics-card-title').textContent,
+      ]);
+      expect(areas).toEqual([
+        ['robotics-teams-add', 'Add a Team'],
+        ['robotics-teams-roster', 'Roster (4)'],
+        ['robotics-teams-settings', 'Tournament Settings'],
+      ]);
+      expect(layout.querySelector('.robotics-teams-roster').querySelectorAll('.robotics-team-row')).toHaveLength(4);
+    });
+
+    it('fences the destructive resets into a labeled Danger Zone, apart from Copy Roster', () => {
+      const app = initRoboticsApp();
+      const root = setupFourTeams(app);
+      const settings = root.querySelector('.robotics-teams-settings');
+      const zone = settings.querySelector('.robotics-danger-zone');
+      expect(zone.querySelector('.robotics-danger-label').textContent).toBe('Danger Zone');
+      expect([...zone.querySelectorAll('button')].map((b) => b.textContent)).toEqual(['Reset Results', 'Reset Everything / New Tournament']);
+      const copyRoster = [...settings.querySelectorAll('button')].find((b) => b.textContent === 'Copy Roster to Clipboard');
+      expect(copyRoster).toBeTruthy();
+      expect(zone.contains(copyRoster)).toBe(false);
     });
 
     it('marks a match complete and shows the completed badge', () => {
@@ -1054,6 +1084,30 @@ describe('initRoboticsApp', () => {
       expect(app.getState().elimination.bracket).toBeTruthy();
       root = document.getElementById('roboticsApp');
       expect(root.querySelector('.robotics-bracket')).toBeTruthy();
+    });
+
+    it('groups the setup cards into one grid with the bracket full-width beneath it', () => {
+      const app = initRoboticsApp();
+      setupFourTeams(app);
+      app.setActiveTab('finals');
+      let root = document.getElementById('roboticsApp');
+      const setupTitles = () => [...root.querySelectorAll('.robotics-finals-setup > .robotics-card > .robotics-card-title')].map((h) => h.textContent);
+      expect(setupTitles()).toEqual(['Form a Playoff Alliance', 'Playoff Alliances', 'Bracket Configuration']);
+
+      app.dispatch((s) => formPlayoffAlliance(s, s.teams[0].id, s.teams[1].id));
+      app.dispatch((s) => formPlayoffAlliance(s, s.teams[2].id, s.teams[3].id));
+      app.dispatch((s) => setBracketConfig(s, { bracketSize: 2, includeThirdPlace: false }));
+      app.dispatch((s) => autoFillSeedsFromStandings(s));
+      app.dispatch((s) => generateBracket(s));
+      root = document.getElementById('roboticsApp');
+      expect(setupTitles()).toEqual(['Form a Playoff Alliance', 'Playoff Alliances', 'Bracket Configuration', 'Seeds']);
+
+      const setup = root.querySelector('.robotics-finals-setup');
+      const bracket = root.querySelector('.robotics-bracket');
+      expect(setup.contains(bracket)).toBe(false);
+      expect(bracket.parentElement).toBe(setup.parentElement);
+      expect(setup.nextElementSibling).toBe(bracket);
+      expect([...bracket.querySelectorAll('.robotics-bracket-round.is-final h4')].map((h) => h.textContent)).toEqual(['Final']);
     });
 
     it('records an elimination result and offers Reveal Results (no Champion banner) once the final completes', () => {

@@ -208,8 +208,9 @@ function renderRegenerateMatchupsButton(state, dispatch) {
   return regenerateBtn;
 }
 
+/** Roster in a wide column; Add a Team and Tournament Settings beside it on wide screens, stacked around it on narrow ones. */
 export function renderTeamsTab(state, dispatch) {
-  const section = el('div', { className: 'robotics-section' });
+  const section = el('div', { className: 'robotics-teams-layout' });
 
   const locked = !canRegenerateMatchups(state);
   const lockHint = 'Locked — a Qualification Match is already complete. Use Reset Results or Reset Everything / New Tournament first.';
@@ -258,15 +259,15 @@ export function renderTeamsTab(state, dispatch) {
     addBtn.title = lockHint;
     addBtn.classList.add('is-locked');
   }
-  section.appendChild(el('div', { className: 'robotics-card' }, [
+  section.appendChild(el('div', { className: 'robotics-card robotics-teams-add' }, [
     el('h3', { className: 'robotics-card-title' }, ['Add a Team']),
     el('div', { className: 'robotics-form-row' }, [nameInput, membersInput, addBtn]),
   ]));
 
-  const list = el('div', { className: 'robotics-card' });
+  const list = el('div', { className: 'robotics-card robotics-teams-roster' });
   list.appendChild(el('h3', { className: 'robotics-card-title' }, [`Roster (${state.teams.length})`]));
   if (state.teams.length === 0) {
-    list.appendChild(el('p', { className: 'robotics-empty' }, ['No teams yet — add one above.']));
+    list.appendChild(el('p', { className: 'robotics-empty' }, ['No teams yet — add one with Add a Team.']));
   }
   state.teams.forEach((team) => {
     const nameInput = el('input', { type: 'text', className: 'robotics-team-name-input', value: team.name });
@@ -320,7 +321,7 @@ export function renderTeamsTab(state, dispatch) {
   });
   section.appendChild(list);
 
-  const config = el('div', { className: 'robotics-card' });
+  const config = el('div', { className: 'robotics-card robotics-teams-settings' });
   config.appendChild(el('h3', { className: 'robotics-card-title' }, ['Tournament Settings']));
   const matchesPerTeamInput = el('input', { type: 'number', value: state.qualification.matchesPerTeam });
   matchesPerTeamInput.addEventListener('change', () => {
@@ -369,12 +370,12 @@ export function renderTeamsTab(state, dispatch) {
     },
   }, ['Reset Everything / New Tournament']);
 
-  const dangerRow = el('div', { className: 'robotics-form-row robotics-danger-row' }, [
-    resetResultsBtn,
-    newTournamentBtn,
-    el('button', { className: 'robotics-btn robotics-btn-ghost', onClick: () => copyToClipboard(exportRosterMarkdown(state.teams), 'Roster copied to clipboard.') }, ['Copy Roster to Clipboard']),
-  ]);
-  config.appendChild(dangerRow);
+  config.appendChild(el('button', { className: 'robotics-btn robotics-btn-ghost', onClick: () => copyToClipboard(exportRosterMarkdown(state.teams), 'Roster copied to clipboard.') }, ['Copy Roster to Clipboard']));
+
+  config.appendChild(el('div', { className: 'robotics-danger-zone' }, [
+    el('h4', { className: 'robotics-danger-label' }, ['Danger Zone']),
+    el('div', { className: 'robotics-form-row' }, [resetResultsBtn, newTournamentBtn]),
+  ]));
 
   section.appendChild(config);
   return section;
@@ -695,12 +696,17 @@ function renderBracket(state, dispatch) {
   }
 
   const finalMatch = bracket.matches.find((m) => m.round === 'final');
-  container.appendChild(renderBracketRoundColumn(state, dispatch, [finalMatch], 'Final'));
+  const finalCol = renderBracketRoundColumn(state, dispatch, [finalMatch], 'Final');
+  finalCol.classList.add('is-final');
+  container.appendChild(finalCol);
   return container;
 }
 
+/** Setup cards share one auto-fit row on wide screens; the bracket spans the full width beneath them. */
 export function renderFinalsTab(state, dispatch, { setActiveTab }) {
   const section = el('div', { className: 'robotics-section' });
+  const setup = el('div', { className: 'robotics-finals-setup' });
+  section.appendChild(setup);
 
   const usedTeamIds = new Set(state.elimination.alliances.flatMap((a) => a.teamIds));
   const available = state.teams.filter((t) => !usedTeamIds.has(t.id));
@@ -737,7 +743,7 @@ export function renderFinalsTab(state, dispatch, { setActiveTab }) {
     }, ['Form Alliance']),
   ]);
   selectionCard.appendChild(selectionRow);
-  section.appendChild(selectionCard);
+  setup.appendChild(selectionCard);
 
   const alliancesCard = el('div', { className: 'robotics-card' });
   alliancesCard.appendChild(el('h3', { className: 'robotics-card-title' }, ['Playoff Alliances']));
@@ -750,7 +756,7 @@ export function renderFinalsTab(state, dispatch, { setActiveTab }) {
       el('button', { className: 'robotics-btn robotics-btn-danger robotics-btn-sm', onClick: () => dispatch((s) => removePlayoffAlliance(s, alliance.id)) }, ['Remove']),
     ]));
   });
-  section.appendChild(alliancesCard);
+  setup.appendChild(alliancesCard);
 
   const bracketConfigCard = el('div', { className: 'robotics-card robotics-settings-grid' });
   bracketConfigCard.appendChild(el('h3', { className: 'robotics-card-title' }, ['Bracket Configuration']));
@@ -763,7 +769,7 @@ export function renderFinalsTab(state, dispatch, { setActiveTab }) {
     className: 'robotics-btn robotics-btn-secondary',
     onClick: () => dispatch((s) => setBracketConfig(s, { bracketSize: parseInt(sizeInput.value, 10) || null, includeThirdPlace: thirdPlaceInput.checked })),
   }, ['Save Bracket Config']));
-  section.appendChild(bracketConfigCard);
+  setup.appendChild(bracketConfigCard);
 
   if (state.elimination.bracketSize) {
     const seedsCard = el('div', { className: 'robotics-card robotics-settings-grid' });
@@ -784,7 +790,7 @@ export function renderFinalsTab(state, dispatch, { setActiveTab }) {
       el('button', { className: 'robotics-btn robotics-btn-primary', onClick: () => dispatch((s) => generateBracket(s)) }, ['Generate Bracket']),
     ]);
     seedsCard.appendChild(seedActions);
-    section.appendChild(seedsCard);
+    setup.appendChild(seedsCard);
   }
 
   if (state.elimination.bracket) {
