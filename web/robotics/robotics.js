@@ -433,7 +433,12 @@ function renderMatchRow(state, dispatch, entry, { currentIndex, upNextIndex }) {
     row.appendChild(el('span', { className: 'robotics-match-field' }, [`Field ${field}`]));
   }
 
-  row.appendChild(el('span', { className: `robotics-current-label${isCurrent ? '' : ' is-placeholder'}` }, ['Current Match']));
+  const dotProps = { className: `robotics-current-dot${isCurrent ? '' : ' is-placeholder'}` };
+  if (isCurrent) {
+    dotProps.role = 'img';
+    dotProps['aria-label'] = 'Current Match';
+  }
+  row.appendChild(el('span', dotProps));
 
   const scores = renderQualificationScoreInputs(dispatch, match, qualIndex);
   const { scoreA, scoreB } = scores;

@@ -994,29 +994,29 @@ body {
 .robotics-match-grid {
   --match-col-time: 6.5rem;
   --match-col-field: 4.5rem;
-  --match-col-label: 7.5rem;
+  --match-col-indicator: 1.5rem;
   --match-col-score: 4.5rem;
   --match-col-actions: 14rem;
   display: grid;
   grid-template-columns:
-    var(--match-col-time) var(--match-col-label)
+    var(--match-col-time) var(--match-col-indicator)
     minmax(0, 1fr) var(--match-col-score) var(--match-col-score) minmax(0, 1fr)
     var(--match-col-actions);
-  grid-template-areas: "time label red red-score blue-score blue actions";
+  grid-template-areas: "time indicator red red-score blue-score blue actions";
   gap: var(--spacing-sm);
 }
 
 .robotics-match-grid.has-field {
   grid-template-columns:
-    var(--match-col-time) var(--match-col-field) var(--match-col-label)
+    var(--match-col-time) var(--match-col-field) var(--match-col-indicator)
     minmax(0, 1fr) var(--match-col-score) var(--match-col-score) minmax(0, 1fr)
     var(--match-col-actions);
-  grid-template-areas: "time field label red red-score blue-score blue actions";
+  grid-template-areas: "time field indicator red red-score blue-score blue actions";
 }
 
 .robotics-match-grid > .robotics-match-time { grid-area: time; }
 .robotics-match-grid > .robotics-match-field { grid-area: field; }
-.robotics-match-grid > .robotics-current-label { grid-area: label; justify-self: start; }
+.robotics-match-grid > .robotics-current-dot { grid-area: indicator; justify-self: center; }
 .robotics-match-grid > .robotics-match-alliance.is-red { grid-area: red; }
 .robotics-match-grid > .robotics-match-alliance.is-blue { grid-area: blue; }
 .robotics-match-grid > .robotics-score-input.is-red { grid-area: red-score; }
@@ -1069,16 +1069,15 @@ body {
   white-space: nowrap;
 }
 
-.robotics-current-label {
-  padding: 2px var(--spacing-sm);
-  border-radius: var(--radius-lg);
+/* A dot, not a pill: the row's own is-current border/glow already carries most of
+   the "this one's live" signal, so the indicator only needs to be visible at a
+   glance across a room, not read as text. */
+.robotics-current-dot {
+  width: 0.85rem;
+  height: 0.85rem;
+  border-radius: 50%;
   background-color: var(--arena-live);
-  color: var(--arena-bg);
-  font-size: 0.7rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  white-space: nowrap;
+  box-shadow: var(--arena-glow);
 }
 
 .robotics-match-alliance {
@@ -1574,7 +1573,7 @@ body {
   opacity: 0.55;
 }
 
-.robotics-current-label.is-placeholder {
+.robotics-current-dot.is-placeholder {
   visibility: hidden;
 }
 
@@ -1676,19 +1675,19 @@ body {
 @container (max-width: 66rem) {
   .robotics-match-grid {
     grid-template-columns:
-      var(--match-col-time) var(--match-col-label)
+      var(--match-col-time) var(--match-col-indicator)
       minmax(0, 1fr) var(--match-col-score) var(--match-col-score) minmax(0, 1fr);
     grid-template-areas:
-      "time label red red-score blue-score blue"
+      "time indicator red red-score blue-score blue"
       "actions actions actions actions actions actions";
   }
 
   .robotics-match-grid.has-field {
     grid-template-columns:
-      var(--match-col-time) var(--match-col-field) var(--match-col-label)
+      var(--match-col-time) var(--match-col-field) var(--match-col-indicator)
       minmax(0, 1fr) var(--match-col-score) var(--match-col-score) minmax(0, 1fr);
     grid-template-areas:
-      "time field label red red-score blue-score blue"
+      "time field indicator red red-score blue-score blue"
       "actions actions actions actions actions actions actions";
   }
 }
@@ -1699,7 +1698,7 @@ body {
   .robotics-match-grid.has-field {
     grid-template-columns: auto auto minmax(0, 1fr) var(--match-col-score);
     grid-template-areas:
-      "time label label label"
+      "time indicator indicator indicator"
       "red red red red-score"
       "blue blue blue blue-score"
       "actions actions actions actions";
@@ -1707,7 +1706,7 @@ body {
 
   .robotics-match-grid.has-field {
     grid-template-areas:
-      "time field label label"
+      "time field indicator indicator"
       "red red red red-score"
       "blue blue blue blue-score"
       "actions actions actions actions";

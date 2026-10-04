@@ -536,7 +536,7 @@ describe('initRoboticsApp', () => {
       expect(freshScoreInputs[1].value).toBe('10');
     });
 
-    it('shows an explicit text label on the current match row', () => {
+    it('marks the current match row with a compact dot indicator, not a wide text label', () => {
       const app = initRoboticsApp();
       setupFourTeams(app);
       app.dispatch((s) => setMatchesPerTeam(s, 3));
@@ -544,7 +544,15 @@ describe('initRoboticsApp', () => {
       app.setActiveTab('schedule');
       const root = document.getElementById('roboticsApp');
       const currentRow = root.querySelector('.robotics-match-row.is-current');
-      expect(currentRow.querySelector('.robotics-current-label').textContent).toBe('Current Match');
+      const dot = currentRow.querySelector('.robotics-current-dot');
+      expect(dot.classList.contains('is-placeholder')).toBe(false);
+      expect(dot.getAttribute('aria-label')).toBe('Current Match');
+      expect(dot.textContent).toBe('');
+
+      const otherRow = [...root.querySelectorAll('.robotics-match-row')].find((r) => r !== currentRow);
+      const otherDot = otherRow.querySelector('.robotics-current-dot');
+      expect(otherDot.classList.contains('is-placeholder')).toBe(true);
+      expect(otherDot.getAttribute('aria-label')).toBeNull();
     });
 
     it('reorders not-yet-complete matches with the down button, which becomes the new current match', () => {
@@ -601,7 +609,7 @@ describe('initRoboticsApp', () => {
       expect(root.querySelector('.robotics-match-row').classList.contains('has-field')).toBe(true);
     });
 
-    it('lays each match row out as flat grid cells: time, label, red side, red score, blue score, blue side, actions', () => {
+    it('lays each match row out as flat grid cells: time, indicator dot, red side, red score, blue score, blue side, actions', () => {
       const app = initRoboticsApp();
       setupFourTeams(app);
       app.dispatch((s) => setMatchesPerTeam(s, 3));
@@ -613,7 +621,7 @@ describe('initRoboticsApp', () => {
       const cells = [...row.children].map((c) => c.className);
       expect(cells).toEqual([
         'robotics-match-time',
-        'robotics-current-label',
+        'robotics-current-dot',
         'robotics-match-alliance is-red',
         'robotics-score-input is-red',
         'robotics-score-input is-blue',
