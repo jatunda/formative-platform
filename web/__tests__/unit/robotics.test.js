@@ -33,6 +33,13 @@ function clickButtonWithText(root, text) {
   btn.click();
 }
 
+// dispatch() now defers its DOM rebuild past the current event (see robotics.js) so that a
+// click isn't swallowed by a same-tick rebuild triggered by another field's blur/change commit.
+// Tests that inspect the DOM after a dispatch-triggering interaction must await this first.
+function flushRender() {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
 async function clickDialogButton(root, text) {
   const dialog = root.querySelector('.robotics-confirm-dialog');
   const btn = dialog && [...dialog.querySelectorAll('button')].find((b) => b.textContent === text);
@@ -68,13 +75,14 @@ describe('initRoboticsApp', () => {
     expect(active.textContent).toBe('Teams');
   });
 
-  it('adds and removes a team through the form', () => {
+  it('adds and removes a team through the form', async () => {
     const app = initRoboticsApp();
     const root = document.getElementById('roboticsApp');
     addTeamViaForm(root, 'Alpha', 'Ann, Al');
     expect(app.getState().teams).toHaveLength(1);
     expect(app.getState().teams[0].members).toEqual(['Ann', 'Al']);
 
+    await flushRender();
     clickButtonWithText(root, 'Remove');
     expect(app.getState().teams).toHaveLength(0);
   });
@@ -107,15 +115,16 @@ describe('initRoboticsApp', () => {
       expect(app.getState().teams[0].name).toBe('Alpha');
     });
 
-    it('adds the team on Enter in the Team name field and keeps focus in the Team name field', () => {
+    it('adds the team on Enter in the Team name field and keeps focus in the Team name field', async () => {
       const app = initRoboticsApp();
       const root = document.getElementById('roboticsApp');
       const { nameInput } = getFormInputs(root);
       nameInput.value = 'Alpha';
       nameInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', cancelable: true }));
       expect(app.getState().teams).toHaveLength(1);
-      const { nameInput: refreshedNameInput } = getFormInputs(root);
-      expect(document.activeElement).toBe(refreshedNameInput);
+      expect(document.activeElement).toBe(getFormInputs(root).nameInput);
+      await flushRender();
+      expect(document.activeElement).toBe(getFormInputs(root).nameInput);
     });
 
     it('adds the team on Enter in the Members field and returns focus to the Team name field', () => {
@@ -165,6 +174,7 @@ describe('initRoboticsApp', () => {
     const app = initRoboticsApp();
     const root = document.getElementById('roboticsApp');
     addTeamViaForm(root, 'Alpha', 'Ann');
+    await flushRender();
     clickButtonWithText(root, 'Copy Roster to Clipboard');
     expect(writeText).toHaveBeenCalledWith(expect.stringContaining('Alpha: Ann'));
     await Promise.resolve();
@@ -173,20 +183,22 @@ describe('initRoboticsApp', () => {
   });
 
   describe('inline roster editing', () => {
-    it('renames a team inline by committing the name input on change', () => {
+    it('renames a team inline by committing the name input on change', async () => {
       const app = initRoboticsApp();
       const root = document.getElementById('roboticsApp');
       addTeamViaForm(root, 'Alpha', 'Ann');
+      await flushRender();
       const nameInput = root.querySelector('.robotics-team-name-input');
       nameInput.value = 'Alpha Squad';
       nameInput.dispatchEvent(new Event('change'));
       expect(app.getState().teams[0].name).toBe('Alpha Squad');
     });
 
-    it('ignores a blank rename and reverts the input to the current name', () => {
+    it('ignores a blank rename and reverts the input to the current name', async () => {
       const app = initRoboticsApp();
       const root = document.getElementById('roboticsApp');
       addTeamViaForm(root, 'Alpha', 'Ann');
+      await flushRender();
       const nameInput = root.querySelector('.robotics-team-name-input');
       nameInput.value = '   ';
       nameInput.dispatchEvent(new Event('change'));
@@ -194,7 +206,7 @@ describe('initRoboticsApp', () => {
       expect(nameInput.value).toBe('Alpha');
     });
 
-    it('renaming a team preserves its id and any generated matches', () => {
+    it('renaming a team preserves its id and any generated matches', async () => {
       const app = initRoboticsApp();
       const root = document.getElementById('roboticsApp');
       ['Alpha', 'Bravo', 'Charlie', 'Delta'].forEach((name) => addTeamViaForm(root, name));
@@ -203,6 +215,7 @@ describe('initRoboticsApp', () => {
       const teamId = app.getState().teams[0].id;
       const matchCountBefore = app.getState().qualification.matches.length;
 
+      await flushRender();
       const nameInput = document.getElementById('roboticsApp').querySelector('.robotics-team-name-input');
       nameInput.value = 'Alpha Prime';
       nameInput.dispatchEvent(new Event('change'));
@@ -213,79 +226,175 @@ describe('initRoboticsApp', () => {
       expect(app.getState().qualification.matches[0].allianceA.concat(app.getState().qualification.matches[0].allianceB)).toContain(teamId);
     });
 
-    it('adds a member individually via the add-member field', () => {
+    it('adds a member individually via the add-member field', async () => {
       const app = initRoboticsApp();
       const root = document.getElementById('roboticsApp');
       addTeamViaForm(root, 'Alpha', 'Ann');
+      await flushRender();
       const addInput = root.querySelector('.robotics-member-add-input');
       addInput.value = 'Bea';
       clickButtonWithText(root, 'Add member');
       expect(app.getState().teams[0].members).toEqual(['Ann', 'Bea']);
     });
 
-    it('ignores adding a blank member', () => {
+    it('ignores adding a blank member', async () => {
       const app = initRoboticsApp();
       const root = document.getElementById('roboticsApp');
       addTeamViaForm(root, 'Alpha', 'Ann');
+      await flushRender();
       clickButtonWithText(root, 'Add member');
       expect(app.getState().teams[0].members).toEqual(['Ann']);
     });
 
-    it('adds a member by pressing Enter in the add-member field', () => {
+    it('adds a member by pressing Enter in the add-member field', async () => {
       const app = initRoboticsApp();
       const root = document.getElementById('roboticsApp');
       addTeamViaForm(root, 'Alpha', 'Ann');
+      await flushRender();
       const addInput = root.querySelector('.robotics-member-add-input');
       addInput.value = 'Bea';
       addInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', cancelable: true }));
       expect(app.getState().teams[0].members).toEqual(['Ann', 'Bea']);
     });
 
-    it('does not add a member on a non-Enter keydown', () => {
+    it('does not add a member on a non-Enter keydown', async () => {
       const app = initRoboticsApp();
       const root = document.getElementById('roboticsApp');
       addTeamViaForm(root, 'Alpha', 'Ann');
+      await flushRender();
       const addInput = root.querySelector('.robotics-member-add-input');
       addInput.value = 'Bea';
       addInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', cancelable: true }));
       expect(app.getState().teams[0].members).toEqual(['Ann']);
     });
 
-    it('adds a member on Enter and keeps focus in that same team\'s add-member field', () => {
+    it('adds a member on Enter and keeps focus in that same team\'s add-member field', async () => {
       const app = initRoboticsApp();
       const root = document.getElementById('roboticsApp');
       addTeamViaForm(root, 'Alpha', 'Ann');
+      await flushRender();
       const addInput = root.querySelector('.robotics-member-add-input');
       addInput.value = 'Bea';
       addInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', cancelable: true }));
       expect(app.getState().teams[0].members).toEqual(['Ann', 'Bea']);
-      const refreshedAddInput = root.querySelector('.robotics-member-add-input');
-      expect(document.activeElement).toBe(refreshedAddInput);
+      expect(document.activeElement).toBe(root.querySelector('.robotics-member-add-input'));
+      await flushRender();
+      expect(document.activeElement).toBe(root.querySelector('.robotics-member-add-input'));
     });
 
-    it('adding a member to one team does not leave focus on another team\'s add-member field', () => {
+    it('adding a member to one team does not leave focus on another team\'s add-member field', async () => {
+      const app = initRoboticsApp();
+      const root = document.getElementById('roboticsApp');
+      addTeamViaForm(root, 'Alpha', 'Ann');
+      await flushRender();
+      addTeamViaForm(root, 'Bravo', 'Bob');
+      await flushRender();
+      const teamIds = app.getState().teams.map((t) => t.id);
+      const bravoSelector = `.robotics-member-add-input[data-team-id="${teamIds[1]}"]`;
+      const alphaSelector = `.robotics-member-add-input[data-team-id="${teamIds[0]}"]`;
+      const bravoInput = root.querySelector(bravoSelector);
+      bravoInput.value = 'Bea';
+      bravoInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', cancelable: true }));
+      expect(app.getState().teams[1].members).toEqual(['Bob', 'Bea']);
+      expect(document.activeElement).toBe(root.querySelector(bravoSelector));
+      expect(document.activeElement).not.toBe(root.querySelector(alphaSelector));
+      await flushRender();
+      expect(document.activeElement).toBe(root.querySelector(bravoSelector));
+      expect(document.activeElement).not.toBe(root.querySelector(alphaSelector));
+    });
+
+    it('removes an individual member without affecting the rest of the roster', async () => {
+      const app = initRoboticsApp();
+      const root = document.getElementById('roboticsApp');
+      addTeamViaForm(root, 'Alpha', 'Ann, Al');
+      await flushRender();
+      const removeBtn = root.querySelector('.robotics-member-remove[aria-label="Remove Ann"]');
+      removeBtn.click();
+      expect(app.getState().teams[0].members).toEqual(['Al']);
+    });
+
+    it('does not refocus the row that shifted into a removed row\'s position', async () => {
+      const app = initRoboticsApp();
+      const root = document.getElementById('roboticsApp');
+      ['Alpha', 'Bravo', 'Charlie'].forEach((name) => addTeamViaForm(root, name));
+      await flushRender();
+      const removeButtons = () => [...root.querySelectorAll('.robotics-team-row')].map((row) => [...row.querySelectorAll('button')].find((b) => b.textContent === 'Remove'));
+      removeButtons()[0].focus();
+      removeButtons()[0].click();
+      await flushRender();
+      expect(app.getState().teams.map((t) => t.name)).toEqual(['Bravo', 'Charlie']);
+      // Bravo's row shifted into Alpha's old position; its Remove button must not inherit focus
+      // from Alpha's now-gone one, or an unaware next keypress would delete Bravo too.
+      expect(document.activeElement).not.toBe(removeButtons()[0]);
+    });
+  });
+
+  describe('deferred render (fixes the stale-click-on-rerender bug)', () => {
+    // Root cause (see robotics.js): a field's "change" event commits during the browser's
+    // blur-handling phase of a click, which runs before that same click's mouseup/click phase.
+    // A synchronous DOM rebuild there destroys the actual click target mid-interaction, so the
+    // click lands on a node that's already gone. These tests pin down the fix's two halves:
+    // the rebuild no longer happens inside the triggering event, and two actions queued close
+    // together (a field commit, then a different control's click) both still land.
+
+    it('does not tear down the DOM inside the event that committed a field edit', async () => {
+      const app = initRoboticsApp();
+      const root = document.getElementById('roboticsApp');
+      addTeamViaForm(root, 'Alpha', 'Ann');
+      await flushRender();
+      const nameInput = root.querySelector('.robotics-team-name-input');
+      const addTeamBtn = [...root.querySelectorAll('button')].find((b) => b.textContent === 'Add Team');
+
+      nameInput.value = 'Alpha Squad';
+      nameInput.dispatchEvent(new Event('change'));
+      // Synchronously, right after the commit: the old subtree (and the button a browser's
+      // in-flight click would be headed for) must still be attached, not yet replaced.
+      expect(document.body.contains(addTeamBtn)).toBe(true);
+      expect(document.body.contains(nameInput)).toBe(true);
+
+      await flushRender();
+      // Only now does the rebuild happen, replacing the old nodes.
+      expect(document.body.contains(addTeamBtn)).toBe(false);
+      expect(app.getState().teams[0].name).toBe('Alpha Squad');
+    });
+
+    it('commits an in-progress name edit and adds a different new team from one click', async () => {
+      const app = initRoboticsApp();
+      const root = document.getElementById('roboticsApp');
+      addTeamViaForm(root, 'Alpha', 'Ann');
+      await flushRender();
+      const nameInput = root.querySelector('.robotics-team-name-input');
+      const inputs = root.querySelectorAll('input');
+      const newNameInput = [...inputs].find((i) => i.placeholder === 'Team name');
+
+      // No await between these: the "change" commit and the "Add Team" click land in the
+      // same tick, before the rebuild that "change" just triggered has run.
+      nameInput.value = 'Alpha Squad';
+      nameInput.dispatchEvent(new Event('change'));
+      newNameInput.value = 'Bravo';
+      clickButtonWithText(root, 'Add Team');
+
+      expect(app.getState().teams.map((t) => t.name)).toEqual(['Alpha Squad', 'Bravo']);
+    });
+
+    it('focuses a different, already-rendered field immediately after a sibling field commits, and keeps focus there once the rebuild runs', async () => {
       const app = initRoboticsApp();
       const root = document.getElementById('roboticsApp');
       addTeamViaForm(root, 'Alpha', 'Ann');
       addTeamViaForm(root, 'Bravo', 'Bob');
-      const teamIds = app.getState().teams.map((t) => t.id);
-      const bravoInput = root.querySelector(`.robotics-member-add-input[data-team-id="${teamIds[1]}"]`);
-      bravoInput.value = 'Bea';
-      bravoInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', cancelable: true }));
-      expect(app.getState().teams[1].members).toEqual(['Bob', 'Bea']);
-      const refreshedBravoInput = root.querySelector(`.robotics-member-add-input[data-team-id="${teamIds[1]}"]`);
-      const refreshedAlphaInput = root.querySelector(`.robotics-member-add-input[data-team-id="${teamIds[0]}"]`);
-      expect(document.activeElement).toBe(refreshedBravoInput);
-      expect(document.activeElement).not.toBe(refreshedAlphaInput);
-    });
+      await flushRender();
+      const [alphaInput, bravoInput] = root.querySelectorAll('.robotics-team-name-input');
 
-    it('removes an individual member without affecting the rest of the roster', () => {
-      const app = initRoboticsApp();
-      const root = document.getElementById('roboticsApp');
-      addTeamViaForm(root, 'Alpha', 'Ann, Al');
-      const removeBtn = root.querySelector('.robotics-member-remove[aria-label="Remove Ann"]');
-      removeBtn.click();
-      expect(app.getState().teams[0].members).toEqual(['Al']);
+      alphaInput.value = 'Alpha Squad';
+      alphaInput.dispatchEvent(new Event('change'));
+      // What a browser's mousedown-driven focus shift would do, landing before the rebuild.
+      bravoInput.focus();
+      expect(document.activeElement).toBe(bravoInput);
+
+      await flushRender();
+      const [, refreshedBravoInput] = root.querySelectorAll('.robotics-team-name-input');
+      expect(document.activeElement).toBe(refreshedBravoInput);
+      expect(app.getState().teams[0].name).toBe('Alpha Squad');
     });
   });
 
@@ -303,6 +412,7 @@ describe('initRoboticsApp', () => {
       // directly dispatch config + regenerate to keep this test focused on the lock behavior
       app.dispatch((s) => setMatchesPerTeam(s, 2));
       app.dispatch((s) => regenerateMatchups(s));
+      await flushRender();
       root = document.getElementById('roboticsApp');
       expect([...root.querySelectorAll('button')].find((b) => b.textContent === 'Regenerate Matchups').getAttribute('aria-disabled')).toBeNull();
 
@@ -322,12 +432,13 @@ describe('initRoboticsApp', () => {
       clickButtonWithText(root, 'Reset Results');
       root = document.getElementById('roboticsApp');
       await clickDialogButton(root, 'Reset Results');
+      await flushRender();
       root = document.getElementById('roboticsApp');
       expect([...root.querySelectorAll('button')].find((b) => b.textContent === 'Generate Matchups').getAttribute('aria-disabled')).toBeNull();
       expect(app.getState().teams).toHaveLength(4);
     });
 
-    it('labels the button "Generate Matchups" before any matchups exist, and "Regenerate Matchups" after', () => {
+    it('labels the button "Generate Matchups" before any matchups exist, and "Regenerate Matchups" after', async () => {
       const app = initRoboticsApp();
       let root = setupFourTeams(app);
       expect([...root.querySelectorAll('button')].some((b) => b.textContent === 'Generate Matchups')).toBe(true);
@@ -335,6 +446,7 @@ describe('initRoboticsApp', () => {
 
       app.dispatch((s) => setMatchesPerTeam(s, 2));
       app.dispatch((s) => regenerateMatchups(s));
+      await flushRender();
       root = document.getElementById('roboticsApp');
       expect([...root.querySelectorAll('button')].some((b) => b.textContent === 'Generate Matchups')).toBe(false);
       expect([...root.querySelectorAll('button')].some((b) => b.textContent === 'Regenerate Matchups')).toBe(true);
@@ -416,9 +528,10 @@ describe('initRoboticsApp', () => {
       expect(dangerZone.querySelector('button').textContent).toBe('Reset Results');
     });
 
-    it('lays out Add a Team, the Roster, and Tournament Settings as separate grid areas', () => {
+    it('lays out Add a Team, the Roster, and Tournament Settings as separate grid areas', async () => {
       const app = initRoboticsApp();
       const root = setupFourTeams(app);
+      await flushRender();
       const layout = root.querySelector('.robotics-teams-layout');
       expect(layout).toBeTruthy();
 
@@ -446,7 +559,7 @@ describe('initRoboticsApp', () => {
       expect(zone.contains(copyRoster)).toBe(false);
     });
 
-    it('marks a match complete and shows the completed badge', () => {
+    it('marks a match complete and shows the completed badge', async () => {
       const app = initRoboticsApp();
       setupFourTeams(app);
       app.dispatch((s) => setMatchesPerTeam(s, 2));
@@ -457,12 +570,13 @@ describe('initRoboticsApp', () => {
       scoreInputs[0].value = '50';
       scoreInputs[1].value = '10';
       clickButtonWithText(root, 'Mark Complete');
+      await flushRender();
       root = document.getElementById('roboticsApp');
       expect(root.querySelector('.robotics-complete-badge')).toBeTruthy();
       expect(app.getState().qualification.matches[0].completed).toBe(true);
     });
 
-    it('marks the winning side with is-winner once a match completes with a decisive score', () => {
+    it('marks the winning side with is-winner once a match completes with a decisive score', async () => {
       const app = initRoboticsApp();
       setupFourTeams(app);
       app.dispatch((s) => setMatchesPerTeam(s, 2));
@@ -474,6 +588,7 @@ describe('initRoboticsApp', () => {
       scoreInputs[1].value = '10';
       clickButtonWithText(root, 'Mark Complete');
 
+      await flushRender();
       root = document.getElementById('roboticsApp');
       const alliances = root.querySelectorAll('.robotics-match-row .robotics-match-alliance');
       expect(alliances[0].classList.contains('is-winner')).toBe(true);
@@ -512,7 +627,7 @@ describe('initRoboticsApp', () => {
       expect(app.getState().qualification.matches[0].noShow[firstTeamId]).toBe(true);
     });
 
-    it('marks a clicked no-show team with the is-no-show class, and clears it on a second click', () => {
+    it('marks a clicked no-show team with the is-no-show class, and clears it on a second click', async () => {
       const app = initRoboticsApp();
       setupFourTeams(app);
       app.dispatch((s) => setMatchesPerTeam(s, 2));
@@ -522,11 +637,13 @@ describe('initRoboticsApp', () => {
       let toggle = root.querySelector('.robotics-match-row .robotics-team-toggle');
       toggle.click();
 
+      await flushRender();
       root = document.getElementById('roboticsApp');
       toggle = root.querySelector('.robotics-match-row .robotics-team-toggle');
       expect(toggle.classList.contains('is-no-show')).toBe(true);
 
       toggle.click();
+      await flushRender();
       root = document.getElementById('roboticsApp');
       toggle = root.querySelector('.robotics-match-row .robotics-team-toggle');
       expect(toggle.classList.contains('is-no-show')).toBe(false);
@@ -613,7 +730,7 @@ describe('initRoboticsApp', () => {
       expect(currentRows[0]).toBe(root.querySelectorAll('.robotics-match-row')[0]);
     });
 
-    it('disables the up button on the topmost match and does not render reorder buttons on a completed match', () => {
+    it('disables the up button on the topmost match and does not render reorder buttons on a completed match', async () => {
       const app = initRoboticsApp();
       setupFourTeams(app);
       app.dispatch((s) => setMatchesPerTeam(s, 3));
@@ -629,6 +746,7 @@ describe('initRoboticsApp', () => {
       scoreInputs[1].value = '10';
       clickButtonWithText(root, 'Mark Complete');
 
+      await flushRender();
       root = document.getElementById('roboticsApp');
       const completedRow = root.querySelectorAll('.robotics-match-row')[0];
       expect([...completedRow.querySelectorAll('button')].some((b) => b.textContent === '↑' || b.textContent === '↓')).toBe(false);
@@ -873,6 +991,7 @@ describe('initRoboticsApp', () => {
     it('shows a confirmation dialog recommending even matchesPerTeam values before generating uneven matchups', async () => {
       const app = initRoboticsApp();
       const root = setupFiveTeams(app); // 5 teams * default 3 matchesPerTeam = 15, not divisible by 4
+      await flushRender();
       clickButtonWithText(root, 'Generate Matchups');
       expect(app.getState().qualification.matches).toHaveLength(0);
       const dialog = document.querySelector('.robotics-confirm-dialog');
@@ -886,6 +1005,7 @@ describe('initRoboticsApp', () => {
     it('proceeds with the uneven matchups once the teacher confirms the dialog', async () => {
       const app = initRoboticsApp();
       const root = setupFiveTeams(app);
+      await flushRender();
       clickButtonWithText(root, 'Generate Matchups');
       await clickDialogButton(document.getElementById('roboticsApp'), 'Generate Anyway');
       expect(app.getState().qualification.matches.length).toBeGreaterThan(0);
@@ -1049,7 +1169,7 @@ describe('initRoboticsApp', () => {
       expect(bravo.querySelector('.robotics-now-playing-members')).toBeNull();
     });
 
-    it('shows the Match Time ("--" before a Start Time is set) and the Field only when more than one runs', () => {
+    it('shows the Match Time ("--" before a Start Time is set) and the Field only when more than one runs', async () => {
       const app = initRoboticsApp();
       openSchedule(app, 3);
       expect(card().querySelector('.robotics-now-playing-time').textContent).toBe('--');
@@ -1057,12 +1177,13 @@ describe('initRoboticsApp', () => {
 
       const start = new Date(2026, 9, 3, 14, 5).getTime();
       app.dispatch((s) => setTimelineConfig(s, { startTime: start, fieldCount: 2 }));
+      await flushRender();
       expect(card().querySelector('.robotics-now-playing-time').textContent)
         .toBe(new Date(start).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }));
       expect(card().querySelector('.robotics-now-playing-field').textContent).toBe('Field 1');
     });
 
-    it('keeps draft scores and No-Shows in sync with the Current Match row', () => {
+    it('keeps draft scores and No-Shows in sync with the Current Match row', async () => {
       const app = initRoboticsApp();
       openSchedule(app, 3);
       const [cardScoreA] = card().querySelectorAll('.robotics-score-input');
@@ -1070,6 +1191,7 @@ describe('initRoboticsApp', () => {
       cardScoreA.dispatchEvent(new Event('change'));
       card().querySelectorAll('.robotics-score-input')[1].value = '7';
       card().querySelectorAll('.robotics-score-input')[1].dispatchEvent(new Event('change'));
+      await flushRender();
 
       const rowInputs = document.querySelector('.robotics-match-row.is-current').querySelectorAll('.robotics-score-input');
       expect([rowInputs[0].value, rowInputs[1].value]).toEqual(['42', '7']);
@@ -1077,43 +1199,49 @@ describe('initRoboticsApp', () => {
       // ...and the other way: an edit in the row shows up in the card.
       rowInputs[0].value = '50';
       rowInputs[0].dispatchEvent(new Event('change'));
+      await flushRender();
       expect(card().querySelectorAll('.robotics-score-input')[0].value).toBe('50');
 
       const match = app.getState().qualification.matches[0];
       card().querySelector('.robotics-now-playing-team-name').click();
+      await flushRender();
       expect(app.getState().qualification.matches[0].noShow[match.allianceA[0]]).toBe(true);
       expect(card().querySelector('.robotics-now-playing-team-name').classList.contains('is-no-show')).toBe(true);
       expect(card().querySelector('.robotics-now-playing-team-name').title).toBe('Click to mark present');
       expect(document.querySelector('.robotics-match-row.is-current .robotics-team-toggle').classList.contains('is-no-show')).toBe(true);
     });
 
-    it('Mark Complete records the result and moves the card on to the next match', () => {
+    it('Mark Complete records the result and moves the card on to the next match', async () => {
       const app = initRoboticsApp();
       openSchedule(app, 3);
       const [scoreA, scoreB] = card().querySelectorAll('.robotics-score-input');
       scoreA.value = '30';
       scoreB.value = '20';
       card().querySelector('.robotics-now-playing-complete').click();
+      await flushRender();
       const [first, second] = app.getState().qualification.matches;
       expect(first).toMatchObject({ completed: true, scoreA: 30, scoreB: 20 });
       const redNames = [...card().querySelectorAll('.robotics-now-playing-side.is-red .robotics-now-playing-team-name')].map((n) => n.textContent);
       expect(redNames).toEqual(names(app.getState(), second.allianceA));
     });
 
-    it('auto-scrolls the Current Match row into view when Mark Complete advances it, but not on a draft score edit', () => {
+    it('auto-scrolls the Current Match row into view once Mark Complete advances it, but not on a draft score edit', async () => {
       const app = initRoboticsApp();
       openSchedule(app, 3);
       const scrollIntoView = vi.fn();
       Element.prototype.scrollIntoView = scrollIntoView;
+      const nextTick = () => new Promise((resolve) => setTimeout(resolve, 0));
 
       const [scoreA, scoreB] = card().querySelectorAll('.robotics-score-input');
       scoreA.value = '10';
       scoreA.dispatchEvent(new Event('change'));
       scoreB.value = '0';
       scoreB.dispatchEvent(new Event('change'));
+      await nextTick();
       expect(scrollIntoView).not.toHaveBeenCalled();
 
       card().querySelector('.robotics-now-playing-complete').click();
+      await nextTick();
 
       expect(scrollIntoView).toHaveBeenCalledTimes(1);
       expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest' });
@@ -1122,14 +1250,16 @@ describe('initRoboticsApp', () => {
       delete Element.prototype.scrollIntoView;
     });
 
-    it('does not auto-scroll when the Current Match changes while on a different tab', () => {
+    it('does not auto-scroll when the Current Match changes while on a different tab', async () => {
       const app = initRoboticsApp();
       openSchedule(app, 1);
       const scrollIntoView = vi.fn();
       Element.prototype.scrollIntoView = scrollIntoView;
+      const nextTick = () => new Promise((resolve) => setTimeout(resolve, 0));
 
       app.setActiveTab('teams');
       app.dispatch((s) => recordQualificationResult(s, 0, { scoreA: 1, scoreB: 0 }));
+      await nextTick();
       expect(scrollIntoView).not.toHaveBeenCalled();
 
       delete Element.prototype.scrollIntoView;
@@ -1155,10 +1285,11 @@ describe('initRoboticsApp', () => {
       expect(document.querySelector('.robotics-up-next')).toBeNull();
     });
 
-    it('says the Qualification Round is complete once every match is, with a button on to Finals', () => {
+    it('says the Qualification Round is complete once every match is, with a button on to Finals', async () => {
       const app = initRoboticsApp();
       openSchedule(app, 1);
       app.dispatch((s) => recordQualificationResult(s, 0, { scoreA: 1, scoreB: 0 }));
+      await flushRender();
       expect(card().classList.contains('is-finished')).toBe(true);
       expect(card().querySelector('.robotics-now-playing-message').textContent).toBe('Qualification Round complete');
       expect(card().querySelector('.robotics-score-input')).toBeNull();
@@ -1186,7 +1317,7 @@ describe('initRoboticsApp', () => {
       app.setActiveTab('schedule');
       return app;
     }
-    const toggle = () => document.querySelector('.robotics-timeline-toggle');
+    const toggle = () => document.querySelector('.robotics-timeline .robotics-accordion-toggle');
     const panel = () => document.getElementById(toggle().getAttribute('aria-controls'));
 
     it('is collapsed by default into a one-line summary of the current configuration', () => {
@@ -1196,16 +1327,17 @@ describe('initRoboticsApp', () => {
       expect(toggle().parentElement.tagName).toBe('H3');
       expect(toggle().getAttribute('aria-expanded')).toBe('false');
       expect(panel().hidden).toBe(true);
-      expect(document.querySelector('.robotics-timeline-summary').textContent)
+      expect(document.querySelector('.robotics-timeline .robotics-accordion-summary').textContent)
         .toBe('Forward · no start time · 4 + 1 min · 1 field');
     });
 
-    it('summarises the applied start time with a projected end time', () => {
+    it('summarises the applied start time with a projected end time', async () => {
       const app = openScheduleWithMatches();
       const start = new Date();
       start.setHours(13, 0, 0, 0);
       app.dispatch((s) => setTimelineConfig(s, { startTime: start.getTime(), fieldCount: 2 }));
-      const summary = document.querySelector('.robotics-timeline-summary').textContent;
+      await flushRender();
+      const summary = document.querySelector('.robotics-timeline .robotics-accordion-summary').textContent;
       expect(summary).toMatch(/^Forward · starts .+ · 4 \+ 1 min · 2 fields · ends ~.+$/);
     });
 
@@ -1314,7 +1446,7 @@ describe('initRoboticsApp', () => {
       ['Alpha', 'Bravo', 'Charlie', 'Delta'].forEach((name) => addTeamViaForm(root, name));
     }
 
-    it('forms and removes a playoff alliance', () => {
+    it('forms and removes a playoff alliance', async () => {
       const app = initRoboticsApp();
       setupFourTeams(app);
       app.setActiveTab('finals');
@@ -1322,6 +1454,7 @@ describe('initRoboticsApp', () => {
       clickButtonWithText(root, 'Form Alliance');
       expect(app.getState().elimination.alliances).toHaveLength(1);
 
+      await flushRender();
       root = document.getElementById('roboticsApp');
       clickButtonWithText(root, 'Remove');
       expect(app.getState().elimination.alliances).toHaveLength(0);
@@ -1360,12 +1493,13 @@ describe('initRoboticsApp', () => {
       expect(app.getState().elimination.alliances).toHaveLength(0);
     });
 
-    it('configures the bracket, assigns seeds, and generates it', () => {
+    it('configures the bracket, assigns seeds, and generates it', async () => {
       const app = initRoboticsApp();
       setupFourTeams(app);
       app.setActiveTab('finals');
       let root = document.getElementById('roboticsApp');
       clickButtonWithText(root, 'Form Alliance'); // Alpha+Bravo
+      await flushRender();
       root = document.getElementById('roboticsApp');
       clickButtonWithText(root, 'Form Alliance'); // Charlie+Delta
       expect(app.getState().elimination.alliances).toHaveLength(2);
@@ -1375,31 +1509,37 @@ describe('initRoboticsApp', () => {
       sizeInput.value = '2';
       clickButtonWithText(root, 'Save Bracket Config');
 
+      await flushRender();
       root = document.getElementById('roboticsApp');
       clickButtonWithText(root, 'Auto-fill Seeds from Standings');
       root = document.getElementById('roboticsApp');
       clickButtonWithText(root, 'Generate Bracket');
 
       expect(app.getState().elimination.bracket).toBeTruthy();
+      await flushRender();
       root = document.getElementById('roboticsApp');
       expect(root.querySelector('.robotics-bracket')).toBeTruthy();
     });
 
-    it('groups the setup cards into one grid with the bracket full-width beneath it', () => {
+    it('groups the setup cards into one collapsible accordion with the bracket full-width beneath it', async () => {
       const app = initRoboticsApp();
       setupFourTeams(app);
       app.setActiveTab('finals');
       let root = document.getElementById('roboticsApp');
-      const setupTitles = () => [...root.querySelectorAll('.robotics-finals-setup > .robotics-card > .robotics-card-title')].map((h) => h.textContent);
-      expect(setupTitles()).toEqual(['Form a Playoff Alliance', 'Playoff Alliances', 'Bracket Configuration']);
+      const panelTitles = () => [...root.querySelectorAll('.robotics-finals-accordion-panel > .robotics-card > .robotics-card-title')].map((h) => h.textContent);
+      expect(panelTitles()).toEqual(['Form a Playoff Alliance', 'Playoff Alliances', 'Bracket Configuration']);
 
       app.dispatch((s) => formPlayoffAlliance(s, s.teams[0].id, s.teams[1].id));
       app.dispatch((s) => formPlayoffAlliance(s, s.teams[2].id, s.teams[3].id));
       app.dispatch((s) => setBracketConfig(s, { bracketSize: 2, includeThirdPlace: false }));
       app.dispatch((s) => autoFillSeedsFromStandings(s));
       app.dispatch((s) => generateBracket(s));
+      await flushRender();
       root = document.getElementById('roboticsApp');
-      expect(setupTitles()).toEqual(['Form a Playoff Alliance', 'Playoff Alliances', 'Bracket Configuration', 'Seeds']);
+      expect(panelTitles()).toEqual(['Form a Playoff Alliance', 'Playoff Alliances', 'Bracket Configuration']);
+      // Seeds sits outside the accordion, sharing the setup row.
+      const seedsTitle = root.querySelector('.robotics-finals-setup > .robotics-card:not(.robotics-accordion) > .robotics-card-title');
+      expect(seedsTitle.textContent).toBe('Seeds');
 
       const setup = root.querySelector('.robotics-finals-setup');
       const bracket = root.querySelector('.robotics-bracket');
@@ -1409,28 +1549,134 @@ describe('initRoboticsApp', () => {
       expect([...bracket.querySelectorAll('.robotics-bracket-round.is-final h4')].map((h) => h.textContent)).toEqual(['Final']);
     });
 
-    it('records an elimination result and offers Reveal Results (no Champion banner) once the final completes', () => {
+    describe('collapsible Playoff Setup accordion', () => {
+      const toggle = () => document.querySelector('.robotics-finals-accordion .robotics-accordion-toggle');
+      const panel = () => document.getElementById(toggle().getAttribute('aria-controls'));
+
+      it('is collapsed by default into a one-line summary of alliances and bracket configuration', () => {
+        const app = initRoboticsApp();
+        setupFourTeams(app);
+        app.setActiveTab('finals');
+        expect(toggle().tagName).toBe('BUTTON');
+        expect(toggle().getAttribute('type')).toBe('button');
+        expect(toggle().parentElement.tagName).toBe('H3');
+        expect(toggle().getAttribute('aria-expanded')).toBe('false');
+        expect(panel().hidden).toBe(true);
+        expect(document.querySelector('.robotics-finals-accordion .robotics-accordion-summary').textContent)
+          .toBe('0 alliances · bracket size not set · with third-place match');
+      });
+
+      it('summarises alliances formed and the saved bracket configuration', async () => {
+        const app = initRoboticsApp();
+        setupFourTeams(app);
+        app.setActiveTab('finals');
+        app.dispatch((s) => formPlayoffAlliance(s, s.teams[0].id, s.teams[1].id));
+        app.dispatch((s) => setBracketConfig(s, { bracketSize: 4, includeThirdPlace: false }));
+        await flushRender();
+        const summary = document.querySelector('.robotics-finals-accordion .robotics-accordion-summary').textContent;
+        expect(summary).toBe('1 alliance · bracket size 4 · no third-place match');
+      });
+
+      it('expands and collapses in place when the summary is clicked, and the setup cards still work while expanded', async () => {
+        const app = initRoboticsApp();
+        setupFourTeams(app);
+        app.setActiveTab('finals');
+        const btn = toggle();
+        btn.click();
+        expect(btn.getAttribute('aria-expanded')).toBe('true');
+        expect(panel().hidden).toBe(false);
+        expect(document.querySelector('.robotics-finals-accordion').classList.contains('is-expanded')).toBe(true);
+        // Toggled in place, so keyboard focus is not lost to a re-render.
+        expect(toggle()).toBe(btn);
+
+        let root = document.getElementById('roboticsApp');
+        clickButtonWithText(root, 'Form Alliance');
+        expect(app.getState().elimination.alliances).toHaveLength(1);
+        await flushRender();
+
+        root = document.getElementById('roboticsApp');
+        const sizeInput = [...root.querySelectorAll('input')].find((i) => i.previousSibling?.textContent?.includes('Bracket size'));
+        sizeInput.value = '2';
+        clickButtonWithText(root, 'Save Bracket Config');
+        expect(app.getState().elimination.bracketSize).toBe(2);
+        await flushRender();
+
+        root = document.getElementById('roboticsApp');
+        clickButtonWithText(root, 'Remove');
+        expect(app.getState().elimination.alliances).toHaveLength(0);
+        await flushRender();
+
+        toggle().click();
+        expect(toggle().getAttribute('aria-expanded')).toBe('false');
+        expect(panel().hidden).toBe(true);
+      });
+
+      it('remembers the open/closed choice across reloads', () => {
+        const app = initRoboticsApp();
+        setupFourTeams(app);
+        app.setActiveTab('finals');
+        toggle().click();
+        initRoboticsApp().setActiveTab('finals');
+        expect(toggle().getAttribute('aria-expanded')).toBe('true');
+        expect(panel().hidden).toBe(false);
+
+        toggle().click();
+        initRoboticsApp().setActiveTab('finals');
+        expect(toggle().getAttribute('aria-expanded')).toBe('false');
+      });
+
+      it('stays open after a Tournament change re-renders the tab', () => {
+        const app = initRoboticsApp();
+        setupFourTeams(app);
+        app.setActiveTab('finals');
+        toggle().click();
+        app.dispatch((s) => formPlayoffAlliance(s, s.teams[0].id, s.teams[1].id));
+        expect(toggle().getAttribute('aria-expanded')).toBe('true');
+      });
+
+      it('keeps the preference out of Tournament state, so New Tournament does not reset it', async () => {
+        const app = initRoboticsApp();
+        setupFourTeams(app);
+        app.setActiveTab('finals');
+        toggle().click();
+        expect(localStorage.getItem('robotics-tournament-state')).not.toContain('xpanded');
+
+        app.setActiveTab('teams');
+        let root = document.getElementById('roboticsApp');
+        clickButtonWithText(root, 'Reset Everything / New Tournament');
+        root = document.getElementById('roboticsApp');
+        await clickDialogButton(root, 'Reset Everything');
+        app.setActiveTab('finals');
+        expect(toggle().getAttribute('aria-expanded')).toBe('true');
+      });
+    });
+
+    it('records an elimination result and offers Reveal Results (no Champion banner) once the final completes', async () => {
       const app = initRoboticsApp();
       setupFourTeams(app);
       app.setActiveTab('finals');
       let root = document.getElementById('roboticsApp');
       clickButtonWithText(root, 'Form Alliance');
+      await flushRender();
       root = document.getElementById('roboticsApp');
       clickButtonWithText(root, 'Form Alliance');
       root = document.getElementById('roboticsApp');
       const sizeInput = [...root.querySelectorAll('input')].find((i) => i.previousSibling?.textContent?.includes('Bracket size'));
       sizeInput.value = '2';
       clickButtonWithText(root, 'Save Bracket Config');
+      await flushRender();
       root = document.getElementById('roboticsApp');
       clickButtonWithText(root, 'Auto-fill Seeds from Standings');
       root = document.getElementById('roboticsApp');
       clickButtonWithText(root, 'Generate Bracket');
+      await flushRender();
 
       root = document.getElementById('roboticsApp');
       const scoreInputs = root.querySelectorAll('.robotics-bracket .robotics-score-input');
       scoreInputs[0].value = '80';
       scoreInputs[1].value = '20';
       clickButtonWithText(root, 'Mark Complete');
+      await flushRender();
 
       root = document.getElementById('roboticsApp');
       expect(root.textContent).not.toContain('Champion');
@@ -1440,28 +1686,32 @@ describe('initRoboticsApp', () => {
       expect(document.querySelector('.robotics-podium')).toBeTruthy();
     });
 
-    it('marks the winning side of a completed elimination match with is-winner, and the card as is-complete', () => {
+    it('marks the winning side of a completed elimination match with is-winner, and the card as is-complete', async () => {
       const app = initRoboticsApp();
       setupFourTeams(app);
       app.setActiveTab('finals');
       let root = document.getElementById('roboticsApp');
       clickButtonWithText(root, 'Form Alliance');
+      await flushRender();
       root = document.getElementById('roboticsApp');
       clickButtonWithText(root, 'Form Alliance');
       root = document.getElementById('roboticsApp');
       const sizeInput = [...root.querySelectorAll('input')].find((i) => i.previousSibling?.textContent?.includes('Bracket size'));
       sizeInput.value = '2';
       clickButtonWithText(root, 'Save Bracket Config');
+      await flushRender();
       root = document.getElementById('roboticsApp');
       clickButtonWithText(root, 'Auto-fill Seeds from Standings');
       root = document.getElementById('roboticsApp');
       clickButtonWithText(root, 'Generate Bracket');
+      await flushRender();
 
       root = document.getElementById('roboticsApp');
       const scoreInputs = root.querySelectorAll('.robotics-bracket .robotics-score-input');
       scoreInputs[0].value = '80';
       scoreInputs[1].value = '20';
       clickButtonWithText(root, 'Mark Complete');
+      await flushRender();
 
       root = document.getElementById('roboticsApp');
       const matchCard = root.querySelector('.robotics-bracket-match');
@@ -1474,22 +1724,25 @@ describe('initRoboticsApp', () => {
       expect(alliances[1].classList.contains('is-winner')).toBe(false);
     });
 
-    it('toggles no-show by clicking a team name on an elimination match', () => {
+    it('toggles no-show by clicking a team name on an elimination match', async () => {
       const app = initRoboticsApp();
       setupFourTeams(app);
       app.setActiveTab('finals');
       let root = document.getElementById('roboticsApp');
       clickButtonWithText(root, 'Form Alliance');
+      await flushRender();
       root = document.getElementById('roboticsApp');
       clickButtonWithText(root, 'Form Alliance');
       root = document.getElementById('roboticsApp');
       const sizeInput = [...root.querySelectorAll('input')].find((i) => i.previousSibling?.textContent?.includes('Bracket size'));
       sizeInput.value = '2';
       clickButtonWithText(root, 'Save Bracket Config');
+      await flushRender();
       root = document.getElementById('roboticsApp');
       clickButtonWithText(root, 'Auto-fill Seeds from Standings');
       root = document.getElementById('roboticsApp');
       clickButtonWithText(root, 'Generate Bracket');
+      await flushRender();
 
       root = document.getElementById('roboticsApp');
       const toggle = root.querySelector('.robotics-bracket .robotics-team-toggle');
@@ -1499,22 +1752,25 @@ describe('initRoboticsApp', () => {
       expect(Object.values(bracketMatch.noShow)).toContain(true);
     });
 
-    it('keeps a typed-but-unsaved elimination score after toggling No-Show, including repeated toggling', () => {
+    it('keeps a typed-but-unsaved elimination score after toggling No-Show, including repeated toggling', async () => {
       const app = initRoboticsApp();
       setupFourTeams(app);
       app.setActiveTab('finals');
       let root = document.getElementById('roboticsApp');
       clickButtonWithText(root, 'Form Alliance');
+      await flushRender();
       root = document.getElementById('roboticsApp');
       clickButtonWithText(root, 'Form Alliance');
       root = document.getElementById('roboticsApp');
       const sizeInput = [...root.querySelectorAll('input')].find((i) => i.previousSibling?.textContent?.includes('Bracket size'));
       sizeInput.value = '2';
       clickButtonWithText(root, 'Save Bracket Config');
+      await flushRender();
       root = document.getElementById('roboticsApp');
       clickButtonWithText(root, 'Auto-fill Seeds from Standings');
       root = document.getElementById('roboticsApp');
       clickButtonWithText(root, 'Generate Bracket');
+      await flushRender();
 
       root = document.getElementById('roboticsApp');
       let scoreInputs = root.querySelectorAll('.robotics-bracket .robotics-score-input');
@@ -1543,7 +1799,7 @@ describe('initRoboticsApp', () => {
       expect(bracketMatch.completed).toBe(false);
     });
 
-    it('renders the Third-Place Match column positioned to the left of the Final', () => {
+    it('renders the Third-Place Match column positioned to the left of the Final', async () => {
       const app = initRoboticsApp();
       const setupRoot = document.getElementById('roboticsApp');
       ['Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo', 'Foxtrot', 'Golf', 'Hotel'].forEach((name) => addTeamViaForm(setupRoot, name));
@@ -1552,6 +1808,7 @@ describe('initRoboticsApp', () => {
       for (let i = 0; i < 4; i++) {
         root = document.getElementById('roboticsApp');
         clickButtonWithText(root, 'Form Alliance');
+        await flushRender();
       }
       expect(app.getState().elimination.alliances).toHaveLength(4);
 
@@ -1560,10 +1817,12 @@ describe('initRoboticsApp', () => {
       sizeInput.value = '4';
       root.querySelector('input[type="checkbox"]').checked = true;
       clickButtonWithText(root, 'Save Bracket Config');
+      await flushRender();
       root = document.getElementById('roboticsApp');
       clickButtonWithText(root, 'Auto-fill Seeds from Standings');
       root = document.getElementById('roboticsApp');
       clickButtonWithText(root, 'Generate Bracket');
+      await flushRender();
 
       root = document.getElementById('roboticsApp');
       const headings = [...root.querySelectorAll('.robotics-bracket-round')].map((col) => col.querySelector('h4').textContent);
@@ -1585,7 +1844,7 @@ describe('initRoboticsApp', () => {
       clickButtonWithText(root, 'Generate Bracket');
     }
 
-    it('shows no Reveal Results button while the Third-Place Match is still undecided, and no place banners at any point', () => {
+    it('shows no Reveal Results button while the Third-Place Match is still undecided, and no place banners at any point', async () => {
       const app = initRoboticsApp();
       const setupRoot = document.getElementById('roboticsApp');
       ['Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo', 'Foxtrot', 'Golf', 'Hotel'].forEach((name) => addTeamViaForm(setupRoot, name));
@@ -1594,16 +1853,19 @@ describe('initRoboticsApp', () => {
       for (let i = 0; i < 4; i++) {
         root = document.getElementById('roboticsApp');
         clickButtonWithText(root, 'Form Alliance');
+        await flushRender();
       }
       root = document.getElementById('roboticsApp');
       const sizeInput = [...root.querySelectorAll('input')].find((i) => i.previousSibling?.textContent?.includes('Bracket size'));
       sizeInput.value = '4';
       root.querySelector('input[type="checkbox"]').checked = true;
       clickButtonWithText(root, 'Save Bracket Config');
+      await flushRender();
       root = document.getElementById('roboticsApp');
       clickButtonWithText(root, 'Auto-fill Seeds from Standings');
       root = document.getElementById('roboticsApp');
       clickButtonWithText(root, 'Generate Bracket');
+      await flushRender();
 
       // Semis (inputs 0-3), then the Final (inputs 6-7), leaving the Third-Place Match (inputs 4-5).
       for (const [a, b] of [[0, 1], [2, 3], [6, 7]]) {
@@ -1612,6 +1874,7 @@ describe('initRoboticsApp', () => {
         scoreInputs[a].value = '80';
         scoreInputs[b].value = '20';
         scoreInputs[a].closest('.robotics-bracket-match').querySelector('.robotics-match-actions button').click();
+        await flushRender();
       }
 
       root = document.getElementById('roboticsApp');
@@ -1623,6 +1886,7 @@ describe('initRoboticsApp', () => {
       scoreInputs[4].value = '50';
       scoreInputs[5].value = '40';
       scoreInputs[4].closest('.robotics-bracket-match').querySelector('.robotics-match-actions button').click();
+      await flushRender();
 
       root = document.getElementById('roboticsApp');
       expect(root.querySelector('.robotics-reveal-results-btn')?.textContent).toBe('Reveal Results →');
@@ -1716,12 +1980,13 @@ describe('initRoboticsApp', () => {
       expect(document.querySelector('.robotics-podium-hint').textContent).toContain('3rd place');
     });
 
-    it('reveals 3rd, 2nd, then 1st on each podium click, listing Teams and Members', () => {
+    it('reveals 3rd, 2nd, then 1st on each podium click, listing Teams and Members', async () => {
       window.matchMedia = vi.fn(() => ({ matches: false }));
       seedCompleteFour();
       const app = openResults();
 
       podium().click();
+      await flushRender();
       expect(block(3).classList.contains('is-revealed')).toBe(true);
       expect(block(3).textContent).toContain('Charlie');
       expect(block(3).textContent).toContain('Cy');
@@ -1729,12 +1994,14 @@ describe('initRoboticsApp', () => {
       expect(block(3).classList.contains('is-rising')).toBe(true);
 
       podium().click();
+      await flushRender();
       expect(block(2).textContent).toContain('Bravo');
       expect(block(2).textContent).toContain('Bea, Bo');
       expect(block(1).classList.contains('is-covered')).toBe(true);
       expect(document.querySelector('.robotics-confetti')).toBeFalsy();
 
       podium().click();
+      await flushRender();
       expect(block(1).classList.contains('is-revealed')).toBe(true);
       expect(block(1).textContent).toContain('Alpha');
       expect(block(1).querySelector('.robotics-confetti')).toBeTruthy();
@@ -1743,7 +2010,30 @@ describe('initRoboticsApp', () => {
 
       // Fully revealed: further clicks change nothing.
       podium().click();
+      await flushRender();
       expect(getRevealedCount(app.getState())).toBe(3);
+    });
+
+    it('reveals the right place for each click even when two clicks land before the DOM rebuild', async () => {
+      window.matchMedia = vi.fn(() => ({ matches: false }));
+      seedCompleteFour();
+      openResults();
+
+      // Two reveals triggered back-to-back, before dispatch's deferred rebuild runs for either:
+      // each must still tag its own place, not both tag whichever was "next" at the first click.
+      podium().click();
+      podium().click();
+      await flushRender();
+
+      expect(block(3).classList.contains('is-revealed')).toBe(true);
+      expect(block(3).classList.contains('is-rising')).toBe(true);
+      expect(block(2).classList.contains('is-revealed')).toBe(true);
+      expect(block(2).classList.contains('is-rising')).toBe(true);
+
+      podium().click();
+      await flushRender();
+      expect(block(1).classList.contains('is-revealed')).toBe(true);
+      expect(block(1).querySelector('.robotics-confetti')).toBeTruthy();
     });
 
     it('reveals with Space, but not on another tab or while typing in a field', () => {
@@ -1788,22 +2078,25 @@ describe('initRoboticsApp', () => {
       expect(getRevealedCount(app.getState())).toBe(0);
     });
 
-    it('skips 3rd when there is no Third-Place Match', () => {
+    it('skips 3rd when there is no Third-Place Match', async () => {
       seedTournament({ teams: FOUR_TEAMS.slice(0, 2), winners: [false] });
       openResults();
       expect([...podium().querySelectorAll('.robotics-podium-block')].map((b) => b.dataset.place)).toEqual(['2', '1']);
       expect(document.querySelector('.robotics-podium-hint').textContent).toContain('2nd place');
       podium().click();
+      await flushRender();
       expect(block(2).textContent).toContain('Alpha');
       podium().click();
+      await flushRender();
       expect(block(1).textContent).toContain('Bravo');
     });
 
-    it('launches no confetti under prefers-reduced-motion', () => {
+    it('launches no confetti under prefers-reduced-motion', async () => {
       window.matchMedia = vi.fn(() => ({ matches: true }));
       seedCompleteFour({ revealedCount: 2 });
       openResults();
       podium().click();
+      await flushRender();
       expect(block(1).classList.contains('is-revealed')).toBe(true);
       expect(document.querySelector('.robotics-confetti')).toBeFalsy();
     });
@@ -1818,12 +2111,13 @@ describe('initRoboticsApp', () => {
       expect(block(3).classList.contains('is-rising')).toBe(false);
     });
 
-    it('Replay reveal re-covers every block', () => {
+    it('Replay reveal re-covers every block', async () => {
       seedCompleteFour({ revealedCount: 3 });
       const app = openResults();
       expect(block(1).classList.contains('is-revealed')).toBe(true);
       clickButtonWithText(document.getElementById('roboticsApp'), 'Replay reveal');
       expect(getRevealedCount(app.getState())).toBe(0);
+      await flushRender();
       expect(block(1).classList.contains('is-covered')).toBe(true);
     });
 
@@ -1961,6 +2255,9 @@ describe('live status header', () => {
     app.dispatch((s) => setMatchesPerTeam(s, 2));
     app.dispatch((s) => regenerateMatchups(s));
     app.dispatch((s) => setTimelineConfig(s, { startTime, matchDurationMin: 5, gapMin: 0, fieldCount: 1 }));
+    // dispatch()'s DOM rebuild is deferred to a macrotask (see robotics.js); under these fake
+    // timers it only runs once a timer-advance lets it, rather than automatically.
+    vi.advanceTimersByTime(0);
     return app;
   }
 
@@ -1978,6 +2275,7 @@ describe('live status header', () => {
   it('shows Qualification phase, match progress and drift once matches are scheduled', () => {
     scheduledApp();
     app.dispatch((s) => recordQualificationResult(s, 0, { scoreA: 1, scoreB: 0 }));
+    vi.advanceTimersByTime(0);
     expect(text('.robotics-status-phase')).toBe('Qualification');
     expect(text('.robotics-status-progress')).toBe('Match 2 of 2');
     // Match 2 is scheduled 5 min after Start Time, and it is still the Start Time.

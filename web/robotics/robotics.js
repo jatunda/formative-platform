@@ -32,7 +32,7 @@ import {
 } from './state.js';
 import { computeMatchTime, computeTotalDurationMinutes, computeStartTimeFromEndTime, estimateEliminationMatchCount, formatTimelineSummary } from './match-timeline.js';
 import { computeStandings } from './standings.js';
-import { resolveMatchSides, getMatchWinner, isBracketComplete, countUndecidedMatches, getPlacements } from './bracket.js';
+import { resolveMatchSides, getMatchWinner, isBracketComplete, countUndecidedMatches, getPlacements, formatFinalsSetupSummary } from './bracket.js';
 import { launchConfetti } from './confetti.js';
 import { getCurrentMatchIndex, getUpNextMatchIndex } from './current-match.js';
 import { exportStandingsMarkdown, exportMatchesMarkdown, exportRosterMarkdown, exportPlacementsMarkdown } from './markdown-export.js';
@@ -55,6 +55,28 @@ export function teamName(state, teamId) {
 
 function allianceTeamNames(state, teamIds) {
   return teamIds.map((id) => teamName(state, id)).join(' & ');
+}
+
+// ---- Long-name shrink-to-fit ----
+// Names this short always render at normal size (no style attribute at all).
+const NAME_FIT_THRESHOLD = 14;
+// Each character past the threshold nudges the scale down, floored here so a
+// name never shrinks past readable.
+const NAME_FIT_SHRINK_PER_CHAR = 0.03;
+const NAME_FIT_MIN_SCALE = 0.6;
+
+/**
+ * Inline style shrinking a name's font-size (via the `--robotics-name-scale`
+ * custom property consumed by `.robotics-fit-name` in robotics.css) once it's
+ * long enough to risk wrapping onto a second line in a width-constrained
+ * cell. `null` for names short enough to render at normal size, so callers
+ * can skip the `style` attribute entirely.
+ */
+export function nameFitStyle(text) {
+  const length = String(text ?? '').length;
+  if (length <= NAME_FIT_THRESHOLD) return null;
+  const scale = Math.max(NAME_FIT_MIN_SCALE, 1 - (length - NAME_FIT_THRESHOLD) * NAME_FIT_SHRINK_PER_CHAR);
+  return `--robotics-name-scale: ${scale};`;
 }
 
 function playoffAllianceTeamIds(state, allianceId) {
@@ -546,16 +568,17 @@ function renderTimelineControls(state, dispatch) {
 }
 
 /**
- * The Match Timeline as a compact panel: a one-line summary that toggles the controls open in place.
- * Toggling only flips the DOM (keeping focus on the button) and reports the choice via onToggle.
+ * A collapsible card: a one-line summary that toggles a panel open in place.
+ * Toggling only flips the DOM (keeping focus on the button, not losing it to a
+ * re-render) and reports the choice via onToggle so the caller can persist it.
+ * Shared by the Match Timeline and the Finals tab's setup section.
  */
-function renderMatchTimeline(state, dispatch, { expanded, onToggle }) {
-  const card = el('div', { className: `robotics-card robotics-timeline${expanded ? ' is-expanded' : ''}` });
-  const panel = renderTimelineControls(state, dispatch);
+function renderAccordion({ variant, title, summary, panel, expanded, onToggle }) {
+  const card = el('div', { className: `robotics-card robotics-accordion robotics-${variant}${expanded ? ' is-expanded' : ''}` });
   panel.hidden = !expanded;
   const toggle = el('button', {
     type: 'button',
-    className: 'robotics-timeline-toggle',
+    className: 'robotics-accordion-toggle',
     'aria-expanded': String(expanded),
     'aria-controls': panel.id,
     onClick: () => {
@@ -566,18 +589,28 @@ function renderMatchTimeline(state, dispatch, { expanded, onToggle }) {
       onToggle(next);
     },
   }, [
-    el('span', { className: 'robotics-timeline-chevron', 'aria-hidden': 'true' }, ['▸']),
-    el('span', { className: 'robotics-timeline-heading' }, [
-      el('span', { className: 'robotics-card-title' }, ['Match Timeline']),
-      el('span', { className: 'robotics-timeline-summary' }, [
-        formatTimelineSummary(state.timeline, getScheduledMatchCount(state), formatClock),
-      ]),
+    el('span', { className: 'robotics-accordion-chevron', 'aria-hidden': 'true' }, ['▸']),
+    el('span', { className: 'robotics-accordion-heading' }, [
+      el('span', { className: 'robotics-card-title' }, [title]),
+      el('span', { className: 'robotics-accordion-summary' }, [summary]),
     ]),
   ]);
   // Accordion pattern: the heading wraps the button (a button may not contain a heading).
-  card.appendChild(el('h3', { className: 'robotics-timeline-header' }, [toggle]));
+  card.appendChild(el('h3', { className: 'robotics-accordion-header' }, [toggle]));
   card.appendChild(panel);
   return card;
+}
+
+function renderMatchTimeline(state, dispatch, { expanded, onToggle }) {
+  const panel = renderTimelineControls(state, dispatch);
+  return renderAccordion({
+    variant: 'timeline',
+    title: 'Match Timeline',
+    summary: formatTimelineSummary(state.timeline, getScheduledMatchCount(state), formatClock),
+    panel,
+    expanded,
+    onToggle,
+  });
 }
 
 // ---- Now Playing ----
@@ -877,8 +910,12 @@ function renderBracket(state, dispatch) {
   return container;
 }
 
-/** Setup cards share one auto-fit row on wide screens; the bracket spans the full width beneath them. */
-export function renderFinalsTab(state, dispatch, { setActiveTab }) {
+/**
+ * Alliance Selection and Bracket Configuration collapse into one accordion (collapsed by
+ * default) so the Elimination Bracket is the dominant content on the tab once setup is done;
+ * Seeds (once a Bracket Size is set) stays outside it, sharing the setup row on wide screens.
+ */
+export function renderFinalsTab(state, dispatch, { setActiveTab, ui }) {
   const section = el('div', { className: 'robotics-section' });
   const setup = el('div', { className: 'robotics-finals-setup' });
   section.appendChild(setup);
@@ -918,7 +955,6 @@ export function renderFinalsTab(state, dispatch, { setActiveTab }) {
     }, ['Form Alliance']),
   ]);
   selectionCard.appendChild(selectionRow);
-  setup.appendChild(selectionCard);
 
   const alliancesCard = el('div', { className: 'robotics-card' });
   alliancesCard.appendChild(el('h3', { className: 'robotics-card-title' }, ['Playoff Alliances']));
@@ -931,7 +967,6 @@ export function renderFinalsTab(state, dispatch, { setActiveTab }) {
       el('button', { className: 'robotics-btn robotics-btn-danger robotics-btn-sm', onClick: () => dispatch((s) => removePlayoffAlliance(s, alliance.id)) }, ['Remove']),
     ]));
   });
-  setup.appendChild(alliancesCard);
 
   const bracketConfigCard = el('div', { className: 'robotics-card robotics-settings-grid' });
   bracketConfigCard.appendChild(el('h3', { className: 'robotics-card-title' }, ['Bracket Configuration']));
@@ -944,7 +979,20 @@ export function renderFinalsTab(state, dispatch, { setActiveTab }) {
     className: 'robotics-btn robotics-btn-secondary',
     onClick: () => dispatch((s) => setBracketConfig(s, { bracketSize: parseInt(sizeInput.value, 10) || null, includeThirdPlace: thirdPlaceInput.checked })),
   }, ['Save Bracket Config']));
-  setup.appendChild(bracketConfigCard);
+
+  const setupPanel = el('div', { className: 'robotics-finals-accordion-panel', id: 'robotics-finals-accordion-panel' }, [
+    selectionCard,
+    alliancesCard,
+    bracketConfigCard,
+  ]);
+  setup.appendChild(renderAccordion({
+    variant: 'finals-accordion',
+    title: 'Playoff Setup',
+    summary: formatFinalsSetupSummary(state.elimination),
+    panel: setupPanel,
+    expanded: ui.prefs.finalsSetupExpanded === true,
+    onToggle: (expanded) => ui.setPref('finalsSetupExpanded', expanded),
+  }));
 
   if (state.elimination.bracketSize) {
     const seedsCard = el('div', { className: 'robotics-card robotics-settings-grid' });
@@ -1052,11 +1100,23 @@ export function renderResultsTab(state, dispatch) {
   }
 
   const revealNext = () => {
-    dispatch(revealNextPlacement);
-    // dispatch re-rendered the app synchronously, so look up the new block for this place.
-    const block = document.querySelector(`.robotics-podium-block[data-place="${nextPlace}"]`);
-    block?.classList.add('is-rising');
-    if (nextPlace === 1) launchConfetti(block);
+    // Read the place to reveal from live state inside the updater, not the outer `nextPlace`
+    // closed over at render time: dispatch()'s rebuild is deferred, so a second reveal
+    // triggered before that rebuild runs must not re-read the same stale `nextPlace` as the
+    // first — each call needs its own.
+    let revealedPlace;
+    dispatch(
+      (s) => {
+        revealedPlace = getNextPlaceToReveal(s);
+        return revealNextPlacement(s);
+      },
+      () => {
+        // This runs once the freshly rebuilt block for this place actually exists.
+        const block = document.querySelector(`.robotics-podium-block[data-place="${revealedPlace}"]`);
+        block?.classList.add('is-rising');
+        if (revealedPlace === 1) launchConfetti(block);
+      },
+    );
   };
   const podium = nextPlace
     ? el('div', {
@@ -1125,6 +1185,55 @@ function updateLiveStatus(root, state, now) {
   driftEl.dataset.drift = drift?.status ?? '';
 }
 
+// Input types where selectionStart/selectionEnd/setSelectionRange are valid to call;
+// other types (e.g. "number") throw InvalidStateError if you touch them.
+const SELECTABLE_INPUT_TYPES = new Set(['text', 'search', 'url', 'tel', 'password']);
+
+/** Locate the focused element within root by its childNode index path, so it can be found again after a rebuild. */
+function captureFocusPath(root) {
+  const active = document.activeElement;
+  if (!active || active === root || !root.contains(active)) return null;
+  const path = [];
+  const siblingCounts = [];
+  let node = active;
+  while (node && node !== root) {
+    const parent = node.parentNode;
+    if (!parent) return null;
+    path.unshift(Array.prototype.indexOf.call(parent.childNodes, node));
+    siblingCounts.unshift(parent.childNodes.length);
+    node = parent;
+  }
+  const hasSelection = SELECTABLE_INPUT_TYPES.has(active.type);
+  return {
+    path,
+    siblingCounts,
+    tagName: active.tagName,
+    selectionStart: hasSelection ? active.selectionStart : null,
+    selectionEnd: hasSelection ? active.selectionEnd : null,
+  };
+}
+
+/**
+ * Re-focus (and restore cursor position for) the element at a path captured by captureFocusPath,
+ * if it still exists. Also requires every ancestor along that path to still have the same
+ * childNode count it had at capture time: a list that grew or shrank (e.g. a row removed) means
+ * a sibling has shifted into the captured position, and that sibling — not whatever was focused
+ * before — would wrongly receive focus, so restoration is skipped rather than guessed at.
+ */
+function restoreFocusPath(root, focusPath) {
+  if (!focusPath) return;
+  let node = root;
+  for (let i = 0; i < focusPath.path.length; i++) {
+    if (node?.childNodes.length !== focusPath.siblingCounts[i]) return;
+    node = node.childNodes[focusPath.path[i]];
+  }
+  if (!node || node.tagName !== focusPath.tagName) return;
+  node.focus();
+  if (focusPath.selectionStart !== null && typeof node.setSelectionRange === 'function') {
+    node.setSelectionRange(focusPath.selectionStart, focusPath.selectionEnd);
+  }
+}
+
 // Only one control panel runs per page; initialising another stops the previous clock and Space handler.
 let stopActiveClock = null;
 
@@ -1175,28 +1284,71 @@ export function initRoboticsApp({ mountId = 'roboticsApp', storageKey = 'robotic
     },
   };
 
-  function render() {
-    mount.innerHTML = '';
-    mount.appendChild(renderApp(state, dispatch, activeTab, setActiveTab, ui));
-  }
-
-  // Auto-scroll the Qualification Matches list to the Current Match row, but only when
-  // the Current Match actually advances (a dispatch changes which match is current) - not
-  // on every re-render, so editing a draft score doesn't yank the teacher's scroll position.
-  function dispatch(updater) {
-    const previousCurrentIndex = getCurrentMatchIndex(state.qualification.matches);
-    state = updater(state);
-    storage.save(state);
-    render();
+  // Auto-scroll the Qualification Matches list to the Current Match row, but only once
+  // the Current Match actually advances to a different one - not on every re-render on
+  // the Schedule tab, so editing a draft score doesn't yank the teacher's scroll position.
+  // `undefined` means "haven't observed the Current Match on this tab yet", which skips
+  // the very first observation (e.g. switching onto the tab) rather than treating it as a change.
+  let lastCurrentMatchIndex;
+  function autoScrollToCurrentMatchIfAdvanced() {
+    if (activeTab !== 'schedule') return;
     const currentIndex = getCurrentMatchIndex(state.qualification.matches);
-    if (activeTab === 'schedule' && currentIndex !== previousCurrentIndex) {
+    if (lastCurrentMatchIndex !== undefined && currentIndex !== lastCurrentMatchIndex) {
       mount.querySelector('.robotics-match-row.is-current')?.scrollIntoView?.({ block: 'nearest' });
     }
+    lastCurrentMatchIndex = currentIndex;
+  }
+
+  function render() {
+    const focusPath = captureFocusPath(mount);
+    mount.innerHTML = '';
+    mount.appendChild(renderApp(state, dispatch, activeTab, setActiveTab, ui));
+    restoreFocusPath(mount, focusPath);
+    autoScrollToCurrentMatchIfAdvanced();
+  }
+
+  // dispatch() rebuilds the whole DOM (mount.innerHTML = ''), which would otherwise tear down
+  // the actual click target mid-interaction: a field's "change" event commits during the
+  // browser's blur-handling phase of a click, which runs before that same click's mouseup/click
+  // phase, so a synchronous rebuild there destroys the node the click was headed for. Deferring
+  // the rebuild past the current event (a macrotask, not a microtask — a blur-triggered
+  // microtask can still run before the pending click/mouseup) lets the whole native click
+  // sequence land first; captureFocusPath/restoreFocusPath above then carry whatever has focus
+  // by that point across the rebuild.
+  let renderTimer = null;
+  // Callbacks queued by dispatch(updater, afterRender) for code that needs the freshly-rebuilt
+  // DOM — e.g. to tag a specific node for a one-off animation — rather than whatever is still
+  // live at the moment dispatch() is called.
+  let afterRenderCallbacks = [];
+  function flushAfterRenderCallbacks() {
+    const callbacks = afterRenderCallbacks;
+    afterRenderCallbacks = [];
+    callbacks.forEach((callback) => callback());
+  }
+  function scheduleRender() {
+    if (renderTimer !== null) return;
+    renderTimer = setTimeout(() => {
+      renderTimer = null;
+      render();
+      flushAfterRenderCallbacks();
+    }, 0);
+  }
+
+  function dispatch(updater, afterRender) {
+    state = updater(state);
+    storage.save(state);
+    if (afterRender) afterRenderCallbacks.push(afterRender);
+    scheduleRender();
   }
 
   function setActiveTab(tab) {
     activeTab = tab;
+    if (renderTimer !== null) {
+      clearTimeout(renderTimer);
+      renderTimer = null;
+    }
     render();
+    flushAfterRenderCallbacks();
   }
 
   render();
