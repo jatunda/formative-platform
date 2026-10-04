@@ -233,19 +233,21 @@ export function renderTeamsTab(state, dispatch) {
     className: 'robotics-btn robotics-btn-primary',
     onClick: addTeamFromForm,
   }, ['Add Team']);
+  // dispatch() re-renders and replaces the whole subtree on success, so a closed-over
+  // element reference may already be detached afterward — look up the live one by selector.
+  const focusAfterRender = (selector) => document.querySelector(selector)?.focus();
   nameInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
       e.preventDefault();
       addTeamFromForm();
+      focusAfterRender('input[placeholder="Team name"]');
     }
   });
   membersInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
       e.preventDefault();
       addTeamFromForm();
-      // dispatch() re-renders and replaces the whole subtree on success, so the
-      // closed-over nameInput may already be detached — look up the live one.
-      document.querySelector('input[placeholder="Team name"]')?.focus();
+      focusAfterRender('input[placeholder="Team name"]');
     }
   });
   if (locked) {
@@ -293,7 +295,12 @@ export function renderTeamsTab(state, dispatch) {
       ]));
     });
 
-    const addMemberInput = el('input', { type: 'text', className: 'robotics-member-add-input', placeholder: 'Add member' });
+    const addMemberInput = el('input', {
+      type: 'text',
+      className: 'robotics-member-add-input',
+      placeholder: 'Add member',
+      'data-team-id': team.id,
+    });
     const addMember = () => {
       const value = addMemberInput.value.trim();
       if (!value) return;
@@ -303,6 +310,7 @@ export function renderTeamsTab(state, dispatch) {
       if (e.key === 'Enter') {
         e.preventDefault();
         addMember();
+        focusAfterRender(`.robotics-member-add-input[data-team-id="${team.id}"]`);
       }
     });
     const addMemberBtn = el('button', {

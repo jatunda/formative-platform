@@ -107,6 +107,17 @@ describe('initRoboticsApp', () => {
       expect(app.getState().teams[0].name).toBe('Alpha');
     });
 
+    it('adds the team on Enter in the Team name field and keeps focus in the Team name field', () => {
+      const app = initRoboticsApp();
+      const root = document.getElementById('roboticsApp');
+      const { nameInput } = getFormInputs(root);
+      nameInput.value = 'Alpha';
+      nameInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', cancelable: true }));
+      expect(app.getState().teams).toHaveLength(1);
+      const { nameInput: refreshedNameInput } = getFormInputs(root);
+      expect(document.activeElement).toBe(refreshedNameInput);
+    });
+
     it('adds the team on Enter in the Members field and returns focus to the Team name field', () => {
       const app = initRoboticsApp();
       const root = document.getElementById('roboticsApp');
@@ -238,6 +249,34 @@ describe('initRoboticsApp', () => {
       addInput.value = 'Bea';
       addInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', cancelable: true }));
       expect(app.getState().teams[0].members).toEqual(['Ann']);
+    });
+
+    it('adds a member on Enter and keeps focus in that same team\'s add-member field', () => {
+      const app = initRoboticsApp();
+      const root = document.getElementById('roboticsApp');
+      addTeamViaForm(root, 'Alpha', 'Ann');
+      const addInput = root.querySelector('.robotics-member-add-input');
+      addInput.value = 'Bea';
+      addInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', cancelable: true }));
+      expect(app.getState().teams[0].members).toEqual(['Ann', 'Bea']);
+      const refreshedAddInput = root.querySelector('.robotics-member-add-input');
+      expect(document.activeElement).toBe(refreshedAddInput);
+    });
+
+    it('adding a member to one team does not leave focus on another team\'s add-member field', () => {
+      const app = initRoboticsApp();
+      const root = document.getElementById('roboticsApp');
+      addTeamViaForm(root, 'Alpha', 'Ann');
+      addTeamViaForm(root, 'Bravo', 'Bob');
+      const teamIds = app.getState().teams.map((t) => t.id);
+      const bravoInput = root.querySelector(`.robotics-member-add-input[data-team-id="${teamIds[1]}"]`);
+      bravoInput.value = 'Bea';
+      bravoInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', cancelable: true }));
+      expect(app.getState().teams[1].members).toEqual(['Bob', 'Bea']);
+      const refreshedBravoInput = root.querySelector(`.robotics-member-add-input[data-team-id="${teamIds[1]}"]`);
+      const refreshedAlphaInput = root.querySelector(`.robotics-member-add-input[data-team-id="${teamIds[0]}"]`);
+      expect(document.activeElement).toBe(refreshedBravoInput);
+      expect(document.activeElement).not.toBe(refreshedAlphaInput);
     });
 
     it('removes an individual member without affecting the rest of the roster', () => {
