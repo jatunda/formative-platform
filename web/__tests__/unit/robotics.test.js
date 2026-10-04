@@ -4,6 +4,7 @@ import {
   teamName,
   getAllMatchesInScheduleOrder,
   autoFillSeedsFromStandings,
+  nameFitStyle,
 } from '../../robotics/robotics.js';
 import {
   createInitialState,
@@ -627,6 +628,39 @@ describe('initRoboticsApp', () => {
       expect(app.getState().qualification.matches[0].noShow[firstTeamId]).toBe(true);
     });
 
+    it('shrinks a long team name in a match row to fit one line, leaving short names at normal size', () => {
+      const app = initRoboticsApp();
+      const root = document.getElementById('roboticsApp');
+      addTeamViaForm(root, 'Robo Raiders Supreme');
+      ['Bravo', 'Charlie', 'Delta'].forEach((name) => addTeamViaForm(root, name));
+      app.dispatch((s) => setMatchesPerTeam(s, 2));
+      app.dispatch((s) => regenerateMatchups(s));
+      app.setActiveTab('schedule');
+      const freshRoot = document.getElementById('roboticsApp');
+      const toggles = [...freshRoot.querySelectorAll('.robotics-match-row .robotics-team-toggle')];
+      const longNameToggle = toggles.find((t) => t.textContent === 'Robo Raiders Supreme');
+      const shortNameToggle = toggles.find((t) => t.textContent === 'Bravo');
+      expect(longNameToggle.classList.contains('robotics-fit-name')).toBe(true);
+      expect(longNameToggle.getAttribute('style')).toContain('--robotics-name-scale:');
+      expect(shortNameToggle.classList.contains('robotics-fit-name')).toBe(false);
+      expect(shortNameToggle.getAttribute('style')).toBeNull();
+    });
+
+    it('lets an extremely long team name fall back to wrapping instead of forcing nowrap past the shrink floor', () => {
+      const app = initRoboticsApp();
+      const root = document.getElementById('roboticsApp');
+      const extremeName = 'A'.repeat(60);
+      addTeamViaForm(root, extremeName);
+      ['Bravo', 'Charlie', 'Delta'].forEach((name) => addTeamViaForm(root, name));
+      app.dispatch((s) => setMatchesPerTeam(s, 2));
+      app.dispatch((s) => regenerateMatchups(s));
+      app.setActiveTab('schedule');
+      const freshRoot = document.getElementById('roboticsApp');
+      const toggle = [...freshRoot.querySelectorAll('.robotics-match-row .robotics-team-toggle')].find((t) => t.textContent === extremeName);
+      expect(toggle.classList.contains('robotics-fit-name')).toBe(false);
+      expect(toggle.getAttribute('style')).toContain('--robotics-name-scale: 0.6;');
+    });
+
     it('marks a clicked no-show team with the is-no-show class, and clears it on a second click', async () => {
       const app = initRoboticsApp();
       setupFourTeams(app);
@@ -1084,6 +1118,30 @@ describe('initRoboticsApp', () => {
       expect(byName.Alpha.querySelector('.robotics-standings-members').textContent).toBe('Ann, Al');
       expect(byName.Bravo.querySelector('.robotics-standings-members')).toBeNull();
     });
+
+    it('shrinks a long team or member name in the Standings table to fit one line, leaving short ones at normal size', () => {
+      const app = initRoboticsApp();
+      const root = document.getElementById('roboticsApp');
+      addTeamViaForm(root, 'Robo Raiders Supreme', 'Alexandria Montgomery-Wu');
+      ['Bravo', 'Charlie', 'Delta'].forEach((name) => addTeamViaForm(root, name));
+      app.dispatch((s) => setMatchesPerTeam(s, 2));
+      app.dispatch((s) => regenerateMatchups(s));
+      app.getState().qualification.matches.forEach((_, i) => {
+        app.dispatch((s) => recordQualificationResult(s, i, { scoreA: 10, scoreB: 5 }));
+      });
+      app.setActiveTab('schedule');
+      const freshRoot = document.getElementById('roboticsApp');
+      const teamCells = [...freshRoot.querySelectorAll('table tbody tr td:nth-child(2)')];
+      const byName = Object.fromEntries(teamCells.map((td) => [td.querySelector('.robotics-standings-team-name').textContent, td]));
+
+      const longNameEl = byName['Robo Raiders Supreme'].querySelector('.robotics-standings-team-name');
+      const longMembersEl = byName['Robo Raiders Supreme'].querySelector('.robotics-standings-members');
+      expect(longNameEl.getAttribute('style')).toContain('--robotics-name-scale:');
+      expect(longMembersEl.getAttribute('style')).toContain('--robotics-name-scale:');
+
+      const shortNameEl = byName.Bravo.querySelector('.robotics-standings-team-name');
+      expect(shortNameEl.getAttribute('style')).toBeNull();
+    });
   });
 
   describe('merged Schedule & Standings tab', () => {
@@ -1167,6 +1225,23 @@ describe('initRoboticsApp', () => {
       const bravo = teams.find((t) => t.querySelector('.robotics-now-playing-team-name').textContent === 'Bravo');
       expect(alpha.querySelector('.robotics-now-playing-members').textContent).toBe('Ana, Abe');
       expect(bravo.querySelector('.robotics-now-playing-members')).toBeNull();
+    });
+
+    it('shrinks a long team or member name in the Now Playing banner to fit, leaving short ones at normal size', () => {
+      const app = initRoboticsApp();
+      const root = document.getElementById('roboticsApp');
+      addTeamViaForm(root, 'Robo Raiders Supreme', 'Alexandria Montgomery-Wu');
+      ['Bravo', 'Charlie', 'Delta'].forEach((name) => addTeamViaForm(root, name));
+      app.dispatch((s) => setMatchesPerTeam(s, 3));
+      app.dispatch((s) => regenerateMatchups(s));
+      app.setActiveTab('schedule');
+      const teams = [...card().querySelectorAll('.robotics-now-playing-team')];
+      const longTeam = teams.find((t) => t.querySelector('.robotics-now-playing-team-name').textContent === 'Robo Raiders Supreme');
+      const shortTeam = teams.find((t) => t.querySelector('.robotics-now-playing-team-name').textContent === 'Bravo');
+
+      expect(longTeam.querySelector('.robotics-now-playing-team-name').getAttribute('style')).toContain('--robotics-name-scale:');
+      expect(longTeam.querySelector('.robotics-now-playing-members').getAttribute('style')).toContain('--robotics-name-scale:');
+      expect(shortTeam.querySelector('.robotics-now-playing-team-name').getAttribute('style')).toBeNull();
     });
 
     it('shows the Match Time ("--" before a Start Time is set) and the Field only when more than one runs', async () => {
@@ -2228,6 +2303,29 @@ describe('autoFillSeedsFromStandings', () => {
   it('is a no-op when there are no playoff alliances yet', () => {
     const state = createInitialState();
     expect(autoFillSeedsFromStandings(state).elimination.seeds).toEqual({});
+  });
+});
+
+describe('nameFitStyle', () => {
+  it('returns null for a short name, so no style attribute is rendered at all', () => {
+    expect(nameFitStyle('Alpha')).toBeNull();
+    expect(nameFitStyle('')).toBeNull();
+  });
+
+  it('shrinks the font-size scale for a name past the fit threshold, and reports it fits one line', () => {
+    const fit = nameFitStyle('Robo Raiders Supreme'); // 20 chars
+    expect(fit.style).toContain('--robotics-name-scale:');
+    const scale = Number(fit.style.match(/--robotics-name-scale:\s*([\d.]+)/)[1]);
+    expect(scale).toBeLessThan(1);
+    expect(scale).toBeCloseTo(0.82);
+    expect(fit.fitsOneLine).toBe(true);
+  });
+
+  it('floors the scale so an extremely long name never shrinks past readable, and reports it no longer fits one line', () => {
+    const fit = nameFitStyle('A'.repeat(60));
+    const scale = Number(fit.style.match(/--robotics-name-scale:\s*([\d.]+)/)[1]);
+    expect(scale).toBe(0.6);
+    expect(fit.fitsOneLine).toBe(false);
   });
 });
 

@@ -367,15 +367,19 @@ body {
 .robotics-now-playing-team-name {
   color: var(--arena-text);
   font-family: var(--arena-font-display);
-  font-size: clamp(1.5rem, 2.6vw, 2.5rem);
+  font-size: calc(clamp(1.5rem, 2.6vw, 2.5rem) * var(--robotics-name-scale, 1));
   font-weight: 700;
   line-height: 1.1;
+  /* Fallback for the rare name too long for .robotics-fit-name's nowrap to be
+     applied (see nameFitStyle's fitsOneLine in robotics.js): wrap rather than
+     overflow into the neighboring side. */
   overflow-wrap: anywhere;
 }
 
 .robotics-now-playing-members {
   color: var(--arena-text-muted);
-  font-size: clamp(0.9rem, 1.1vw, 1.1rem);
+  font-size: calc(clamp(0.9rem, 1.1vw, 1.1rem) * var(--robotics-name-scale, 1));
+  overflow-wrap: anywhere;
 }
 
 .robotics-app .robotics-now-playing-arena > input.robotics-score-input {
@@ -1117,6 +1121,19 @@ body {
   overflow-wrap: anywhere;
 }
 
+/* ---- Long name shrink-to-fit ----
+   `--robotics-name-scale` is set inline per name (see nameFitStyle in
+   robotics.js), computed from character count; each context below folds
+   that scale into its own font-size so a long name shrinks instead of
+   wrapping, while a short name (scale defaults to 1) renders unchanged. */
+.robotics-fit-name {
+  white-space: nowrap;
+}
+
+.robotics-match-alliance .robotics-team-toggle {
+  font-size: calc(1em * var(--robotics-name-scale, 1));
+}
+
 /* ---- Alliance colors: side A is red, side B is blue (as in VEX) ---- */
 
 .robotics-match-grid > .robotics-match-alliance,
@@ -1217,9 +1234,13 @@ body {
   background-color: var(--arena-blue-soft);
 }
 
+.robotics-standings-team-name {
+  font-size: calc(1em * var(--robotics-name-scale, 1));
+}
+
 .robotics-standings-members {
   color: var(--arena-text-muted);
-  font-size: 0.75rem;
+  font-size: calc(0.75rem * var(--robotics-name-scale, 1));
   margin-top: 2px;
 }
 

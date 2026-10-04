@@ -66,17 +66,30 @@ const NAME_FIT_SHRINK_PER_CHAR = 0.03;
 const NAME_FIT_MIN_SCALE = 0.6;
 
 /**
- * Inline style shrinking a name's font-size (via the `--robotics-name-scale`
- * custom property consumed by `.robotics-fit-name` in robotics.css) once it's
- * long enough to risk wrapping onto a second line in a width-constrained
- * cell. `null` for names short enough to render at normal size, so callers
- * can skip the `style` attribute entirely.
+ * Long-name shrink-to-fit sizing for a name rendered in a width-constrained
+ * cell. `null` when the name is short enough to render at normal size.
+ * Otherwise `{ style, fitsOneLine }`: `style` sets the `--robotics-name-scale`
+ * custom property consumed by `.robotics-fit-name` in robotics.css.
+ * `fitsOneLine` is false once a name is so long the scale has hit its floor
+ * and can no longer be trusted to fit one line — callers skip forcing
+ * `nowrap` in that case, so the name falls back to wrapping instead of
+ * visually overflowing into a neighboring cell.
  */
 export function nameFitStyle(text) {
   const length = String(text ?? '').length;
   if (length <= NAME_FIT_THRESHOLD) return null;
-  const scale = Math.max(NAME_FIT_MIN_SCALE, 1 - (length - NAME_FIT_THRESHOLD) * NAME_FIT_SHRINK_PER_CHAR);
-  return `--robotics-name-scale: ${scale};`;
+  const rawScale = 1 - (length - NAME_FIT_THRESHOLD) * NAME_FIT_SHRINK_PER_CHAR;
+  return {
+    style: `--robotics-name-scale: ${Math.max(NAME_FIT_MIN_SCALE, rawScale)};`,
+    fitsOneLine: rawScale >= NAME_FIT_MIN_SCALE,
+  };
+}
+
+/** `className`/`style` fragment for a name, folding in nameFitStyle's shrink-to-fit. */
+function nameFitProps(text) {
+  const fit = nameFitStyle(text);
+  if (!fit) return { fitClass: '', style: null };
+  return { fitClass: fit.fitsOneLine ? ' robotics-fit-name' : '', style: fit.style };
 }
 
 function playoffAllianceTeamIds(state, allianceId) {
@@ -99,11 +112,14 @@ function renderAllianceSide(state, teamIds, noShow, onToggleNoShow, isWinner, co
   teamIds.forEach((teamId, i) => {
     if (i > 0) children.push(' & ');
     const isNoShow = !!noShow[teamId];
+    const name = teamName(state, teamId);
+    const { fitClass, style } = nameFitProps(name);
     children.push(el('span', {
-      className: `robotics-team-toggle${isNoShow ? ' is-no-show' : ''}`,
+      className: `robotics-team-toggle${fitClass}${isNoShow ? ' is-no-show' : ''}`,
       title: isNoShow ? 'Click to mark present' : 'Click to mark No-Show',
       onClick: () => onToggleNoShow(teamId, !isNoShow),
-    }, [teamName(state, teamId)]));
+      ...(style ? { style } : {}),
+    }, [name]));
   });
   return el('span', { className: `robotics-match-alliance is-${color}${isWinner ? ' is-winner' : ''}` }, children);
 }
@@ -634,13 +650,18 @@ function renderNowPlayingSide(state, match, teamIds, onToggleNoShow, color) {
   return el('div', { className: `robotics-now-playing-side is-${color}` }, teamIds.map((teamId) => {
     const team = state.teams.find((t) => t.id === teamId);
     const isNoShow = !!match.noShow[teamId];
+    const name = teamName(state, teamId);
+    const nameFit = nameFitProps(name);
+    const membersText = team?.members.length ? team.members.join(', ') : null;
+    const membersFit = membersText ? nameFitProps(membersText) : { fitClass: '', style: null };
     return el('div', { className: 'robotics-now-playing-team' }, [
       el('span', {
-        className: `robotics-team-toggle robotics-now-playing-team-name${isNoShow ? ' is-no-show' : ''}`,
+        className: `robotics-team-toggle robotics-now-playing-team-name${nameFit.fitClass}${isNoShow ? ' is-no-show' : ''}`,
         title: isNoShow ? 'Click to mark present' : 'Click to mark No-Show',
         onClick: () => onToggleNoShow(teamId, !isNoShow),
-      }, [teamName(state, teamId)]),
-      ...(team?.members.length ? [el('div', { className: 'robotics-now-playing-members' }, [team.members.join(', ')])] : []),
+        ...(nameFit.style ? { style: nameFit.style } : {}),
+      }, [name]),
+      ...(membersText ? [el('div', { className: `robotics-now-playing-members${membersFit.fitClass}`, ...(membersFit.style ? { style: membersFit.style } : {}) }, [membersText])] : []),
     ]);
   }));
 }
@@ -741,9 +762,13 @@ export function renderScheduleTab(state, dispatch, { setActiveTab }) {
 
 /** Team name with its Members as a muted second line (omitted when there are none). */
 function renderStandingsTeamCell(team) {
-  const parts = [el('div', { className: 'robotics-standings-team-name' }, [team?.name ?? '(unknown)'])];
+  const name = team?.name ?? '(unknown)';
+  const nameFit = nameFitProps(name);
+  const parts = [el('div', { className: `robotics-standings-team-name${nameFit.fitClass}`, ...(nameFit.style ? { style: nameFit.style } : {}) }, [name])];
   if (team?.members?.length) {
-    parts.push(el('div', { className: 'robotics-standings-members' }, [team.members.join(', ')]));
+    const membersText = team.members.join(', ');
+    const membersFit = nameFitProps(membersText);
+    parts.push(el('div', { className: `robotics-standings-members${membersFit.fitClass}`, ...(membersFit.style ? { style: membersFit.style } : {}) }, [membersText]));
   }
   return parts;
 }
