@@ -511,7 +511,7 @@ body {
   transition: transform var(--transition-fast);
 }
 
-.is-expanded .robotics-accordion-chevron {
+.robotics-accordion.is-expanded .robotics-accordion-chevron {
   transform: rotate(90deg);
 }
 
@@ -521,7 +521,11 @@ body {
   min-width: 0;
 }
 
-.robotics-accordion .robotics-card-title {
+/* Scoped to the heading specifically, not .robotics-accordion as a whole: the
+   Finals accordion's panel nests full .robotics-card titles of its own (Form a
+   Playoff Alliance, Playoff Alliances, Bracket Configuration) that must keep
+   their normal card-title styling once the accordion expands. */
+.robotics-accordion-heading .robotics-card-title {
   display: block;
   margin: 0;
   padding: 0;
