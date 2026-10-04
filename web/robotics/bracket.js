@@ -116,6 +116,23 @@ export function buildBracket({ bracketSize, seeds, includeThirdPlace }) {
   return { bracketSize, paddedSize, seeds: [...seeds], includeThirdPlace, matches };
 }
 
+/**
+ * One-line summary of the Finals setup cards (Alliance Selection + Bracket
+ * Configuration) for their collapsed panel, e.g.
+ * `2 alliances · bracket size 4 · no third-place match`.
+ * @param {{alliances: object[], bracketSize: number|null, includeThirdPlace: boolean}} elimination
+ * @returns {string}
+ */
+export function formatFinalsSetupSummary(elimination) {
+  const allianceCount = elimination.alliances.length;
+  const parts = [
+    allianceCount === 1 ? '1 alliance' : `${allianceCount} alliances`,
+    elimination.bracketSize ? `bracket size ${elimination.bracketSize}` : 'bracket size not set',
+    elimination.includeThirdPlace ? 'with third-place match' : 'no third-place match',
+  ];
+  return parts.join(' · ');
+}
+
 function findMatch(bracket, matchId) {
   return bracket.matches.find((m) => m.id === matchId);
 }

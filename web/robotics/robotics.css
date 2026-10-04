@@ -472,17 +472,18 @@ body {
   }
 }
 
-/* Match Timeline: a one-line summary button that opens the controls in place. */
-.robotics-timeline {
+/* Collapsible accordion: a one-line summary button that opens a panel in
+   place. Shared by the Match Timeline and the Finals tab's Playoff Setup. */
+.robotics-accordion {
   padding: var(--spacing-sm) var(--spacing-lg);
 }
 
-.robotics-timeline-header {
+.robotics-accordion-header {
   margin: 0;
   font: inherit;
 }
 
-.robotics-timeline-toggle {
+.robotics-accordion-toggle {
   display: flex;
   align-items: center;
   gap: var(--spacing-sm);
@@ -496,13 +497,13 @@ body {
   cursor: pointer;
 }
 
-.robotics-timeline-toggle:focus-visible {
+.robotics-accordion-toggle:focus-visible {
   outline: none;
   border-radius: var(--radius-md);
   box-shadow: var(--arena-focus);
 }
 
-.robotics-timeline-chevron {
+.robotics-accordion-chevron {
   flex: none;
   color: var(--arena-text-muted);
   font-size: 1.25rem;
@@ -510,17 +511,17 @@ body {
   transition: transform var(--transition-fast);
 }
 
-.robotics-timeline.is-expanded .robotics-timeline-chevron {
+.is-expanded .robotics-accordion-chevron {
   transform: rotate(90deg);
 }
 
-.robotics-timeline-heading {
+.robotics-accordion-heading {
   display: flex;
   flex-direction: column;
   min-width: 0;
 }
 
-.robotics-timeline .robotics-card-title {
+.robotics-accordion .robotics-card-title {
   display: block;
   margin: 0;
   padding: 0;
@@ -528,13 +529,14 @@ body {
   font-size: 1rem;
 }
 
-/* Wraps rather than truncates: in the narrow column an ellipsis would hide the end time. */
-.robotics-timeline-summary {
+/* Wraps rather than truncates: in a narrow column an ellipsis would hide the end of the summary. */
+.robotics-accordion-summary {
   color: var(--arena-text-muted);
   font-size: 0.875rem;
   font-variant-numeric: tabular-nums;
 }
 
+/* Match Timeline: the controls shown once the accordion above is expanded. */
 .robotics-timeline-panel {
   display: grid;
   gap: var(--spacing-sm);
@@ -611,6 +613,21 @@ body {
 /* Team A / Team B selects share the card's width instead of shrinking to fit. */
 .robotics-finals-setup .robotics-form-row > .robotics-field {
   flex: 1 1 140px;
+}
+
+/* Playoff Setup accordion: Form a Playoff Alliance, Playoff Alliances, and
+   Bracket Configuration collapse into one summary line so the Elimination
+   Bracket is the dominant content on the tab once setup is done. */
+.robotics-finals-accordion-panel {
+  display: grid;
+  gap: var(--spacing-lg);
+  margin-top: var(--spacing-sm);
+  padding-top: var(--spacing-sm);
+  border-top: 1px solid var(--arena-border);
+}
+
+.robotics-finals-accordion-panel[hidden] {
+  display: none;
 }
 
 .robotics-card {
