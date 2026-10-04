@@ -246,9 +246,18 @@ body {
   container-type: inline-size;
 }
 
+/* Pinned to the top of the viewport as the Qualification Matches list below it
+   scrolls, so the Current Match stays visible on a tall roster; the opaque
+   background keeps list rows from showing through behind it (and through the
+   gap to Up Next when they're stacked). */
 .robotics-now-playing-layout {
   display: grid;
   gap: var(--spacing-md);
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--arena-bg);
+  padding-bottom: var(--spacing-md);
 }
 
 @container (min-width: 56rem) {

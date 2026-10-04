@@ -1061,6 +1061,41 @@ describe('initRoboticsApp', () => {
       expect(redNames).toEqual(names(app.getState(), second.allianceA));
     });
 
+    it('auto-scrolls the Current Match row into view when Mark Complete advances it, but not on a draft score edit', () => {
+      const app = initRoboticsApp();
+      openSchedule(app, 3);
+      const scrollIntoView = vi.fn();
+      Element.prototype.scrollIntoView = scrollIntoView;
+
+      const [scoreA, scoreB] = card().querySelectorAll('.robotics-score-input');
+      scoreA.value = '10';
+      scoreA.dispatchEvent(new Event('change'));
+      scoreB.value = '0';
+      scoreB.dispatchEvent(new Event('change'));
+      expect(scrollIntoView).not.toHaveBeenCalled();
+
+      card().querySelector('.robotics-now-playing-complete').click();
+
+      expect(scrollIntoView).toHaveBeenCalledTimes(1);
+      expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest' });
+      expect(scrollIntoView.mock.instances[0]).toBe(document.querySelector('.robotics-match-row.is-current'));
+
+      delete Element.prototype.scrollIntoView;
+    });
+
+    it('does not auto-scroll when the Current Match changes while on a different tab', () => {
+      const app = initRoboticsApp();
+      openSchedule(app, 1);
+      const scrollIntoView = vi.fn();
+      Element.prototype.scrollIntoView = scrollIntoView;
+
+      app.setActiveTab('teams');
+      app.dispatch((s) => recordQualificationResult(s, 0, { scoreA: 1, scoreB: 0 }));
+      expect(scrollIntoView).not.toHaveBeenCalled();
+
+      delete Element.prototype.scrollIntoView;
+    });
+
     it('shows a read-only Up Next preview of the following match', () => {
       const app = initRoboticsApp();
       openSchedule(app, 3);

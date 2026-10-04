@@ -1172,10 +1172,18 @@ export function initRoboticsApp({ mountId = 'roboticsApp', storageKey = 'robotic
     mount.appendChild(renderApp(state, dispatch, activeTab, setActiveTab, ui));
   }
 
+  // Auto-scroll the Qualification Matches list to the Current Match row, but only when
+  // the Current Match actually advances (a dispatch changes which match is current) - not
+  // on every re-render, so editing a draft score doesn't yank the teacher's scroll position.
   function dispatch(updater) {
+    const previousCurrentIndex = getCurrentMatchIndex(state.qualification.matches);
     state = updater(state);
     storage.save(state);
     render();
+    const currentIndex = getCurrentMatchIndex(state.qualification.matches);
+    if (activeTab === 'schedule' && currentIndex !== previousCurrentIndex) {
+      mount.querySelector('.robotics-match-row.is-current')?.scrollIntoView?.({ block: 'nearest' });
+    }
   }
 
   function setActiveTab(tab) {
