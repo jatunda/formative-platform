@@ -540,6 +540,14 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* Every accordion panel (Match Timeline, Finals Playoff Setup) sets its own
+   display: grid, so hiding it needs higher specificity than that — true of
+   any panel-specific class, hence one shared override here rather than one
+   per variant. */
+.robotics-accordion-panel[hidden] {
+  display: none;
+}
+
 /* Match Timeline: the controls shown once the accordion above is expanded. */
 .robotics-timeline-panel {
   display: grid;
@@ -547,10 +555,6 @@ body {
   margin-top: var(--spacing-sm);
   padding-top: var(--spacing-sm);
   border-top: 1px solid var(--arena-border);
-}
-
-.robotics-timeline-panel[hidden] {
-  display: none;
 }
 
 .robotics-timeline-panel .robotics-field {
@@ -628,10 +632,6 @@ body {
   margin-top: var(--spacing-sm);
   padding-top: var(--spacing-sm);
   border-top: 1px solid var(--arena-border);
-}
-
-.robotics-finals-accordion-panel[hidden] {
-  display: none;
 }
 
 .robotics-card {

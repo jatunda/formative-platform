@@ -575,6 +575,7 @@ function renderTimelineControls(state, dispatch) {
  */
 function renderAccordion({ variant, title, summary, panel, expanded, onToggle }) {
   const card = el('div', { className: `robotics-card robotics-accordion robotics-${variant}${expanded ? ' is-expanded' : ''}` });
+  panel.classList.add('robotics-accordion-panel');
   panel.hidden = !expanded;
   const toggle = el('button', {
     type: 'button',
