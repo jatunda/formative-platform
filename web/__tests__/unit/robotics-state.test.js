@@ -25,6 +25,11 @@ import {
   setEliminationDraftScore,
   resetResults,
   newTournament,
+  getRevealedCount,
+  getNextPlaceToReveal,
+  getRevealedPlaces,
+  revealNextPlacement,
+  replayReveal,
 } from '../../robotics/state.js';
 
 function withFourTeams(state) {
@@ -374,5 +379,104 @@ describe('newTournament', () => {
     state = newTournament(state);
     expect(state.teams).toHaveLength(0);
     expect(state.qualification.matches).toHaveLength(0);
+  });
+});
+
+describe('Podium reveal', () => {
+  /** Two (or four, with a Third-Place Match) single-Team Playoff Alliances in a generated bracket. */
+  function withBracket({ size = 2, includeThirdPlace = false } = {}) {
+    let s = createInitialState();
+    for (let i = 0; i < size; i++) s = addTeam(s, { name: `T${i}`, members: [] });
+    s.teams.forEach((t) => { s = formPlayoffAlliance(s, t.id, t.id); });
+    s = setBracketConfig(s, { bracketSize: size, includeThirdPlace });
+    s.elimination.alliances.forEach((a, i) => { s = setSeed(s, i + 1, a.id); });
+    return generateBracket(s);
+  }
+
+  function completeAll(state) {
+    let s = state;
+    for (const m of s.elimination.bracket.matches) s = recordEliminationResult(s, m.id, { scoreA: 9, scoreB: 1 });
+    return s;
+  }
+
+  it('starts with nothing revealed, including for a state saved before reveal progress existed', () => {
+    expect(getRevealedCount(createInitialState())).toBe(0);
+    const { podium, ...legacy } = createInitialState();
+    expect(getRevealedCount(legacy)).toBe(0);
+  });
+
+  it('does nothing while the bracket is not complete', () => {
+    const s = withBracket();
+    expect(revealNextPlacement(s)).toBe(s);
+    expect(revealNextPlacement(createInitialState())).toEqual(createInitialState());
+  });
+
+  it('reveals 3rd, then 2nd, then 1st, and stops there', () => {
+    let s = completeAll(withBracket({ size: 4, includeThirdPlace: true }));
+    expect([...getRevealedPlaces(s)]).toEqual([]);
+    s = revealNextPlacement(s);
+    expect([...getRevealedPlaces(s)]).toEqual([3]);
+    s = revealNextPlacement(s);
+    expect([...getRevealedPlaces(s)]).toEqual([3, 2]);
+    s = revealNextPlacement(s);
+    expect([...getRevealedPlaces(s)]).toEqual([3, 2, 1]);
+    s = revealNextPlacement(s);
+    expect(getRevealedCount(s)).toBe(3);
+  });
+
+  it('skips 3rd when there is no Third-Place Match', () => {
+    let s = completeAll(withBracket());
+    s = revealNextPlacement(s);
+    expect([...getRevealedPlaces(s)]).toEqual([2]);
+    s = revealNextPlacement(revealNextPlacement(s));
+    expect([...getRevealedPlaces(s)]).toEqual([2, 1]);
+  });
+
+  it('reveals nothing on the Podium while the bracket is not complete, whatever the stored step', () => {
+    // An undecided bracket has no Placements, so its key is '' - only the completeness check stops this.
+    const s = { ...withBracket(), podium: { revealedCount: 2, revealedFor: '' } };
+    expect([...getRevealedPlaces(s)]).toEqual([]);
+  });
+
+  it('replayReveal re-covers every block', () => {
+    let s = revealNextPlacement(revealNextPlacement(completeAll(withBracket())));
+    s = replayReveal(s);
+    expect(getRevealedCount(s)).toBe(0);
+    expect([...getRevealedPlaces(s)]).toEqual([]);
+  });
+
+  it('names the next place to reveal, or null once all are revealed or while undecided', () => {
+    expect(getNextPlaceToReveal(withBracket())).toBeNull();
+    let s = completeAll(withBracket({ size: 4, includeThirdPlace: true }));
+    expect(getNextPlaceToReveal(s)).toBe(3);
+    s = revealNextPlacement(revealNextPlacement(s));
+    expect(getNextPlaceToReveal(s)).toBe(1);
+    expect(getNextPlaceToReveal(revealNextPlacement(s))).toBeNull();
+  });
+
+  it('re-covers the Podium when an edited result changes the Placements', () => {
+    let s = revealNextPlacement(revealNextPlacement(completeAll(withBracket())));
+    const finalId = s.elimination.bracket.matches.find((m) => m.round === 'final').id;
+    s = recordEliminationResult(s, finalId, { scoreA: 1, scoreB: 9 });
+    expect(getRevealedCount(s)).toBe(0);
+    expect([...getRevealedPlaces(s)]).toEqual([]);
+  });
+
+  it('keeps the reveal when an edit leaves the Placements unchanged', () => {
+    let s = revealNextPlacement(completeAll(withBracket()));
+    const finalId = s.elimination.bracket.matches.find((m) => m.round === 'final').id;
+    s = recordEliminationResult(s, finalId, { scoreA: 7, scoreB: 2 });
+    expect([...getRevealedPlaces(s)]).toEqual([2]);
+  });
+
+  it('regenerating the bracket clears reveal progress', () => {
+    const s = revealNextPlacement(completeAll(withBracket()));
+    expect(generateBracket(s).podium.revealedCount).toBe(0);
+  });
+
+  it('Reset Results and New Tournament clear reveal progress', () => {
+    const s = revealNextPlacement(completeAll(withBracket()));
+    expect(getRevealedCount(resetResults(s))).toBe(0);
+    expect(getRevealedCount(newTournament(s))).toBe(0);
   });
 });

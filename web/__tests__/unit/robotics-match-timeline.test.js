@@ -4,6 +4,8 @@ import {
   computeTotalDurationMinutes,
   computeStartTimeFromEndTime,
   estimateEliminationMatchCount,
+  formatTimelineSummary,
+  MINUTE_MS,
 } from '../../robotics/match-timeline.js';
 
 const START = new Date('2026-10-02T08:00:00Z').getTime();
@@ -71,5 +73,48 @@ describe('computeStartTimeFromEndTime', () => {
     const totalMinutes = 55; // arbitrary total duration for this test
     const result = computeStartTimeFromEndTime({ ...timeline, endTime }, totalMinutes);
     expect(result).toBe(endTime - totalMinutes * 60 * 1000);
+  });
+});
+
+describe('formatTimelineSummary', () => {
+  // A fixed-format clock keeps these assertions independent of locale and timezone.
+  const clock = (ms) => `@${(ms - START) / MINUTE_MS}`;
+  const base = { mode: 'forward', startTime: null, endTime: null, matchDurationMin: 4, gapMin: 1, fieldCount: 2 };
+
+  it('leads Forward mode with the start time and ends with the projected end time', () => {
+    // 10 matches on 2 fields = 5 slots → 5*4 + 4*1 = 24 min
+    expect(formatTimelineSummary({ ...base, startTime: START }, 10, clock))
+      .toBe('Forward · starts @0 · 4 + 1 min · 2 fields · ends ~@24');
+  });
+
+  it('uses the singular for a single field', () => {
+    expect(formatTimelineSummary({ ...base, startTime: START, fieldCount: 1 }, 2, clock))
+      .toBe('Forward · starts @0 · 4 + 1 min · 1 field · ends ~@9');
+  });
+
+  it('omits the end time when there are no matches to schedule yet', () => {
+    expect(formatTimelineSummary({ ...base, startTime: START }, 0, clock))
+      .toBe('Forward · starts @0 · 4 + 1 min · 2 fields');
+  });
+
+  it('says so when no start time is set in Forward mode', () => {
+    expect(formatTimelineSummary(base, 10, clock))
+      .toBe('Forward · no start time · 4 + 1 min · 2 fields');
+  });
+
+  it('leads Backward mode with the target end time and ends with the computed start time', () => {
+    const timeline = { ...base, mode: 'backward', endTime: START + 60 * MINUTE_MS, startTime: START + 36 * MINUTE_MS };
+    expect(formatTimelineSummary(timeline, 10, clock))
+      .toBe('Backward · ends @60 · 4 + 1 min · 2 fields · starts ~@36');
+  });
+
+  it('omits the start time in Backward mode until one has been applied', () => {
+    expect(formatTimelineSummary({ ...base, mode: 'backward', endTime: START }, 10, clock))
+      .toBe('Backward · ends @0 · 4 + 1 min · 2 fields');
+  });
+
+  it('says so when no end time is set in Backward mode', () => {
+    expect(formatTimelineSummary({ ...base, mode: 'backward' }, 10, clock))
+      .toBe('Backward · no end time · 4 + 1 min · 2 fields');
   });
 });

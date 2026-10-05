@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { nextPowerOfTwo, seedOrder, buildBracket, resolveMatchSides, getBracketWinner } from '../../robotics/bracket.js';
+import { nextPowerOfTwo, seedOrder, buildBracket, resolveMatchSides, getBracketWinner, countUndecidedMatches, isBracketComplete, getPlacements } from '../../robotics/bracket.js';
 
 describe('nextPowerOfTwo', () => {
   it('returns the same number when already a power of two', () => {
@@ -135,5 +135,74 @@ describe('buildBracket', () => {
       matches: bracket.matches.map((m) => (m.id === final.id ? { ...m, scoreA: 80, scoreB: 20, completed: true } : m)),
     };
     expect(getBracketWinner(bracket)).toBe(seeds[0]);
+  });
+});
+
+/** Record [scoreA, scoreB] (as complete) on the played matches, in bracket order. */
+function withResults(bracket, results) {
+  const playedIds = bracket.matches.filter((m) => !m.isBye).map((m) => m.id);
+  const scoresById = new Map(results.map((scores, i) => [playedIds[i], scores]));
+  return {
+    ...bracket,
+    matches: bracket.matches.map((m) => {
+      const scores = scoresById.get(m.id);
+      return scores ? { ...m, scoreA: scores[0], scoreB: scores[1], completed: true } : m;
+    }),
+  };
+}
+
+describe('countUndecidedMatches / isBracketComplete', () => {
+  const fourWithThird = () => buildBracket({ bracketSize: 4, seeds: ['a1', 'a2', 'a3', 'a4'], includeThirdPlace: true });
+
+  it('counts every played match (Third-Place Match included) as undecided at the start, and Byes not at all', () => {
+    expect(countUndecidedMatches(fourWithThird())).toBe(4);
+    expect(countUndecidedMatches(buildBracket({ bracketSize: 3, seeds: ['a1', 'a2', 'a3'], includeThirdPlace: false }))).toBe(2);
+  });
+
+  it('is incomplete while the Third-Place Match is undecided, even with the Final decided', () => {
+    // Played matches in bracket order: semi, semi, Final, Third-Place Match - decide the first three.
+    const bracket = withResults(fourWithThird(), [[5, 1], [5, 1], [5, 1]]);
+    expect(countUndecidedMatches(bracket)).toBe(1);
+    expect(isBracketComplete(bracket)).toBe(false);
+  });
+
+  it('treats a tied completed match as undecided', () => {
+    const bracket = withResults(buildBracket({ bracketSize: 2, seeds: ['a1', 'a2'], includeThirdPlace: false }), [[3, 3]]);
+    expect(isBracketComplete(bracket)).toBe(false);
+  });
+
+  it('is complete once every played match has a winner', () => {
+    expect(isBracketComplete(withResults(fourWithThird(), [[5, 1], [5, 1], [5, 1], [5, 1]]))).toBe(true);
+  });
+
+  it('is not complete with no bracket', () => {
+    expect(isBracketComplete(null)).toBe(false);
+  });
+});
+
+describe('getPlacements', () => {
+  it('has no Placements before anything is decided', () => {
+    expect(getPlacements(buildBracket({ bracketSize: 2, seeds: ['a1', 'a2'], includeThirdPlace: false }))).toEqual([]);
+  });
+
+  it('gives 1st and 2nd from the Final when there is no Third-Place Match', () => {
+    const bracket = withResults(buildBracket({ bracketSize: 2, seeds: ['a1', 'a2'], includeThirdPlace: false }), [[1, 9]]);
+    expect(getPlacements(bracket)).toEqual([
+      { place: 1, allianceId: 'a2' },
+      { place: 2, allianceId: 'a1' },
+    ]);
+  });
+
+  it('adds 3rd from the Third-Place Match winner', () => {
+    // Semis are a1 v a4 and a2 v a3; a1 and a2 win them, a1 wins the Final, and a3 beats a4 for 3rd.
+    const bracket = withResults(
+      buildBracket({ bracketSize: 4, seeds: ['a1', 'a2', 'a3', 'a4'], includeThirdPlace: true }),
+      [[9, 1], [9, 1], [9, 1], [1, 9]],
+    );
+    expect(getPlacements(bracket)).toEqual([
+      { place: 1, allianceId: 'a1' },
+      { place: 2, allianceId: 'a2' },
+      { place: 3, allianceId: 'a3' },
+    ]);
   });
 });

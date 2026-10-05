@@ -20,3 +20,13 @@ If it fails:
 - **Truly unreachable defensive code** (a guard whose caller already prevents the condition) is the one legitimate exception — don't contort a test around it. Leave it uncovered and say so, rather than lowering the threshold to paper over it.
 
 Lowering `coverage.thresholds` to make a failing run pass is not an acceptable fix on its own — raising it is reserved for when coverage has genuinely improved.
+
+## Agent skills
+
+### Issue tracker
+
+Issues/specs live as markdown files under `.scratch/<feature-slug>/`; closing moves the file into `issues/closed/`. See `docs/agents/issue-tracker.md`.
+
+### Domain docs
+
+Multi-context: root `CONTEXT.md` (Formative Platform) + `web/robotics/CONTEXT.md` (Robotics Tournament), mapped from `CONTEXT-MAP.md`. See `docs/agents/domain.md`.

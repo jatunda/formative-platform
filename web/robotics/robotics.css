@@ -1,29 +1,156 @@
-/* Robotics Tournament Control Panel — page-local overrides & layout.
-   Reuses the design tokens defined in ../style.css (colors, spacing,
-   radius, shadows) so this page matches the rest of the app. */
+/* Robotics Tournament Control Panel — "esports arena" theme.
+   Builds on the shared tokens in ../style.css (spacing, radius, transitions)
+   but layers robotics-local --arena-* tokens on top. This stylesheet is only
+   loaded by robotics.html, so the :root tokens and html/body overrides below
+   never reach the rest of Formative. */
 
+:root {
+  /* Surfaces — deep near-black navy, stepping lighter toward the viewer */
+  --arena-bg: #070b14;
+  --arena-surface: #0e1524;
+  --arena-surface-raised: #152036;
+  --arena-surface-sunken: #0a101c;
+  --arena-border: #22304a;
+  --arena-border-strong: #33476b;
+
+  /* Text */
+  --arena-text: #eef2fa;
+  --arena-text-muted: #8f9cb8;
+
+  /* Alliances (A = red, B = blue, as in VEX) */
+  --arena-red: #ff4d5e;
+  --arena-red-soft: rgba(255, 77, 94, 0.14);
+  --arena-blue: #3d9bff;
+  --arena-blue-soft: rgba(61, 155, 255, 0.14);
+  --arena-blue-hover: #2285f0;
+  --arena-on-solid: #ffffff; /* text on solid blue/red fills */
+
+  /* Accent + status */
+  --arena-accent: #ffc83d;
+  --arena-accent-soft: rgba(255, 200, 61, 0.14);
+  --arena-success: #3ddc84;
+  --arena-danger: #ff5c6c;
+
+  /* Medals — meant for the Podium only (standings rank colors are dropped in ticket 03) */
+  --arena-gold: var(--arena-accent);
+  --arena-silver: #c9d3e3;
+  --arena-bronze: #d98b4a;
+
+  /* Live glow */
+  --arena-live: #3ddcff;
+  --arena-glow: 0 0 0 1px rgba(61, 220, 255, 0.45), 0 0 24px rgba(61, 220, 255, 0.25);
+  --arena-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  --arena-focus: 0 0 0 3px rgba(61, 155, 255, 0.35);
+
+  /* Type — webfonts with system fallbacks so the page renders offline */
+  --arena-font-display: 'Rajdhani', 'Bahnschrift', 'Arial Narrow', 'Roboto Condensed', system-ui, sans-serif;
+  --arena-font-body: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+
+  --arena-gutter: clamp(12px, 2vw, 32px);
+}
+
+/* Bigger base size so it reads on a projector; rem-based spacing scales with it. */
+html {
+  font-size: 112.5%;
+  background-color: var(--arena-bg);
+}
+
+/* Fully fluid: override the shared stylesheet's 800px body (and the old 1200px cap). */
 body {
-  max-width: 1200px;
+  max-width: none;
+  margin: 0;
+  padding: var(--spacing-xl) var(--arena-gutter);
+  background-color: var(--arena-bg);
+  background-image: radial-gradient(ellipse at top, rgba(61, 155, 255, 0.08), transparent 60%);
+  background-attachment: fixed;
+  color: var(--arena-text);
+  font-family: var(--arena-font-body);
+  line-height: 1.45;
 }
 
 .robotics-app {
   max-width: none;
-  margin: 0 auto;
+  margin: 0;
   padding: 0;
-  font-family: var(--font-sans);
+  font-family: var(--arena-font-body);
+  color: var(--arena-text);
+}
+
+/* Condensed display face for headings. :where/:is keep this at element-level
+   specificity so class rules like .robotics-title can still override it. */
+:where(.robotics-app) :is(h1, h2, h3, h4) {
+  font-family: var(--arena-font-display);
+  font-weight: 700;
+  letter-spacing: 0.02em;
 }
 
 /* ---- Header ---- */
 
 .robotics-header {
   margin-bottom: var(--spacing-xl);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-md) var(--spacing-xl);
+  padding: var(--spacing-md) var(--spacing-lg);
+  background: linear-gradient(90deg, var(--arena-surface-raised), var(--arena-surface));
+  border: 1px solid var(--arena-border);
+  border-left: 4px solid var(--arena-live);
+  border-radius: var(--radius-2xl);
+  box-shadow: var(--arena-shadow);
 }
 
 .robotics-title {
-  margin: 0 0 var(--spacing-xs);
-  color: var(--accent-blue);
+  margin: 0;
+  color: var(--arena-text);
+  font-size: 2.2rem;
+  line-height: 1.1;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* ---- Live status strip ---- */
+
+.robotics-status-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-sm) var(--spacing-lg);
+  font-family: var(--arena-font-display);
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
+}
+
+.robotics-status-strip > * + *:not([hidden])::before {
+  content: '';
+  display: inline-block;
+  width: 1px;
+  height: 1em;
+  margin-right: var(--spacing-lg);
+  vertical-align: -0.1em;
+  background: var(--arena-border-strong);
+}
+
+.robotics-status-phase {
+  color: var(--arena-live);
+}
+
+.robotics-status-progress {
+  color: var(--arena-text);
+}
+
+.robotics-status-drift[data-drift='on-schedule'] { color: var(--arena-success); }
+.robotics-status-drift[data-drift='behind'] { color: var(--arena-danger); }
+.robotics-status-drift[data-drift='ahead'] { color: var(--arena-accent); }
+
+.robotics-status-clock {
+  color: var(--arena-text);
   font-size: 1.6rem;
-  letter-spacing: -0.01em;
+  font-weight: 700;
 }
 
 /* ---- Tabs ---- */
@@ -32,7 +159,7 @@ body {
   display: flex;
   gap: var(--spacing-xs);
   margin-bottom: var(--spacing-xl);
-  border-bottom: 1px solid var(--border-color);
+  box-shadow: inset 0 -2px 0 var(--arena-border);
   overflow-x: auto;
 }
 
@@ -44,12 +171,15 @@ body {
   margin: 0;
   padding: var(--spacing-sm) var(--spacing-lg);
   border: none;
-  border-bottom: 2px solid transparent;
+  border-bottom: 3px solid transparent;
   border-radius: var(--radius-md) var(--radius-md) 0 0;
   background: none;
-  color: var(--text-secondary);
-  font-size: 0.95rem;
-  font-weight: 500;
+  color: var(--arena-text-muted);
+  font-family: var(--arena-font-display);
+  font-size: 1.15rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
   white-space: nowrap;
   cursor: pointer;
   transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast);
@@ -64,21 +194,22 @@ body {
 .robotics-tab-btn[data-tab-key="schedule"]::before { content: '📅'; }
 .robotics-tab-btn[data-tab-key="standings"]::before { content: '📊'; }
 .robotics-tab-btn[data-tab-key="finals"]::before { content: '🏆'; }
+.robotics-tab-btn[data-tab-key="results"]::before { content: '🏅'; }
 
 .robotics-tab-btn:hover {
-  color: var(--text-primary);
-  background-color: var(--accent-blue-hover);
+  color: var(--arena-text);
+  background-color: var(--arena-blue-soft);
 }
 
 .robotics-tab-btn:focus-visible {
-  outline: 2px solid var(--accent-blue);
+  outline: 2px solid var(--arena-blue);
   outline-offset: -2px;
 }
 
 .robotics-tab-btn.active {
-  color: var(--accent-blue);
-  border-bottom-color: var(--accent-blue);
-  font-weight: 600;
+  color: var(--arena-text);
+  border-bottom-color: var(--arena-accent);
+  font-weight: 700;
 }
 
 /* ---- Layout ---- */
@@ -88,28 +219,447 @@ body {
   gap: var(--spacing-lg);
 }
 
-.robotics-card {
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-xl);
-  background-color: var(--bg-secondary);
+/* Schedule & Standings: on narrow screens the side column dissolves so the
+   Match Timeline leads the stack, then matches, then Standings; on wide ones
+   matches sit beside a column of Timeline above Standings (see Responsive). */
+.robotics-schedule-layout {
+  display: grid;
+  gap: var(--spacing-lg);
+}
+
+.robotics-schedule-layout > *,
+.robotics-schedule-side > * {
+  min-width: 0;
+}
+
+.robotics-schedule-side {
+  display: contents;
+}
+
+.robotics-schedule-side > .robotics-timeline {
+  order: -1;
+}
+
+/* Now Playing: the Current Match at display scale (readable from the back of a
+   classroom), with the Up Next preview beside it on wide lists, below on narrow. */
+.robotics-schedule-matches {
+  container-type: inline-size;
+}
+
+/* Pinned to the top of the viewport as the Qualification Matches list below it
+   scrolls, so the Current Match stays visible on a tall roster; the opaque
+   background keeps list rows from showing through behind it (and through the
+   gap to Up Next when they're stacked). */
+.robotics-now-playing-layout {
+  display: grid;
+  gap: var(--spacing-md);
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--arena-bg);
+  padding-bottom: var(--spacing-md);
+}
+
+@container (min-width: 56rem) {
+  .robotics-now-playing-layout:has(> .robotics-up-next) {
+    grid-template-columns: minmax(0, 1fr) minmax(14rem, 22%);
+    align-items: stretch;
+  }
+}
+
+.robotics-now-playing,
+.robotics-up-next {
+  min-width: 0;
   padding: var(--spacing-lg);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--arena-border);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(180deg, var(--arena-surface-raised), var(--arena-surface));
+  box-shadow: var(--arena-shadow);
+}
+
+.robotics-now-playing {
+  display: grid;
+  gap: var(--spacing-md);
+  border-color: var(--arena-live);
+  box-shadow: var(--arena-glow), var(--arena-shadow);
+}
+
+.robotics-now-playing.is-idle {
+  justify-items: center;
+  text-align: center;
+  border-color: var(--arena-border);
+  box-shadow: var(--arena-shadow);
+}
+
+.robotics-now-playing.is-finished {
+  border-color: var(--arena-success);
+}
+
+.robotics-now-playing-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--spacing-sm) var(--spacing-lg);
+}
+
+.robotics-now-playing-kicker {
+  color: var(--arena-live);
+  font-family: var(--arena-font-display);
+  font-size: 1rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.robotics-now-playing-meta,
+.robotics-up-next-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--spacing-md);
+}
+
+.robotics-now-playing-time {
+  color: var(--arena-text);
+  font-family: var(--arena-font-display);
+  font-size: clamp(1.5rem, 2.5vw, 2.25rem);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.robotics-now-playing-field {
+  color: var(--arena-text-muted);
+  font-family: var(--arena-font-display);
+  font-size: 1.1rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.robotics-now-playing-arena {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.robotics-now-playing-side {
+  align-self: stretch;
+  display: grid;
+  align-content: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+  border-radius: var(--radius-md);
+}
+
+.robotics-now-playing-side.is-red {
+  border-left: 6px solid var(--arena-red);
+  background-color: var(--arena-red-soft);
+}
+
+.robotics-now-playing-side.is-blue {
+  border-right: 6px solid var(--arena-blue);
+  background-color: var(--arena-blue-soft);
+  text-align: right;
+}
+
+.robotics-now-playing-team-name {
+  color: var(--arena-text);
+  font-family: var(--arena-font-display);
+  font-size: calc(clamp(1.5rem, 2.6vw, 2.5rem) * var(--robotics-name-scale, 1));
+  font-weight: 700;
+  line-height: 1.1;
+  /* Fallback for the rare name too long for .robotics-fit-name's nowrap to be
+     applied (see nameFitStyle's fitsOneLine in robotics.js): wrap rather than
+     overflow into the neighboring side. */
+  overflow-wrap: anywhere;
+}
+
+.robotics-now-playing-members {
+  color: var(--arena-text-muted);
+  font-size: calc(clamp(0.9rem, 1.1vw, 1.1rem) * var(--robotics-name-scale, 1));
+  overflow-wrap: anywhere;
+}
+
+.robotics-app .robotics-now-playing-arena > input.robotics-score-input {
+  width: clamp(5rem, 8vw, 8rem);
+  flex: none;
+  padding-block: var(--spacing-sm);
+  font-size: clamp(2.5rem, 5vw, 4.5rem);
+  line-height: 1;
+}
+
+.robotics-now-playing-arena > .robotics-match-vs {
+  font-family: var(--arena-font-display);
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.robotics-app .robotics-now-playing-complete {
+  justify-self: end;
+  padding: var(--spacing-sm) var(--spacing-xl);
+  font-size: 1.15rem;
+}
+
+.robotics-now-playing-message {
+  margin: 0;
+  color: var(--arena-text);
+  font-family: var(--arena-font-display);
+  font-size: clamp(1.5rem, 2.6vw, 2.5rem);
+  font-weight: 700;
+}
+
+.robotics-now-playing.is-idle:not(.is-finished) .robotics-now-playing-message {
+  color: var(--arena-text-muted);
+  font-size: 1.25rem;
+}
+
+.robotics-up-next {
+  display: grid;
+  align-content: center;
+  gap: var(--spacing-sm);
+  border-style: dashed;
+  border-color: var(--arena-accent);
+}
+
+.robotics-up-next .robotics-now-playing-kicker {
+  color: var(--arena-accent);
+}
+
+.robotics-up-next .robotics-now-playing-time {
+  font-size: 1.5rem;
+}
+
+.robotics-up-next-teams {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--radius-md);
+  color: var(--arena-text);
+  font-family: var(--arena-font-display);
+  font-size: 1.3rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.robotics-up-next-teams.is-red {
+  border-left: 4px solid var(--arena-red);
+  background-color: var(--arena-red-soft);
+}
+
+.robotics-up-next-teams.is-blue {
+  border-left: 4px solid var(--arena-blue);
+  background-color: var(--arena-blue-soft);
+}
+
+/* Narrow list: each side stacks over its score, vs between. */
+@container (max-width: 40rem) {
+  .robotics-now-playing-arena {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .robotics-now-playing-arena > .robotics-now-playing-side.is-blue {
+    grid-area: 3 / 1;
+    text-align: left;
+    border-right: 0;
+    border-left: 6px solid var(--arena-blue);
+  }
+
+  .robotics-now-playing-arena > .robotics-score-input.is-blue { grid-area: 3 / 2; }
+
+  .robotics-now-playing-arena > .robotics-match-vs {
+    grid-column: 1 / -1;
+    justify-self: center;
+  }
+
+  .robotics-app .robotics-now-playing-complete {
+    justify-self: stretch;
+  }
+}
+
+/* Collapsible accordion: a one-line summary button that opens a panel in
+   place. Shared by the Match Timeline and the Finals tab's Playoff Setup. */
+.robotics-accordion {
+  padding: var(--spacing-sm) var(--spacing-lg);
+}
+
+.robotics-accordion-header {
+  margin: 0;
+  font: inherit;
+}
+
+.robotics-accordion-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  width: 100%;
+  padding: var(--spacing-xs) 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.robotics-accordion-toggle:focus-visible {
+  outline: none;
+  border-radius: var(--radius-md);
+  box-shadow: var(--arena-focus);
+}
+
+.robotics-accordion-chevron {
+  flex: none;
+  color: var(--arena-text-muted);
+  font-size: 1.25rem;
+  line-height: 1;
+  transition: transform var(--transition-fast);
+}
+
+.robotics-accordion.is-expanded .robotics-accordion-chevron {
+  transform: rotate(90deg);
+}
+
+.robotics-accordion-heading {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* Scoped to the heading specifically, not .robotics-accordion as a whole: the
+   Finals accordion's panel nests full .robotics-card titles of its own (Form a
+   Playoff Alliance, Playoff Alliances, Bracket Configuration) that must keep
+   their normal card-title styling once the accordion expands. */
+.robotics-accordion-heading .robotics-card-title {
+  display: block;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-size: 1rem;
+}
+
+/* Wraps rather than truncates: in a narrow column an ellipsis would hide the end of the summary. */
+.robotics-accordion-summary {
+  color: var(--arena-text-muted);
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Every accordion panel (Match Timeline, Finals Playoff Setup) sets its own
+   display: grid, so hiding it needs higher specificity than that — true of
+   any panel-specific class, hence one shared override here rather than one
+   per variant. */
+.robotics-accordion-panel[hidden] {
+  display: none;
+}
+
+/* Match Timeline: the controls shown once the accordion above is expanded. */
+.robotics-timeline-panel {
+  display: grid;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-sm);
+  padding-top: var(--spacing-sm);
+  border-top: 1px solid var(--arena-border);
+}
+
+.robotics-timeline-panel .robotics-field {
+  align-items: stretch;
+  min-width: 0;
+  font-size: 0.875rem;
+}
+
+/* Fit the narrow column: drop the shared 140px input floor. */
+.robotics-timeline-panel .robotics-field select,
+.robotics-timeline-panel .robotics-field input:not([type="checkbox"]) {
+  min-width: 0;
+}
+
+.robotics-timeline-time {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--spacing-sm);
+  align-items: end;
+}
+
+.robotics-timeline-pacing {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--spacing-sm);
+  align-items: end;
+}
+
+/* Teams: Add a Team, Roster, Tournament Settings stack in that order on narrow
+   screens; on wide ones the Roster takes a wide column beside the other two. */
+.robotics-teams-layout {
+  display: grid;
+  grid-template-areas: "add" "roster" "settings";
+  gap: var(--spacing-lg);
+  align-items: start;
+}
+
+.robotics-teams-layout > * {
+  min-width: 0;
+}
+
+.robotics-teams-add { grid-area: add; }
+.robotics-teams-roster { grid-area: roster; }
+.robotics-teams-settings { grid-area: settings; }
+
+/* Finals: the setup cards stack on narrow screens and share an auto-fit row on
+   wide ones; the bracket follows at full width. */
+.robotics-finals-setup {
+  display: grid;
+  gap: var(--spacing-lg);
+  align-items: start;
+}
+
+.robotics-finals-setup > * {
+  min-width: 0;
+}
+
+/* A setup card can be a single settings column wide, where spanning two would
+   add an implicit column and push the card past its edge. */
+.robotics-finals-setup .robotics-settings-grid > .robotics-checkbox-field {
+  grid-column: 1 / -1;
+}
+
+/* Team A / Team B selects share the card's width instead of shrinking to fit. */
+.robotics-finals-setup .robotics-form-row > .robotics-field {
+  flex: 1 1 140px;
+}
+
+/* Playoff Setup accordion: Form a Playoff Alliance, Playoff Alliances, and
+   Bracket Configuration collapse into one summary line so the Elimination
+   Bracket is the dominant content on the tab once setup is done. */
+.robotics-finals-accordion-panel {
+  display: grid;
+  gap: var(--spacing-lg);
+  margin-top: var(--spacing-sm);
+  padding-top: var(--spacing-sm);
+  border-top: 1px solid var(--arena-border);
+}
+
+.robotics-card {
+  border: 1px solid var(--arena-border);
+  border-radius: var(--radius-2xl);
+  background: linear-gradient(180deg, var(--arena-surface-raised), var(--arena-surface) 120px);
+  padding: var(--spacing-lg) var(--spacing-xl);
+  box-shadow: var(--arena-shadow);
 }
 
 .robotics-card-title {
   margin: 0 0 var(--spacing-md);
   padding-bottom: var(--spacing-sm);
-  border-bottom: 1px solid var(--border-color);
-  color: var(--accent-blue);
-  font-size: 0.95rem;
-  font-weight: 600;
+  border-bottom: 1px solid var(--arena-border);
+  color: var(--arena-text);
+  font-size: 1.25rem;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
 }
 
 .robotics-empty {
   margin: 0;
-  color: var(--text-secondary);
+  color: var(--arena-text-muted);
   font-style: italic;
   font-size: 0.9rem;
 }
@@ -151,15 +701,18 @@ body {
 .robotics-app input[type="number"],
 .robotics-app input[type="datetime-local"],
 .robotics-app input[type="time"],
-.robotics-app input:not([type]) {
+.robotics-app input:not([type]),
+.robotics-app select {
   width: 100%;
   box-sizing: border-box;
   padding: var(--spacing-sm) var(--spacing-md);
-  background-color: var(--bg-primary);
-  border: 1px solid var(--border-color);
+  background-color: var(--arena-surface-sunken);
+  border: 1px solid var(--arena-border);
   border-radius: var(--radius-lg);
-  color: var(--text-primary);
-  font-size: 0.95rem;
+  color: var(--arena-text);
+  font-family: var(--arena-font-body);
+  font-size: 1rem;
+  font-variant-numeric: tabular-nums;
   transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
@@ -167,21 +720,71 @@ body {
 .robotics-app input[type="number"]:focus,
 .robotics-app input[type="datetime-local"]:focus,
 .robotics-app input[type="time"]:focus,
-.robotics-app input:not([type]):focus {
+.robotics-app input:not([type]):focus,
+.robotics-app select:focus {
   outline: none;
-  border-color: var(--accent-blue);
-  box-shadow: var(--shadow-focus);
+  border-color: var(--arena-blue);
+  box-shadow: var(--arena-focus);
 }
 
+/* Custom checkbox: native box is too small and off-theme on a projector. */
 .robotics-app input[type="checkbox"] {
-  width: auto;
-  accent-color: var(--accent-blue);
+  appearance: none;
+  -webkit-appearance: none;
+  display: inline-grid;
+  place-content: center;
+  flex: 0 0 auto;
+  width: 1.25rem;
+  height: 1.25rem;
+  margin: 0;
+  border: 2px solid var(--arena-border-strong);
+  border-radius: var(--radius-md);
+  background-color: var(--arena-surface-sunken);
   cursor: pointer;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.robotics-app input[type="checkbox"]::after {
+  content: '';
+  width: 0.35rem;
+  height: 0.65rem;
+  margin-top: -0.15rem;
+  border: solid var(--arena-on-solid);
+  border-width: 0 2.5px 2.5px 0;
+  transform: rotate(45deg) scale(0);
+  transition: transform var(--transition-fast);
+}
+
+.robotics-app input[type="checkbox"]:checked {
+  border-color: var(--arena-blue);
+  background-color: var(--arena-blue);
+}
+
+.robotics-app input[type="checkbox"]:checked::after {
+  transform: rotate(45deg) scale(1);
+}
+
+.robotics-app input[type="checkbox"]:hover:not(:disabled) {
+  border-color: var(--arena-blue);
+}
+
+.robotics-app input[type="checkbox"]:focus-visible {
+  outline: none;
+  box-shadow: var(--arena-focus);
+}
+
+.robotics-app input[type="checkbox"]:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.robotics-app select:hover {
+  border-color: var(--arena-border-strong);
 }
 
 .robotics-app label {
-  color: var(--text-secondary);
-  font-size: 0.85rem;
+  color: var(--arena-text-muted);
+  font-size: 0.9rem;
 }
 
 .robotics-field {
@@ -197,15 +800,42 @@ body {
   min-width: 140px;
 }
 
+/* The whole label is the hit target, styled as a toggle chip. */
 .robotics-checkbox-field {
   flex-direction: row;
   align-items: center;
+  align-self: start;
+  justify-self: start;
   gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 1px solid var(--arena-border);
+  border-radius: var(--radius-lg);
+  background-color: var(--arena-surface-sunken);
+  cursor: pointer;
+  user-select: none;
+  transition: border-color var(--transition-fast), background-color var(--transition-fast);
 }
 
-.robotics-score-input {
-  width: 56px;
-  flex: 0 0 56px;
+.robotics-app .robotics-checkbox-field {
+  color: var(--arena-text);
+  font-size: 1rem;
+}
+
+.robotics-checkbox-field:hover {
+  border-color: var(--arena-border-strong);
+}
+
+.robotics-checkbox-field:has(input:checked) {
+  border-color: var(--arena-blue);
+  background-color: var(--arena-blue-soft);
+}
+.robotics-app input.robotics-score-input {
+  width: 64px;
+  flex: 0 0 64px;
+  padding-inline: var(--spacing-xs);
+  font-family: var(--arena-font-display);
+  font-size: 1.3rem;
+  font-weight: 700;
   text-align: center;
   appearance: textfield;
   -moz-appearance: textfield;
@@ -228,64 +858,73 @@ body {
   margin: 0;
   padding: var(--spacing-sm) var(--spacing-lg);
   border-radius: var(--radius-lg);
-  font-size: 0.9rem;
-  font-weight: 500;
+  font-family: var(--arena-font-display);
+  font-size: 1.05rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
   cursor: pointer;
-  transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.robotics-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--arena-focus);
 }
 
 .robotics-btn-primary {
-  border: 1px solid var(--primary-btn-bg);
-  background-color: var(--primary-btn-bg);
-  color: var(--primary-btn-text);
+  border: 1px solid var(--arena-blue);
+  background-color: var(--arena-blue);
+  color: var(--arena-on-solid);
 }
 
 .robotics-btn-primary:hover {
-  background-color: var(--primary-btn-bg-hover);
-  border-color: var(--primary-btn-bg-hover);
+  background-color: var(--arena-blue-hover);
+  border-color: var(--arena-blue-hover);
+  box-shadow: 0 0 16px rgba(61, 155, 255, 0.35);
 }
 
 .robotics-btn-secondary {
-  border: 1px solid var(--border-color);
-  background-color: var(--bg-primary);
-  color: var(--text-primary);
+  border: 1px solid var(--arena-border);
+  background-color: var(--arena-surface-sunken);
+  color: var(--arena-text);
 }
 
 .robotics-btn-secondary:hover {
-  border-color: var(--accent-blue);
-  color: var(--accent-blue);
+  border-color: var(--arena-border-strong);
+  background-color: var(--arena-surface-raised);
 }
 
 .robotics-btn-ghost {
   border: 1px solid transparent;
   background-color: transparent;
-  color: var(--accent-blue);
+  color: var(--arena-blue);
 }
 
 .robotics-btn-ghost:hover {
-  background-color: var(--accent-blue-hover);
+  background-color: var(--arena-blue-soft);
 }
 
 .robotics-btn-danger {
-  border: 1px solid var(--error-red);
+  border: 1px solid var(--arena-danger);
   background-color: transparent;
-  color: var(--error-text-light);
+  color: var(--arena-danger);
 }
 
 .robotics-btn-danger:hover {
-  background-color: var(--error-red);
-  color: white;
+  background-color: var(--arena-danger);
+  color: var(--arena-on-solid);
 }
 
 .robotics-btn-sm {
   padding: var(--spacing-xs) var(--spacing-md);
-  font-size: 0.8rem;
+  font-size: 0.9rem;
 }
 
 .robotics-btn:disabled {
-  background-color: var(--disabled-gray);
-  border-color: var(--disabled-gray);
-  color: var(--text-secondary);
+  background-color: var(--arena-border);
+  border-color: var(--arena-border);
+  color: var(--arena-text-muted);
   cursor: not-allowed;
 }
 
@@ -298,12 +937,12 @@ body {
 }
 
 .robotics-team-name {
-  color: var(--text-primary);
+  color: var(--arena-text);
 }
 
 .robotics-team-members {
   flex: 1;
-  color: var(--text-secondary);
+  color: var(--arena-text-muted);
   font-size: 0.85rem;
 }
 
@@ -325,17 +964,17 @@ body {
   align-items: center;
   gap: var(--spacing-xs);
   padding: var(--spacing-xs) var(--spacing-sm);
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--arena-border);
   border-radius: var(--radius-lg);
-  background-color: var(--bg-secondary);
-  color: var(--text-secondary);
+  background-color: var(--arena-surface);
+  color: var(--arena-text-muted);
   font-size: 0.85rem;
 }
 
 .robotics-member-remove {
   border: none;
   background: none;
-  color: var(--text-secondary);
+  color: var(--arena-text-muted);
   cursor: pointer;
   line-height: 1;
   padding: 0;
@@ -343,115 +982,200 @@ body {
 }
 
 .robotics-member-remove:hover {
-  color: var(--error-red);
+  color: var(--arena-danger);
 }
 
 .robotics-member-add-row {
   display: flex;
   align-items: center;
   gap: var(--spacing-xs);
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  min-width: 0;
 }
 
-.robotics-member-add-input {
-  width: 120px;
+/* Qualified with .robotics-app to beat the generic full-width text-input rule. */
+.robotics-app input.robotics-member-add-input {
+  width: 140px;
   min-width: 0;
+}
+
+.robotics-member-add-row > .robotics-btn {
+  white-space: nowrap;
 }
 
 /* ---- Match rows ---- */
 
+/* Shared card look for list rows (Teams-tab rows reuse it too). */
 .robotics-match-row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--spacing-md);
   padding: var(--spacing-md);
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--arena-border);
   border-radius: var(--radius-lg);
   margin-bottom: var(--spacing-sm);
-  background-color: var(--bg-primary);
-  transition: background-color var(--transition-fast), border-color var(--transition-fast);
+  background-color: var(--arena-surface-sunken);
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
 .robotics-match-row:last-child {
   margin-bottom: 0;
 }
 
+/* Qualification Match row: a fixed column grid so cells line up down the list.
+   Only the two alliance-team columns flex; everything else is fixed width. */
+.robotics-match-grid {
+  --match-col-time: 6.5rem;
+  --match-col-field: 4.5rem;
+  --match-col-indicator: 1.5rem;
+  --match-col-score: 4.5rem;
+  --match-col-actions: 14rem;
+  display: grid;
+  grid-template-columns:
+    var(--match-col-time) var(--match-col-indicator)
+    minmax(0, 1fr) var(--match-col-score) var(--match-col-score) minmax(0, 1fr)
+    var(--match-col-actions);
+  grid-template-areas: "time indicator red red-score blue-score blue actions";
+  gap: var(--spacing-sm);
+}
+
+.robotics-match-grid.has-field {
+  grid-template-columns:
+    var(--match-col-time) var(--match-col-field) var(--match-col-indicator)
+    minmax(0, 1fr) var(--match-col-score) var(--match-col-score) minmax(0, 1fr)
+    var(--match-col-actions);
+  grid-template-areas: "time field indicator red red-score blue-score blue actions";
+}
+
+.robotics-match-grid > .robotics-match-time { grid-area: time; }
+.robotics-match-grid > .robotics-match-field { grid-area: field; }
+.robotics-match-grid > .robotics-current-dot { grid-area: indicator; justify-self: center; }
+.robotics-match-grid > .robotics-match-alliance.is-red { grid-area: red; }
+.robotics-match-grid > .robotics-match-alliance.is-blue { grid-area: blue; }
+.robotics-match-grid > .robotics-score-input.is-red { grid-area: red-score; }
+.robotics-match-grid > .robotics-score-input.is-blue { grid-area: blue-score; }
+.robotics-match-grid > .robotics-match-actions { grid-area: actions; }
+
+.robotics-app .robotics-match-grid > input.robotics-score-input {
+  width: 100%;
+}
+
 .robotics-match-row.is-current {
-  background-color: var(--accent-blue-focus);
-  border-color: var(--accent-blue);
-  /* inset shadow rather than a thicker border, so the row's columns don't shift */
-  box-shadow: inset 3px 0 0 var(--accent-blue);
+  border-color: var(--arena-live);
+  background-color: color-mix(in srgb, var(--arena-live) 8%, var(--arena-surface-sunken));
+  box-shadow: var(--arena-glow);
 }
 
 .robotics-match-row.is-up-next {
-  background-color: color-mix(in srgb, var(--warning-yellow) 14%, var(--bg-primary));
-  border-color: var(--warning-yellow);
+  border-color: var(--arena-accent);
+  border-style: dashed;
 }
 
 .robotics-match-row.is-complete {
-  opacity: 0.65;
+  border-color: color-mix(in srgb, var(--arena-success) 35%, var(--arena-border));
+  opacity: 0.7;
 }
 
 .robotics-match-row.is-complete .robotics-complete-badge {
-  color: var(--success-green);
+  color: var(--arena-success);
   font-weight: 600;
 }
 
 .robotics-match-time {
-  flex: 0 0 auto;
-  min-width: 90px;
-  color: var(--text-secondary);
-  font-size: 0.8rem;
-  font-family: var(--font-mono);
+  color: var(--arena-text-muted);
+  font-family: var(--arena-font-display);
+  font-size: 1.05rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.robotics-match-row.is-current .robotics-match-time {
+  color: var(--arena-text);
 }
 
 .robotics-match-field {
-  flex: 0 0 auto;
-  color: var(--text-secondary);
+  color: var(--arena-text-muted);
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.02em;
+  white-space: nowrap;
 }
 
-.robotics-current-label {
-  flex: 0 0 auto;
-  padding: 2px var(--spacing-sm);
-  border-radius: var(--radius-lg);
-  background-color: var(--accent-blue);
-  color: var(--primary-btn-text);
-  font-size: 0.7rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-}
-
-.robotics-match-teams {
-  display: flex;
-  flex: 1 1 320px;
-  align-items: center;
-  gap: var(--spacing-sm);
+/* A dot, not a pill: the row's own is-current border/glow already carries most of
+   the "this one's live" signal, so the indicator only needs to be visible at a
+   glance across a room, not read as text. */
+.robotics-current-dot {
+  width: 0.85rem;
+  height: 0.85rem;
+  border-radius: 50%;
+  background-color: var(--arena-live);
+  box-shadow: var(--arena-glow);
 }
 
 .robotics-match-alliance {
-  flex: 1;
-  min-width: 90px;
-  color: var(--text-primary);
-  font-size: 0.9rem;
+  min-width: 0;
+  color: var(--arena-text);
+  font-size: 0.95rem;
+  overflow-wrap: anywhere;
+}
+
+/* ---- Long name shrink-to-fit ----
+   `--robotics-name-scale` is set inline per name (see nameFitStyle in
+   robotics.js), computed from character count; each context below folds
+   that scale into its own font-size so a long name shrinks instead of
+   wrapping, while a short name (scale defaults to 1) renders unchanged. */
+.robotics-fit-name {
+  white-space: nowrap;
+}
+
+.robotics-match-alliance .robotics-team-toggle {
+  font-size: calc(1em * var(--robotics-name-scale, 1));
+}
+
+/* ---- Alliance colors: side A is red, side B is blue (as in VEX) ---- */
+
+.robotics-match-grid > .robotics-match-alliance,
+.robotics-bracket-side {
+  align-self: stretch;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 0.3em;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--radius-md);
+}
+
+.robotics-match-grid > .robotics-match-alliance.is-red,
+.robotics-bracket-side.is-red {
+  border-left: 4px solid var(--arena-red);
+  background-color: var(--arena-red-soft);
+}
+
+.robotics-match-grid > .robotics-match-alliance.is-blue,
+.robotics-bracket-side.is-blue {
+  border-right: 4px solid var(--arena-blue);
+  background-color: var(--arena-blue-soft);
+}
+
+.robotics-app input.robotics-score-input.is-red {
+  border-color: var(--arena-red);
+  background-color: var(--arena-red-soft);
+  color: var(--arena-red);
+}
+
+.robotics-app input.robotics-score-input.is-blue {
+  border-color: var(--arena-blue);
+  background-color: var(--arena-blue-soft);
+  color: var(--arena-blue);
 }
 
 .robotics-match-vs {
   flex: 0 0 auto;
-  color: var(--text-secondary);
+  color: var(--arena-text-muted);
   font-size: 0.8rem;
   text-transform: uppercase;
-}
-
-.robotics-match-noshow {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--spacing-md);
-  flex: 1 1 auto;
 }
 
 .robotics-match-actions {
@@ -462,12 +1186,9 @@ body {
   margin-left: auto;
 }
 
-/* Fixed width in schedule rows (fits "Mark Complete ↑ ↓", the widest variant)
-   so completed and pending rows give the teams column the same space and stay
-   aligned. Scoped to rows: bracket cards are column flexboxes, where a flex
-   basis would set height instead. */
-.robotics-match-row .robotics-match-actions {
-  flex-basis: 13rem;
+.robotics-match-grid > .robotics-match-actions {
+  justify-content: flex-end;
+  margin-left: 0;
 }
 
 .robotics-complete-badge {
@@ -484,63 +1205,91 @@ body {
 .robotics-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.9rem;
+  font-size: 1rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.robotics-rank-cell {
+  font-family: var(--arena-font-display);
+  font-size: 1.15rem;
 }
 
 .robotics-table th,
 .robotics-table td {
   padding: var(--spacing-sm) var(--spacing-md);
   text-align: left;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--arena-border);
 }
 
 .robotics-table thead th {
-  color: var(--text-secondary);
-  font-size: 0.75rem;
+  color: var(--arena-text-muted);
+  font-family: var(--arena-font-display);
+  font-size: 0.95rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  border-bottom: 2px solid var(--border-color);
+  border-bottom: 2px solid var(--arena-border);
 }
 
 .robotics-table tbody tr:hover {
-  background-color: var(--accent-blue-hover);
+  background-color: var(--arena-blue-soft);
 }
 
-.robotics-table tbody tr:nth-child(1) .robotics-rank-cell { color: #ffd700; font-weight: 700; }
-.robotics-table tbody tr:nth-child(2) .robotics-rank-cell { color: #c0c0c0; font-weight: 700; }
-.robotics-table tbody tr:nth-child(3) .robotics-rank-cell { color: #cd7f32; font-weight: 700; }
+.robotics-standings-team-name {
+  font-size: calc(1em * var(--robotics-name-scale, 1));
+}
+
+.robotics-standings-members {
+  color: var(--arena-text-muted);
+  font-size: calc(0.75rem * var(--robotics-name-scale, 1));
+  margin-top: 2px;
+}
 
 /* ---- Standings adaptive-ranking note ---- */
 
 .robotics-standings-note {
-  color: var(--text-secondary);
+  color: var(--arena-text-muted);
   font-size: 0.85rem;
   margin: 0 0 var(--spacing-sm);
 }
 
 /* ---- Bracket ---- */
 
+/* Round columns grow to fill the width; the bracket scrolls inside its own box
+   only when the rounds' minimum widths no longer fit. */
 .robotics-bracket {
   display: flex;
+  font-variant-numeric: tabular-nums;
   align-items: stretch;
   gap: var(--spacing-xl);
   overflow-x: auto;
-  padding-bottom: var(--spacing-sm);
+  padding: var(--spacing-lg) var(--spacing-xl);
+  border: 1px solid var(--arena-border);
+  border-radius: var(--radius-2xl);
+  background-color: var(--arena-surface-sunken);
 }
 
 .robotics-bracket-round {
   display: flex;
-  flex: 0 0 auto;
+  flex: 1 0 260px;
   flex-direction: column;
-  width: 260px;
 }
 
 .robotics-bracket-round h4 {
-  margin: 0 0 var(--spacing-xs);
-  color: var(--accent-blue);
-  font-size: 0.85rem;
+  margin: 0 0 var(--spacing-sm);
+  padding-bottom: var(--spacing-xs);
+  border-bottom: 2px solid var(--arena-border-strong);
+  color: var(--arena-text-muted);
+  font-family: var(--arena-font-display);
+  font-size: 1.1rem;
+  font-weight: 700;
+  text-align: center;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.08em;
+}
+
+.robotics-bracket-round.is-final h4 {
+  border-bottom-color: var(--arena-gold);
+  color: var(--arena-gold);
 }
 
 /* Pure flex-grow spacers (no fixed size) so the ratio between them — not their
@@ -557,70 +1306,210 @@ body {
   gap: var(--spacing-xs);
   padding: var(--spacing-md);
   margin: var(--spacing-xs) 0;
+  /* Rounds stretch to fill a wide bracket; the cards stay readable sizes. */
+  align-self: center;
+  width: 100%;
+  max-width: 380px;
+  box-sizing: border-box;
+  border-radius: var(--radius-xl);
+  background: var(--arena-surface);
+  transition: border-color var(--transition-fast);
+}
+
+.robotics-bracket-match.is-complete {
+  border-color: color-mix(in srgb, var(--arena-success) 35%, var(--arena-border));
+}
+
+.robotics-bracket-match .robotics-score-input {
+  font-family: var(--arena-font-display);
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.robotics-bracket-match .robotics-match-vs {
+  align-self: center;
+}
+
+.robotics-bracket-match .robotics-complete-badge {
+  color: var(--arena-success);
+  font-weight: 600;
 }
 
 .robotics-bracket-side {
-  display: flex;
-  align-items: center;
+  flex-wrap: nowrap;
   justify-content: space-between;
   gap: var(--spacing-sm);
 }
 
-.robotics-bracket-match .robotics-match-noshow {
-  flex-direction: column;
-  gap: var(--spacing-xs);
-}
-
 .robotics-bracket-bye {
-  color: var(--text-secondary);
+  color: var(--arena-text-muted);
   font-style: italic;
 }
 
-.robotics-champion-banner {
-  padding: var(--spacing-lg);
-  border: 1px solid var(--warning-yellow);
-  border-radius: var(--radius-xl);
-  background: linear-gradient(135deg, var(--warning-bg-light), var(--bg-secondary));
-  color: var(--warning-yellow);
-  font-size: 1.1rem;
-  font-weight: 600;
-  text-align: center;
-  align-self: flex-start;
+.robotics-reveal-results-btn {
+  width: auto;
+  align-self: center;
+  padding: var(--spacing-md) var(--spacing-2xl);
+  font-family: var(--arena-font-display);
+  font-size: 1.5rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
-/* ---- Placements row (1st/2nd/3rd), below the bracket ---- */
+/* ---- Results: Podium ---- */
 
-.robotics-placements {
+.robotics-podium-hint {
+  margin: 0 0 var(--spacing-md);
+  color: var(--arena-text-muted);
+  text-align: center;
+}
+
+.robotics-podium {
   display: flex;
-  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: center;
   gap: var(--spacing-md);
-  margin-bottom: var(--spacing-lg);
+  padding-top: var(--spacing-xl);
 }
 
-.robotics-placements:empty {
-  display: none;
+.robotics-podium.is-revealable {
+  cursor: pointer;
 }
 
-/* ---- 2nd/3rd place banners ---- */
-
-.robotics-second-place-banner,
-.robotics-third-place-banner {
-  padding: var(--spacing-lg);
-  border: 1px solid var(--border-color);
+.robotics-podium.is-revealable:focus-visible {
+  outline: 2px solid var(--arena-blue);
+  outline-offset: 4px;
   border-radius: var(--radius-xl);
-  background-color: var(--bg-secondary);
-  font-size: 1rem;
-  font-weight: 600;
+}
+
+.robotics-podium-block {
+  --medal: var(--arena-silver);
+  --step-height: 9rem;
+  position: relative;
+  display: flex;
+  flex: 0 1 22rem;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.robotics-podium-block.is-place-1 { --medal: var(--arena-gold); --step-height: 13rem; }
+.robotics-podium-block.is-place-3 { --medal: var(--arena-bronze); --step-height: 6rem; }
+
+.robotics-podium-reveal {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: var(--spacing-sm);
+  min-height: 7rem;
+  padding: var(--spacing-md);
   text-align: center;
-  align-self: flex-start;
 }
 
-.robotics-second-place-banner {
-  color: #c0c0c0;
+.robotics-podium-team-name {
+  font-family: var(--arena-font-display);
+  font-size: clamp(1.4rem, 2.4vw, 2.4rem);
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--arena-text);
+  overflow-wrap: anywhere;
 }
 
-.robotics-third-place-banner {
-  color: #cd7f32;
+.robotics-podium-members {
+  color: var(--arena-text-muted);
+  font-size: 1rem;
+}
+
+.robotics-podium-mystery {
+  font-family: var(--arena-font-display);
+  font-size: 3rem;
+  font-weight: 700;
+  color: var(--arena-border-strong);
+}
+
+.robotics-podium-step {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  height: var(--step-height);
+  padding-top: var(--spacing-md);
+  border: 1px solid var(--arena-border-strong);
+  border-bottom: none;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  background: var(--arena-surface-sunken);
+  transition: background-color var(--transition-normal), border-color var(--transition-normal), box-shadow var(--transition-normal);
+}
+
+.robotics-podium-place {
+  font-family: var(--arena-font-display);
+  font-size: clamp(2rem, 4vw, 3.5rem);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--arena-text-muted);
+}
+
+.robotics-podium-block.is-revealed .robotics-podium-step {
+  border-color: var(--medal);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--medal) 35%, transparent), var(--arena-surface));
+}
+
+.robotics-podium-block.is-revealed .robotics-podium-place {
+  color: var(--medal);
+}
+
+/* 1st place keeps a gold glow once revealed. */
+.robotics-podium-block.is-place-1.is-revealed .robotics-podium-step {
+  box-shadow: 0 0 0 1px var(--arena-gold), 0 0 48px rgba(255, 200, 61, 0.45);
+}
+
+.robotics-podium-block.is-place-1.is-revealed .robotics-podium-team-name {
+  color: var(--arena-gold);
+  text-shadow: 0 0 24px rgba(255, 200, 61, 0.5);
+}
+
+/* Only the block just revealed rises (see renderResultsTab), so revisits don't replay it. */
+.robotics-podium-block.is-rising .robotics-podium-reveal {
+  animation: podium-rise 0.6s cubic-bezier(0.2, 0.8, 0.3, 1.2) both;
+}
+
+@keyframes podium-rise {
+  from { opacity: 0; transform: translateY(2rem) scale(0.9); }
+  to { opacity: 1; transform: none; }
+}
+
+/* ---- Confetti (confetti.js) ---- */
+
+.robotics-confetti {
+  position: absolute;
+  left: 50%;
+  top: 40%;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.robotics-confetti-piece {
+  position: absolute;
+  width: 10px;
+  height: 14px;
+  border-radius: 2px;
+  animation: robotics-confetti-fly 1.8s cubic-bezier(0.15, 0.6, 0.35, 1) var(--delay, 0ms) both;
+}
+
+@keyframes robotics-confetti-fly {
+  0% { transform: translate(0, 0) rotate(0deg); opacity: 1; }
+  60% { opacity: 1; }
+  100% { transform: translate(var(--dx), calc(var(--dy) + 260px)) rotate(var(--rot)); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .robotics-podium-block.is-rising .robotics-podium-reveal {
+    animation: none;
+  }
+
+  .robotics-podium-step {
+    transition: none;
+  }
 }
 
 /* ---- Toast ---- */
@@ -630,13 +1519,15 @@ body {
   right: var(--spacing-xl);
   bottom: var(--spacing-xl);
   z-index: 1000;
-  padding: var(--spacing-sm) var(--spacing-lg);
-  border: 1px solid var(--accent-blue);
+  padding: var(--spacing-md) var(--spacing-xl);
+  border: 1px solid var(--arena-border-strong);
+  border-left: 4px solid var(--arena-blue);
   border-radius: var(--radius-lg);
-  background-color: var(--bg-secondary);
-  color: var(--text-primary);
-  font-size: 0.9rem;
-  box-shadow: var(--shadow-popup);
+  background-color: var(--arena-surface-raised);
+  color: var(--arena-text);
+  font-size: 1rem;
+  font-weight: 500;
+  box-shadow: var(--arena-shadow);
   opacity: 0;
   visibility: hidden;
   transform: translateY(8px);
@@ -650,8 +1541,8 @@ body {
 }
 
 .robotics-toast-error {
-  border-color: var(--error-red);
-  color: var(--error-text-light);
+  border-left-color: var(--arena-danger);
+  color: var(--arena-danger);
 }
 
 /* ---- Confirm dialog ---- */
@@ -663,7 +1554,8 @@ body {
   display: none;
   align-items: center;
   justify-content: center;
-  background-color: rgba(0, 0, 0, 0.5);
+  background-color: rgba(3, 6, 12, 0.75);
+  backdrop-filter: blur(3px);
 }
 
 .robotics-confirm-overlay-visible {
@@ -672,24 +1564,29 @@ body {
 
 .robotics-confirm-dialog {
   width: calc(100% - var(--spacing-xl) * 2);
-  max-width: 420px;
-  padding: var(--spacing-lg) var(--spacing-xl);
-  border-radius: var(--radius-lg);
-  background-color: var(--bg-secondary);
-  color: var(--text-primary);
-  box-shadow: var(--shadow-popup);
+  max-width: 480px;
+  padding: var(--spacing-xl) var(--spacing-2xl);
+  border: 1px solid var(--arena-border-strong);
+  border-radius: var(--radius-2xl);
+  background-color: var(--arena-surface-raised);
+  color: var(--arena-text);
+  box-shadow: var(--arena-shadow);
 }
 
 .robotics-confirm-title {
   margin: 0 0 var(--spacing-sm);
-  font-size: 1.1rem;
+  font-family: var(--arena-font-display);
+  font-size: 1.5rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .robotics-confirm-message {
   margin: 0 0 var(--spacing-lg);
-  color: var(--text-secondary);
-  font-size: 0.9rem;
-  line-height: 1.4;
+  color: var(--arena-text-muted);
+  font-size: 1rem;
+  line-height: 1.5;
 }
 
 .robotics-confirm-actions {
@@ -711,13 +1608,15 @@ body {
 }
 
 .robotics-match-alliance.is-winner > .robotics-team-toggle:not(.is-no-show) {
-  color: var(--success-green);
+  color: var(--arena-success);
   font-weight: 700;
 }
 
+/* Muted text with a danger-colored strike reads on both the red and blue tints
+   (danger-red text alone would disappear into the red side). */
 .robotics-team-toggle.is-no-show {
-  color: var(--error-text-light);
-  text-decoration: line-through;
+  color: var(--arena-text-muted);
+  text-decoration: line-through 2px var(--arena-danger);
 }
 
 .robotics-match-row.is-complete .robotics-team-toggle.is-no-show,
@@ -725,29 +1624,41 @@ body {
   opacity: 0.55;
 }
 
-.robotics-current-label.is-placeholder {
+.robotics-current-dot.is-placeholder {
   visibility: hidden;
 }
 
 /* ---- Teams-tab lock state ---- */
 
-.robotics-danger-row {
+.robotics-danger-zone {
   margin-top: var(--spacing-xl);
-  padding-top: var(--spacing-lg);
-  border-top: 1px solid var(--border-color);
+  padding: var(--spacing-md) var(--spacing-lg) var(--spacing-lg);
+  border: 1px dashed color-mix(in srgb, var(--arena-danger) 55%, var(--arena-border));
+  border-radius: var(--radius-xl);
+  background-color: color-mix(in srgb, var(--arena-danger) 6%, transparent);
+}
+
+.robotics-danger-label {
+  margin: 0 0 var(--spacing-sm);
+  color: var(--arena-danger);
+  font-family: var(--arena-font-display);
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
 }
 
 .robotics-btn.is-locked {
-  background-color: var(--disabled-gray);
-  border-color: var(--disabled-gray);
-  color: var(--text-secondary);
+  background-color: var(--arena-border);
+  border-color: var(--arena-border);
+  color: var(--arena-text-muted);
   cursor: not-allowed;
 }
 
 .robotics-btn.is-locked:hover {
-  background-color: var(--disabled-gray);
-  border-color: var(--disabled-gray);
-  color: var(--text-secondary);
+  background-color: var(--arena-border);
+  border-color: var(--arena-border);
+  color: var(--arena-text-muted);
 }
 
 .robotics-locked-field {
@@ -757,10 +1668,102 @@ body {
 
 /* ---- Responsive ---- */
 
+/* Wide: matches take the remaining space, Timeline + Standings a narrow column that stays
+   in view while the match list scrolls (scrolling itself if it outgrows the
+   viewport). */
+@media (min-width: 1100px) {
+  .robotics-schedule-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 25%);
+    align-items: start;
+  }
+
+  .robotics-schedule-side {
+    display: grid;
+    gap: var(--spacing-lg);
+    position: sticky;
+    top: var(--spacing-md);
+    max-height: calc(100vh - 2 * var(--spacing-md));
+    overflow-y: auto;
+    /* Room inside the scroll box for the card's shadow, which it would
+       otherwise clip; the negative margin keeps the column aligned. */
+    padding: 0 var(--spacing-lg) var(--spacing-lg);
+    margin: 0 calc(-1 * var(--spacing-lg));
+  }
+
+  .robotics-teams-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(340px, 30%);
+    grid-template-rows: auto 1fr;
+    grid-template-areas:
+      "roster add"
+      "roster settings";
+  }
+
+  /* Narrow column: give each Add a Team field the full width. */
+  .robotics-teams-add .robotics-form-row > input {
+    flex-basis: 100%;
+  }
+
+  .robotics-finals-setup {
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  }
+}
+
 @media (max-width: 640px) {
   .robotics-match-actions {
     margin-left: 0;
     width: 100%;
+    justify-content: flex-start;
+  }
+}
+
+/* The match grid stacks on the width of its own list, not the viewport, so it
+   also degrades cleanly when the list sits in a narrow side-by-side column. */
+.robotics-card:has(> .robotics-match-grid) {
+  container-type: inline-size;
+}
+
+/* Mid width: actions drop to their own line so the team columns keep their room. */
+@container (max-width: 66rem) {
+  .robotics-match-grid {
+    grid-template-columns:
+      var(--match-col-time) var(--match-col-indicator)
+      minmax(0, 1fr) var(--match-col-score) var(--match-col-score) minmax(0, 1fr);
+    grid-template-areas:
+      "time indicator red red-score blue-score blue"
+      "actions actions actions actions actions actions";
+  }
+
+  .robotics-match-grid.has-field {
+    grid-template-columns:
+      var(--match-col-time) var(--match-col-field) var(--match-col-indicator)
+      minmax(0, 1fr) var(--match-col-score) var(--match-col-score) minmax(0, 1fr);
+    grid-template-areas:
+      "time field indicator red red-score blue-score blue"
+      "actions actions actions actions actions actions actions";
+  }
+}
+
+@container (max-width: 44rem) {
+  /* Stack: meta on top, each side beside its score, actions at the bottom. */
+  .robotics-match-grid,
+  .robotics-match-grid.has-field {
+    grid-template-columns: auto auto minmax(0, 1fr) var(--match-col-score);
+    grid-template-areas:
+      "time indicator indicator indicator"
+      "red red red red-score"
+      "blue blue blue blue-score"
+      "actions actions actions actions";
+  }
+
+  .robotics-match-grid.has-field {
+    grid-template-areas:
+      "time field indicator indicator"
+      "red red red red-score"
+      "blue blue blue blue-score"
+      "actions actions actions actions";
+  }
+
+  .robotics-match-grid > .robotics-match-actions {
     justify-content: flex-start;
   }
 }
