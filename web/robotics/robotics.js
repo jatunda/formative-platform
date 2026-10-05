@@ -398,11 +398,11 @@ function renderMatchRow(state, dispatch, entry, { currentIndex, upNextIndex }) {
 
   const scoreA = el('input', { type: 'number', className: 'robotics-score-input', value: match.scoreA ?? '' });
   const scoreB = el('input', { type: 'number', className: 'robotics-score-input', value: match.scoreB ?? '' });
-  scoreA.addEventListener('change', () => {
-    dispatch((s) => setQualificationDraftScore(s, qualIndex, 'scoreA', scoreA.value === '' ? null : parseInt(scoreA.value, 10) || 0));
+  scoreA.addEventListener('input', () => {
+    dispatch((s) => setQualificationDraftScore(s, qualIndex, 'scoreA', scoreA.value === '' ? null : parseInt(scoreA.value, 10) || 0), { rerender: false });
   });
-  scoreB.addEventListener('change', () => {
-    dispatch((s) => setQualificationDraftScore(s, qualIndex, 'scoreB', scoreB.value === '' ? null : parseInt(scoreB.value, 10) || 0));
+  scoreB.addEventListener('input', () => {
+    dispatch((s) => setQualificationDraftScore(s, qualIndex, 'scoreB', scoreB.value === '' ? null : parseInt(scoreB.value, 10) || 0), { rerender: false });
   });
   const winningSide = match.completed && match.scoreA !== match.scoreB
     ? (match.scoreA > match.scoreB ? 'A' : 'B')
@@ -605,11 +605,11 @@ function renderBracketMatch(state, dispatch, match) {
 
   const scoreA = el('input', { type: 'number', className: 'robotics-score-input', value: match.scoreA ?? '' });
   const scoreB = el('input', { type: 'number', className: 'robotics-score-input', value: match.scoreB ?? '' });
-  scoreA.addEventListener('change', () => {
-    dispatch((s) => setEliminationDraftScore(s, match.id, 'scoreA', scoreA.value === '' ? null : parseInt(scoreA.value, 10) || 0));
+  scoreA.addEventListener('input', () => {
+    dispatch((s) => setEliminationDraftScore(s, match.id, 'scoreA', scoreA.value === '' ? null : parseInt(scoreA.value, 10) || 0), { rerender: false });
   });
-  scoreB.addEventListener('change', () => {
-    dispatch((s) => setEliminationDraftScore(s, match.id, 'scoreB', scoreB.value === '' ? null : parseInt(scoreB.value, 10) || 0));
+  scoreB.addEventListener('input', () => {
+    dispatch((s) => setEliminationDraftScore(s, match.id, 'scoreB', scoreB.value === '' ? null : parseInt(scoreB.value, 10) || 0), { rerender: false });
   });
   card.appendChild(el('div', { className: 'robotics-bracket-side' }, [
     sides.allianceA
@@ -680,23 +680,24 @@ function renderBracket(state, dispatch) {
   const finalMatch = bracket.matches.find((m) => m.round === 'final');
   container.appendChild(renderBracketRoundColumn(state, dispatch, [finalMatch], 'Final'));
 
-  const winner = getMatchWinner(bracket, finalMatch.id);
-  if (winner) {
-    container.appendChild(el('div', { className: 'robotics-champion-banner' }, [`🏆 Champion: ${playoffAllianceLabel(state, winner)}`]));
-  }
-
-  const runnerUp = getMatchLoser(bracket, finalMatch.id);
-  if (runnerUp) {
-    container.appendChild(el('div', { className: 'robotics-second-place-banner' }, [`🥈 2nd Place: ${playoffAllianceLabel(state, runnerUp)}`]));
-  }
-
-  if (thirdPlaceMatch) {
-    const thirdPlaceWinner = getMatchWinner(bracket, thirdPlaceMatch.id);
-    if (thirdPlaceWinner) {
-      container.appendChild(el('div', { className: 'robotics-third-place-banner' }, [`🥉 3rd Place: ${playoffAllianceLabel(state, thirdPlaceWinner)}`]));
-    }
-  }
   return container;
+}
+
+const PLACEMENT_BANNERS = {
+  1: { className: 'robotics-champion-banner', label: '🏆 Champion' },
+  2: { className: 'robotics-second-place-banner', label: '🥈 2nd Place' },
+  3: { className: 'robotics-third-place-banner', label: '🥉 3rd Place' },
+};
+
+/**
+ * 1st/2nd/3rd banners as their own row, outside the bracket's horizontal
+ * scroll area so they're visible without scrolling sideways.
+ */
+function renderPlacementBanners(state) {
+  return el('div', { className: 'robotics-placements' }, computeBracketPlacements(state).map(({ place, teamIds }) => {
+    const { className, label } = PLACEMENT_BANNERS[place];
+    return el('div', { className }, [`${label}: ${teamIds.length ? allianceTeamNames(state, teamIds) : '(unassigned)'}`]);
+  }));
 }
 
 /** Decided placements (1st/2nd/3rd) for the current Elimination Bracket, each with its Playoff Alliance's Team ids. */
@@ -807,6 +808,7 @@ export function renderFinalsTab(state, dispatch) {
 
   if (state.elimination.bracket) {
     section.appendChild(renderBracket(state, dispatch));
+    section.appendChild(renderPlacementBanners(state));
   }
 
   section.appendChild(el('button', {
@@ -861,10 +863,12 @@ export function initRoboticsApp({ mountId = 'roboticsApp', storageKey = 'robotic
     mount.appendChild(renderApp(state, dispatch, activeTab, setActiveTab));
   }
 
-  function dispatch(updater) {
+  // Pass { rerender: false } for updates nothing on screen reflects yet (draft
+  // scores): re-rendering mid-edit would replace the input focus is moving to.
+  function dispatch(updater, { rerender = true } = {}) {
     state = updater(state);
     storage.save(state);
-    render();
+    if (rerender) render();
   }
 
   function setActiveTab(tab) {

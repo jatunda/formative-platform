@@ -6,5 +6,5 @@
 
 **Status:** closed
 
-- [ ] The Schedule tab shows a Generate/Regenerate Matchups button with identical labeling, lock state, and disabled-hint behavior as the Teams tab's
-- [ ] Clicking it from either tab produces identical results and both tabs reflect the new state immediately
+- [x] The Schedule tab shows a Generate/Regenerate Matchups button with identical labeling, lock state, and disabled-hint behavior as the Teams tab's
+- [x] Clicking it from either tab produces identical results and both tabs reflect the new state immediately

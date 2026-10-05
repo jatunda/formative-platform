@@ -6,7 +6,7 @@
 
 **Status:** closed
 
-- [ ] Each roster row has an edit control (inline fields, or edit-mode toggle) for the Team's name and its Member list
-- [ ] Saving an edit updates the Team everywhere it's displayed (match rows, standings, alliances, bracket) without altering any existing match, alliance, or seed assignment
-- [ ] Editing is available before, during, and after the Qualification Round and Elimination Bracket — not gated by the same lock that governs regenerating matchups
-- [ ] Members can be added and removed individually, not just replaced as one comma-separated blob
+- [x] Each roster row has an edit control (inline fields, or edit-mode toggle) for the Team's name and its Member list
+- [x] Saving an edit updates the Team everywhere it's displayed (match rows, standings, alliances, bracket) without altering any existing match, alliance, or seed assignment
+- [x] Editing is available before, during, and after the Qualification Round and Elimination Bracket — not gated by the same lock that governs regenerating matchups
+- [x] Members can be added and removed individually, not just replaced as one comma-separated blob

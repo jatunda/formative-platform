@@ -38,6 +38,19 @@ describe('generateQualificationMatches', () => {
     }
   });
 
+  it('gives every team exactly matchesPerTeam appearances for any evenly divisible roster, across many draws', () => {
+    // Configs where the old repeat-first greedy routinely left some Teams at
+    // matchesPerTeam - 1 and others at + 1 despite an even slot count.
+    for (const [teamCount, matchesPerTeam] of [[5, 4], [10, 2], [12, 4], [16, 5]]) {
+      for (let run = 0; run < 10; run++) {
+        const counts = appearanceCounts(generateQualificationMatches(teams(teamCount), matchesPerTeam));
+        for (const t of teams(teamCount)) {
+          expect(counts.get(t.id)).toBe(matchesPerTeam);
+        }
+      }
+    }
+  }, 15_000); // ~40 full draws; generous for slow CI runners
+
   it('balances appearances within 1 when not evenly divisible', () => {
     const matches = generateQualificationMatches(teams(5), 2);
     const counts = appearanceCounts(matches);

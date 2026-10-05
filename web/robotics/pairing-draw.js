@@ -80,33 +80,45 @@ function recordHistory(allianceA, allianceB, teammatesOf, opponentsOf) {
 }
 
 /**
- * Pick the match (group of 4 + alliance split) for one slot: searches the
- * least-used teams for the combination with the fewest repeat
- * teammates/opponents, breaking ties by how evenly it keeps appearance
- * counts balanced, then randomly.
+ * Every 4-team group that keeps appearance counts within 1 of each other:
+ * if fewer than 4 teams sit at the lowest count, all of them must play, topped
+ * up from the next level; otherwise the group comes only from the lowest level.
+ * Holding this invariant on every pick is what guarantees each Team plays
+ * exactly matchesPerTeam matches whenever teams × matchesPerTeam divides by 4.
+ */
+function balancedGroups(teamIds, used, random) {
+  const minUsed = Math.min(...teamIds.map((id) => used.get(id)));
+  const shuffled = shuffle(teamIds, random);
+  const lowest = shuffled.filter((id) => used.get(id) === minUsed);
+  if (lowest.length >= 4) {
+    return combinationsOfFour(lowest.slice(0, CANDIDATE_POOL_SIZE));
+  }
+  const next = shuffled.filter((id) => used.get(id) === minUsed + 1).slice(0, CANDIDATE_POOL_SIZE);
+  const fillCount = 4 - lowest.length;
+  return combinationsOfFour([...lowest, ...next])
+    .filter((group) => group.filter((id) => used.get(id) !== minUsed).length === fillCount);
+}
+
+/**
+ * Pick the match (group of 4 + alliance split) for one slot: among groups
+ * that keep appearance counts balanced, the one with the fewest repeat
+ * teammates/opponents, ties broken randomly.
  */
 function pickNextMatch(teamIds, used, teammatesOf, opponentsOf, random) {
-  const pool = shuffle(teamIds, random)
-    .sort((a, b) => used.get(a) - used.get(b))
-    .slice(0, Math.min(CANDIDATE_POOL_SIZE, teamIds.length));
-
   let best = null;
   let bestScore = Infinity;
-  let bestUsageCost = Infinity;
-  for (const group of combinationsOfFour(pool)) {
+  for (const group of balancedGroups(teamIds, used, random)) {
     const split = bestSplitForGroup(group, teammatesOf, opponentsOf, random);
-    const usageCost = group.reduce((sum, id) => sum + used.get(id), 0);
-    if (split.score < bestScore || (split.score === bestScore && usageCost < bestUsageCost)) {
-      best = { allianceA: split.allianceA, allianceB: split.allianceB, group };
+    if (split.score < bestScore) {
+      best = { allianceA: split.allianceA, allianceB: split.allianceB, group, score: split.score };
       bestScore = split.score;
-      bestUsageCost = usageCost;
     }
   }
   return best;
 }
 
-/** Build the unordered set of matchups (Pairing Rule 1: avoid repeat teammates/opponents). */
-function drawMatchups(teamIds, matchesPerTeam, random) {
+/** One greedy pass at the unordered set of matchups; returns them with their total repeat score. */
+function drawMatchupsOnce(teamIds, matchesPerTeam, random) {
   const used = new Map(teamIds.map((id) => [id, 0]));
   const teammatesOf = new Map(teamIds.map((id) => [id, new Set()]));
   const opponentsOf = new Map(teamIds.map((id) => [id, new Set()]));
@@ -114,13 +126,30 @@ function drawMatchups(teamIds, matchesPerTeam, random) {
   const totalMatches = Math.ceil(totalSlotsNeeded / 4);
 
   const matches = [];
+  let repeats = 0;
   for (let m = 0; m < totalMatches; m++) {
-    const { allianceA, allianceB, group } = pickNextMatch(teamIds, used, teammatesOf, opponentsOf, random);
+    const { allianceA, allianceB, group, score } = pickNextMatch(teamIds, used, teammatesOf, opponentsOf, random);
     matches.push({ allianceA, allianceB });
+    repeats += score;
     recordHistory(allianceA, allianceB, teammatesOf, opponentsOf);
     for (const id of group) used.set(id, used.get(id) + 1);
   }
-  return matches;
+  return { matches, repeats };
+}
+
+// Keeping appearance counts balanced narrows each greedy pick, so a single
+// pass can corner itself into repeats a different early choice would have
+// avoided - retry and keep the best, as scheduleMatchOrder does below.
+const MAX_DRAW_ATTEMPTS = 40;
+
+/** Build the unordered set of matchups (Pairing Rule 1: avoid repeat teammates/opponents). */
+function drawMatchups(teamIds, matchesPerTeam, random) {
+  let best = null;
+  for (let attempt = 0; attempt < MAX_DRAW_ATTEMPTS && (!best || best.repeats > 0); attempt++) {
+    const draw = drawMatchupsOnce(teamIds, matchesPerTeam, random);
+    if (!best || draw.repeats < best.repeats) best = draw;
+  }
+  return best.matches;
 }
 
 function violatesMinGap(match, lastPlayedIndex, index) {

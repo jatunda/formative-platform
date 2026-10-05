@@ -6,6 +6,6 @@
 
 **Status:** closed
 
-- [ ] Score number inputs no longer show up/down spinner arrows, on both Qualification and Elimination match rows
-- [ ] Typing a score, then toggling any No-Show flag on that same match before marking it complete, no longer clears the typed score
-- [ ] This holds for repeated toggling (on/off/on) and for toggling either side's No-Show, not just one
+- [x] Score number inputs no longer show up/down spinner arrows, on both Qualification and Elimination match rows
+- [x] Typing a score, then toggling any No-Show flag on that same match before marking it complete, no longer clears the typed score
+- [x] This holds for repeated toggling (on/off/on) and for toggling either side's No-Show, not just one

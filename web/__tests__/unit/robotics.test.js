@@ -5,7 +5,7 @@ import {
   getAllMatchesInScheduleOrder,
   autoFillSeedsFromStandings,
 } from '../../robotics/robotics.js';
-import { createInitialState, addTeam, setMatchesPerTeam, regenerateMatchups, recordQualificationResult, setTimelineConfig } from '../../robotics/state.js';
+import { createInitialState, addTeam, setMatchesPerTeam, regenerateMatchups, recordQualificationResult, setTimelineConfig, formPlayoffAlliance, setBracketConfig, generateBracket } from '../../robotics/state.js';
 
 function setClipboardMock() {
   const writeText = vi.fn();
@@ -449,6 +449,22 @@ describe('initRoboticsApp', () => {
       expect(toggle.classList.contains('is-no-show')).toBe(false);
     });
 
+    it('saves a typed score as a draft without re-rendering, so focus can move to the other score input', () => {
+      const app = initRoboticsApp();
+      setupFourTeams(app);
+      app.dispatch((s) => regenerateMatchups(s));
+      app.setActiveTab('schedule');
+      const root = document.getElementById('roboticsApp');
+
+      const [scoreA, scoreB] = root.querySelectorAll('.robotics-match-row .robotics-score-input');
+      scoreA.value = '12';
+      scoreA.dispatchEvent(new Event('input'));
+
+      expect(app.getState().qualification.matches[0].scoreA).toBe(12);
+      expect(document.getElementById('roboticsApp').querySelectorAll('.robotics-score-input')[1]).toBe(scoreB);
+      expect(scoreB.isConnected).toBe(true);
+    });
+
     it('keeps a typed-but-unsaved score after toggling No-Show, including repeated toggling on either side', () => {
       const app = initRoboticsApp();
       setupFourTeams(app);
@@ -459,11 +475,11 @@ describe('initRoboticsApp', () => {
 
       const scoreInputs = root.querySelectorAll('.robotics-score-input');
       scoreInputs[0].value = '50';
-      scoreInputs[0].dispatchEvent(new Event('change'));
+      scoreInputs[0].dispatchEvent(new Event('input'));
       root = document.getElementById('roboticsApp');
       let freshScoreInputs = root.querySelectorAll('.robotics-score-input');
       freshScoreInputs[1].value = '10';
-      freshScoreInputs[1].dispatchEvent(new Event('change'));
+      freshScoreInputs[1].dispatchEvent(new Event('input'));
 
       root = document.getElementById('roboticsApp');
       let toggles = root.querySelectorAll('.robotics-match-row .robotics-team-toggle');
@@ -1079,11 +1095,11 @@ describe('initRoboticsApp', () => {
       root = document.getElementById('roboticsApp');
       let scoreInputs = root.querySelectorAll('.robotics-bracket .robotics-score-input');
       scoreInputs[0].value = '80';
-      scoreInputs[0].dispatchEvent(new Event('change'));
+      scoreInputs[0].dispatchEvent(new Event('input'));
       root = document.getElementById('roboticsApp');
       scoreInputs = root.querySelectorAll('.robotics-bracket .robotics-score-input');
       scoreInputs[1].value = '20';
-      scoreInputs[1].dispatchEvent(new Event('change'));
+      scoreInputs[1].dispatchEvent(new Event('input'));
 
       root = document.getElementById('roboticsApp');
       let toggles = root.querySelectorAll('.robotics-bracket .robotics-team-toggle');
@@ -1145,6 +1161,26 @@ describe('initRoboticsApp', () => {
       clickButtonWithText(root, 'Generate Bracket');
     }
 
+    it('renders a Bye as its own card naming the advancing Playoff Alliance', () => {
+      const app = initRoboticsApp();
+      setupFourTeams(app);
+      // 3 Playoff Alliances in a 3-alliance bracket: the top seed gets a Bye
+      app.dispatch((s) => {
+        const [alpha, bravo, charlie, delta] = s.teams.map((t) => t.id);
+        let next = formPlayoffAlliance(s, alpha, bravo);
+        next = formPlayoffAlliance(next, charlie, charlie);
+        next = formPlayoffAlliance(next, delta, delta);
+        return setBracketConfig(next, { bracketSize: 3, includeThirdPlace: false });
+      });
+      app.dispatch((s) => generateBracket(autoFillSeedsFromStandings(s)));
+      app.setActiveTab('finals');
+
+      const root = document.getElementById('roboticsApp');
+      const byes = [...root.querySelectorAll('.robotics-bracket .robotics-bracket-bye')].map((b) => b.textContent);
+      expect(byes).toHaveLength(1);
+      expect(byes[0]).toMatch(/^BYE → (Alpha & Bravo|Charlie|Delta)$/);
+    });
+
     it('shows a 2nd place banner once the Final completes, with no 3rd place banner when there is no Third-Place Match', () => {
       const app = initRoboticsApp();
       setupFourTeams(app);
@@ -1162,6 +1198,9 @@ describe('initRoboticsApp', () => {
       expect(root.querySelector('.robotics-champion-banner')).toBeTruthy();
       expect(root.querySelector('.robotics-second-place-banner')?.textContent).toContain('2nd Place');
       expect(root.querySelector('.robotics-third-place-banner')).toBeFalsy();
+      // banners sit in their own row, not inside the horizontally scrolling bracket
+      expect(root.querySelector('.robotics-placements .robotics-champion-banner')).toBeTruthy();
+      expect(root.querySelector('.robotics-bracket .robotics-champion-banner')).toBeFalsy();
     });
 
     it('shows a 3rd place banner only once the Third-Place Match completes, and copies all three decided places', () => {

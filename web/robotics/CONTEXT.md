@@ -37,6 +37,8 @@ The fairness goals the Pairing Draw targets, best-effort rather than exhaustivel
 
 These are satisfied greedily, in roughly the priority listed — a rule is only violated when the number of Teams and configured match count make satisfying it mathematically impossible.
 
+Unlike the rules above, equal match counts are a hard guarantee, not a goal: no Team ever plays more than one Qualification Match more than another, so every Team plays exactly `matchesPerTeam` whenever Teams × `matchesPerTeam` is divisible by 4 (the case the Generate Matchups uneven-count warning treats as even).
+
 **No-Show**:
 A flag on one Team within one Match (Qualification or Elimination) recording that the Team did not participate. Counts as a loss for that Team alone; its Match Alliance (or Playoff Alliance) partner is unaffected and can still win the Match on its own merit.
 

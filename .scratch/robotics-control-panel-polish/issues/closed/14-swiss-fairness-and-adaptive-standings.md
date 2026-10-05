@@ -10,10 +10,10 @@
 
 **Status:** closed
 
-- [ ] Generating or regenerating matchups with a `matchesPerTeam` × team-count that won't produce equal match counts for every Team shows a confirmation dialog before proceeding
-- [ ] That dialog recommends at least one or two alternative `matchesPerTeam` values (not team-count changes) that would produce equal match counts for the current roster size
-- [ ] Canceling the dialog leaves existing matchups untouched; confirming proceeds with the uneven generation as today
-- [ ] Standings detects whether every Team has played the same number of completed Qualification Matches
-- [ ] When match counts are equal, Standings ranks by wins then cumulative points, as today
-- [ ] When match counts are unequal, Standings ranks by win percentage then average points per match, and the displayed columns reflect rate-based figures instead of raw ones
-- [ ] `web/robotics/CONTEXT.md`'s **Standings** entry is updated to describe both ranking modes
+- [x] Generating or regenerating matchups with a `matchesPerTeam` × team-count that won't produce equal match counts for every Team shows a confirmation dialog before proceeding
+- [x] That dialog recommends at least one or two alternative `matchesPerTeam` values (not team-count changes) that would produce equal match counts for the current roster size
+- [x] Canceling the dialog leaves existing matchups untouched; confirming proceeds with the uneven generation as today
+- [x] Standings detects whether every Team has played the same number of completed Qualification Matches
+- [x] When match counts are equal, Standings ranks by wins then cumulative points, as today
+- [x] When match counts are unequal, Standings ranks by win percentage then average points per match, and the displayed columns reflect rate-based figures instead of raw ones
+- [x] `web/robotics/CONTEXT.md`'s **Standings** entry is updated to describe both ranking modes

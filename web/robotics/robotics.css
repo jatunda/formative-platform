@@ -380,7 +380,8 @@ body {
 .robotics-match-row.is-current {
   background-color: var(--accent-blue-focus);
   border-color: var(--accent-blue);
-  border-left: 4px solid var(--accent-blue);
+  /* inset shadow rather than a thicker border, so the row's columns don't shift */
+  box-shadow: inset 3px 0 0 var(--accent-blue);
 }
 
 .robotics-match-row.is-up-next {
@@ -459,6 +460,14 @@ body {
   gap: var(--spacing-sm);
   flex: 0 0 auto;
   margin-left: auto;
+}
+
+/* Fixed width in schedule rows (fits "Mark Complete ↑ ↓", the widest variant)
+   so completed and pending rows give the teams column the same space and stay
+   aligned. Scoped to rows: bracket cards are column flexboxes, where a flex
+   basis would set height instead. */
+.robotics-match-row .robotics-match-actions {
+  flex-basis: 13rem;
 }
 
 .robotics-complete-badge {
@@ -577,6 +586,19 @@ body {
   font-weight: 600;
   text-align: center;
   align-self: flex-start;
+}
+
+/* ---- Placements row (1st/2nd/3rd), below the bracket ---- */
+
+.robotics-placements {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-lg);
+}
+
+.robotics-placements:empty {
+  display: none;
 }
 
 /* ---- 2nd/3rd place banners ---- */
