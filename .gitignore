@@ -4,3 +4,5 @@ dist/
 firebase-service-account.json
 web/ai-config.js
 web/coverage/
+.claude/
+.playwright-mcp/
