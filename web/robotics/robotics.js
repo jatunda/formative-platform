@@ -1338,10 +1338,30 @@ export function initRoboticsApp({ mountId = 'roboticsApp', storageKey = 'robotic
   // browser's blur-handling phase of a click, which runs before that same click's mouseup/click
   // phase, so a synchronous rebuild there destroys the node the click was headed for. Deferring
   // the rebuild past the current event (a macrotask, not a microtask — a blur-triggered
-  // microtask can still run before the pending click/mouseup) lets the whole native click
-  // sequence land first; captureFocusPath/restoreFocusPath above then carry whatever has focus
-  // by that point across the rebuild.
+  // microtask can still run before the pending click/mouseup) isn't enough on its own, though:
+  // mousedown and mouseup are two separate native events with a real (if short) gap between
+  // them while the mouse button is physically held, and a macrotask queued during mousedown's
+  // blur/change readily fires inside that gap, rebuilding the DOM before mouseup/click ever
+  // reach the original target. So the rebuild additionally waits out any mouse button that's
+  // currently down — once mouseup fires, the browser dispatches that click synchronously right
+  // after it (no macrotask boundary in between), so by the time our deferred render actually
+  // runs, the whole native click sequence has already landed on the pre-rebuild DOM.
+  // captureFocusPath/restoreFocusPath above then carry whatever has focus across the rebuild.
   let renderTimer = null;
+  let mouseButtonDown = false;
+  let renderPendingUntilMouseUp = false;
+  function onMouseDownCapture() {
+    mouseButtonDown = true;
+  }
+  function onMouseUpCapture() {
+    mouseButtonDown = false;
+    if (renderPendingUntilMouseUp) {
+      renderPendingUntilMouseUp = false;
+      scheduleRender();
+    }
+  }
+  document.addEventListener('mousedown', onMouseDownCapture, true);
+  document.addEventListener('mouseup', onMouseUpCapture, true);
   // Callbacks queued by dispatch(updater, afterRender) for code that needs the freshly-rebuilt
   // DOM — e.g. to tag a specific node for a one-off animation — rather than whatever is still
   // live at the moment dispatch() is called.
@@ -1352,6 +1372,10 @@ export function initRoboticsApp({ mountId = 'roboticsApp', storageKey = 'robotic
     callbacks.forEach((callback) => callback());
   }
   function scheduleRender() {
+    if (mouseButtonDown) {
+      renderPendingUntilMouseUp = true;
+      return;
+    }
     if (renderTimer !== null) return;
     renderTimer = setTimeout(() => {
       renderTimer = null;
@@ -1373,6 +1397,7 @@ export function initRoboticsApp({ mountId = 'roboticsApp', storageKey = 'robotic
       clearTimeout(renderTimer);
       renderTimer = null;
     }
+    renderPendingUntilMouseUp = false;
     render();
     flushAfterRenderCallbacks();
   }
@@ -1397,6 +1422,8 @@ export function initRoboticsApp({ mountId = 'roboticsApp', storageKey = 'robotic
   function destroy() {
     clearInterval(clockTimer);
     document.removeEventListener('keydown', onKeydown);
+    document.removeEventListener('mousedown', onMouseDownCapture, true);
+    document.removeEventListener('mouseup', onMouseUpCapture, true);
     if (stopActiveClock === destroy) stopActiveClock = null;
   }
   stopActiveClock = destroy;

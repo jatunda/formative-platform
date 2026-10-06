@@ -337,6 +337,12 @@ describe('initRoboticsApp', () => {
     // click lands on a node that's already gone. These tests pin down the fix's two halves:
     // the rebuild no longer happens inside the triggering event, and two actions queued close
     // together (a field commit, then a different control's click) both still land.
+    //
+    // A second, subtler half of the same root cause (see the "held-down click" test below):
+    // mousedown and mouseup are two separate native events with a real gap between them while
+    // the mouse button is physically held - deferring the rebuild by one macrotask isn't enough
+    // on its own, because that macrotask readily fires inside that gap. The rebuild additionally
+    // has to wait out any mouse button that's currently down.
 
     it('does not tear down the DOM inside the event that committed a field edit', async () => {
       const app = initRoboticsApp();
@@ -396,6 +402,41 @@ describe('initRoboticsApp', () => {
       const [, refreshedBravoInput] = root.querySelectorAll('.robotics-team-name-input');
       expect(document.activeElement).toBe(refreshedBravoInput);
       expect(app.getState().teams[0].name).toBe('Alpha Squad');
+    });
+
+    it('does not tear down the DOM while the mouse button is still held down, even once a field commits', async () => {
+      const app = initRoboticsApp();
+      const root = document.getElementById('roboticsApp');
+      ['Alpha', 'Bravo', 'Charlie', 'Delta'].forEach((name) => addTeamViaForm(root, name));
+      app.dispatch((s) => setMatchesPerTeam(s, 2));
+      app.dispatch((s) => regenerateMatchups(s));
+      app.setActiveTab('schedule');
+
+      const scoreInputs = root.querySelectorAll('.robotics-score-input');
+      const markBtn = [...root.querySelectorAll('button')].find((b) => b.textContent === 'Mark Complete');
+      scoreInputs[0].value = '50';
+      scoreInputs[1].value = '10';
+
+      // A real mousedown on the button steals focus from the field *before* the field's blur
+      // (hence "change") fires - and that field commit must not schedule a rebuild that lands
+      // before the button is released. Simulated here as two separate events instead of one
+      // click() call, because the real gap between them is exactly what the bug lives in.
+      markBtn.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+      scoreInputs[0].dispatchEvent(new Event('change'));
+
+      // Give the deferred render every opportunity to fire while the button is still "held" -
+      // with the bug, this is exactly when the rebuild ran and pulled the target out from under
+      // the pending mouseup/click.
+      await flushRender();
+      await flushRender();
+      expect(document.body.contains(markBtn)).toBe(true);
+
+      markBtn.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
+      markBtn.click();
+
+      await flushRender();
+      expect(app.getState().qualification.matches[0].completed).toBe(true);
+      expect(app.getState().qualification.matches[0].scoreA).toBe(50);
     });
   });
 
