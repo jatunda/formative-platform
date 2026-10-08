@@ -8,11 +8,15 @@ Context: `renderBracketRoundColumn`/`renderBracketSpacer` compute a "1 : 2 : 2 :
 
 **Blocked by:** None (can start immediately).
 
-**Status:** ready-for-agent
+**Status:** closed
 
-- [ ] Bracket column grow-ratio math lives in its own exported, pure function (e.g. in a new `bracket-layout.js`, or alongside `bracket.js`), decoupled from DOM construction
-- [ ] Direct unit tests cover the grow-ratio calculation for small, large, and odd round counts
-- [ ] `timeOfDayToEpochMs`/`timeOfDayInputValue` live in a pure module (e.g. `match-timeline.js`) and accept an injectable reference time instead of calling `new Date()` internally
-- [ ] Direct unit tests cover `timeOfDayToEpochMs`/`timeOfDayInputValue`, including a case at/near a day boundary (midnight)
-- [ ] `robotics.js` calls the extracted functions; no behavior change to the rendered Bracket layout or the Match Timeline's time inputs
-- [ ] `npm run test:coverage` passes clean per `CLAUDE.md`
+- [x] Bracket column grow-ratio math lives in its own exported, pure function (e.g. in a new `bracket-layout.js`, or alongside `bracket.js`), decoupled from DOM construction
+- [x] Direct unit tests cover the grow-ratio calculation for small, large, and odd round counts
+- [x] `timeOfDayToEpochMs`/`timeOfDayInputValue` live in a pure module (e.g. `match-timeline.js`) and accept an injectable reference time instead of calling `new Date()` internally
+- [x] Direct unit tests cover `timeOfDayToEpochMs`/`timeOfDayInputValue`, including a case at/near a day boundary (midnight)
+- [x] `robotics.js` calls the extracted functions; no behavior change to the rendered Bracket layout or the Match Timeline's time inputs
+- [x] `npm run test:coverage` passes clean per `CLAUDE.md`
+
+## Comments
+
+Implemented: `bracketColumnSpacerGrowRatios` added to new `bracket-layout.js`; `timeOfDayToEpochMs`/`timeOfDayInputValue` moved into `match-timeline.js` with `timeOfDayToEpochMs` taking an optional `referenceTime` (defaults to `Date.now()`). `robotics.js` now imports both and calls them; `renderBracketRoundColumn`/`renderBracketSpacer` keep only DOM construction. Coverage: both new/touched modules at 100%; full suite coverage gate passes clean. `/code-review` found no issues.

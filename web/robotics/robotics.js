@@ -32,9 +32,19 @@ import {
   playoffAllianceTeamIds,
   getAllMatchesInScheduleOrder,
 } from './state.js';
-import { computeMatchTime, computeTotalDurationMinutes, computeStartTimeFromEndTime, formatTimelineSummary, matchField, getScheduledMatchCount } from './match-timeline.js';
+import {
+  computeMatchTime,
+  computeTotalDurationMinutes,
+  computeStartTimeFromEndTime,
+  formatTimelineSummary,
+  matchField,
+  getScheduledMatchCount,
+  timeOfDayInputValue,
+  timeOfDayToEpochMs,
+} from './match-timeline.js';
 import { computeStandings } from './standings.js';
 import { resolveMatchSides, getMatchWinner, isBracketComplete, countUndecidedMatches, getPlacements, formatFinalsSetupSummary } from './bracket.js';
+import { bracketColumnSpacerGrowRatios } from './bracket-layout.js';
 import { launchConfetti } from './confetti.js';
 import { getCurrentMatchIndex, getUpNextMatchIndex } from './current-match.js';
 import { exportStandingsMarkdown, exportMatchesMarkdown, exportRosterMarkdown, exportPlacementsMarkdown } from './markdown-export.js';
@@ -166,22 +176,6 @@ function el(tag, props = {}, children = []) {
   });
   children.forEach((child) => node.appendChild(typeof child === 'string' ? document.createTextNode(child) : child));
   return node;
-}
-
-// A Match Timeline Start/End Time is a time-of-day only (the Tournament runs in one sitting) —
-// combine it with today's date to get the epoch-ms the rest of the app works in.
-function timeOfDayInputValue(epochMs) {
-  if (epochMs == null) return '';
-  const d = new Date(epochMs);
-  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-}
-
-function timeOfDayToEpochMs(timeStr) {
-  if (!timeStr) return null;
-  const [hours, minutes] = timeStr.split(':').map(Number);
-  const d = new Date();
-  d.setHours(hours, minutes, 0, 0);
-  return d.getTime();
 }
 
 // ---- Tab: Teams ----
@@ -843,11 +837,6 @@ function renderBracketMatch(state, dispatch, match) {
   return card;
 }
 
-// A bracket-tree column centers each match between the two matches feeding it by
-// surrounding every match with flex spacers in a 1 : 2 : 2 : ... : 2 : 1 ratio: the
-// leftover space a shorter column gets stretched into (relative to round 1, which
-// has the most matches and so defines the bracket's overall height) is distributed
-// so each match lands at the midpoint of its two feeders, recursively.
 function renderBracketSpacer(grow) {
   return el('div', { className: 'robotics-bracket-spacer', style: `flex-grow: ${grow};` });
 }
@@ -855,12 +844,13 @@ function renderBracketSpacer(grow) {
 function renderBracketRoundColumn(state, dispatch, matches, title) {
   const col = el('div', { className: 'robotics-bracket-round' }, [el('h4', {}, [title])]);
   const sorted = [...matches].sort((a, b) => a.slot - b.slot);
-  col.appendChild(renderBracketSpacer(1));
+  const growRatios = bracketColumnSpacerGrowRatios(sorted.length);
+  col.appendChild(renderBracketSpacer(growRatios[0]));
   sorted.forEach((match, i) => {
     col.appendChild(renderBracketMatch(state, dispatch, match));
-    if (i < sorted.length - 1) col.appendChild(renderBracketSpacer(2));
+    if (i < sorted.length - 1) col.appendChild(renderBracketSpacer(growRatios[i + 1]));
   });
-  col.appendChild(renderBracketSpacer(1));
+  col.appendChild(renderBracketSpacer(growRatios[growRatios.length - 1]));
   return col;
 }
 

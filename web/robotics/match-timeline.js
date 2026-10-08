@@ -79,6 +79,35 @@ export function getScheduledMatchCount(qualificationMatchCount, bracket, estimat
   return qualificationMatchCount + eliminationCount;
 }
 
+// A Match Timeline Start/End Time is a time-of-day only (the Tournament runs in one sitting) —
+// combine it with a reference date to get the epoch-ms the rest of the app works in.
+
+/**
+ * Render an epoch-ms Match Timeline Start/End Time as a `<input type="time">` value.
+ * @param {number|null} epochMs
+ * @returns {string}
+ */
+export function timeOfDayInputValue(epochMs) {
+  if (epochMs == null) return '';
+  const d = new Date(epochMs);
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+/**
+ * Parse an `<input type="time">` value into epoch-ms, combined with referenceTime's
+ * calendar date (so the Tournament's single sitting always lands on "today").
+ * @param {string} timeStr - "HH:MM", or "" for unset
+ * @param {number} [referenceTime] - epoch-ms to take the calendar date from; defaults to now
+ * @returns {number|null}
+ */
+export function timeOfDayToEpochMs(timeStr, referenceTime = Date.now()) {
+  if (!timeStr) return null;
+  const [hours, minutes] = timeStr.split(':').map(Number);
+  const d = new Date(referenceTime);
+  d.setHours(hours, minutes, 0, 0);
+  return d.getTime();
+}
+
 /**
  * One-line summary of a Match Timeline for its collapsed panel, e.g.
  * `Forward · starts 1:00 PM · 4 + 1 min · 2 fields · ends ~2:10 PM`.

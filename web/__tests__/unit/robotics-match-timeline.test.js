@@ -7,6 +7,8 @@ import {
   formatTimelineSummary,
   matchField,
   getScheduledMatchCount,
+  timeOfDayInputValue,
+  timeOfDayToEpochMs,
   MINUTE_MS,
 } from '../../robotics/match-timeline.js';
 
@@ -132,6 +134,42 @@ describe('matchField', () => {
     expect(matchField(2, 1)).toBe(2);
     expect(matchField(2, 2)).toBe(1);
     expect(matchField(2, 3)).toBe(2);
+  });
+});
+
+describe('timeOfDayInputValue', () => {
+  it('formats hours and minutes zero-padded to HH:MM', () => {
+    expect(timeOfDayInputValue(new Date(2026, 9, 2, 9, 5).getTime())).toBe('09:05');
+    expect(timeOfDayInputValue(new Date(2026, 9, 2, 23, 45).getTime())).toBe('23:45');
+  });
+
+  it('returns an empty string when unset', () => {
+    expect(timeOfDayInputValue(null)).toBe('');
+  });
+});
+
+describe('timeOfDayToEpochMs', () => {
+  it('returns null for an empty string', () => {
+    expect(timeOfDayToEpochMs('')).toBeNull();
+  });
+
+  it('combines the time-of-day with the reference date', () => {
+    const referenceTime = new Date(2026, 9, 2, 12, 0).getTime();
+    expect(timeOfDayToEpochMs('09:05', referenceTime)).toBe(new Date(2026, 9, 2, 9, 5).getTime());
+  });
+
+  it('stays on the reference date even when the time-of-day is near midnight', () => {
+    // A reference time late in the evening combined with an early time-of-day doesn't roll
+    // over to the next calendar day - the date always comes from the reference, not the clock.
+    const referenceTime = new Date(2026, 9, 2, 23, 45).getTime();
+    expect(timeOfDayToEpochMs('00:05', referenceTime)).toBe(new Date(2026, 9, 2, 0, 5).getTime());
+  });
+
+  it('defaults the reference time to now when omitted', () => {
+    const before = Date.now();
+    const result = timeOfDayToEpochMs('00:00');
+    const now = new Date(before);
+    expect(result).toBe(new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0).getTime());
   });
 });
 
