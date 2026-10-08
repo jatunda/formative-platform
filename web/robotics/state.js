@@ -31,6 +31,16 @@ function noShowPatch(match, teamId, flag) {
   return { noShow };
 }
 
+/** No-ops if there's no Elimination Bracket yet (its default before generateBracket, and again after resetResults/newTournament). */
+function updateEliminationBracket(state, matchId, makePatch) {
+  if (!state.elimination.bracket) return state;
+  const bracket = {
+    ...state.elimination.bracket,
+    matches: updateOneMatch(state.elimination.bracket.matches, byId(matchId), makePatch),
+  };
+  return { ...state, elimination: { ...state.elimination, bracket } };
+}
+
 /**
  * The blank Tournament state: no Teams, default Qualification/Timeline
  * config, no Elimination Bracket. See web/robotics/CONTEXT.md for the
@@ -243,28 +253,16 @@ export function generateBracket(state) {
 }
 
 export function recordEliminationResult(state, matchId, { scoreA, scoreB }) {
-  const bracket = {
-    ...state.elimination.bracket,
-    matches: updateOneMatch(state.elimination.bracket.matches, byId(matchId), () => ({ scoreA, scoreB, completed: true })),
-  };
-  return { ...state, elimination: { ...state.elimination, bracket } };
+  return updateEliminationBracket(state, matchId, () => ({ scoreA, scoreB, completed: true }));
 }
 
 /** Persists an in-progress (not yet "Mark Complete"-d) score so it survives a No-Show toggle's re-render. */
 export function setEliminationDraftScore(state, matchId, field, value) {
-  const bracket = {
-    ...state.elimination.bracket,
-    matches: updateOneMatch(state.elimination.bracket.matches, byId(matchId), () => ({ [field]: value })),
-  };
-  return { ...state, elimination: { ...state.elimination, bracket } };
+  return updateEliminationBracket(state, matchId, () => ({ [field]: value }));
 }
 
 export function setEliminationNoShow(state, matchId, teamId, flag) {
-  const bracket = {
-    ...state.elimination.bracket,
-    matches: updateOneMatch(state.elimination.bracket.matches, byId(matchId), (m) => noShowPatch(m, teamId, flag)),
-  };
-  return { ...state, elimination: { ...state.elimination, bracket } };
+  return updateEliminationBracket(state, matchId, (m) => noShowPatch(m, teamId, flag));
 }
 
 /**

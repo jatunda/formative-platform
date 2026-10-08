@@ -397,6 +397,16 @@ describe('playoff alliances and bracket generation', () => {
     const result = setEliminationNoShow(state, 'not-a-real-id', t1.id, true);
     expect(result.elimination.bracket.matches).toEqual(state.elimination.bracket.matches);
   });
+
+  it('no-ops on recordEliminationResult/setEliminationDraftScore/setEliminationNoShow when there is no bracket yet', () => {
+    const state = createInitialState();
+    expect(() => recordEliminationResult(state, 'any-id', { scoreA: 1, scoreB: 0 })).not.toThrow();
+    expect(recordEliminationResult(state, 'any-id', { scoreA: 1, scoreB: 0 })).toBe(state);
+    expect(() => setEliminationDraftScore(state, 'any-id', 'scoreA', 1)).not.toThrow();
+    expect(setEliminationDraftScore(state, 'any-id', 'scoreA', 1)).toBe(state);
+    expect(() => setEliminationNoShow(state, 'any-id', 'team-1', true)).not.toThrow();
+    expect(setEliminationNoShow(state, 'any-id', 'team-1', true)).toBe(state);
+  });
 });
 
 describe('newTournament', () => {
