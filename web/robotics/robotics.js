@@ -566,7 +566,7 @@ function renderAccordion({ variant, title, summary, panel, expanded, onToggle })
   }, [
     el('span', { className: 'robotics-accordion-chevron', 'aria-hidden': 'true' }, ['▸']),
     el('span', { className: 'robotics-accordion-heading' }, [
-      el('span', { className: 'robotics-card-title' }, [title]),
+      el('span', { className: 'robotics-accordion-title' }, [title]),
       el('span', { className: 'robotics-accordion-summary' }, [summary]),
     ]),
   ]);

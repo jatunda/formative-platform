@@ -1194,7 +1194,7 @@ describe('initRoboticsApp', () => {
       app.setActiveTab('schedule');
       const freshRoot = document.getElementById('roboticsApp');
 
-      const cardTitles = [...freshRoot.querySelectorAll('.robotics-card-title')].map((h) => h.textContent);
+      const cardTitles = [...freshRoot.querySelectorAll('.robotics-card-title, .robotics-accordion-title')].map((h) => h.textContent);
       expect(cardTitles).toEqual(expect.arrayContaining(['Match Timeline', 'Qualification Matches', 'Standings']));
       expect(freshRoot.querySelectorAll('.robotics-match-row').length).toBeGreaterThan(0);
       expect(freshRoot.querySelector('table.robotics-table')).toBeTruthy();
@@ -1219,7 +1219,7 @@ describe('initRoboticsApp', () => {
       expect(timelineCard.classList.contains('robotics-timeline')).toBe(true);
       expect(standingsCol.classList.contains('robotics-schedule-standings')).toBe(true);
 
-      const titlesIn = (col) => [...col.querySelectorAll('.robotics-card-title')].map((h) => h.textContent);
+      const titlesIn = (col) => [...col.querySelectorAll('.robotics-card-title, .robotics-accordion-title')].map((h) => h.textContent);
       const buttonsIn = (col) => [...col.querySelectorAll('button')].map((b) => b.textContent);
       expect(titlesIn(matchesCol)).toEqual(['Qualification Matches']);
       expect(matchesCol.querySelectorAll('.robotics-match-row').length).toBeGreaterThan(0);

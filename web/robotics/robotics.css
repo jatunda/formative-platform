@@ -525,16 +525,12 @@ body {
   min-width: 0;
 }
 
-/* Scoped to the heading specifically, not .robotics-accordion as a whole: the
-   Finals accordion's panel nests full .robotics-card titles of its own (Form a
-   Playoff Alliance, Playoff Alliances, Bracket Configuration) that must keep
-   their normal card-title styling once the accordion expands. */
-.robotics-accordion-heading .robotics-card-title {
-  display: block;
-  margin: 0;
-  padding: 0;
-  border: 0;
+.robotics-accordion-title {
+  color: var(--arena-text);
   font-size: 1rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
 
 /* Wraps rather than truncates: in a narrow column an ellipsis would hide the end of the summary. */
