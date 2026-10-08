@@ -30,6 +30,8 @@ import {
   getRevealedPlaces,
   revealNextPlacement,
   replayReveal,
+  playoffAllianceTeamIds,
+  getAllMatchesInScheduleOrder,
 } from '../../robotics/state.js';
 
 function withFourTeams(state) {
@@ -478,5 +480,47 @@ describe('Podium reveal', () => {
     const s = revealNextPlacement(completeAll(withBracket()));
     expect(getRevealedCount(resetResults(s))).toBe(0);
     expect(getRevealedCount(newTournament(s))).toBe(0);
+  });
+});
+
+describe('playoffAllianceTeamIds', () => {
+  it('returns the two Team ids making up a Playoff Alliance', () => {
+    let state = withFourTeams(createInitialState());
+    const [t1, t2] = state.teams;
+    state = formPlayoffAlliance(state, t1.id, t2.id);
+    const allianceId = state.elimination.alliances[0].id;
+    expect(playoffAllianceTeamIds(state, allianceId)).toEqual([t1.id, t2.id]);
+  });
+
+  it('returns an empty list for an alliance id that does not resolve', () => {
+    expect(playoffAllianceTeamIds(createInitialState(), 'nope')).toEqual([]);
+  });
+});
+
+describe('getAllMatchesInScheduleOrder', () => {
+  it('returns an empty list for a fresh tournament', () => {
+    expect(getAllMatchesInScheduleOrder(createInitialState())).toEqual([]);
+  });
+
+  it('orders Qualification Matches before Elimination Matches and excludes Byes', () => {
+    let state = withFourTeams(createInitialState());
+    state = setMatchesPerTeam(state, 1);
+    state = regenerateMatchups(state);
+    const [t1, t2, t3, t4] = state.teams;
+    state = formPlayoffAlliance(state, t1.id, t2.id);
+    state = formPlayoffAlliance(state, t3.id, t4.id);
+    const [a1, a2] = state.elimination.alliances;
+    state = setBracketConfig(state, { bracketSize: 2, includeThirdPlace: false });
+    state = setSeed(state, 1, a1.id);
+    state = setSeed(state, 2, a2.id);
+    state = generateBracket(state);
+
+    const entries = getAllMatchesInScheduleOrder(state);
+    expect(entries.map((e) => e.kind)).toEqual([
+      ...state.qualification.matches.map(() => 'qualification'),
+      ...state.elimination.bracket.matches.filter((m) => !m.isBye).map(() => 'elimination'),
+    ]);
+    expect(entries.map((e) => e.globalIndex)).toEqual(entries.map((_, i) => i));
+    expect(entries.some((e) => e.match.isBye)).toBe(false);
   });
 });

@@ -29,8 +29,10 @@ import {
   getNextPlaceToReveal,
   revealNextPlacement,
   replayReveal,
+  playoffAllianceTeamIds,
+  getAllMatchesInScheduleOrder,
 } from './state.js';
-import { computeMatchTime, computeTotalDurationMinutes, computeStartTimeFromEndTime, estimateEliminationMatchCount, formatTimelineSummary } from './match-timeline.js';
+import { computeMatchTime, computeTotalDurationMinutes, computeStartTimeFromEndTime, formatTimelineSummary, matchField, getScheduledMatchCount } from './match-timeline.js';
 import { computeStandings } from './standings.js';
 import { resolveMatchSides, getMatchWinner, isBracketComplete, countUndecidedMatches, getPlacements, formatFinalsSetupSummary } from './bracket.js';
 import { launchConfetti } from './confetti.js';
@@ -38,6 +40,7 @@ import { getCurrentMatchIndex, getUpNextMatchIndex } from './current-match.js';
 import { exportStandingsMarkdown, exportMatchesMarkdown, exportRosterMarkdown, exportPlacementsMarkdown } from './markdown-export.js';
 import { createToastContainer, showToast } from './toast.js';
 import { createConfirmDialogContainer, showConfirm } from './confirm-dialog.js';
+import { createRenderLoop } from './render-loop.js';
 import { getTournamentPhase, PHASE_LABELS, getMatchProgress, getCurrentMatchTime, getScheduleDrift, formatScheduleDrift } from './tournament-status.js';
 
 const TABS = [
@@ -92,10 +95,6 @@ function nameFitProps(text) {
   return { fitClass: fit.fitsOneLine ? ' robotics-fit-name' : '', style: fit.style };
 }
 
-function playoffAllianceTeamIds(state, allianceId) {
-  return state.elimination.alliances.find((a) => a.id === allianceId)?.teamIds ?? [];
-}
-
 function playoffAllianceLabel(state, allianceId) {
   const teamIds = playoffAllianceTeamIds(state, allianceId);
   return teamIds.length ? allianceTeamNames(state, teamIds) : '(unassigned)';
@@ -122,29 +121,6 @@ function renderAllianceSide(state, teamIds, noShow, onToggleNoShow, isWinner, co
     }, [name]));
   });
   return el('span', { className: `robotics-match-alliance is-${color}${isWinner ? ' is-winner' : ''}` }, children);
-}
-
-/**
- * All matches (Qualification then Elimination, Byes excluded since they
- * occupy no time slot) in schedule order, each annotated with its global
- * index for Match Time purposes.
- */
-export function getAllMatchesInScheduleOrder(state) {
-  const entries = state.qualification.matches.map((match, i) => ({ kind: 'qualification', match, qualIndex: i }));
-  if (state.elimination.bracket) {
-    const order = { 'third-place': Infinity - 1, final: Infinity };
-    const sortedElimMatches = [...state.elimination.bracket.matches]
-      .filter((m) => !m.isBye)
-      .sort((a, b) => {
-        const aKey = typeof a.round === 'number' ? a.round : order[a.round];
-        const bKey = typeof b.round === 'number' ? b.round : order[b.round];
-        return aKey - bKey || a.slot - b.slot;
-      });
-    for (const match of sortedElimMatches) {
-      entries.push({ kind: 'elimination', match });
-    }
-  }
-  return entries.map((entry, globalIndex) => ({ ...entry, globalIndex }));
 }
 
 /** Rank formed Playoff Alliances by the better (lower-index) Standings rank of their two Teams. */
@@ -429,29 +405,23 @@ export function renderTeamsTab(state, dispatch) {
 
 // ---- Tab: Schedule / Swiss Live ----
 
-/** The Field a match plays on, or null when only one Field runs (so there is nothing to show). */
-function matchField(state, globalIndex) {
-  const { fieldCount } = state.timeline;
-  return fieldCount > 1 ? (globalIndex % fieldCount) + 1 : null;
-}
-
-/** Draft-score inputs for one Qualification Match: each edit is saved as a draft (re-rendering every view of the match). */
-function renderQualificationScoreInputs(dispatch, match, qualIndex) {
+/** Draft-score inputs for one match (Qualification or Elimination): each edit is saved as a draft (re-rendering every view of the match). */
+function renderScoreInputs(dispatch, match, matchRef, setDraftScore) {
   const scoreA = el('input', { type: 'number', className: 'robotics-score-input is-red', value: match.scoreA ?? '' });
   const scoreB = el('input', { type: 'number', className: 'robotics-score-input is-blue', value: match.scoreB ?? '' });
   scoreA.addEventListener('change', () => {
-    dispatch((s) => setQualificationDraftScore(s, qualIndex, 'scoreA', scoreA.value === '' ? null : parseInt(scoreA.value, 10) || 0));
+    dispatch((s) => setDraftScore(s, matchRef, 'scoreA', scoreA.value === '' ? null : parseInt(scoreA.value, 10) || 0));
   });
   scoreB.addEventListener('change', () => {
-    dispatch((s) => setQualificationDraftScore(s, qualIndex, 'scoreB', scoreB.value === '' ? null : parseInt(scoreB.value, 10) || 0));
+    dispatch((s) => setDraftScore(s, matchRef, 'scoreB', scoreB.value === '' ? null : parseInt(scoreB.value, 10) || 0));
   });
   return { scoreA, scoreB };
 }
 
-function renderMarkQualificationCompleteButton(dispatch, match, qualIndex, { scoreA, scoreB }, className) {
+function renderMarkMatchCompleteButton(dispatch, match, matchRef, { scoreA, scoreB }, className, recordResult) {
   return el('button', {
     className,
-    onClick: () => dispatch((s) => recordQualificationResult(s, qualIndex, {
+    onClick: () => dispatch((s) => recordResult(s, matchRef, {
       scoreA: parseInt(scoreA.value, 10) || 0,
       scoreB: parseInt(scoreB.value, 10) || 0,
     })),
@@ -464,7 +434,7 @@ function renderMatchRow(state, dispatch, entry, { currentIndex, upNextIndex }) {
   const isCurrent = isQual && qualIndex === currentIndex;
   const isUpNext = isQual && qualIndex === upNextIndex;
 
-  const field = matchField(state, entry.globalIndex);
+  const field = matchField(state.timeline.fieldCount, entry.globalIndex);
   const classNames = ['robotics-match-row', 'robotics-match-grid'];
   if (field) classNames.push('has-field');
   if (isCurrent) classNames.push('is-current');
@@ -486,7 +456,7 @@ function renderMatchRow(state, dispatch, entry, { currentIndex, upNextIndex }) {
   }
   row.appendChild(el('span', dotProps));
 
-  const scores = renderQualificationScoreInputs(dispatch, match, qualIndex);
+  const scores = renderScoreInputs(dispatch, match, qualIndex, setQualificationDraftScore);
   const { scoreA, scoreB } = scores;
   const winningSide = match.completed && match.scoreA !== match.scoreB
     ? (match.scoreA > match.scoreB ? 'A' : 'B')
@@ -499,7 +469,7 @@ function renderMatchRow(state, dispatch, entry, { currentIndex, upNextIndex }) {
   row.appendChild(renderAllianceSide(state, match.allianceB, match.noShow, toggleQualificationNoShow, winningSide === 'B', 'blue'));
 
   const actions = el('div', { className: 'robotics-match-actions' });
-  actions.appendChild(renderMarkQualificationCompleteButton(dispatch, match, qualIndex, scores, 'robotics-btn robotics-btn-secondary robotics-btn-sm'));
+  actions.appendChild(renderMarkMatchCompleteButton(dispatch, match, qualIndex, scores, 'robotics-btn robotics-btn-secondary robotics-btn-sm', recordQualificationResult));
 
   if (match.completed) {
     actions.appendChild(el('span', { className: 'robotics-complete-badge' }, ['✓ Complete']));
@@ -522,14 +492,6 @@ function renderMatchRow(state, dispatch, entry, { currentIndex, upNextIndex }) {
   row.appendChild(actions);
 
   return row;
-}
-
-/** Every match the schedule spans: Qualification Matches plus actual (or, before a bracket exists, estimated) Elimination Matches. */
-function getScheduledMatchCount(state) {
-  const eliminationCount = state.elimination.bracket
-    ? state.elimination.bracket.matches.filter((m) => !m.isBye).length
-    : estimateEliminationMatchCount(state.timeline.estimatedBracketSize, state.timeline.estimatedThirdPlace);
-  return state.qualification.matches.length + eliminationCount;
 }
 
 function formatClock(epochMs) {
@@ -559,7 +521,9 @@ function renderTimelineControls(state, dispatch) {
         return;
       }
       const endTime = timeOfDayToEpochMs(timeInput.value);
-      const totalMinutes = computeTotalDurationMinutes(state.timeline, getScheduledMatchCount(state));
+      const totalMinutes = computeTotalDurationMinutes(state.timeline, getScheduledMatchCount(
+        state.qualification.matches.length, state.elimination.bracket, state.timeline.estimatedBracketSize, state.timeline.estimatedThirdPlace,
+      ));
       const startTime = computeStartTimeFromEndTime({ endTime }, totalMinutes);
       dispatch((s) => setTimelineConfig(s, { endTime, startTime }));
     },
@@ -623,7 +587,9 @@ function renderMatchTimeline(state, dispatch, { expanded, onToggle }) {
   return renderAccordion({
     variant: 'timeline',
     title: 'Match Timeline',
-    summary: formatTimelineSummary(state.timeline, getScheduledMatchCount(state), formatClock),
+    summary: formatTimelineSummary(state.timeline, getScheduledMatchCount(
+      state.qualification.matches.length, state.elimination.bracket, state.timeline.estimatedBracketSize, state.timeline.estimatedThirdPlace,
+    ), formatClock),
     panel,
     expanded,
     onToggle,
@@ -638,7 +604,7 @@ function formatMatchClock(epochMs) {
 
 /** "2:05 PM · Field 2" (Field only when more than one runs). */
 function renderMatchMeta(state, entry, className) {
-  const field = matchField(state, entry.globalIndex);
+  const field = matchField(state.timeline.fieldCount, entry.globalIndex);
   return el('div', { className }, [
     el('span', { className: 'robotics-now-playing-time' }, [formatMatchClock(computeMatchTime(state.timeline, entry.globalIndex))]),
     ...(field ? [el('span', { className: 'robotics-now-playing-field' }, [`Field ${field}`])] : []),
@@ -711,7 +677,7 @@ function renderNowPlaying(state, dispatch, { currentIndex, upNextIndex, setActiv
   const current = entries[currentIndex];
   const { match } = current;
   const toggleNoShow = (teamId, next) => dispatch((s) => setQualificationNoShow(s, currentIndex, teamId, next));
-  const scores = renderQualificationScoreInputs(dispatch, match, currentIndex);
+  const scores = renderScoreInputs(dispatch, match, currentIndex, setQualificationDraftScore);
 
   wrap.appendChild(el('section', { className: 'robotics-now-playing', 'aria-label': 'Now Playing' }, [
     el('div', { className: 'robotics-now-playing-header' }, [
@@ -725,7 +691,7 @@ function renderNowPlaying(state, dispatch, { currentIndex, upNextIndex, setActiv
       scores.scoreB,
       renderNowPlayingSide(state, match, match.allianceB, toggleNoShow, 'blue'),
     ]),
-    renderMarkQualificationCompleteButton(dispatch, match, currentIndex, scores, 'robotics-btn robotics-btn-primary robotics-now-playing-complete'),
+    renderMarkMatchCompleteButton(dispatch, match, currentIndex, scores, 'robotics-btn robotics-btn-primary robotics-now-playing-complete', recordQualificationResult),
   ]));
 
   if (upNextIndex !== null) wrap.appendChild(renderUpNext(state, entries[upNextIndex]));
@@ -855,36 +821,23 @@ function renderBracketMatch(state, dispatch, match) {
   const winner = getMatchWinner(state.elimination.bracket, match.id);
   const toggleEliminationNoShow = (teamId, next) => dispatch((s) => setEliminationNoShow(s, match.id, teamId, next));
 
-  const scoreA = el('input', { type: 'number', className: 'robotics-score-input is-red', value: match.scoreA ?? '' });
-  const scoreB = el('input', { type: 'number', className: 'robotics-score-input is-blue', value: match.scoreB ?? '' });
-  scoreA.addEventListener('change', () => {
-    dispatch((s) => setEliminationDraftScore(s, match.id, 'scoreA', scoreA.value === '' ? null : parseInt(scoreA.value, 10) || 0));
-  });
-  scoreB.addEventListener('change', () => {
-    dispatch((s) => setEliminationDraftScore(s, match.id, 'scoreB', scoreB.value === '' ? null : parseInt(scoreB.value, 10) || 0));
-  });
+  const scores = renderScoreInputs(dispatch, match, match.id, setEliminationDraftScore);
   card.appendChild(el('div', { className: 'robotics-bracket-side is-red' }, [
     sides.allianceA
       ? renderAllianceSide(state, playoffAllianceTeamIds(state, sides.allianceA), match.noShow, toggleEliminationNoShow, winner === sides.allianceA, 'red')
       : el('span', { className: 'robotics-match-alliance' }, ['TBD']),
-    scoreA,
+    scores.scoreA,
   ]));
   card.appendChild(el('div', { className: 'robotics-match-vs' }, ['vs']));
   card.appendChild(el('div', { className: 'robotics-bracket-side is-blue' }, [
     sides.allianceB
       ? renderAllianceSide(state, playoffAllianceTeamIds(state, sides.allianceB), match.noShow, toggleEliminationNoShow, winner === sides.allianceB, 'blue')
       : el('span', { className: 'robotics-match-alliance' }, ['TBD']),
-    scoreB,
+    scores.scoreB,
   ]));
 
   const actions = el('div', { className: 'robotics-match-actions' });
-  actions.appendChild(el('button', {
-    className: 'robotics-btn robotics-btn-secondary robotics-btn-sm',
-    onClick: () => dispatch((s) => recordEliminationResult(s, match.id, {
-      scoreA: parseInt(scoreA.value, 10) || 0,
-      scoreB: parseInt(scoreB.value, 10) || 0,
-    })),
-  }, [match.completed ? 'Save Edit' : 'Mark Complete']));
+  actions.appendChild(renderMarkMatchCompleteButton(dispatch, match, match.id, scores, 'robotics-btn robotics-btn-secondary robotics-btn-sm', recordEliminationResult));
   if (match.completed) actions.appendChild(el('span', { className: 'robotics-complete-badge' }, ['✓ Complete']));
   card.appendChild(actions);
   return card;
@@ -1211,55 +1164,6 @@ function updateLiveStatus(root, state, now) {
   driftEl.dataset.drift = drift?.status ?? '';
 }
 
-// Input types where selectionStart/selectionEnd/setSelectionRange are valid to call;
-// other types (e.g. "number") throw InvalidStateError if you touch them.
-const SELECTABLE_INPUT_TYPES = new Set(['text', 'search', 'url', 'tel', 'password']);
-
-/** Locate the focused element within root by its childNode index path, so it can be found again after a rebuild. */
-function captureFocusPath(root) {
-  const active = document.activeElement;
-  if (!active || active === root || !root.contains(active)) return null;
-  const path = [];
-  const siblingCounts = [];
-  let node = active;
-  while (node && node !== root) {
-    const parent = node.parentNode;
-    if (!parent) return null;
-    path.unshift(Array.prototype.indexOf.call(parent.childNodes, node));
-    siblingCounts.unshift(parent.childNodes.length);
-    node = parent;
-  }
-  const hasSelection = SELECTABLE_INPUT_TYPES.has(active.type);
-  return {
-    path,
-    siblingCounts,
-    tagName: active.tagName,
-    selectionStart: hasSelection ? active.selectionStart : null,
-    selectionEnd: hasSelection ? active.selectionEnd : null,
-  };
-}
-
-/**
- * Re-focus (and restore cursor position for) the element at a path captured by captureFocusPath,
- * if it still exists. Also requires every ancestor along that path to still have the same
- * childNode count it had at capture time: a list that grew or shrank (e.g. a row removed) means
- * a sibling has shifted into the captured position, and that sibling — not whatever was focused
- * before — would wrongly receive focus, so restoration is skipped rather than guessed at.
- */
-function restoreFocusPath(root, focusPath) {
-  if (!focusPath) return;
-  let node = root;
-  for (let i = 0; i < focusPath.path.length; i++) {
-    if (node?.childNodes.length !== focusPath.siblingCounts[i]) return;
-    node = node.childNodes[focusPath.path[i]];
-  }
-  if (!node || node.tagName !== focusPath.tagName) return;
-  node.focus();
-  if (focusPath.selectionStart !== null && typeof node.setSelectionRange === 'function') {
-    node.setSelectionRange(focusPath.selectionStart, focusPath.selectionEnd);
-  }
-}
-
 // Only one control panel runs per page; initialising another stops the previous clock and Space handler.
 let stopActiveClock = null;
 
@@ -1325,84 +1229,22 @@ export function initRoboticsApp({ mountId = 'roboticsApp', storageKey = 'robotic
     lastCurrentMatchIndex = currentIndex;
   }
 
-  function render() {
-    const focusPath = captureFocusPath(mount);
-    mount.innerHTML = '';
-    mount.appendChild(renderApp(state, dispatch, activeTab, setActiveTab, ui));
-    restoreFocusPath(mount, focusPath);
-    autoScrollToCurrentMatchIfAdvanced();
-  }
-
-  // dispatch() rebuilds the whole DOM (mount.innerHTML = ''), which would otherwise tear down
-  // the actual click target mid-interaction: a field's "change" event commits during the
-  // browser's blur-handling phase of a click, which runs before that same click's mouseup/click
-  // phase, so a synchronous rebuild there destroys the node the click was headed for. Deferring
-  // the rebuild past the current event (a macrotask, not a microtask — a blur-triggered
-  // microtask can still run before the pending click/mouseup) isn't enough on its own, though:
-  // mousedown and mouseup are two separate native events with a real (if short) gap between
-  // them while the mouse button is physically held, and a macrotask queued during mousedown's
-  // blur/change readily fires inside that gap, rebuilding the DOM before mouseup/click ever
-  // reach the original target. So the rebuild additionally waits out any mouse button that's
-  // currently down — once mouseup fires, the browser dispatches that click synchronously right
-  // after it (no macrotask boundary in between), so by the time our deferred render actually
-  // runs, the whole native click sequence has already landed on the pre-rebuild DOM.
-  // captureFocusPath/restoreFocusPath above then carry whatever has focus across the rebuild.
-  let renderTimer = null;
-  let mouseButtonDown = false;
-  let renderPendingUntilMouseUp = false;
-  function onMouseDownCapture() {
-    mouseButtonDown = true;
-  }
-  function onMouseUpCapture() {
-    mouseButtonDown = false;
-    if (renderPendingUntilMouseUp) {
-      renderPendingUntilMouseUp = false;
-      scheduleRender();
-    }
-  }
-  document.addEventListener('mousedown', onMouseDownCapture, true);
-  document.addEventListener('mouseup', onMouseUpCapture, true);
-  // Callbacks queued by dispatch(updater, afterRender) for code that needs the freshly-rebuilt
-  // DOM — e.g. to tag a specific node for a one-off animation — rather than whatever is still
-  // live at the moment dispatch() is called.
-  let afterRenderCallbacks = [];
-  function flushAfterRenderCallbacks() {
-    const callbacks = afterRenderCallbacks;
-    afterRenderCallbacks = [];
-    callbacks.forEach((callback) => callback());
-  }
-  function scheduleRender() {
-    if (mouseButtonDown) {
-      renderPendingUntilMouseUp = true;
-      return;
-    }
-    if (renderTimer !== null) return;
-    renderTimer = setTimeout(() => {
-      renderTimer = null;
-      render();
-      flushAfterRenderCallbacks();
-    }, 0);
-  }
-
   function dispatch(updater, afterRender) {
     state = updater(state);
     storage.save(state);
-    if (afterRender) afterRenderCallbacks.push(afterRender);
-    scheduleRender();
+    loop.requestRender(afterRender);
   }
 
   function setActiveTab(tab) {
     activeTab = tab;
-    if (renderTimer !== null) {
-      clearTimeout(renderTimer);
-      renderTimer = null;
-    }
-    renderPendingUntilMouseUp = false;
-    render();
-    flushAfterRenderCallbacks();
+    loop.renderNow();
   }
 
-  render();
+  const loop = createRenderLoop({
+    mount,
+    render: () => renderApp(state, dispatch, activeTab, setActiveTab, ui),
+    onPainted: autoScrollToCurrentMatchIfAdvanced,
+  });
 
   stopActiveClock?.();
   const clockTimer = setInterval(() => updateLiveStatus(mount, state, Date.now()), CLOCK_TICK_MS);
@@ -1422,8 +1264,7 @@ export function initRoboticsApp({ mountId = 'roboticsApp', storageKey = 'robotic
   function destroy() {
     clearInterval(clockTimer);
     document.removeEventListener('keydown', onKeydown);
-    document.removeEventListener('mousedown', onMouseDownCapture, true);
-    document.removeEventListener('mouseup', onMouseUpCapture, true);
+    loop.destroy();
     if (stopActiveClock === destroy) stopActiveClock = null;
   }
   stopActiveClock = destroy;

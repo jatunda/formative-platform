@@ -5,6 +5,8 @@ import {
   computeStartTimeFromEndTime,
   estimateEliminationMatchCount,
   formatTimelineSummary,
+  matchField,
+  getScheduledMatchCount,
   MINUTE_MS,
 } from '../../robotics/match-timeline.js';
 
@@ -116,5 +118,35 @@ describe('formatTimelineSummary', () => {
   it('says so when no end time is set in Backward mode', () => {
     expect(formatTimelineSummary({ ...base, mode: 'backward' }, 10, clock))
       .toBe('Backward · no end time · 4 + 1 min · 2 fields');
+  });
+});
+
+describe('matchField', () => {
+  it('returns null when only one field runs - nothing to show', () => {
+    expect(matchField(1, 0)).toBeNull();
+    expect(matchField(1, 5)).toBeNull();
+  });
+
+  it('cycles matches across fields, 1-indexed', () => {
+    expect(matchField(2, 0)).toBe(1);
+    expect(matchField(2, 1)).toBe(2);
+    expect(matchField(2, 2)).toBe(1);
+    expect(matchField(2, 3)).toBe(2);
+  });
+});
+
+describe('getScheduledMatchCount', () => {
+  it('adds the estimated Elimination Match count before a bracket exists', () => {
+    // estimateEliminationMatchCount(8, false) === 7
+    expect(getScheduledMatchCount(12, null, 8, false)).toBe(19);
+  });
+
+  it('adds one more when the estimate includes a Third-Place Match', () => {
+    expect(getScheduledMatchCount(12, null, 8, true)).toBe(20);
+  });
+
+  it('uses the actual bracket once one exists, excluding Byes, ignoring the estimate', () => {
+    const bracket = { matches: [{ isBye: true }, {}, {}] };
+    expect(getScheduledMatchCount(12, bracket, 8, false)).toBe(14);
   });
 });

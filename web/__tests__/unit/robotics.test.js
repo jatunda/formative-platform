@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   initRoboticsApp,
   teamName,
-  getAllMatchesInScheduleOrder,
   autoFillSeedsFromStandings,
   nameFitStyle,
 } from '../../robotics/robotics.js';
@@ -2352,12 +2351,6 @@ describe('initRoboticsApp', () => {
 describe('teamName', () => {
   it('falls back for an unknown team id', () => {
     expect(teamName(createInitialState(), 'nope')).toBe('(unknown team)');
-  });
-});
-
-describe('getAllMatchesInScheduleOrder', () => {
-  it('returns an empty list for a fresh tournament', () => {
-    expect(getAllMatchesInScheduleOrder(createInitialState())).toEqual([]);
   });
 });
 

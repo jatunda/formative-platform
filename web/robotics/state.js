@@ -7,6 +7,30 @@ function generateId(prefix) {
   return `${prefix}-${Date.now().toString(36)}-${idCounter}`;
 }
 
+// Qualification Matches are located by array index (reordered in place, never regenerated
+// with new ids); Elimination Matches are located by id (generated once by the bracket, never
+// reordered). byIndex/byId plus updateOneMatch/noShowPatch are what's actually shared between
+// every Qualification/Elimination setter pair below - the two concepts themselves stay separate
+// exports, matching their separate CONTEXT.md definitions.
+function byIndex(index) {
+  return (_match, i) => i === index;
+}
+
+function byId(matchId) {
+  return (match) => match.id === matchId;
+}
+
+function updateOneMatch(matches, locator, patch) {
+  return matches.map((m, i) => (locator(m, i) ? { ...m, ...patch } : m));
+}
+
+function noShowPatch(match, teamId, flag) {
+  const noShow = { ...match.noShow };
+  if (flag) noShow[teamId] = true;
+  else delete noShow[teamId];
+  return { noShow };
+}
+
 /**
  * The blank Tournament state: no Teams, default Qualification/Timeline
  * config, no Elimination Bracket. See web/robotics/CONTEXT.md for the
@@ -116,28 +140,18 @@ export function regenerateMatchups(state, { random } = {}) {
 }
 
 export function recordQualificationResult(state, matchIndex, { scoreA, scoreB }) {
-  const matches = state.qualification.matches.map((m, i) =>
-    i === matchIndex ? { ...m, scoreA, scoreB, completed: true } : m
-  );
+  const matches = updateOneMatch(state.qualification.matches, byIndex(matchIndex), { scoreA, scoreB, completed: true });
   return { ...state, qualification: { ...state.qualification, matches } };
 }
 
 /** Persists an in-progress (not yet "Mark Complete"-d) score so it survives a No-Show toggle's re-render. */
 export function setQualificationDraftScore(state, matchIndex, field, value) {
-  const matches = state.qualification.matches.map((m, i) =>
-    i === matchIndex ? { ...m, [field]: value } : m
-  );
+  const matches = updateOneMatch(state.qualification.matches, byIndex(matchIndex), { [field]: value });
   return { ...state, qualification: { ...state.qualification, matches } };
 }
 
 export function setQualificationNoShow(state, matchIndex, teamId, flag) {
-  const matches = state.qualification.matches.map((m, i) => {
-    if (i !== matchIndex) return m;
-    const noShow = { ...m.noShow };
-    if (flag) noShow[teamId] = true;
-    else delete noShow[teamId];
-    return { ...m, noShow };
-  });
+  const matches = updateOneMatch(state.qualification.matches, byIndex(matchIndex), noShowPatch(state.qualification.matches[matchIndex], teamId, flag));
   return { ...state, qualification: { ...state.qualification, matches } };
 }
 
@@ -172,6 +186,11 @@ export function setTimelineConfig(state, patch) {
 }
 
 // ---- Elimination ----
+
+/** @returns {string[]} the Team ids making up a Playoff Alliance, or [] if allianceId doesn't resolve. */
+export function playoffAllianceTeamIds(state, allianceId) {
+  return state.elimination.alliances.find((a) => a.id === allianceId)?.teamIds ?? [];
+}
 
 export function formPlayoffAlliance(state, teamIdA, teamIdB) {
   const teamIds = teamIdA === teamIdB ? [teamIdA] : [teamIdA, teamIdB];
@@ -226,9 +245,7 @@ export function generateBracket(state) {
 export function recordEliminationResult(state, matchId, { scoreA, scoreB }) {
   const bracket = {
     ...state.elimination.bracket,
-    matches: state.elimination.bracket.matches.map((m) =>
-      m.id === matchId ? { ...m, scoreA, scoreB, completed: true } : m
-    ),
+    matches: updateOneMatch(state.elimination.bracket.matches, byId(matchId), { scoreA, scoreB, completed: true }),
   };
   return { ...state, elimination: { ...state.elimination, bracket } };
 }
@@ -237,25 +254,41 @@ export function recordEliminationResult(state, matchId, { scoreA, scoreB }) {
 export function setEliminationDraftScore(state, matchId, field, value) {
   const bracket = {
     ...state.elimination.bracket,
-    matches: state.elimination.bracket.matches.map((m) =>
-      m.id === matchId ? { ...m, [field]: value } : m
-    ),
+    matches: updateOneMatch(state.elimination.bracket.matches, byId(matchId), { [field]: value }),
   };
   return { ...state, elimination: { ...state.elimination, bracket } };
 }
 
 export function setEliminationNoShow(state, matchId, teamId, flag) {
+  const match = state.elimination.bracket.matches.find((m) => m.id === matchId);
   const bracket = {
     ...state.elimination.bracket,
-    matches: state.elimination.bracket.matches.map((m) => {
-      if (m.id !== matchId) return m;
-      const noShow = { ...m.noShow };
-      if (flag) noShow[teamId] = true;
-      else delete noShow[teamId];
-      return { ...m, noShow };
-    }),
+    matches: updateOneMatch(state.elimination.bracket.matches, byId(matchId), noShowPatch(match, teamId, flag)),
   };
   return { ...state, elimination: { ...state.elimination, bracket } };
+}
+
+/**
+ * All matches (Qualification then Elimination, Byes excluded since they
+ * occupy no time slot) in schedule order, each annotated with its global
+ * index for Match Time purposes.
+ */
+export function getAllMatchesInScheduleOrder(state) {
+  const entries = state.qualification.matches.map((match, i) => ({ kind: 'qualification', match, qualIndex: i }));
+  if (state.elimination.bracket) {
+    const order = { 'third-place': Infinity - 1, final: Infinity };
+    const sortedElimMatches = [...state.elimination.bracket.matches]
+      .filter((m) => !m.isBye)
+      .sort((a, b) => {
+        const aKey = typeof a.round === 'number' ? a.round : order[a.round];
+        const bKey = typeof b.round === 'number' ? b.round : order[b.round];
+        return aKey - bKey || a.slot - b.slot;
+      });
+    for (const match of sortedElimMatches) {
+      entries.push({ kind: 'elimination', match });
+    }
+  }
+  return entries.map((entry, globalIndex) => ({ ...entry, globalIndex }));
 }
 
 // ---- Podium reveal ----

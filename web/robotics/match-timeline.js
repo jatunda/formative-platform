@@ -54,6 +54,32 @@ export function computeStartTimeFromEndTime(timeline, totalDurationMinutes) {
 }
 
 /**
+ * The Field a match plays on, or null when only one Field runs (so there is nothing to show).
+ * @param {number} fieldCount
+ * @param {number} globalIndex - 0-based position in schedule order
+ * @returns {number|null}
+ */
+export function matchField(fieldCount, globalIndex) {
+  return fieldCount > 1 ? (globalIndex % fieldCount) + 1 : null;
+}
+
+/**
+ * Every match the schedule spans: Qualification Matches plus actual (once a
+ * bracket exists) or estimated Elimination Matches.
+ * @param {number} qualificationMatchCount
+ * @param {{matches: {isBye?: boolean}[]}|null} bracket - the actual Elimination Bracket, once generated
+ * @param {number} estimatedBracketSize
+ * @param {boolean} estimatedThirdPlace
+ * @returns {number}
+ */
+export function getScheduledMatchCount(qualificationMatchCount, bracket, estimatedBracketSize, estimatedThirdPlace) {
+  const eliminationCount = bracket
+    ? bracket.matches.filter((m) => !m.isBye).length
+    : estimateEliminationMatchCount(estimatedBracketSize, estimatedThirdPlace);
+  return qualificationMatchCount + eliminationCount;
+}
+
+/**
  * One-line summary of a Match Timeline for its collapsed panel, e.g.
  * `Forward · starts 1:00 PM · 4 + 1 min · 2 fields · ends ~2:10 PM`.
  * Forward mode leads with the Start Time and projects the end; Backward mode
