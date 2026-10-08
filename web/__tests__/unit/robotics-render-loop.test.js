@@ -66,6 +66,22 @@ describe('createRenderLoop', () => {
     expect(render).toHaveBeenCalledTimes(1);
   });
 
+  it('defers a render requested while the mouse is up if mousedown lands before the queued timer fires', () => {
+    const render = vi.fn(() => makeTree('x'));
+    const loop = createRenderLoop({ mount, render });
+    render.mockClear();
+
+    loop.requestRender();
+    document.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+    vi.runAllTimers();
+    expect(render).not.toHaveBeenCalled();
+
+    document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+    expect(render).not.toHaveBeenCalled();
+    vi.runAllTimers();
+    expect(render).toHaveBeenCalledTimes(1);
+  });
+
   it('runs the afterRender callback once the next real paint lands', () => {
     const render = vi.fn(() => makeTree('a'));
     const loop = createRenderLoop({ mount, render });

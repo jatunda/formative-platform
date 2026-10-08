@@ -107,6 +107,10 @@ export function createRenderLoop({ mount, render, onPainted }) {
     if (renderTimer !== null) return;
     renderTimer = setTimeout(() => {
       renderTimer = null;
+      if (mouseButtonDown) {
+        renderPendingUntilMouseUp = true;
+        return;
+      }
       paint();
     }, 0);
   }
