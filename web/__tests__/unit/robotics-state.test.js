@@ -210,6 +210,16 @@ describe('no-show flag', () => {
     state = setQualificationNoShow(state, 0, teamId, false);
     expect(state.qualification.matches[0].noShow[teamId]).toBeFalsy();
   });
+
+  it('no-ops on an unmatched qualification matchIndex instead of throwing', () => {
+    let state = withFourTeams(createInitialState());
+    state = setMatchesPerTeam(state, 2);
+    state = regenerateMatchups(state);
+    const teamId = state.qualification.matches[0].allianceA[0];
+    expect(() => setQualificationNoShow(state, 999, teamId, true)).not.toThrow();
+    const result = setQualificationNoShow(state, 999, teamId, true);
+    expect(result.qualification.matches).toEqual(state.qualification.matches);
+  });
 });
 
 describe('qualification draft score', () => {
@@ -370,6 +380,22 @@ describe('playoff alliances and bracket generation', () => {
     expect(match.scoreA).toBe(80);
     expect(match.scoreB).toBe(20);
     expect(match.completed).toBe(false);
+  });
+
+  it('no-ops on an unmatched elimination matchId instead of throwing', () => {
+    let state = withFourTeams(createInitialState());
+    const [t1, t2, t3, t4] = state.teams;
+    state = formPlayoffAlliance(state, t1.id, t2.id);
+    state = formPlayoffAlliance(state, t3.id, t4.id);
+    const [a1, a2] = state.elimination.alliances;
+    state = setBracketConfig(state, { bracketSize: 2, includeThirdPlace: false });
+    state = setSeed(state, 1, a1.id);
+    state = setSeed(state, 2, a2.id);
+    state = generateBracket(state);
+
+    expect(() => setEliminationNoShow(state, 'not-a-real-id', t1.id, true)).not.toThrow();
+    const result = setEliminationNoShow(state, 'not-a-real-id', t1.id, true);
+    expect(result.elimination.bracket.matches).toEqual(state.elimination.bracket.matches);
   });
 });
 

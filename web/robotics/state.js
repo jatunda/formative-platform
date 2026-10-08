@@ -20,8 +20,8 @@ function byId(matchId) {
   return (match) => match.id === matchId;
 }
 
-function updateOneMatch(matches, locator, patch) {
-  return matches.map((m, i) => (locator(m, i) ? { ...m, ...patch } : m));
+function updateOneMatch(matches, locator, makePatch) {
+  return matches.map((m, i) => (locator(m, i) ? { ...m, ...makePatch(m) } : m));
 }
 
 function noShowPatch(match, teamId, flag) {
@@ -140,18 +140,18 @@ export function regenerateMatchups(state, { random } = {}) {
 }
 
 export function recordQualificationResult(state, matchIndex, { scoreA, scoreB }) {
-  const matches = updateOneMatch(state.qualification.matches, byIndex(matchIndex), { scoreA, scoreB, completed: true });
+  const matches = updateOneMatch(state.qualification.matches, byIndex(matchIndex), () => ({ scoreA, scoreB, completed: true }));
   return { ...state, qualification: { ...state.qualification, matches } };
 }
 
 /** Persists an in-progress (not yet "Mark Complete"-d) score so it survives a No-Show toggle's re-render. */
 export function setQualificationDraftScore(state, matchIndex, field, value) {
-  const matches = updateOneMatch(state.qualification.matches, byIndex(matchIndex), { [field]: value });
+  const matches = updateOneMatch(state.qualification.matches, byIndex(matchIndex), () => ({ [field]: value }));
   return { ...state, qualification: { ...state.qualification, matches } };
 }
 
 export function setQualificationNoShow(state, matchIndex, teamId, flag) {
-  const matches = updateOneMatch(state.qualification.matches, byIndex(matchIndex), noShowPatch(state.qualification.matches[matchIndex], teamId, flag));
+  const matches = updateOneMatch(state.qualification.matches, byIndex(matchIndex), (m) => noShowPatch(m, teamId, flag));
   return { ...state, qualification: { ...state.qualification, matches } };
 }
 
@@ -245,7 +245,7 @@ export function generateBracket(state) {
 export function recordEliminationResult(state, matchId, { scoreA, scoreB }) {
   const bracket = {
     ...state.elimination.bracket,
-    matches: updateOneMatch(state.elimination.bracket.matches, byId(matchId), { scoreA, scoreB, completed: true }),
+    matches: updateOneMatch(state.elimination.bracket.matches, byId(matchId), () => ({ scoreA, scoreB, completed: true })),
   };
   return { ...state, elimination: { ...state.elimination, bracket } };
 }
@@ -254,16 +254,15 @@ export function recordEliminationResult(state, matchId, { scoreA, scoreB }) {
 export function setEliminationDraftScore(state, matchId, field, value) {
   const bracket = {
     ...state.elimination.bracket,
-    matches: updateOneMatch(state.elimination.bracket.matches, byId(matchId), { [field]: value }),
+    matches: updateOneMatch(state.elimination.bracket.matches, byId(matchId), () => ({ [field]: value })),
   };
   return { ...state, elimination: { ...state.elimination, bracket } };
 }
 
 export function setEliminationNoShow(state, matchId, teamId, flag) {
-  const match = state.elimination.bracket.matches.find((m) => m.id === matchId);
   const bracket = {
     ...state.elimination.bracket,
-    matches: updateOneMatch(state.elimination.bracket.matches, byId(matchId), noShowPatch(match, teamId, flag)),
+    matches: updateOneMatch(state.elimination.bracket.matches, byId(matchId), (m) => noShowPatch(m, teamId, flag)),
   };
   return { ...state, elimination: { ...state.elimination, bracket } };
 }
