@@ -18,8 +18,8 @@ import {
   formPlayoffAlliance,
   removePlayoffAlliance,
   setBracketConfig,
-  setSeed,
-  generateBracket,
+  movePlayoffAlliance,
+  startFinals,
   recordEliminationResult,
   setEliminationNoShow,
   setEliminationDraftScore,
@@ -304,47 +304,107 @@ describe('playoff alliances and bracket generation', () => {
     expect(state.elimination.alliances).toHaveLength(1);
   });
 
-  it('generates a bracket once bracketSize and all seeds are assigned', () => {
-    let state = withFourTeams(createInitialState());
-    const [t1, t2, t3, t4] = state.teams;
-    state = formPlayoffAlliance(state, t1.id, t2.id);
-    state = formPlayoffAlliance(state, t3.id, t4.id);
-    const [a1, a2] = state.elimination.alliances;
-    state = setBracketConfig(state, { bracketSize: 2, includeThirdPlace: false });
-    state = setSeed(state, 1, a1.id);
-    state = setSeed(state, 2, a2.id);
-    state = generateBracket(state);
-    expect(state.elimination.bracket.matches.length).toBeGreaterThan(0);
+  it('has no per-number seed map: Seeds are the alliance list order', () => {
+    expect(createInitialState().elimination).not.toHaveProperty('seeds');
   });
 
-  it('throws when generating a bracket with unassigned seeds', () => {
-    let state = withFourTeams(createInitialState());
-    state = setBracketConfig(state, { bracketSize: 2, includeThirdPlace: false });
-    expect(() => generateBracket(state)).toThrow();
+  it('setBracketConfig changes only the fields it is given', () => {
+    let state = setBracketConfig(createInitialState(), { bracketSize: 4 });
+    expect(state.elimination.includeThirdPlace).toBe(true);
+    state = setBracketConfig(state, { includeThirdPlace: false });
+    expect(state.elimination.bracketSize).toBe(4);
+    expect(state.elimination.includeThirdPlace).toBe(false);
+  });
+});
+
+describe('movePlayoffAlliance', () => {
+  /** Alpha, Bravo, Charlie as three single-Team alliances, in that order. */
+  function withThreeAlliances() {
+    let s = withFourTeams(createInitialState());
+    s.teams.slice(0, 3).forEach((t) => { s = formPlayoffAlliance(s, t.id, t.id); });
+    return s;
+  }
+  const order = (s) => s.elimination.alliances.map((a) => a.teamIds[0]);
+
+  it('moves an alliance up or down one place, changing its Seed', () => {
+    const s = withThreeAlliances();
+    const [a, b, c] = order(s);
+    const [, second] = s.elimination.alliances;
+    expect(order(movePlayoffAlliance(s, second.id, -1))).toEqual([b, a, c]);
+    expect(order(movePlayoffAlliance(s, second.id, 1))).toEqual([a, c, b]);
   });
 
-  it('throws when bracketSize is less than 2', () => {
-    let state = withFourTeams(createInitialState());
-    state = setBracketConfig(state, { bracketSize: 1, includeThirdPlace: false });
-    expect(() => generateBracket(state)).toThrow();
+  it('no-ops past either end of the list, or for an unknown alliance', () => {
+    const s = withThreeAlliances();
+    const [first, , last] = s.elimination.alliances;
+    expect(movePlayoffAlliance(s, first.id, -1)).toBe(s);
+    expect(movePlayoffAlliance(s, last.id, 1)).toBe(s);
+    expect(movePlayoffAlliance(s, 'nope', 1)).toBe(s);
+  });
+});
+
+describe('startFinals', () => {
+  /** n single-Team alliances, formed in roster order. */
+  function withAlliances(n) {
+    let s = createInitialState();
+    for (let i = 0; i < n; i++) s = addTeam(s, { name: `T${i}`, members: [] });
+    s.teams.forEach((t) => { s = formPlayoffAlliance(s, t.id, t.id); });
+    return s;
+  }
+  const allianceIds = (s) => s.elimination.alliances.map((a) => a.id);
+
+  it('no-ops with fewer than 2 alliances', () => {
+    const none = withFourTeams(createInitialState());
+    expect(startFinals(none)).toBe(none);
+    const one = withAlliances(1);
+    expect(startFinals(one)).toBe(one);
   });
 
-  it('throws when bracketSize is negative', () => {
-    let state = withFourTeams(createInitialState());
-    state = setBracketConfig(state, { bracketSize: -2, includeThirdPlace: false });
-    expect(() => generateBracket(state)).toThrow();
+  it('builds the Bracket from every alliance, seeded in list order, when no Bracket Size is set', () => {
+    let s = withAlliances(3);
+    s = movePlayoffAlliance(s, s.elimination.alliances[2].id, -1);
+    const next = startFinals(s);
+    expect(next.elimination.bracket.seeds).toEqual(allianceIds(s));
+    expect(next.elimination.bracketSize).toBe(3);
   });
+
+  it('enters only the first Bracket Size alliances when more have formed', () => {
+    const s = setBracketConfig(withAlliances(4), { bracketSize: 2 });
+    expect(startFinals(s).elimination.bracket.seeds).toEqual(allianceIds(s).slice(0, 2));
+  });
+
+  it('shrinks Bracket Size to the number of alliances formed when fewer have', () => {
+    const next = startFinals(setBracketConfig(withAlliances(3), { bracketSize: 8 }));
+    expect(next.elimination.bracketSize).toBe(3);
+    expect(next.elimination.bracket.bracketSize).toBe(3);
+  });
+
+  it('ignores a Bracket Size below 2 and enters every alliance', () => {
+    const next = startFinals(setBracketConfig(withAlliances(3), { bracketSize: 1 }));
+    expect(next.elimination.bracket.seeds).toHaveLength(3);
+  });
+
+  it('uses the Third-Place setting', () => {
+    const next = startFinals(setBracketConfig(withAlliances(4), { includeThirdPlace: true }));
+    expect(next.elimination.bracket.matches.some((m) => m.round === 'third-place')).toBe(true);
+  });
+
+  it('ignores the per-number seed map of a Tournament saved before Seeds became list order', () => {
+    const s = withAlliances(2);
+    const legacy = { ...s, elimination: { ...s.elimination, seeds: { 1: allianceIds(s)[1], 2: allianceIds(s)[0] } } };
+    expect(startFinals(legacy).elimination.bracket.seeds).toEqual(allianceIds(s));
+  });
+});
+
+describe('elimination results', () => {
 
   it('records an elimination match result', () => {
     let state = withFourTeams(createInitialState());
     const [t1, t2, t3, t4] = state.teams;
     state = formPlayoffAlliance(state, t1.id, t2.id);
     state = formPlayoffAlliance(state, t3.id, t4.id);
-    const [a1, a2] = state.elimination.alliances;
-    state = setBracketConfig(state, { bracketSize: 2, includeThirdPlace: false });
-    state = setSeed(state, 1, a1.id);
-    state = setSeed(state, 2, a2.id);
-    state = generateBracket(state);
+    state = setBracketConfig(state, { includeThirdPlace: false });
+    state = startFinals(state);
     const matchId = state.elimination.bracket.matches[0].id;
     state = recordEliminationResult(state, matchId, { scoreA: 80, scoreB: 20 });
     const match = state.elimination.bracket.matches.find((m) => m.id === matchId);
@@ -357,11 +417,8 @@ describe('playoff alliances and bracket generation', () => {
     const [t1, t2, t3, t4] = state.teams;
     state = formPlayoffAlliance(state, t1.id, t2.id);
     state = formPlayoffAlliance(state, t3.id, t4.id);
-    const [a1, a2] = state.elimination.alliances;
-    state = setBracketConfig(state, { bracketSize: 2, includeThirdPlace: false });
-    state = setSeed(state, 1, a1.id);
-    state = setSeed(state, 2, a2.id);
-    state = generateBracket(state);
+    state = setBracketConfig(state, { includeThirdPlace: false });
+    state = startFinals(state);
     const matchId = state.elimination.bracket.matches.find((m) => !m.isBye).id;
 
     state = setEliminationDraftScore(state, matchId, 'scoreA', 80);
@@ -387,11 +444,8 @@ describe('playoff alliances and bracket generation', () => {
     const [t1, t2, t3, t4] = state.teams;
     state = formPlayoffAlliance(state, t1.id, t2.id);
     state = formPlayoffAlliance(state, t3.id, t4.id);
-    const [a1, a2] = state.elimination.alliances;
-    state = setBracketConfig(state, { bracketSize: 2, includeThirdPlace: false });
-    state = setSeed(state, 1, a1.id);
-    state = setSeed(state, 2, a2.id);
-    state = generateBracket(state);
+    state = setBracketConfig(state, { includeThirdPlace: false });
+    state = startFinals(state);
 
     expect(() => setEliminationNoShow(state, 'not-a-real-id', t1.id, true)).not.toThrow();
     const result = setEliminationNoShow(state, 'not-a-real-id', t1.id, true);
@@ -426,9 +480,8 @@ describe('Podium reveal', () => {
     let s = createInitialState();
     for (let i = 0; i < size; i++) s = addTeam(s, { name: `T${i}`, members: [] });
     s.teams.forEach((t) => { s = formPlayoffAlliance(s, t.id, t.id); });
-    s = setBracketConfig(s, { bracketSize: size, includeThirdPlace });
-    s.elimination.alliances.forEach((a, i) => { s = setSeed(s, i + 1, a.id); });
-    return generateBracket(s);
+    s = setBracketConfig(s, { includeThirdPlace });
+    return startFinals(s);
   }
 
   function completeAll(state) {
@@ -507,9 +560,9 @@ describe('Podium reveal', () => {
     expect([...getRevealedPlaces(s)]).toEqual([2]);
   });
 
-  it('regenerating the bracket clears reveal progress', () => {
+  it('starting the Finals again clears reveal progress', () => {
     const s = revealNextPlacement(completeAll(withBracket()));
-    expect(generateBracket(s).podium.revealedCount).toBe(0);
+    expect(startFinals(s).podium.revealedCount).toBe(0);
   });
 
   it('Reset Results and New Tournament clear reveal progress', () => {
@@ -545,11 +598,8 @@ describe('getAllMatchesInScheduleOrder', () => {
     const [t1, t2, t3, t4] = state.teams;
     state = formPlayoffAlliance(state, t1.id, t2.id);
     state = formPlayoffAlliance(state, t3.id, t4.id);
-    const [a1, a2] = state.elimination.alliances;
-    state = setBracketConfig(state, { bracketSize: 2, includeThirdPlace: false });
-    state = setSeed(state, 1, a1.id);
-    state = setSeed(state, 2, a2.id);
-    state = generateBracket(state);
+    state = setBracketConfig(state, { includeThirdPlace: false });
+    state = startFinals(state);
 
     const entries = getAllMatchesInScheduleOrder(state);
     expect(entries.map((e) => e.kind)).toEqual([

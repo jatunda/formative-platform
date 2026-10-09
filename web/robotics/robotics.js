@@ -17,9 +17,9 @@ import {
   setTimelineConfig,
   formPlayoffAlliance,
   removePlayoffAlliance,
+  movePlayoffAlliance,
   setBracketConfig,
-  setSeed,
-  generateBracket,
+  startFinals,
   recordEliminationResult,
   setEliminationNoShow,
   setEliminationDraftScore,
@@ -42,7 +42,8 @@ import {
   timeOfDayToEpochMs,
 } from './match-timeline.js';
 import { computeStandings, formatRecord } from './standings.js';
-import { resolveMatchSides, getMatchWinner, isBracketComplete, countUndecidedMatches, getPlacements, formatFinalsSetupSummary } from './bracket.js';
+import { resolveMatchSides, getMatchWinner, isBracketComplete, countUndecidedMatches, getPlacements } from './bracket.js';
+import { getAllianceCaptain, getSelectionRowStatus, getAllianceSelectionBlockReason } from './alliance-selection.js';
 import { bracketColumnSpacerGrowRatios } from './bracket-layout.js';
 import { launchConfetti } from './confetti.js';
 import { getCurrentMatchIndex, getUpNextMatchIndex } from './current-match.js';
@@ -55,6 +56,7 @@ import { getTournamentPhase, PHASE_LABELS, getMatchProgress, getCurrentMatchTime
 const TABS = [
   { key: 'teams', label: 'Teams' },
   { key: 'schedule', label: 'Schedule & Standings' },
+  { key: 'alliance-selection', label: 'Alliance Selection' },
   { key: 'finals', label: 'Finals' },
   { key: 'results', label: 'Results' },
 ];
@@ -132,22 +134,6 @@ function renderAllianceSide(state, teamIds, noShow, onToggleNoShow, isWinner, co
   return el('span', { className: `robotics-match-alliance is-${color}${isWinner ? ' is-winner' : ''}` }, children);
 }
 
-/** Rank formed Playoff Alliances by the better (lower-index) Standings rank of their two Teams. */
-export function autoFillSeedsFromStandings(state) {
-  const standings = computeStandings(state.teams, state.qualification.matches);
-  const rankOf = new Map(standings.map((s, i) => [s.teamId, i]));
-  const ranked = [...state.elimination.alliances].sort((a, b) => {
-    const bestA = Math.min(...a.teamIds.map((id) => rankOf.get(id) ?? Infinity));
-    const bestB = Math.min(...b.teamIds.map((id) => rankOf.get(id) ?? Infinity));
-    return bestA - bestB;
-  });
-  let next = state;
-  ranked.forEach((alliance, i) => {
-    next = setSeed(next, i + 1, alliance.id);
-  });
-  return next;
-}
-
 function copyToClipboard(text, successMessage = 'Copied to clipboard.') {
   if (!navigator.clipboard?.writeText) {
     showToast('Clipboard unavailable — copy failed.', { isError: true });
@@ -175,6 +161,16 @@ function el(tag, props = {}, children = []) {
   });
   children.forEach((child) => node.appendChild(typeof child === 'string' ? document.createTextNode(child) : child));
   return node;
+}
+
+/**
+ * Styles a control whose action is locked or invalid as inactive, with the reason on hover.
+ * It stays clickable: its click handler shows the same reason as an error toast instead.
+ */
+function markLocked(control, reason) {
+  control.setAttribute('aria-disabled', 'true');
+  control.title = reason;
+  control.classList.add('is-locked');
 }
 
 // ---- Tab: Teams ----
@@ -207,11 +203,7 @@ function renderRegenerateMatchupsButton(state, dispatch) {
       });
     },
   }, [regenerateLabel]);
-  if (locked) {
-    regenerateBtn.setAttribute('aria-disabled', 'true');
-    regenerateBtn.title = lockHint;
-    regenerateBtn.classList.add('is-locked');
-  }
+  if (locked) markLocked(regenerateBtn, lockHint);
   return regenerateBtn;
 }
 
@@ -264,9 +256,7 @@ export function renderTeamsTab(state, dispatch) {
       input.classList.add('robotics-locked-field');
       input.addEventListener('click', () => showToast(lockHint, { isError: true }));
     });
-    addBtn.setAttribute('aria-disabled', 'true');
-    addBtn.title = lockHint;
-    addBtn.classList.add('is-locked');
+    markLocked(addBtn, lockHint);
   }
   section.appendChild(el('div', { className: 'robotics-card robotics-teams-add' }, [
     el('h3', { className: 'robotics-card-title' }, ['Add a Team']),
@@ -557,13 +547,11 @@ function renderTimelineControls(state, dispatch) {
 }
 
 /**
- * A collapsible card: a title row (plus an optional one-line summary) that
- * toggles a panel open in place.
+ * A collapsible card: a title row that toggles a panel open in place.
  * Toggling only flips the DOM (keeping focus on the button, not losing it to a
  * re-render) and reports the choice via onToggle so the caller can persist it.
- * Shared by the Match Timeline and the Finals tab's setup section.
  */
-function renderAccordion({ variant, title, summary, panel, expanded, onToggle }) {
+function renderAccordion({ variant, title, panel, expanded, onToggle }) {
   const card = el('div', { className: `robotics-card robotics-accordion robotics-${variant}${expanded ? ' is-expanded' : ''}` });
   panel.classList.add('robotics-accordion-panel');
   panel.hidden = !expanded;
@@ -583,7 +571,6 @@ function renderAccordion({ variant, title, summary, panel, expanded, onToggle })
     el('span', { className: 'robotics-accordion-chevron', 'aria-hidden': 'true' }, ['▸']),
     el('span', { className: 'robotics-accordion-heading' }, [
       el('span', { className: 'robotics-accordion-title' }, [title]),
-      ...(summary ? [el('span', { className: 'robotics-accordion-summary' }, [summary])] : []),
     ]),
   ]);
   // Accordion pattern: the heading wraps the button (a button may not contain a heading).
@@ -726,8 +713,8 @@ function renderQualificationNowPlaying(state, dispatch, { currentIndex, upNextIn
       ? renderNowPlayingIdle('No Qualification Matches scheduled yet.')
       : renderPhaseCompleteCard({
         message: 'Qualification Round complete',
-        buttonLabel: 'On to Finals →',
-        destinationTab: 'finals',
+        buttonLabel: 'On to Alliance Selection →',
+        destinationTab: 'alliance-selection',
         setActiveTab,
       });
   }
@@ -789,6 +776,50 @@ function renderStandingsTeamCell(team) {
   return parts;
 }
 
+/**
+ * The Standings table (plus the rate-mode note when it applies): Rank, Team, W-L-T, then
+ * Points, or Win % and Avg Pts/Match in rate mode. The Alliance Selection tab adds a column
+ * via `extraColumn` ({ header, cell(entry) }) and per-row classes via `rowClass(entry)`.
+ * @returns {Node[]}
+ */
+function renderStandingsTable(state, standings, { extraColumn = null, rowClass = () => '' } = {}) {
+  const nodes = [];
+  const isRateMode = standings[0].rankingMode === 'rate';
+  if (isRateMode) {
+    nodes.push(el('p', { className: 'robotics-standings-note' }, [
+      'Teams have played an uneven number of Qualification Matches — ranked by win % and average points per match instead of raw totals.',
+    ]));
+  }
+  const headers = isRateMode
+    ? ['Rank', 'Team', 'W-L-T', 'Win %', 'Avg Pts/Match']
+    : ['Rank', 'Team', 'W-L-T', 'Points'];
+  if (extraColumn) headers.push(extraColumn.header);
+  const table = el('table', { className: 'robotics-table' });
+  table.appendChild(el('thead', {}, [
+    el('tr', {}, headers.map((h) => el('th', {}, [h]))),
+  ]));
+  const tbody = el('tbody');
+  standings.forEach((entry, i) => {
+    const team = state.teams.find((t) => t.id === entry.teamId);
+    const cells = [
+      el('td', { className: 'robotics-rank-cell' }, [String(i + 1)]),
+      el('td', {}, renderStandingsTeamCell(team)),
+      el('td', { className: 'robotics-record-cell' }, [formatRecord(entry)]),
+    ];
+    if (isRateMode) {
+      cells.push(el('td', {}, [`${Math.round(entry.winRate * 100)}%`]));
+      cells.push(el('td', {}, [entry.avgPoints.toFixed(1)]));
+    } else {
+      cells.push(el('td', {}, [String(entry.points)]));
+    }
+    if (extraColumn) cells.push(el('td', {}, [extraColumn.cell(entry)]));
+    tbody.appendChild(el('tr', { className: rowClass(entry) }, cells));
+  });
+  table.appendChild(tbody);
+  nodes.push(el('div', { className: 'robotics-table-wrap' }, [table]));
+  return nodes;
+}
+
 export function renderStandingsTab(state) {
   const section = el('div', { className: 'robotics-section' });
   const standings = computeStandings(state.teams, state.qualification.matches);
@@ -799,37 +830,7 @@ export function renderStandingsTab(state) {
   if (standings.length === 0) {
     card.appendChild(el('p', { className: 'robotics-empty' }, ['No results yet — standings will appear once matches are completed.']));
   } else {
-    const isRateMode = standings[0].rankingMode === 'rate';
-    if (isRateMode) {
-      card.appendChild(el('p', { className: 'robotics-standings-note' }, [
-        'Teams have played an uneven number of Qualification Matches — ranked by win % and average points per match instead of raw totals.',
-      ]));
-    }
-    const headers = isRateMode
-      ? ['Rank', 'Team', 'W-L-T', 'Win %', 'Avg Pts/Match']
-      : ['Rank', 'Team', 'W-L-T', 'Points'];
-    const table = el('table', { className: 'robotics-table' });
-    table.appendChild(el('thead', {}, [
-      el('tr', {}, headers.map((h) => el('th', {}, [h]))),
-    ]));
-    const tbody = el('tbody');
-    standings.forEach((entry, i) => {
-      const team = state.teams.find((t) => t.id === entry.teamId);
-      const cells = [
-        el('td', { className: 'robotics-rank-cell' }, [String(i + 1)]),
-        el('td', {}, renderStandingsTeamCell(team)),
-        el('td', { className: 'robotics-record-cell' }, [formatRecord(entry)]),
-      ];
-      if (isRateMode) {
-        cells.push(el('td', {}, [`${Math.round(entry.winRate * 100)}%`]));
-        cells.push(el('td', {}, [entry.avgPoints.toFixed(1)]));
-      } else {
-        cells.push(el('td', {}, [String(entry.points)]));
-      }
-      tbody.appendChild(el('tr', {}, cells));
-    });
-    table.appendChild(tbody);
-    card.appendChild(el('div', { className: 'robotics-table-wrap' }, [table]));
+    renderStandingsTable(state, standings).forEach((node) => card.appendChild(node));
   }
 
   section.appendChild(card);
@@ -854,6 +855,159 @@ export function renderScheduleAndStandingsTab(state, dispatch, { ui, setActiveTa
   standings.classList.add('robotics-schedule-standings');
   const side = el('div', { className: 'robotics-schedule-side' }, [timeline, standings]);
   return el('div', { className: 'robotics-schedule-layout' }, [matches, side]);
+}
+
+// ---- Tab: Alliance Selection ----
+
+/**
+ * A button for an Alliance Selection action. When getAllianceSelectionBlockReason blocks the
+ * action, the button still shows and still clicks, styled inactive, and a click explains why
+ * in an error toast instead of acting - the same rule the state action's no-op follows.
+ */
+function renderSelectionActionButton(state, action, { className, label, ariaLabel, onAllowed }) {
+  const reason = getAllianceSelectionBlockReason(state, action);
+  const btn = el('button', {
+    className,
+    ...(ariaLabel ? { 'aria-label': ariaLabel } : {}),
+    onClick: () => {
+      if (reason) {
+        showToast(reason, { isError: true });
+        return;
+      }
+      onAllowed();
+    },
+  }, [label]);
+  if (reason) markLocked(btn, reason);
+  return btn;
+}
+
+/** The Standings with each row's Alliance Selection status: "Alliance N", the Captain, or a Pick button. */
+function renderSelectionStandings(state, dispatch, captainId) {
+  const card = el('div', { className: 'robotics-card robotics-selection-standings' });
+  card.appendChild(el('h3', { className: 'robotics-card-title' }, ['Standings']));
+  const standings = computeStandings(state.teams, state.qualification.matches);
+  if (standings.length === 0) {
+    card.appendChild(el('p', { className: 'robotics-empty' }, ['No Teams yet — add them on the Teams tab.']));
+    return card;
+  }
+
+  // The new alliance is always last in the list; mark it once the rebuilt list exists.
+  const pick = (partnerId) => dispatch(
+    (s) => formPlayoffAlliance(s, captainId, partnerId),
+    () => document.querySelector('.robotics-selection-alliance:last-child')?.classList.add('is-new'),
+  );
+  const rowStatuses = new Map(standings.map((entry) => [entry.teamId, getSelectionRowStatus(state, entry.teamId)]));
+  const statusCell = (entry) => {
+    const rowStatus = rowStatuses.get(entry.teamId);
+    if (rowStatus.status === 'in-alliance') {
+      return el('span', { className: 'robotics-selection-tag' }, [`Alliance ${rowStatus.allianceNumber}`]);
+    }
+    if (rowStatus.status === 'captain') {
+      return el('span', { className: 'robotics-selection-tag is-captain' }, ['Picking']);
+    }
+    return renderSelectionActionButton(state, 'pick', {
+      className: 'robotics-btn robotics-btn-primary robotics-btn-sm',
+      label: 'Pick',
+      onAllowed: () => pick(entry.teamId),
+    });
+  };
+  renderStandingsTable(state, standings, {
+    extraColumn: { header: 'Alliance', cell: statusCell },
+    rowClass: (entry) => `robotics-selection-row is-${rowStatuses.get(entry.teamId).status}`,
+  }).forEach((node) => card.appendChild(node));
+  return card;
+}
+
+/** Bracket Size and the Third-Place Match toggle, each saved as soon as it changes. */
+function renderSelectionSettings(state, dispatch) {
+  const card = el('div', { className: 'robotics-card robotics-selection-settings' });
+  card.appendChild(el('h3', { className: 'robotics-card-title' }, ['Bracket']));
+  const sizeInput = el('input', { type: 'number', min: '2', value: state.elimination.bracketSize ?? '' });
+  sizeInput.addEventListener('change', () => {
+    const size = parseInt(sizeInput.value, 10);
+    dispatch((s) => setBracketConfig(s, { bracketSize: size >= 2 ? size : null }));
+  });
+  const thirdPlaceInput = el('input', { type: 'checkbox' });
+  thirdPlaceInput.checked = state.elimination.includeThirdPlace;
+  thirdPlaceInput.addEventListener('change', () => {
+    dispatch((s) => setBracketConfig(s, { includeThirdPlace: thirdPlaceInput.checked }));
+  });
+  card.appendChild(el('label', { className: 'robotics-field' }, ['Bracket size', sizeInput]));
+  card.appendChild(el('label', { className: 'robotics-field robotics-checkbox-field' }, [thirdPlaceInput, 'Include third-place match']));
+  return card;
+}
+
+/** The formed Playoff Alliances in Seed order (alliance N is Seed N), reorderable with ↑/↓. */
+function renderSelectionAllianceList(state, dispatch) {
+  const card = el('div', { className: 'robotics-card' });
+  card.appendChild(el('h3', { className: 'robotics-card-title' }, ['Playoff Alliances']));
+  const { alliances } = state.elimination;
+  if (alliances.length === 0) {
+    card.appendChild(el('p', { className: 'robotics-empty' }, ['No alliances formed yet.']));
+    return card;
+  }
+  const list = el('ol', { className: 'robotics-selection-alliances' });
+  alliances.forEach((alliance, i) => {
+    const moveBtn = (direction, label, ariaLabel) => {
+      const btn = renderSelectionActionButton(state, 'move', {
+        className: 'robotics-btn robotics-btn-ghost robotics-btn-sm',
+        label,
+        ariaLabel,
+        onAllowed: () => dispatch((s) => movePlayoffAlliance(s, alliance.id, direction)),
+      });
+      const target = i + direction;
+      btn.disabled = target < 0 || target >= alliances.length;
+      return btn;
+    };
+    list.appendChild(el('li', { className: 'robotics-selection-alliance' }, [
+      el('span', { className: 'robotics-selection-seed' }, [`Alliance ${i + 1}`]),
+      el('span', { className: 'robotics-selection-alliance-teams' }, [allianceTeamNames(state, alliance.teamIds)]),
+      el('span', { className: 'robotics-selection-alliance-actions' }, [
+        moveBtn(-1, '↑', 'Move alliance up'),
+        moveBtn(1, '↓', 'Move alliance down'),
+        renderSelectionActionButton(state, 'remove', {
+          className: 'robotics-btn robotics-btn-danger robotics-btn-sm',
+          label: 'Remove',
+          onAllowed: () => dispatch((s) => removePlayoffAlliance(s, alliance.id)),
+        }),
+      ]),
+    ]));
+  });
+  card.appendChild(list);
+  return card;
+}
+
+/**
+ * Alliance Selection: the class watches Playoff Alliances form. Standings (with whose turn
+ * it is) in the main column; Bracket settings, the alliance list, and Start Finals beside it.
+ */
+export function renderAllianceSelectionTab(state, dispatch, { setActiveTab }) {
+  const captainId = getAllianceCaptain(state);
+
+  const main = el('div', { className: 'robotics-selection-main' });
+  if (state.qualification.matches.some((m) => !m.completed)) {
+    main.appendChild(el('p', { className: 'robotics-selection-notice', role: 'status' }, [
+      'The Qualification Round isn’t finished — Standings and the Alliance Captain may still change.',
+    ]));
+  }
+  main.appendChild(el('div', { className: 'robotics-selection-banner' }, [
+    captainId ? `${teamName(state, captainId)} is picking` : 'No Teams left to pick',
+  ]));
+  main.appendChild(renderSelectionStandings(state, dispatch, captainId));
+
+  const side = el('div', { className: 'robotics-selection-side' }, [
+    renderSelectionSettings(state, dispatch),
+    renderSelectionAllianceList(state, dispatch),
+    renderSelectionActionButton(state, 'start-finals', {
+      className: 'robotics-btn robotics-btn-primary robotics-start-finals-btn',
+      label: 'Start Finals →',
+      onAllowed: () => {
+        dispatch((s) => startFinals(s));
+        setActiveTab('finals');
+      },
+    }),
+  ]);
+  return el('div', { className: 'robotics-selection-layout' }, [main, side]);
 }
 
 // ---- Tab: Finals ----
@@ -935,115 +1089,18 @@ function renderBracket(state, dispatch) {
   return container;
 }
 
-/**
- * Alliance Selection and Bracket Configuration collapse into one accordion (collapsed by
- * default) so the Elimination Bracket is the dominant content on the tab once setup is done;
- * Seeds (once a Bracket Size is set) stays outside it, sharing the setup row on wide screens.
- */
-export function renderFinalsTab(state, dispatch, { setActiveTab, ui }) {
+/** The Elimination Bracket, or where to go to start one. Playoff setup lives on the Alliance Selection tab. */
+export function renderFinalsTab(state, dispatch, { setActiveTab }) {
   const section = el('div', { className: 'robotics-section' });
-  const setup = el('div', { className: 'robotics-finals-setup' });
-  section.appendChild(setup);
 
-  const usedTeamIds = new Set(state.elimination.alliances.flatMap((a) => a.teamIds));
-  const available = state.teams.filter((t) => !usedTeamIds.has(t.id));
-
-  const selectionCard = el('div', { className: 'robotics-card' });
-  selectionCard.appendChild(el('h3', { className: 'robotics-card-title' }, ['Form a Playoff Alliance']));
-  const selectA = el('select', {});
-  const selectB = el('select', {});
-  available.forEach((team, i) => {
-    selectA.appendChild(el('option', { value: team.id }, [team.name]));
-    const optionB = el('option', { value: team.id }, [team.name]);
-    if (i === 1) optionB.setAttribute('selected', 'selected');
-    selectB.appendChild(optionB);
-  });
-  const selectionRow = el('div', { className: 'robotics-form-row' }, [
-    el('label', { className: 'robotics-field' }, ['Team A: ', selectA]),
-    el('label', { className: 'robotics-field' }, ['Team B: ', selectB]),
-    el('button', {
-      className: 'robotics-btn robotics-btn-primary',
-      onClick: () => {
-        if (!selectA.value || !selectB.value) return;
-        if (selectA.value === selectB.value) {
-          showConfirm({
-            title: 'Form a Single-Team Alliance?',
-            message: 'Team A and Team B are the same Team. This forms a Playoff Alliance containing just that one Team.',
-            confirmLabel: 'Form Alliance',
-          }).then((confirmed) => {
-            if (confirmed) dispatch((s) => formPlayoffAlliance(s, selectA.value, selectB.value));
-          });
-          return;
-        }
-        dispatch((s) => formPlayoffAlliance(s, selectA.value, selectB.value));
-      },
-    }, ['Form Alliance']),
-  ]);
-  selectionCard.appendChild(selectionRow);
-
-  const alliancesCard = el('div', { className: 'robotics-card' });
-  alliancesCard.appendChild(el('h3', { className: 'robotics-card-title' }, ['Playoff Alliances']));
-  if (state.elimination.alliances.length === 0) {
-    alliancesCard.appendChild(el('p', { className: 'robotics-empty' }, ['No alliances formed yet.']));
-  }
-  state.elimination.alliances.forEach((alliance) => {
-    alliancesCard.appendChild(el('div', { className: 'robotics-match-row robotics-team-row' }, [
-      el('span', { className: 'robotics-team-name' }, [allianceTeamNames(state, alliance.teamIds)]),
-      el('button', { className: 'robotics-btn robotics-btn-danger robotics-btn-sm', onClick: () => dispatch((s) => removePlayoffAlliance(s, alliance.id)) }, ['Remove']),
+  if (!state.elimination.bracket) {
+    section.appendChild(el('div', { className: 'robotics-card' }, [
+      el('p', { className: 'robotics-empty' }, ['Form alliances on the Alliance Selection tab, then Start Finals.']),
     ]));
-  });
-
-  const bracketConfigCard = el('div', { className: 'robotics-card robotics-settings-grid' });
-  bracketConfigCard.appendChild(el('h3', { className: 'robotics-card-title' }, ['Bracket Configuration']));
-  const sizeInput = el('input', { type: 'number', min: '2', value: state.elimination.bracketSize ?? '' });
-  const thirdPlaceInput = el('input', { type: 'checkbox' });
-  thirdPlaceInput.checked = state.elimination.includeThirdPlace;
-  bracketConfigCard.appendChild(el('label', { className: 'robotics-field' }, ['Bracket size: ', sizeInput]));
-  bracketConfigCard.appendChild(el('label', { className: 'robotics-field robotics-checkbox-field' }, [thirdPlaceInput, 'Include third-place match']));
-  bracketConfigCard.appendChild(el('button', {
-    className: 'robotics-btn robotics-btn-secondary',
-    onClick: () => dispatch((s) => setBracketConfig(s, { bracketSize: parseInt(sizeInput.value, 10) || null, includeThirdPlace: thirdPlaceInput.checked })),
-  }, ['Save Bracket Config']));
-
-  const setupPanel = el('div', { className: 'robotics-finals-accordion-panel', id: 'robotics-finals-accordion-panel' }, [
-    selectionCard,
-    alliancesCard,
-    bracketConfigCard,
-  ]);
-  setup.appendChild(renderAccordion({
-    variant: 'finals-accordion',
-    title: 'Playoff Setup',
-    summary: formatFinalsSetupSummary(state.elimination),
-    panel: setupPanel,
-    expanded: ui.prefs.finalsSetupExpanded === true,
-    onToggle: (expanded) => ui.setPref('finalsSetupExpanded', expanded),
-  }));
-
-  if (state.elimination.bracketSize) {
-    const seedsCard = el('div', { className: 'robotics-card robotics-settings-grid' });
-    seedsCard.appendChild(el('h3', { className: 'robotics-card-title' }, ['Seeds']));
-    for (let seedNum = 1; seedNum <= state.elimination.bracketSize; seedNum++) {
-      const select = el('select', {});
-      select.appendChild(el('option', { value: '' }, ['(unassigned)']));
-      state.elimination.alliances.forEach((alliance) => {
-        const opt = el('option', { value: alliance.id }, [allianceTeamNames(state, alliance.teamIds)]);
-        if (state.elimination.seeds[seedNum] === alliance.id) opt.setAttribute('selected', 'selected');
-        select.appendChild(opt);
-      });
-      select.addEventListener('change', () => dispatch((s) => setSeed(s, seedNum, select.value || null)));
-      seedsCard.appendChild(el('label', { className: 'robotics-field' }, [`Seed ${seedNum}: `, select]));
-    }
-    const seedActions = el('div', { className: 'robotics-form-row' }, [
-      el('button', { className: 'robotics-btn robotics-btn-secondary', onClick: () => dispatch((s) => autoFillSeedsFromStandings(s)) }, ['Auto-fill Seeds from Standings']),
-      el('button', { className: 'robotics-btn robotics-btn-primary', onClick: () => dispatch((s) => generateBracket(s)) }, ['Generate Bracket']),
-    ]);
-    seedsCard.appendChild(seedActions);
-    setup.appendChild(seedsCard);
+    return section;
   }
 
-  if (state.elimination.bracket) {
-    section.appendChild(renderBracket(state, dispatch));
-  }
+  section.appendChild(renderBracket(state, dispatch));
 
   if (isBracketComplete(state.elimination.bracket)) {
     section.appendChild(el('button', {
@@ -1064,7 +1121,7 @@ const PODIUM_LAYOUT = [2, 1, 3];
 /** The Results tab before the bracket is complete: how many Elimination Matches remain, or that there is no bracket yet. */
 function renderResultsNotDecided(state) {
   const { bracket } = state.elimination;
-  let detail = 'Generate the Elimination Bracket on the Finals tab to start the playoffs.';
+  let detail = 'Start the Finals from the Alliance Selection tab to begin the playoffs.';
   if (bracket) {
     const remaining = countUndecidedMatches(bracket);
     detail = remaining === 1 ? '1 Elimination Match remains.' : `${remaining} Elimination Matches remain.`;
@@ -1232,6 +1289,7 @@ export function renderApp(state, dispatch, activeTab, setActiveTab, ui) {
   const renderers = {
     teams: renderTeamsTab,
     schedule: renderScheduleAndStandingsTab,
+    'alliance-selection': renderAllianceSelectionTab,
     finals: renderFinalsTab,
     results: renderResultsTab,
   };

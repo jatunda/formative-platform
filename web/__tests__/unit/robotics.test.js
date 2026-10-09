@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   initRoboticsApp,
   teamName,
-  autoFillSeedsFromStandings,
   nameFitStyle,
 } from '../../robotics/robotics.js';
 import {
@@ -14,8 +13,7 @@ import {
   setTimelineConfig,
   formPlayoffAlliance,
   setBracketConfig,
-  setSeed,
-  generateBracket,
+  startFinals,
   recordEliminationResult,
   revealNextPlacement,
   getRevealedCount,
@@ -1415,7 +1413,7 @@ describe('initRoboticsApp', () => {
       expect(document.querySelector('.robotics-up-next')).toBeNull();
     });
 
-    it('says the Qualification Round is complete once every match is, with a button on to Finals', async () => {
+    it('says the Qualification Round is complete once every match is, with a button on to Alliance Selection', async () => {
       const app = initRoboticsApp();
       openSchedule(app, 1);
       app.dispatch((s) => recordQualificationResult(s, 0, { scoreA: 1, scoreB: 0 }));
@@ -1423,8 +1421,8 @@ describe('initRoboticsApp', () => {
       expect(card().classList.contains('is-finished')).toBe(true);
       expect(card().querySelector('.robotics-now-playing-message').textContent).toBe('Qualification Round complete');
       expect(card().querySelector('.robotics-score-input')).toBeNull();
-      clickButtonWithText(card(), 'On to Finals →');
-      expect(document.querySelector('.robotics-tab-btn.active').dataset.tabKey).toBe('finals');
+      clickButtonWithText(card(), 'On to Alliance Selection →');
+      expect(document.querySelector('.robotics-tab-btn.active').dataset.tabKey).toBe('alliance-selection');
     });
 
     it('shows an empty state before any Qualification Matches exist', () => {
@@ -1560,281 +1558,271 @@ describe('initRoboticsApp', () => {
     });
   });
 
-  describe('finals tab', () => {
-    function setupFourTeams(app) {
-      const root = document.getElementById('roboticsApp');
-      ['Alpha', 'Bravo', 'Charlie', 'Delta'].forEach((name) => addTeamViaForm(root, name));
+  describe('alliance selection tab', () => {
+    const NAMES = ['Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo'];
+    const root = () => document.getElementById('roboticsApp');
+    const banner = () => document.querySelector('.robotics-selection-banner').textContent;
+    /** Row status class and last-cell text per Team name, in table order. */
+    const rows = () => [...document.querySelectorAll('.robotics-selection-row')].map((tr) => {
+      const status = ['is-in-alliance', 'is-captain', 'is-available'].find((c) => tr.classList.contains(c));
+      return [tr.querySelector('.robotics-standings-team-name').textContent, status, tr.lastElementChild.textContent];
+    });
+    const pickButton = (name) => [...document.querySelectorAll('.robotics-selection-row')]
+      .find((tr) => tr.querySelector('.robotics-standings-team-name').textContent === name)
+      .querySelector('button');
+    const allianceNames = (app) => app.getState().elimination.alliances.map((a) => a.teamIds.map((id) => teamName(app.getState(), id)).join(' & '));
+
+    /** NAMES as the roster, with no matches played, so Standings keep roster order. */
+    function openSelection(names = NAMES) {
+      const app = initRoboticsApp();
+      names.forEach((name) => addTeamViaForm(root(), name));
+      app.setActiveTab('alliance-selection');
+      return app;
     }
 
-    it('forms and removes a playoff alliance', async () => {
-      const app = initRoboticsApp();
-      setupFourTeams(app);
-      app.setActiveTab('finals');
-      let root = document.getElementById('roboticsApp');
-      clickButtonWithText(root, 'Form Alliance');
-      expect(app.getState().elimination.alliances).toHaveLength(1);
+    it('sits between Schedule & Standings and Finals in the tab order', () => {
+      initRoboticsApp();
+      const tabs = [...document.querySelectorAll('.robotics-tab-btn')];
+      expect(tabs.map((b) => b.dataset.tabKey)).toEqual(['teams', 'schedule', 'alliance-selection', 'finals', 'results']);
+      expect(tabs[2].textContent).toBe('Alliance Selection');
+    });
 
+    it('projects the full Standings, highlighting the Alliance Captain, with Pick on every other available Team', () => {
+      openSelection();
+      expect(banner()).toBe('Alpha is picking');
+      const headers = [...document.querySelectorAll('.robotics-selection-standings th')].map((th) => th.textContent);
+      expect(headers).toEqual(['Rank', 'Team', 'W-L-T', 'Points', 'Alliance']);
+      expect(rows()).toEqual([
+        ['Alpha', 'is-captain', 'Picking'],
+        ['Bravo', 'is-available', 'Pick'],
+        ['Charlie', 'is-available', 'Pick'],
+        ['Delta', 'is-available', 'Pick'],
+        ['Echo', 'is-available', 'Pick'],
+      ]);
+    });
+
+    it('Pick forms an alliance with the Captain, flashes it in the list, and moves the Captain on', async () => {
+      const app = openSelection();
+      pickButton('Charlie').click();
+      expect(allianceNames(app)).toEqual(['Alpha & Charlie']);
       await flushRender();
-      root = document.getElementById('roboticsApp');
-      clickButtonWithText(root, 'Remove');
+
+      expect(banner()).toBe('Bravo is picking');
+      expect(rows()).toEqual([
+        ['Alpha', 'is-in-alliance', 'Alliance 1'],
+        ['Bravo', 'is-captain', 'Picking'],
+        ['Charlie', 'is-in-alliance', 'Alliance 1'],
+        ['Delta', 'is-available', 'Pick'],
+        ['Echo', 'is-available', 'Pick'],
+      ]);
+      const items = [...document.querySelectorAll('.robotics-selection-alliance')];
+      expect(items.map((li) => li.textContent)).toEqual([expect.stringContaining('Alliance 1Alpha & Charlie')]);
+      expect(items[0].classList.contains('is-new')).toBe(true);
+
+      pickButton('Echo').click();
+      await flushRender();
+      const [first, second] = document.querySelectorAll('.robotics-selection-alliance');
+      expect(first.classList.contains('is-new')).toBe(false);
+      expect(second.classList.contains('is-new')).toBe(true);
+      expect(banner()).toBe('Delta is picking');
+    });
+
+    it('says no Team is left to pick once every Team is in an alliance', async () => {
+      openSelection(['Alpha', 'Bravo']);
+      pickButton('Bravo').click();
+      await flushRender();
+      expect(banner()).toBe('No Teams left to pick');
+      expect(document.querySelector('.robotics-selection-standings button')).toBeNull();
+    });
+
+    it('shows empty states with no Teams and no alliances', () => {
+      openSelection([]);
+      expect(banner()).toBe('No Teams left to pick');
+      expect(document.querySelector('.robotics-selection-standings').textContent).toContain('No Teams yet');
+      expect(root().textContent).toContain('No alliances formed yet.');
+    });
+
+    it('follows Standings for the Captain, and warns while Qualification Matches remain', async () => {
+      const app = openSelection(['Alpha', 'Bravo', 'Charlie', 'Delta']);
+      app.dispatch((s) => regenerateMatchups(setMatchesPerTeam(s, 1), { random: () => 0.5 }));
+      await flushRender();
+      expect(document.querySelector('.robotics-selection-notice').textContent).toContain('may still change');
+
+      app.dispatch((s) => recordQualificationResult(s, 0, { scoreA: 2, scoreB: 9 }));
+      await flushRender();
+      expect(document.querySelector('.robotics-selection-notice')).toBeNull();
+      const state = app.getState();
+      const winnerNames = state.qualification.matches[0].allianceB.map((id) => teamName(state, id));
+      expect(winnerNames).toContain(banner().replace(' is picking', ''));
+      expect(rows()[0][1]).toBe('is-captain');
+    });
+
+    it('reorders alliances with ↑/↓, which renumbers them, and disables the move past either end', async () => {
+      const app = openSelection(['Alpha', 'Bravo', 'Charlie', 'Delta']);
+      pickButton('Bravo').click();
+      await flushRender();
+      pickButton('Delta').click();
+      await flushRender();
+      expect(allianceNames(app)).toEqual(['Alpha & Bravo', 'Charlie & Delta']);
+
+      const moveButtons = (label) => [...document.querySelectorAll(`[aria-label="${label}"]`)];
+      expect(moveButtons('Move alliance up').map((b) => b.disabled)).toEqual([true, false]);
+      expect(moveButtons('Move alliance down').map((b) => b.disabled)).toEqual([false, true]);
+
+      moveButtons('Move alliance up')[1].click();
+      expect(allianceNames(app)).toEqual(['Charlie & Delta', 'Alpha & Bravo']);
+      await flushRender();
+      expect(rows().find(([name]) => name === 'Charlie')[2]).toBe('Alliance 1');
+
+      moveButtons('Move alliance down')[0].click();
+      expect(allianceNames(app)).toEqual(['Alpha & Bravo', 'Charlie & Delta']);
+    });
+
+    it('Remove deletes an alliance and the Captain is recomputed', async () => {
+      const app = openSelection();
+      pickButton('Bravo').click();
+      await flushRender();
+      expect(banner()).toBe('Charlie is picking');
+      clickButtonWithText(root(), 'Remove');
       expect(app.getState().elimination.alliances).toHaveLength(0);
-    });
-
-    it('confirms before forming a single-team alliance when Team A and Team B match, then forms it', async () => {
-      const app = initRoboticsApp();
-      setupFourTeams(app);
-      app.setActiveTab('finals');
-      let root = document.getElementById('roboticsApp');
-      const [selectA, selectB] = root.querySelectorAll('select');
-      selectB.value = selectA.value;
-
-      clickButtonWithText(root, 'Form Alliance');
-      root = document.getElementById('roboticsApp');
-      const dialog = root.querySelector('.robotics-confirm-dialog');
-      expect(dialog.textContent).toContain('same Team');
-      expect(app.getState().elimination.alliances).toHaveLength(0);
-
-      await clickDialogButton(root, 'Form Alliance');
-      expect(app.getState().elimination.alliances).toHaveLength(1);
-      expect(app.getState().elimination.alliances[0].teamIds).toHaveLength(1);
-    });
-
-    it('cancelling the single-team alliance confirmation forms nothing', async () => {
-      const app = initRoboticsApp();
-      setupFourTeams(app);
-      app.setActiveTab('finals');
-      let root = document.getElementById('roboticsApp');
-      const [selectA, selectB] = root.querySelectorAll('select');
-      selectB.value = selectA.value;
-
-      clickButtonWithText(root, 'Form Alliance');
-      root = document.getElementById('roboticsApp');
-      await clickDialogButton(root, 'Cancel');
-      expect(app.getState().elimination.alliances).toHaveLength(0);
-    });
-
-    it('configures the bracket, assigns seeds, and generates it', async () => {
-      const app = initRoboticsApp();
-      setupFourTeams(app);
-      app.setActiveTab('finals');
-      let root = document.getElementById('roboticsApp');
-      clickButtonWithText(root, 'Form Alliance'); // Alpha+Bravo
       await flushRender();
-      root = document.getElementById('roboticsApp');
-      clickButtonWithText(root, 'Form Alliance'); // Charlie+Delta
-      expect(app.getState().elimination.alliances).toHaveLength(2);
+      expect(banner()).toBe('Alpha is picking');
+    });
 
-      root = document.getElementById('roboticsApp');
-      const sizeInput = [...root.querySelectorAll('input')].find((i) => i.previousSibling?.textContent?.includes('Bracket size'));
-      sizeInput.value = '2';
-      clickButtonWithText(root, 'Save Bracket Config');
+    it('edits Bracket Size and the Third-Place Match here', async () => {
+      const app = openSelection();
+      const sizeInput = () => document.querySelector('.robotics-selection-side input[type="number"]');
+      const thirdPlace = () => document.querySelector('.robotics-selection-side input[type="checkbox"]');
+      sizeInput().value = '4';
+      sizeInput().dispatchEvent(new Event('change'));
+      expect(app.getState().elimination.bracketSize).toBe(4);
+      await flushRender();
+      expect(sizeInput().value).toBe('4');
+
+      sizeInput().value = '';
+      sizeInput().dispatchEvent(new Event('change'));
+      expect(app.getState().elimination.bracketSize).toBeNull();
 
       await flushRender();
-      root = document.getElementById('roboticsApp');
-      clickButtonWithText(root, 'Auto-fill Seeds from Standings');
-      root = document.getElementById('roboticsApp');
-      clickButtonWithText(root, 'Generate Bracket');
-
-      expect(app.getState().elimination.bracket).toBeTruthy();
-      await flushRender();
-      root = document.getElementById('roboticsApp');
-      expect(root.querySelector('.robotics-bracket')).toBeTruthy();
+      thirdPlace().checked = false;
+      thirdPlace().dispatchEvent(new Event('change'));
+      expect(app.getState().elimination.includeThirdPlace).toBe(false);
     });
 
-    it('groups the setup cards into one collapsible accordion with the bracket full-width beneath it', async () => {
+    it('Start Finals with fewer than 2 alliances does nothing but explain why', async () => {
+      const app = openSelection();
+      pickButton('Bravo').click();
+      await flushRender();
+      const before = app.getState();
+      const startBtn = [...root().querySelectorAll('button')].find((b) => b.textContent === 'Start Finals →');
+      expect(startBtn.classList.contains('is-locked')).toBe(true);
+      expect(startBtn.getAttribute('aria-disabled')).toBe('true');
+
+      startBtn.click();
+      expect(app.getState()).toBe(before);
+      const toast = document.querySelector('.robotics-toast-visible');
+      expect(toast?.textContent).toBe('Form at least 2 alliances before starting the Finals.');
+      expect(toast?.className).toContain('robotics-toast-error');
+      expect(document.querySelector('.robotics-tab-btn.active').dataset.tabKey).toBe('alliance-selection');
+    });
+
+    it('Start Finals builds the Bracket in list order, resets the Podium reveal, and switches to Finals', async () => {
+      const app = openSelection(['Alpha', 'Bravo', 'Charlie', 'Delta']);
+      pickButton('Bravo').click();
+      await flushRender();
+      pickButton('Delta').click();
+      await flushRender();
+      document.querySelectorAll('[aria-label="Move alliance up"]')[1].click();
+      await flushRender();
+      app.dispatch((s) => ({ ...s, podium: { revealedCount: 2, revealedFor: 'stale' } }));
+      await flushRender();
+
+      const startBtn = [...root().querySelectorAll('button')].find((b) => b.textContent === 'Start Finals →');
+      expect(startBtn.classList.contains('is-locked')).toBe(false);
+      startBtn.click();
+      const { elimination, podium } = app.getState();
+      expect(elimination.bracket.seeds).toEqual(elimination.alliances.map((a) => a.id));
+      expect(allianceNames(app)).toEqual(['Charlie & Delta', 'Alpha & Bravo']);
+      expect(podium.revealedCount).toBe(0);
+      expect(document.querySelector('.robotics-tab-btn.active').dataset.tabKey).toBe('finals');
+      expect(document.querySelector('.robotics-bracket')).toBeTruthy();
+    });
+
+    it('loads a Tournament saved with the old per-number seed map, and Start Finals ignores it', () => {
+      let s = createInitialState();
+      ['Alpha', 'Bravo'].forEach((name) => { s = addTeam(s, { name, members: [] }); });
+      s.teams.forEach((t) => { s = formPlayoffAlliance(s, t.id, t.id); });
+      const [a1, a2] = s.elimination.alliances.map((a) => a.id);
+      s = { ...s, elimination: { ...s.elimination, bracketSize: 2, seeds: { 1: a2, 2: a1 } } };
+      localStorage.setItem('robotics-tournament-state', JSON.stringify(s));
+
       const app = initRoboticsApp();
-      setupFourTeams(app);
-      app.setActiveTab('finals');
-      let root = document.getElementById('roboticsApp');
-      const panelTitles = () => [...root.querySelectorAll('.robotics-finals-accordion-panel > .robotics-card > .robotics-card-title')].map((h) => h.textContent);
-      expect(panelTitles()).toEqual(['Form a Playoff Alliance', 'Playoff Alliances', 'Bracket Configuration']);
-
-      app.dispatch((s) => formPlayoffAlliance(s, s.teams[0].id, s.teams[1].id));
-      app.dispatch((s) => formPlayoffAlliance(s, s.teams[2].id, s.teams[3].id));
-      app.dispatch((s) => setBracketConfig(s, { bracketSize: 2, includeThirdPlace: false }));
-      app.dispatch((s) => autoFillSeedsFromStandings(s));
-      app.dispatch((s) => generateBracket(s));
-      await flushRender();
-      root = document.getElementById('roboticsApp');
-      expect(panelTitles()).toEqual(['Form a Playoff Alliance', 'Playoff Alliances', 'Bracket Configuration']);
-      // Seeds sits outside the accordion, sharing the setup row.
-      const seedsTitle = root.querySelector('.robotics-finals-setup > .robotics-card:not(.robotics-accordion) > .robotics-card-title');
-      expect(seedsTitle.textContent).toBe('Seeds');
-
-      const setup = root.querySelector('.robotics-finals-setup');
-      const bracket = root.querySelector('.robotics-bracket');
-      expect(setup.contains(bracket)).toBe(false);
-      expect(bracket.parentElement).toBe(setup.parentElement);
-      expect(setup.nextElementSibling).toBe(bracket);
-      expect([...bracket.querySelectorAll('.robotics-bracket-round.is-final h4')].map((h) => h.textContent)).toEqual(['Final']);
+      app.setActiveTab('alliance-selection');
+      expect(rows().map(([, , cell]) => cell)).toEqual(['Alliance 1', 'Alliance 2']);
+      clickButtonWithText(root(), 'Start Finals →');
+      expect(app.getState().elimination.bracket.seeds).toEqual([a1, a2]);
     });
+  });
 
-    describe('collapsible Playoff Setup accordion', () => {
-      const toggle = () => document.querySelector('.robotics-finals-accordion .robotics-accordion-toggle');
-      const panel = () => document.getElementById(toggle().getAttribute('aria-controls'));
+  describe('finals tab', () => {
+    const NAMES = ['Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo', 'Foxtrot', 'Golf', 'Hotel'];
 
-      it('is collapsed by default into a one-line summary of alliances and bracket configuration', () => {
-        const app = initRoboticsApp();
-        setupFourTeams(app);
-        app.setActiveTab('finals');
-        expect(toggle().tagName).toBe('BUTTON');
-        expect(toggle().getAttribute('type')).toBe('button');
-        expect(toggle().parentElement.tagName).toBe('H3');
-        expect(toggle().getAttribute('aria-expanded')).toBe('false');
-        expect(panel().hidden).toBe(true);
-        expect(document.querySelector('.robotics-finals-accordion .robotics-accordion-summary').textContent)
-          .toBe('0 alliances · bracket size not set · with third-place match');
+    /**
+     * A started Finals: `teamCount` Teams paired into alliances in roster order
+     * (Alpha & Bravo, Charlie & Delta, ...), or one Team each with `singles`.
+     */
+    async function openFinals({ teamCount = 4, singles = false, includeThirdPlace = false } = {}) {
+      const app = initRoboticsApp();
+      app.dispatch((s) => {
+        let next = s;
+        NAMES.slice(0, teamCount).forEach((name) => { next = addTeam(next, { name, members: [] }); });
+        const ids = next.teams.map((t) => t.id);
+        const step = singles ? 1 : 2;
+        for (let i = 0; i < ids.length; i += step) next = formPlayoffAlliance(next, ids[i], ids[i + step - 1]);
+        return startFinals(setBracketConfig(next, { includeThirdPlace }));
       });
+      app.setActiveTab('finals');
+      await flushRender();
+      return app;
+    }
+    const root = () => document.getElementById('roboticsApp');
 
-      it('summarises alliances formed and the saved bracket configuration', async () => {
-        const app = initRoboticsApp();
-        setupFourTeams(app);
-        app.setActiveTab('finals');
-        app.dispatch((s) => formPlayoffAlliance(s, s.teams[0].id, s.teams[1].id));
-        app.dispatch((s) => setBracketConfig(s, { bracketSize: 4, includeThirdPlace: false }));
-        await flushRender();
-        const summary = document.querySelector('.robotics-finals-accordion .robotics-accordion-summary').textContent;
-        expect(summary).toBe('1 alliance · bracket size 4 · no third-place match');
-      });
-
-      it('expands and collapses in place when the summary is clicked, and the setup cards still work while expanded', async () => {
-        const app = initRoboticsApp();
-        setupFourTeams(app);
-        app.setActiveTab('finals');
-        const btn = toggle();
-        btn.click();
-        expect(btn.getAttribute('aria-expanded')).toBe('true');
-        expect(panel().hidden).toBe(false);
-        expect(document.querySelector('.robotics-finals-accordion').classList.contains('is-expanded')).toBe(true);
-        // Toggled in place, so keyboard focus is not lost to a re-render.
-        expect(toggle()).toBe(btn);
-
-        let root = document.getElementById('roboticsApp');
-        clickButtonWithText(root, 'Form Alliance');
-        expect(app.getState().elimination.alliances).toHaveLength(1);
-        await flushRender();
-
-        root = document.getElementById('roboticsApp');
-        const sizeInput = [...root.querySelectorAll('input')].find((i) => i.previousSibling?.textContent?.includes('Bracket size'));
-        sizeInput.value = '2';
-        clickButtonWithText(root, 'Save Bracket Config');
-        expect(app.getState().elimination.bracketSize).toBe(2);
-        await flushRender();
-
-        root = document.getElementById('roboticsApp');
-        clickButtonWithText(root, 'Remove');
-        expect(app.getState().elimination.alliances).toHaveLength(0);
-        await flushRender();
-
-        toggle().click();
-        expect(toggle().getAttribute('aria-expanded')).toBe('false');
-        expect(panel().hidden).toBe(true);
-      });
-
-      it('remembers the open/closed choice across reloads', () => {
-        const app = initRoboticsApp();
-        setupFourTeams(app);
-        app.setActiveTab('finals');
-        toggle().click();
-        initRoboticsApp().setActiveTab('finals');
-        expect(toggle().getAttribute('aria-expanded')).toBe('true');
-        expect(panel().hidden).toBe(false);
-
-        toggle().click();
-        initRoboticsApp().setActiveTab('finals');
-        expect(toggle().getAttribute('aria-expanded')).toBe('false');
-      });
-
-      it('stays open after a Tournament change re-renders the tab', () => {
-        const app = initRoboticsApp();
-        setupFourTeams(app);
-        app.setActiveTab('finals');
-        toggle().click();
-        app.dispatch((s) => formPlayoffAlliance(s, s.teams[0].id, s.teams[1].id));
-        expect(toggle().getAttribute('aria-expanded')).toBe('true');
-      });
-
-      it('keeps the preference out of Tournament state, so New Tournament does not reset it', async () => {
-        const app = initRoboticsApp();
-        setupFourTeams(app);
-        app.setActiveTab('finals');
-        toggle().click();
-        expect(localStorage.getItem('robotics-tournament-state')).not.toContain('xpanded');
-
-        app.setActiveTab('teams');
-        let root = document.getElementById('roboticsApp');
-        clickButtonWithText(root, 'Reset Everything / New Tournament');
-        root = document.getElementById('roboticsApp');
-        await clickDialogButton(root, 'Reset Everything');
-        app.setActiveTab('finals');
-        expect(toggle().getAttribute('aria-expanded')).toBe('true');
-      });
+    it('has no setup UI, and points to Alliance Selection before the Finals start', () => {
+      const app = initRoboticsApp();
+      ['Alpha', 'Bravo', 'Charlie', 'Delta'].forEach((name) => addTeamViaForm(root(), name));
+      app.setActiveTab('finals');
+      expect(root().textContent).toContain('Form alliances on the Alliance Selection tab');
+      expect(root().querySelector('select')).toBeNull();
+      expect(root().querySelector('.robotics-accordion')).toBeNull();
+      expect(root().textContent).not.toContain('Seeds');
+      expect(root().textContent).not.toContain('Auto-fill');
+      expect(root().querySelector('.robotics-bracket')).toBeNull();
     });
 
     it('records an elimination result and offers Reveal Results (no Champion banner) once the final completes', async () => {
-      const app = initRoboticsApp();
-      setupFourTeams(app);
-      app.setActiveTab('finals');
-      let root = document.getElementById('roboticsApp');
-      clickButtonWithText(root, 'Form Alliance');
-      await flushRender();
-      root = document.getElementById('roboticsApp');
-      clickButtonWithText(root, 'Form Alliance');
-      root = document.getElementById('roboticsApp');
-      const sizeInput = [...root.querySelectorAll('input')].find((i) => i.previousSibling?.textContent?.includes('Bracket size'));
-      sizeInput.value = '2';
-      clickButtonWithText(root, 'Save Bracket Config');
-      await flushRender();
-      root = document.getElementById('roboticsApp');
-      clickButtonWithText(root, 'Auto-fill Seeds from Standings');
-      root = document.getElementById('roboticsApp');
-      clickButtonWithText(root, 'Generate Bracket');
-      await flushRender();
-
-      root = document.getElementById('roboticsApp');
-      const scoreInputs = root.querySelectorAll('.robotics-bracket .robotics-score-input');
+      await openFinals();
+      const scoreInputs = root().querySelectorAll('.robotics-bracket .robotics-score-input');
       scoreInputs[0].value = '80';
       scoreInputs[1].value = '20';
-      clickButtonWithText(root, 'Mark Complete');
+      clickButtonWithText(root(), 'Mark Complete');
       await flushRender();
 
-      root = document.getElementById('roboticsApp');
-      expect(root.textContent).not.toContain('Champion');
-      expect(root.querySelector('.robotics-champion-banner')).toBeFalsy();
-      clickButtonWithText(root, 'Reveal Results →');
+      expect(root().textContent).not.toContain('Champion');
+      expect(root().querySelector('.robotics-champion-banner')).toBeFalsy();
+      clickButtonWithText(root(), 'Reveal Results →');
       expect(document.querySelector('.robotics-tab-btn.active').dataset.tabKey).toBe('results');
       expect(document.querySelector('.robotics-podium')).toBeTruthy();
     });
 
     it('marks the winning side of a completed elimination match with is-winner, and the card as is-complete', async () => {
-      const app = initRoboticsApp();
-      setupFourTeams(app);
-      app.setActiveTab('finals');
-      let root = document.getElementById('roboticsApp');
-      clickButtonWithText(root, 'Form Alliance');
-      await flushRender();
-      root = document.getElementById('roboticsApp');
-      clickButtonWithText(root, 'Form Alliance');
-      root = document.getElementById('roboticsApp');
-      const sizeInput = [...root.querySelectorAll('input')].find((i) => i.previousSibling?.textContent?.includes('Bracket size'));
-      sizeInput.value = '2';
-      clickButtonWithText(root, 'Save Bracket Config');
-      await flushRender();
-      root = document.getElementById('roboticsApp');
-      clickButtonWithText(root, 'Auto-fill Seeds from Standings');
-      root = document.getElementById('roboticsApp');
-      clickButtonWithText(root, 'Generate Bracket');
-      await flushRender();
-
-      root = document.getElementById('roboticsApp');
-      const scoreInputs = root.querySelectorAll('.robotics-bracket .robotics-score-input');
+      await openFinals();
+      const scoreInputs = root().querySelectorAll('.robotics-bracket .robotics-score-input');
       scoreInputs[0].value = '80';
       scoreInputs[1].value = '20';
-      clickButtonWithText(root, 'Mark Complete');
+      clickButtonWithText(root(), 'Mark Complete');
       await flushRender();
 
-      root = document.getElementById('roboticsApp');
-      const matchCard = root.querySelector('.robotics-bracket-match');
+      const matchCard = root().querySelector('.robotics-bracket-match');
       expect(matchCard.classList.contains('is-complete')).toBe(true);
       const sides = matchCard.querySelectorAll('.robotics-bracket-side');
       expect(sides[0].classList.contains('is-red')).toBe(true);
@@ -1845,74 +1833,26 @@ describe('initRoboticsApp', () => {
     });
 
     it('toggles no-show by clicking a team name on an elimination match', async () => {
-      const app = initRoboticsApp();
-      setupFourTeams(app);
-      app.setActiveTab('finals');
-      let root = document.getElementById('roboticsApp');
-      clickButtonWithText(root, 'Form Alliance');
-      await flushRender();
-      root = document.getElementById('roboticsApp');
-      clickButtonWithText(root, 'Form Alliance');
-      root = document.getElementById('roboticsApp');
-      const sizeInput = [...root.querySelectorAll('input')].find((i) => i.previousSibling?.textContent?.includes('Bracket size'));
-      sizeInput.value = '2';
-      clickButtonWithText(root, 'Save Bracket Config');
-      await flushRender();
-      root = document.getElementById('roboticsApp');
-      clickButtonWithText(root, 'Auto-fill Seeds from Standings');
-      root = document.getElementById('roboticsApp');
-      clickButtonWithText(root, 'Generate Bracket');
-      await flushRender();
-
-      root = document.getElementById('roboticsApp');
-      const toggle = root.querySelector('.robotics-bracket .robotics-team-toggle');
-      toggle.click();
-
+      const app = await openFinals();
+      root().querySelector('.robotics-bracket .robotics-team-toggle').click();
       const bracketMatch = app.getState().elimination.bracket.matches.find((m) => !m.isBye);
       expect(Object.values(bracketMatch.noShow)).toContain(true);
     });
 
     it('keeps a typed-but-unsaved elimination score after toggling No-Show, including repeated toggling', async () => {
-      const app = initRoboticsApp();
-      setupFourTeams(app);
-      app.setActiveTab('finals');
-      let root = document.getElementById('roboticsApp');
-      clickButtonWithText(root, 'Form Alliance');
-      await flushRender();
-      root = document.getElementById('roboticsApp');
-      clickButtonWithText(root, 'Form Alliance');
-      root = document.getElementById('roboticsApp');
-      const sizeInput = [...root.querySelectorAll('input')].find((i) => i.previousSibling?.textContent?.includes('Bracket size'));
-      sizeInput.value = '2';
-      clickButtonWithText(root, 'Save Bracket Config');
-      await flushRender();
-      root = document.getElementById('roboticsApp');
-      clickButtonWithText(root, 'Auto-fill Seeds from Standings');
-      root = document.getElementById('roboticsApp');
-      clickButtonWithText(root, 'Generate Bracket');
-      await flushRender();
-
-      root = document.getElementById('roboticsApp');
-      let scoreInputs = root.querySelectorAll('.robotics-bracket .robotics-score-input');
+      const app = await openFinals();
+      let scoreInputs = root().querySelectorAll('.robotics-bracket .robotics-score-input');
       scoreInputs[0].value = '80';
       scoreInputs[0].dispatchEvent(new Event('change'));
-      root = document.getElementById('roboticsApp');
-      scoreInputs = root.querySelectorAll('.robotics-bracket .robotics-score-input');
+      scoreInputs = root().querySelectorAll('.robotics-bracket .robotics-score-input');
       scoreInputs[1].value = '20';
       scoreInputs[1].dispatchEvent(new Event('change'));
 
-      root = document.getElementById('roboticsApp');
-      let toggles = root.querySelectorAll('.robotics-bracket .robotics-team-toggle');
-      toggles[0].click();
-      root = document.getElementById('roboticsApp');
-      toggles = root.querySelectorAll('.robotics-bracket .robotics-team-toggle');
-      toggles[0].click();
-      root = document.getElementById('roboticsApp');
-      toggles = root.querySelectorAll('.robotics-bracket .robotics-team-toggle');
-      toggles[0].click();
+      for (let i = 0; i < 3; i++) {
+        root().querySelectorAll('.robotics-bracket .robotics-team-toggle')[0].click();
+      }
 
-      root = document.getElementById('roboticsApp');
-      scoreInputs = root.querySelectorAll('.robotics-bracket .robotics-score-input');
+      scoreInputs = root().querySelectorAll('.robotics-bracket .robotics-score-input');
       expect(scoreInputs[0].value).toBe('80');
       expect(scoreInputs[1].value).toBe('20');
       const bracketMatch = app.getState().elimination.bracket.matches.find((m) => !m.isBye);
@@ -1920,119 +1860,43 @@ describe('initRoboticsApp', () => {
     });
 
     it('renders the Third-Place Match column positioned to the left of the Final', async () => {
-      const app = initRoboticsApp();
-      const setupRoot = document.getElementById('roboticsApp');
-      ['Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo', 'Foxtrot', 'Golf', 'Hotel'].forEach((name) => addTeamViaForm(setupRoot, name));
-      app.setActiveTab('finals');
-      let root = document.getElementById('roboticsApp');
-      for (let i = 0; i < 4; i++) {
-        root = document.getElementById('roboticsApp');
-        clickButtonWithText(root, 'Form Alliance');
-        await flushRender();
-      }
-      expect(app.getState().elimination.alliances).toHaveLength(4);
-
-      root = document.getElementById('roboticsApp');
-      const sizeInput = [...root.querySelectorAll('input')].find((i) => i.previousSibling?.textContent?.includes('Bracket size'));
-      sizeInput.value = '4';
-      root.querySelector('input[type="checkbox"]').checked = true;
-      clickButtonWithText(root, 'Save Bracket Config');
-      await flushRender();
-      root = document.getElementById('roboticsApp');
-      clickButtonWithText(root, 'Auto-fill Seeds from Standings');
-      root = document.getElementById('roboticsApp');
-      clickButtonWithText(root, 'Generate Bracket');
-      await flushRender();
-
-      root = document.getElementById('roboticsApp');
-      const headings = [...root.querySelectorAll('.robotics-bracket-round')].map((col) => col.querySelector('h4').textContent);
+      await openFinals({ teamCount: 8, includeThirdPlace: true });
+      const headings = [...root().querySelectorAll('.robotics-bracket-round')].map((col) => col.querySelector('h4').textContent);
       expect(headings).toEqual(['Round 1', 'Third Place', 'Final']);
     });
 
-    function setupTwoAlliancesWithBracketSize(root, size, includeThirdPlace = false) {
-      clickButtonWithText(root, 'Form Alliance');
-      root = document.getElementById('roboticsApp');
-      clickButtonWithText(root, 'Form Alliance');
-      root = document.getElementById('roboticsApp');
-      const sizeInput = [...root.querySelectorAll('input')].find((i) => i.previousSibling?.textContent?.includes('Bracket size'));
-      sizeInput.value = String(size);
-      if (includeThirdPlace) root.querySelector('input[type="checkbox"]').checked = true;
-      clickButtonWithText(root, 'Save Bracket Config');
-      root = document.getElementById('roboticsApp');
-      clickButtonWithText(root, 'Auto-fill Seeds from Standings');
-      root = document.getElementById('roboticsApp');
-      clickButtonWithText(root, 'Generate Bracket');
-    }
-
     it('renders a Bye as its own card naming the advancing Playoff Alliance', async () => {
-      const app = initRoboticsApp();
-      setupFourTeams(app);
-      // 3 Playoff Alliances in a 3-alliance bracket: the top seed gets a Bye
-      app.dispatch((s) => {
-        const [alpha, bravo, charlie, delta] = s.teams.map((t) => t.id);
-        let next = formPlayoffAlliance(s, alpha, bravo);
-        next = formPlayoffAlliance(next, charlie, charlie);
-        next = formPlayoffAlliance(next, delta, delta);
-        return setBracketConfig(next, { bracketSize: 3, includeThirdPlace: false });
-      });
-      app.dispatch((s) => generateBracket(autoFillSeedsFromStandings(s)));
-      app.setActiveTab('finals');
-      await flushRender();
-
-      const root = document.getElementById('roboticsApp');
-      const byes = [...root.querySelectorAll('.robotics-bracket .robotics-bracket-bye')].map((b) => b.textContent);
-      expect(byes).toHaveLength(1);
-      expect(byes[0]).toMatch(/^BYE → (Alpha & Bravo|Charlie|Delta)$/);
+      // 3 single-Team Playoff Alliances: Seed 1 (Alpha) gets a Bye.
+      await openFinals({ teamCount: 3, singles: true });
+      const byes = [...root().querySelectorAll('.robotics-bracket .robotics-bracket-bye')].map((b) => b.textContent);
+      expect(byes).toEqual(['BYE → Alpha']);
     });
 
     it('shows no Reveal Results button while the Third-Place Match is still undecided, and no place banners at any point', async () => {
-      const app = initRoboticsApp();
-      const setupRoot = document.getElementById('roboticsApp');
-      ['Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo', 'Foxtrot', 'Golf', 'Hotel'].forEach((name) => addTeamViaForm(setupRoot, name));
-      app.setActiveTab('finals');
-      let root = document.getElementById('roboticsApp');
-      for (let i = 0; i < 4; i++) {
-        root = document.getElementById('roboticsApp');
-        clickButtonWithText(root, 'Form Alliance');
-        await flushRender();
-      }
-      root = document.getElementById('roboticsApp');
-      const sizeInput = [...root.querySelectorAll('input')].find((i) => i.previousSibling?.textContent?.includes('Bracket size'));
-      sizeInput.value = '4';
-      root.querySelector('input[type="checkbox"]').checked = true;
-      clickButtonWithText(root, 'Save Bracket Config');
-      await flushRender();
-      root = document.getElementById('roboticsApp');
-      clickButtonWithText(root, 'Auto-fill Seeds from Standings');
-      root = document.getElementById('roboticsApp');
-      clickButtonWithText(root, 'Generate Bracket');
-      await flushRender();
+      const app = await openFinals({ teamCount: 8, includeThirdPlace: true });
 
       // Semis (inputs 0-3), then the Final (inputs 6-7), leaving the Third-Place Match (inputs 4-5).
       for (const [a, b] of [[0, 1], [2, 3], [6, 7]]) {
-        root = document.getElementById('roboticsApp');
-        const scoreInputs = root.querySelectorAll('.robotics-bracket .robotics-score-input');
+        const scoreInputs = root().querySelectorAll('.robotics-bracket .robotics-score-input');
         scoreInputs[a].value = '80';
         scoreInputs[b].value = '20';
         scoreInputs[a].closest('.robotics-bracket-match').querySelector('.robotics-match-actions button').click();
         await flushRender();
       }
 
-      root = document.getElementById('roboticsApp');
       expect(app.getState().elimination.bracket.matches.find((m) => m.round === 'final').completed).toBe(true);
-      expect(root.querySelector('.robotics-reveal-results-btn')).toBeFalsy();
-      expect(root.querySelector('.robotics-champion-banner, .robotics-second-place-banner, .robotics-third-place-banner')).toBeFalsy();
+      expect(root().querySelector('.robotics-reveal-results-btn')).toBeFalsy();
+      expect(root().querySelector('.robotics-champion-banner, .robotics-second-place-banner, .robotics-third-place-banner')).toBeFalsy();
 
-      const scoreInputs = root.querySelectorAll('.robotics-bracket .robotics-score-input');
+      const scoreInputs = root().querySelectorAll('.robotics-bracket .robotics-score-input');
       scoreInputs[4].value = '50';
       scoreInputs[5].value = '40';
       scoreInputs[4].closest('.robotics-bracket-match').querySelector('.robotics-match-actions button').click();
       await flushRender();
 
-      root = document.getElementById('roboticsApp');
-      expect(root.querySelector('.robotics-reveal-results-btn')?.textContent).toBe('Reveal Results →');
-      expect(root.querySelector('.robotics-third-place-banner')).toBeFalsy();
-      expect([...root.querySelectorAll('button')].some((b) => b.textContent === 'Copy Placements to Clipboard')).toBe(false);
+      expect(root().querySelector('.robotics-reveal-results-btn')?.textContent).toBe('Reveal Results →');
+      expect(root().querySelector('.robotics-third-place-banner')).toBeFalsy();
+      expect([...root().querySelectorAll('button')].some((b) => b.textContent === 'Copy Placements to Clipboard')).toBe(false);
     });
   });
 
@@ -2054,9 +1918,7 @@ describe('initRoboticsApp', () => {
       let s = createInitialState();
       teams.forEach(([name, members]) => { s = addTeam(s, { name, members }); });
       s.teams.forEach((t) => { s = formPlayoffAlliance(s, t.id, t.id); });
-      s = setBracketConfig(s, { bracketSize: teams.length, includeThirdPlace });
-      s.elimination.alliances.forEach((a, i) => { s = setSeed(s, i + 1, a.id); });
-      s = generateBracket(s);
+      s = startFinals(setBracketConfig(s, { includeThirdPlace }));
       const played = s.elimination.bracket.matches.filter((m) => !m.isBye);
       winners.forEach((aWins, i) => {
         if (aWins === undefined) return;
@@ -2086,7 +1948,7 @@ describe('initRoboticsApp', () => {
     it('is always in the nav, after Finals', () => {
       initRoboticsApp();
       const keys = [...document.querySelectorAll('.robotics-tab-btn')].map((b) => b.dataset.tabKey);
-      expect(keys).toEqual(['teams', 'schedule', 'finals', 'results']);
+      expect(keys).toEqual(['teams', 'schedule', 'alliance-selection', 'finals', 'results']);
       expect(document.querySelector('[data-tab-key="results"]').textContent).toBe('Results');
     });
 
@@ -2094,7 +1956,7 @@ describe('initRoboticsApp', () => {
       openResults();
       const root = document.getElementById('roboticsApp');
       expect(root.textContent).toContain('Results not decided yet');
-      expect(root.textContent).toContain('Generate the Elimination Bracket');
+      expect(root.textContent).toContain('Start the Finals from the Alliance Selection tab');
       expect(podium()).toBeFalsy();
     });
 
@@ -2356,13 +2218,6 @@ describe('initRoboticsApp', () => {
 describe('teamName', () => {
   it('falls back for an unknown team id', () => {
     expect(teamName(createInitialState(), 'nope')).toBe('(unknown team)');
-  });
-});
-
-describe('autoFillSeedsFromStandings', () => {
-  it('is a no-op when there are no playoff alliances yet', () => {
-    const state = createInitialState();
-    expect(autoFillSeedsFromStandings(state).elimination.seeds).toEqual({});
   });
 });
 

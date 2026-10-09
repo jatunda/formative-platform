@@ -26,19 +26,19 @@ Spec: `.scratch/robotics-alliance-selection-and-finals/spec.md`, user stories 11
 
 **Blocked by:** None (can start immediately).
 
-**Status:** ready-for-agent
+**Status:** closed
 
-- [ ] The tab order is Teams | Schedule & Standings | Alliance Selection | Finals | Results
-- [ ] The Captain is the highest-ranked Team in Standings not in a Playoff Alliance, using the same Standings computation as the Standings tab
-- [ ] Rows render as in-alliance (grayed, "Alliance N"), Captain (highlighted), or available (with a Pick button)
-- [ ] Pick forms an alliance of the Captain and the chosen Team, briefly highlights it in the list, and advances the Captain
-- [ ] The alliance list is in Seed order. ↑/↓ reorders it and Remove deletes an alliance, and the Captain is recomputed
-- [ ] Bracket Size and Third-Place are editable on this tab
-- [ ] Start Finals with 2 or more alliances builds the Bracket in list order, resets the Podium reveal, and switches to Finals
-- [ ] Start Finals with fewer than 2 alliances leaves state unchanged and shows the explanatory error toast
-- [ ] A "Qualification Round isn't finished" notice appears while Qualification Matches remain
-- [ ] The Finals tab has no setup UI, and shows the empty-state message when there's no Bracket
-- [ ] The "Qualification Round complete" card's button reads **On to Alliance Selection →** and goes to that tab
-- [ ] The per-number seed map, the seed-setting action, and Auto-fill Seeds are removed, and their tests replaced. A saved Tournament that still has the old seed map loads without error
-- [ ] Unit tests cover the Captain query, the row statuses, alliance reordering, the Start Finals rules, and the block-reason query. DOM tests cover the tab flow end to end
-- [ ] `npm run test:coverage` in `web/` passes
+- [x] The tab order is Teams | Schedule & Standings | Alliance Selection | Finals | Results
+- [x] The Captain is the highest-ranked Team in Standings not in a Playoff Alliance, using the same Standings computation as the Standings tab
+- [x] Rows render as in-alliance (grayed, "Alliance N"), Captain (highlighted), or available (with a Pick button)
+- [x] Pick forms an alliance of the Captain and the chosen Team, briefly highlights it in the list, and advances the Captain
+- [x] The alliance list is in Seed order. ↑/↓ reorders it and Remove deletes an alliance, and the Captain is recomputed
+- [x] Bracket Size and Third-Place are editable on this tab
+- [x] Start Finals with 2 or more alliances builds the Bracket in list order, resets the Podium reveal, and switches to Finals
+- [x] Start Finals with fewer than 2 alliances leaves state unchanged and shows the explanatory error toast
+- [x] A "Qualification Round isn't finished" notice appears while Qualification Matches remain
+- [x] The Finals tab has no setup UI, and shows the empty-state message when there's no Bracket
+- [x] The "Qualification Round complete" card's button reads **On to Alliance Selection →** and goes to that tab
+- [x] The per-number seed map, the seed-setting action, and Auto-fill Seeds are removed, and their tests replaced. A saved Tournament that still has the old seed map loads without error
+- [x] Unit tests cover the Captain query, the row statuses, alliance reordering, the Start Finals rules, and the block-reason query. DOM tests cover the tab flow end to end
+- [x] `npm run test:coverage` in `web/` passes

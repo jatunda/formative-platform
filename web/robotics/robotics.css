@@ -193,6 +193,7 @@ body {
 .robotics-tab-btn[data-tab-key="teams"]::before { content: '👥'; }
 .robotics-tab-btn[data-tab-key="schedule"]::before { content: '📅'; }
 .robotics-tab-btn[data-tab-key="standings"]::before { content: '📊'; }
+.robotics-tab-btn[data-tab-key="alliance-selection"]::before { content: '🤝'; }
 .robotics-tab-btn[data-tab-key="finals"]::before { content: '🏆'; }
 .robotics-tab-btn[data-tab-key="results"]::before { content: '🏅'; }
 
@@ -476,9 +477,8 @@ body {
   }
 }
 
-/* Collapsible accordion: a title button (with an optional one-line summary)
-   that opens a panel in place. Shared by the Match Timeline and the Finals
-   tab's Playoff Setup. */
+/* Collapsible accordion: a title button that opens a panel in place (the
+   Match Timeline). */
 .robotics-accordion {
   padding: var(--spacing-sm) var(--spacing-lg);
 }
@@ -534,17 +534,9 @@ body {
   letter-spacing: 0.06em;
 }
 
-/* Wraps rather than truncates: in a narrow column an ellipsis would hide the end of the summary. */
-.robotics-accordion-summary {
-  color: var(--arena-text-muted);
-  font-size: 0.875rem;
-  font-variant-numeric: tabular-nums;
-}
-
-/* Every accordion panel (Match Timeline, Finals Playoff Setup) sets its own
-   display: grid, so hiding it needs higher specificity than that — true of
-   any panel-specific class, hence one shared override here rather than one
-   per variant. */
+/* An accordion panel sets its own display: grid, so hiding it needs higher
+   specificity than that — true of any panel-specific class, hence one shared
+   override here rather than one per variant. */
 .robotics-accordion-panel[hidden] {
   display: none;
 }
@@ -611,38 +603,115 @@ body {
 .robotics-teams-roster { grid-area: roster; }
 .robotics-teams-settings { grid-area: settings; }
 
-/* Finals: the setup cards stack on narrow screens and share an auto-fit row on
-   wide ones; the bracket follows at full width. */
-.robotics-finals-setup {
+/* Alliance Selection: Standings (with whose turn it is) as the main column; Bracket
+   settings, the alliance list, and Start Finals beside it on wide screens (see
+   Responsive), below it on narrow ones. */
+.robotics-selection-layout,
+.robotics-selection-main,
+.robotics-selection-side {
   display: grid;
   gap: var(--spacing-lg);
-  align-items: start;
+  align-content: start;
 }
 
-.robotics-finals-setup > * {
+.robotics-selection-layout > *,
+.robotics-selection-side > * {
   min-width: 0;
 }
 
-/* A setup card can be a single settings column wide, where spanning two would
-   add an implicit column and push the card past its edge. */
-.robotics-finals-setup .robotics-settings-grid > .robotics-checkbox-field {
-  grid-column: 1 / -1;
-}
-
-/* Team A / Team B selects share the card's width instead of shrinking to fit. */
-.robotics-finals-setup .robotics-form-row > .robotics-field {
-  flex: 1 1 140px;
-}
-
-/* Playoff Setup accordion: Form a Playoff Alliance, Playoff Alliances, and
-   Bracket Configuration collapse into one summary line so the Elimination
-   Bracket is the dominant content on the tab once setup is done. */
-.robotics-finals-accordion-panel {
+/* A narrow column, so the Bracket settings simply stack. */
+.robotics-selection-settings {
   display: grid;
-  gap: var(--spacing-lg);
-  margin-top: var(--spacing-sm);
-  padding-top: var(--spacing-sm);
-  border-top: 1px solid var(--arena-border);
+  gap: var(--spacing-md);
+}
+
+.robotics-selection-notice {
+  margin: 0;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 1px solid var(--arena-border);
+  border-left: 4px solid var(--arena-accent);
+  border-radius: var(--radius-lg);
+  color: var(--arena-text-muted);
+}
+
+.robotics-selection-banner {
+  padding: var(--spacing-md) var(--spacing-lg);
+  border: 1px solid var(--arena-live);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--arena-glow), var(--arena-shadow);
+  font-family: var(--arena-font-display);
+  font-size: clamp(1.5rem, 2.6vw, 2.25rem);
+  text-align: center;
+}
+
+.robotics-selection-row.is-in-alliance {
+  opacity: 0.45;
+}
+
+.robotics-selection-row.is-captain {
+  background-color: var(--arena-blue-soft);
+  box-shadow: inset 4px 0 0 var(--arena-live);
+}
+
+.robotics-selection-tag {
+  color: var(--arena-text-muted);
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.robotics-selection-tag.is-captain {
+  color: var(--arena-text);
+  font-weight: 700;
+}
+
+.robotics-selection-alliances {
+  display: grid;
+  gap: var(--spacing-sm);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.robotics-selection-alliance {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm);
+  border-radius: var(--radius-lg);
+}
+
+.robotics-selection-seed {
+  color: var(--arena-text-muted);
+  font-family: var(--arena-font-display);
+  white-space: nowrap;
+}
+
+.robotics-selection-alliance-teams {
+  flex: 1 1 8rem;
+  min-width: 0;
+}
+
+.robotics-selection-alliance-actions {
+  display: flex;
+  gap: var(--spacing-xs);
+}
+
+/* The alliance a Pick just formed flashes once, so the class notices it. */
+.robotics-selection-alliance.is-new {
+  animation: robotics-new-alliance 1.6s ease-out;
+}
+
+@keyframes robotics-new-alliance {
+  0%, 30% { background-color: var(--arena-blue-soft); box-shadow: 0 0 0 2px var(--arena-live); }
+  100% { background-color: transparent; box-shadow: 0 0 0 2px transparent; }
+}
+
+.robotics-start-finals-btn {
+  font-family: var(--arena-font-display);
+  font-size: 1.25rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .robotics-card {
@@ -1515,7 +1584,8 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .robotics-podium-block.is-rising .robotics-podium-reveal {
+  .robotics-podium-block.is-rising .robotics-podium-reveal,
+  .robotics-selection-alliance.is-new {
     animation: none;
   }
 
@@ -1715,8 +1785,9 @@ body {
     flex-basis: 100%;
   }
 
-  .robotics-finals-setup {
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  .robotics-selection-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 28%);
+    align-items: start;
   }
 }
 
