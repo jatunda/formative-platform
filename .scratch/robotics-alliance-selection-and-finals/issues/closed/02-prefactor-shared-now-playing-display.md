@@ -11,10 +11,10 @@ Spec: `.scratch/robotics-alliance-selection-and-finals/spec.md`, "Shared Now Pla
 
 **Blocked by:** None (can start immediately).
 
-**Status:** ready-for-agent
+**Status:** closed
 
-- [ ] The Now Playing display no longer depends directly on Qualification-specific state or actions. Everything Qualification-specific is passed in by the Schedule & Standings tab
-- [ ] The phase-complete card is generic: message, button label, and destination are passed in
-- [ ] The Schedule & Standings tab looks and behaves exactly as before
-- [ ] Existing Qualification Now Playing tests pass unchanged
-- [ ] `npm run test:coverage` in `web/` passes
+- [x] The Now Playing display no longer depends directly on Qualification-specific state or actions. Everything Qualification-specific is passed in by the Schedule & Standings tab
+- [x] The phase-complete card is generic: message, button label, and destination are passed in
+- [x] The Schedule & Standings tab looks and behaves exactly as before
+- [x] Existing Qualification Now Playing tests pass unchanged
+- [x] `npm run test:coverage` in `web/` passes
