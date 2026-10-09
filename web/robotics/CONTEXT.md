@@ -47,9 +47,16 @@ The points value recorded for one Match Alliance (or Playoff Alliance) within on
 
 **Standings**:
 Teams ranked from completed Qualification Matches, using one of two modes depending on whether every Team that has played at least one Qualification Match has played the same number of them (a Team with zero Qualification Matches played doesn't count toward that check):
-- *Even match counts*: ranked by win/loss record, with ties broken by cumulative Score — today's behavior, since raw totals are already fair when every Team has played the same number of matches.
-- *Uneven match counts* (see Pairing Draw — the teacher can choose to proceed with an uneven split): ranked by win percentage, with ties broken by average Score per Qualification Match, since raw totals would otherwise favor whichever Team played more.
+- *Even match counts*: ranked by Win Points, with ties broken by cumulative Score — raw totals are already fair when every Team has played the same number of matches.
+- *Uneven match counts* (see Pairing Draw — the teacher can choose to proceed with an uneven split): ranked by win percentage, where a Tie counts as half a win, with ties broken by average Score per Qualification Match, since raw totals would otherwise favor whichever Team played more.
+Each Team's record is shown as W-L-T.
 Meaningful only for the Qualification Round — the Elimination Bracket uses Seeds, not Standings, once it begins.
+
+**Tie**:
+A completed Match whose two Scores are equal. In a Qualification Match, each Team on both sides records a Tie, worth half a win, unless it was a No-Show, which is still a loss. In an Elimination Match, a Tie leaves the Match undecided: no Playoff Alliance advances until the Score is changed.
+
+**Win Points**:
+A Team's Standings value in even-match-count mode: 2 per win, 1 per Tie, 0 per loss, following VEX convention.
 
 **Match Timeline**:
 The tournament-wide timing configuration used to compute every Match's Match Time, in one of two modes:
@@ -65,32 +72,41 @@ The computed scheduled time for one Qualification Match or Elimination Match, de
 How many Matches run concurrently per time slot. Set once per Tournament and not changed mid-Tournament; feeds only the Match Timeline's calculations, and never restricts which Match can be marked complete or edited.
 
 **Current Match**:
-The Qualification Match spotlighted in the live Qualification Round view: always the Inferred Current Match. There is no way to override which match is current other than reordering the schedule itself (see Qualification Match).
+The Match spotlighted in the live view of whichever phase is running. In the Qualification Round, always the Inferred Current Match. There is no way to override which Qualification Match is current other than reordering the schedule itself (see Qualification Match). In the Elimination Bracket, the first undecided Elimination Match in bracket order: by round, then slot, with the Third-Place Match before the Final, skipping Byes. A completed Tie stays Current until its Score is changed.
 
 **Inferred Current Match**:
-The definition behind Current Match: the first not-yet-complete Qualification Match in schedule order. The teacher controls which match this lands on by manually reordering not-yet-complete Qualification Matches, rather than by any separate override.
+The definition behind the Qualification Round's Current Match: the first not-yet-complete Qualification Match in schedule order. The teacher controls which match this lands on by manually reordering not-yet-complete Qualification Matches, rather than by any separate override.
 
 **Up Next**:
-The first not-yet-complete Qualification Match after the Current Match, in schedule order.
+The Match after the Current Match in the same phase. In the Qualification Round, the first not-yet-complete Qualification Match after it in schedule order. In the Elimination Bracket, the next undecided Elimination Match in bracket order. A side not known yet is shown as the Match whose winner will fill it.
 
 **Alliance Selection**:
-The teacher manually forming Playoff Alliances once the Qualification Round ends, by typing in which two Teams form each Alliance.
-_Avoid_: auto-pairing, seeding alliances — Playoff Alliances are always formed by explicit teacher choice, never derived automatically from Standings.
+The step after the Qualification Round in which Playoff Alliances are formed, in turns. On each turn, the Alliance Captain picks a partner from the available Teams. The class sees the full Standings throughout, with Teams already in a Playoff Alliance grayed out. The teacher records every pick and can override the Alliance Captain, or a Decline, at any time. Alliance Selection ends once Bracket Size Playoff Alliances have formed. Teams left without a Playoff Alliance at that point don't advance to the Elimination Bracket. It may begin before every Qualification Match is complete, but then Standings, and so the Alliance Captain, can still change.
+_Avoid_: auto-pairing. Playoff Alliances always come from picks the teacher records, never generated from Standings alone.
+
+**Alliance Captain**:
+The Team whose turn it is to pick during Alliance Selection: by default, the highest-ranked Team in Standings that is not yet in a Playoff Alliance. A Team that has Declined can still become an Alliance Captain.
+
+**Decline**:
+An invited Team refusing to join an Alliance Captain's Playoff Alliance. A Team that has Declined can't be picked as a partner by any Alliance Captain, unless the teacher overrides it.
 
 **Playoff Alliance**:
 A pairing of two Teams formed once via Alliance Selection, fixed for the remainder of the Tournament. Distinct from Match Alliance (above) — a Playoff Alliance persists across every Elimination Match it plays. Normally two distinct Teams, but the teacher can confirm forming a single-Team Playoff Alliance (e.g. when a Team has no partner left) — it plays alone, with no partner Team sharing its Score.
 
 **Elimination Bracket**:
-The single-elimination bracket of Playoff Alliances played after Alliance Selection. Fixed once generated — Bracket Slots are not reseeded between rounds.
+The single-elimination bracket of Playoff Alliances played after Alliance Selection. Fixed once generated — Bracket Slots are not reseeded between rounds. While a Bracket exists, Alliance Selection is locked: no picks, Declines, removals, or Seed changes until the Bracket is discarded.
+
+**Discard Bracket**:
+The action that deletes the Elimination Bracket and its results, unlocking Alliance Selection. Playoff Alliances, Declines, and Seeds are kept. Requires confirming a dialog that names any recorded Elimination Match results that will be lost.
 
 **Bracket Size**:
-The number of Playoff Alliances the teacher chooses to enter into the Elimination Bracket — any positive integer, not restricted to a power of two.
+The number of Playoff Alliances the teacher chooses to enter into the Elimination Bracket — any positive integer, not restricted to a power of two. Also the number of Playoff Alliances that Alliance Selection forms before it ends. Prefilled from the Estimated Bracket Size but set independently of it. If the Finals start with fewer Playoff Alliances formed, Bracket Size shrinks to match.
 
 **Bracket Slot**:
 One seeded position within the Elimination Bracket. If Bracket Size isn't a power of two, the bracket pads to the next power of two, with the extra Bracket Slots resolved as Byes for the top Seeds.
 
 **Seed**:
-The rank-order position assigned to a Playoff Alliance within the Elimination Bracket. Auto-filled from Standings by default, but every Bracket Slot's Seed is manually overridable.
+The rank-order position assigned to a Playoff Alliance within the Elimination Bracket. By default, Seeds follow the order the Playoff Alliances were formed in during Alliance Selection (the first one formed is Seed 1), but every Bracket Slot's Seed is manually overridable.
 
 **Bye**:
 An automatic advancement past Round 1 of the Elimination Bracket, given to a top Seed when Bracket Size is padded to the next power of two.
@@ -112,7 +128,7 @@ _Avoid_: Standings for this — Standings are Qualification Round rankings only.
 How far the Tournament is running behind (or ahead of) the Match Timeline: the gap between the current wall-clock time and the Current Match's Match Time. Display-only — it never changes Match Times (Recalculating the Match Timeline does that).
 
 **Reset Results**:
-The action that clears the Qualification Round, all Match results, and the Elimination Bracket, while preserving the Team roster. Re-enables the Pairing Draw. Requires confirming a dialog (naming what is cleared and that the Team roster is kept) before it takes effect.
+The action that clears the Qualification Round, all Match results, Alliance Selection (Playoff Alliances and Declines), and the Elimination Bracket, while preserving the Team roster. Re-enables the Pairing Draw. Requires confirming a dialog (naming what is cleared and that the Team roster is kept) before it takes effect.
 
 **New Tournament**:
 The action that clears everything — Team roster included — starting completely over. Requires confirming a dialog (making clear the Team roster is also discarded) before it takes effect.
