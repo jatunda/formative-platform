@@ -476,8 +476,9 @@ body {
   }
 }
 
-/* Collapsible accordion: a one-line summary button that opens a panel in
-   place. Shared by the Match Timeline and the Finals tab's Playoff Setup. */
+/* Collapsible accordion: a title button (with an optional one-line summary)
+   that opens a panel in place. Shared by the Match Timeline and the Finals
+   tab's Playoff Setup. */
 .robotics-accordion {
   padding: var(--spacing-sm) var(--spacing-lg);
 }
@@ -546,6 +547,16 @@ body {
    per variant. */
 .robotics-accordion-panel[hidden] {
   display: none;
+}
+
+/* Folded Match Timeline: a slim, title-only row, so the full Standings below
+   it fit in the sidebar without scrolling. */
+.robotics-accordion.robotics-timeline:not(.is-expanded) {
+  padding: var(--spacing-xs) var(--spacing-lg);
+}
+
+.robotics-timeline:not(.is-expanded) .robotics-accordion-toggle {
+  padding: 0;
 }
 
 /* Match Timeline: the controls shown once the accordion above is expanded. */
@@ -1203,6 +1214,11 @@ body {
   border-collapse: collapse;
   font-size: 1rem;
   font-variant-numeric: tabular-nums;
+}
+
+/* One line per Team on the projector, however narrow the sidebar gets. */
+.robotics-record-cell {
+  white-space: nowrap;
 }
 
 .robotics-rank-cell {

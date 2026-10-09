@@ -9,13 +9,13 @@ const teams = [
 describe('exportStandingsMarkdown', () => {
   it('renders a markdown table with rank, team, record, and points', () => {
     const standings = [
-      { teamId: 't1', wins: 2, losses: 0, points: 120 },
-      { teamId: 't2', wins: 0, losses: 2, points: 40 },
+      { teamId: 't1', wins: 2, losses: 0, ties: 1, points: 120 },
+      { teamId: 't2', wins: 0, losses: 2, ties: 1, points: 40 },
     ];
     const md = exportStandingsMarkdown(standings, teams);
-    expect(md).toContain('| Rank | Team | W-L | Points |');
-    expect(md).toContain('| 1 | Alpha | 2-0 | 120 |');
-    expect(md).toContain('| 2 | Bravo | 0-2 | 40 |');
+    expect(md).toContain('| Rank | Team | W-L-T | Points |');
+    expect(md).toContain('| 1 | Alpha | 2-0-1 | 120 |');
+    expect(md).toContain('| 2 | Bravo | 0-2-1 | 40 |');
   });
 });
 

@@ -1,3 +1,5 @@
+import { formatRecord } from './standings.js';
+
 function teamName(teams, teamId) {
   return teams.find((t) => t.id === teamId)?.name ?? teamId;
 }
@@ -7,15 +9,15 @@ function allianceLabel(teams, teamIds) {
 }
 
 /**
- * Render Standings as a markdown table: rank, team, win-loss record, points.
- * @param {{teamId: string, wins: number, losses: number, points: number}[]} standings
+ * Render Standings as a markdown table: rank, team, win-loss-tie record, points.
+ * @param {{teamId: string, wins: number, losses: number, ties: number, points: number}[]} standings
  * @param {{id: string, name: string}[]} teams
  * @returns {string}
  */
 export function exportStandingsMarkdown(standings, teams) {
-  const lines = ['| Rank | Team | W-L | Points |', '| --- | --- | --- | --- |'];
+  const lines = ['| Rank | Team | W-L-T | Points |', '| --- | --- | --- | --- |'];
   standings.forEach((entry, index) => {
-    lines.push(`| ${index + 1} | ${teamName(teams, entry.teamId)} | ${entry.wins}-${entry.losses} | ${entry.points} |`);
+    lines.push(`| ${index + 1} | ${teamName(teams, entry.teamId)} | ${formatRecord(entry)} | ${entry.points} |`);
   });
   return lines.join('\n');
 }

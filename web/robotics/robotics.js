@@ -36,13 +36,12 @@ import {
   computeMatchTime,
   computeTotalDurationMinutes,
   computeStartTimeFromEndTime,
-  formatTimelineSummary,
   matchField,
   getScheduledMatchCount,
   timeOfDayInputValue,
   timeOfDayToEpochMs,
 } from './match-timeline.js';
-import { computeStandings } from './standings.js';
+import { computeStandings, formatRecord } from './standings.js';
 import { resolveMatchSides, getMatchWinner, isBracketComplete, countUndecidedMatches, getPlacements, formatFinalsSetupSummary } from './bracket.js';
 import { bracketColumnSpacerGrowRatios } from './bracket-layout.js';
 import { launchConfetti } from './confetti.js';
@@ -542,7 +541,8 @@ function renderTimelineControls(state, dispatch) {
 }
 
 /**
- * A collapsible card: a one-line summary that toggles a panel open in place.
+ * A collapsible card: a title row (plus an optional one-line summary) that
+ * toggles a panel open in place.
  * Toggling only flips the DOM (keeping focus on the button, not losing it to a
  * re-render) and reports the choice via onToggle so the caller can persist it.
  * Shared by the Match Timeline and the Finals tab's setup section.
@@ -567,7 +567,7 @@ function renderAccordion({ variant, title, summary, panel, expanded, onToggle })
     el('span', { className: 'robotics-accordion-chevron', 'aria-hidden': 'true' }, ['▸']),
     el('span', { className: 'robotics-accordion-heading' }, [
       el('span', { className: 'robotics-accordion-title' }, [title]),
-      el('span', { className: 'robotics-accordion-summary' }, [summary]),
+      ...(summary ? [el('span', { className: 'robotics-accordion-summary' }, [summary])] : []),
     ]),
   ]);
   // Accordion pattern: the heading wraps the button (a button may not contain a heading).
@@ -581,9 +581,6 @@ function renderMatchTimeline(state, dispatch, { expanded, onToggle }) {
   return renderAccordion({
     variant: 'timeline',
     title: 'Match Timeline',
-    summary: formatTimelineSummary(state.timeline, getScheduledMatchCount(
-      state.qualification.matches.length, state.elimination.bracket, state.timeline.estimatedBracketSize, state.timeline.estimatedThirdPlace,
-    ), formatClock),
     panel,
     expanded,
     onToggle,
@@ -750,8 +747,8 @@ export function renderStandingsTab(state) {
       ]));
     }
     const headers = isRateMode
-      ? ['Rank', 'Team', 'W-L', 'Win %', 'Avg Pts/Match']
-      : ['Rank', 'Team', 'W-L', 'Points'];
+      ? ['Rank', 'Team', 'W-L-T', 'Win %', 'Avg Pts/Match']
+      : ['Rank', 'Team', 'W-L-T', 'Points'];
     const table = el('table', { className: 'robotics-table' });
     table.appendChild(el('thead', {}, [
       el('tr', {}, headers.map((h) => el('th', {}, [h]))),
@@ -762,7 +759,7 @@ export function renderStandingsTab(state) {
       const cells = [
         el('td', { className: 'robotics-rank-cell' }, [String(i + 1)]),
         el('td', {}, renderStandingsTeamCell(team)),
-        el('td', {}, [`${entry.wins}-${entry.losses}`]),
+        el('td', { className: 'robotics-record-cell' }, [formatRecord(entry)]),
       ];
       if (isRateMode) {
         cells.push(el('td', {}, [`${Math.round(entry.winRate * 100)}%`]));

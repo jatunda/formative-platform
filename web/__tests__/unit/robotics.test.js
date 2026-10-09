@@ -1121,7 +1121,7 @@ describe('initRoboticsApp', () => {
       app.setActiveTab('schedule');
       const freshRoot = document.getElementById('roboticsApp');
       const headers = [...freshRoot.querySelectorAll('table thead th')].map((th) => th.textContent);
-      expect(headers).toEqual(['Rank', 'Team', 'W-L', 'Points']);
+      expect(headers).toEqual(['Rank', 'Team', 'W-L-T', 'Points']);
       expect(freshRoot.querySelector('.robotics-standings-note')).toBeFalsy();
     });
 
@@ -1137,8 +1137,23 @@ describe('initRoboticsApp', () => {
       app.setActiveTab('schedule');
       const freshRoot = document.getElementById('roboticsApp');
       const headers = [...freshRoot.querySelectorAll('table thead th')].map((th) => th.textContent);
-      expect(headers).toEqual(['Rank', 'Team', 'W-L', 'Win %', 'Avg Pts/Match']);
+      expect(headers).toEqual(['Rank', 'Team', 'W-L-T', 'Win %', 'Avg Pts/Match']);
       expect(freshRoot.querySelector('.robotics-standings-note')).toBeTruthy();
+    });
+
+    it('shows each record as W-L-T in a cell that never wraps', () => {
+      const app = initRoboticsApp();
+      const root = document.getElementById('roboticsApp');
+      ['Alpha', 'Bravo', 'Charlie', 'Delta'].forEach((name) => addTeamViaForm(root, name));
+      app.dispatch((s) => setMatchesPerTeam(s, 2));
+      app.dispatch((s) => regenerateMatchups(s));
+      app.dispatch((s) => recordQualificationResult(s, 0, { scoreA: 10, scoreB: 5 }));
+      app.dispatch((s) => recordQualificationResult(s, 1, { scoreA: 7, scoreB: 7 }));
+      app.setActiveTab('schedule');
+      const recordCells = [...document.querySelectorAll('#roboticsApp table tbody tr td:nth-child(3)')];
+      // Every Team played both matches: the winners of match 1 go 1-0-1, the losers 0-1-1.
+      expect(recordCells.map((td) => td.textContent).sort()).toEqual(['0-1-1', '0-1-1', '1-0-1', '1-0-1']);
+      expect(recordCells.every((td) => td.classList.contains('robotics-record-cell'))).toBe(true);
     });
 
     it('shows Members as a muted subline under the team name, omitted when a team has no Members', () => {
@@ -1435,28 +1450,18 @@ describe('initRoboticsApp', () => {
     const toggle = () => document.querySelector('.robotics-timeline .robotics-accordion-toggle');
     const panel = () => document.getElementById(toggle().getAttribute('aria-controls'));
 
-    it('is collapsed by default into a one-line summary of the current configuration', () => {
+    it('is collapsed by default into a slim, title-only row with no summary', () => {
       openScheduleWithMatches();
       expect(toggle().tagName).toBe('BUTTON');
       expect(toggle().getAttribute('type')).toBe('button');
       expect(toggle().parentElement.tagName).toBe('H3');
       expect(toggle().getAttribute('aria-expanded')).toBe('false');
       expect(panel().hidden).toBe(true);
-      expect(document.querySelector('.robotics-timeline .robotics-accordion-summary').textContent)
-        .toBe('Forward · no start time · 4 + 1 min · 1 field');
+      expect(toggle().textContent).toBe('▸Match Timeline');
+      expect(document.querySelector('.robotics-timeline .robotics-accordion-summary')).toBeNull();
     });
 
-    it('summarises the applied start time with a projected end time', async () => {
-      const app = openScheduleWithMatches();
-      const start = new Date();
-      start.setHours(13, 0, 0, 0);
-      app.dispatch((s) => setTimelineConfig(s, { startTime: start.getTime(), fieldCount: 2 }));
-      await flushRender();
-      const summary = document.querySelector('.robotics-timeline .robotics-accordion-summary').textContent;
-      expect(summary).toMatch(/^Forward · starts .+ · 4 \+ 1 min · 2 fields · ends ~.+$/);
-    });
-
-    it('expands and collapses in place when the summary is clicked', () => {
+    it('expands and collapses in place when the title row is clicked', () => {
       openScheduleWithMatches();
       const btn = toggle();
       btn.click();
