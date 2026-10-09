@@ -19,6 +19,7 @@ import {
   removePlayoffAlliance,
   setBracketConfig,
   movePlayoffAlliance,
+  declineTeam,
   startFinals,
   recordEliminationResult,
   setEliminationNoShow,
@@ -460,6 +461,26 @@ describe('elimination results', () => {
     expect(setEliminationDraftScore(state, 'any-id', 'scoreA', 1)).toBe(state);
     expect(() => setEliminationNoShow(state, 'any-id', 'team-1', true)).not.toThrow();
     expect(setEliminationNoShow(state, 'any-id', 'team-1', true)).toBe(state);
+  });
+});
+
+describe('resetting Declines', () => {
+  function withAllianceAndDecline() {
+    let state = withFourTeams(createInitialState());
+    const [a, b, c] = state.teams.map((t) => t.id);
+    state = formPlayoffAlliance(state, a, b);
+    return declineTeam(state, c);
+  }
+
+  it('Reset Results clears alliances and Declines, and keeps the roster', () => {
+    const state = resetResults(withAllianceAndDecline());
+    expect(state.elimination.alliances).toEqual([]);
+    expect(state.elimination.declinedTeamIds).toEqual([]);
+    expect(state.teams).toHaveLength(4);
+  });
+
+  it('New Tournament clears Declines along with everything else', () => {
+    expect(newTournament(withAllianceAndDecline()).elimination.declinedTeamIds).toEqual([]);
   });
 });
 

@@ -12,8 +12,17 @@ function allianceNumberOf(state, teamId) {
 }
 
 /**
+ * The Teams that have Declined; each Decline counts against every Alliance Captain until Undo.
+ * Tournaments saved before Declines existed have no `declinedTeamIds`, read as none.
+ * @returns {string[]}
+ */
+export function getDeclinedTeamIds(state) {
+  return state.elimination.declinedTeamIds ?? [];
+}
+
+/**
  * The Alliance Captain: the highest-ranked Team in Standings (the same computation the
- * Standings tab uses) that is not yet in a Playoff Alliance.
+ * Standings tab uses) that is not yet in a Playoff Alliance. A Declined Team is eligible.
  * @returns {string|null} a Team id, or null when no Team is left to pick
  */
 export function getAllianceCaptain(state) {
@@ -22,19 +31,21 @@ export function getAllianceCaptain(state) {
 }
 
 /**
- * How one Team's row reads on the Alliance Selection tab.
- * @returns {{status: 'in-alliance', allianceNumber: number}|{status: 'captain'}|{status: 'available'}}
+ * How one Team's row reads on the Alliance Selection tab. A Declined Captain reads as the
+ * Captain, and a Declined Team that was picked anyway reads as in its alliance.
+ * @returns {{status: 'in-alliance', allianceNumber: number}|{status: 'captain'}|{status: 'declined'}|{status: 'available'}}
  */
 export function getSelectionRowStatus(state, teamId) {
   const allianceNumber = allianceNumberOf(state, teamId);
   if (allianceNumber) return { status: 'in-alliance', allianceNumber };
   if (teamId === getAllianceCaptain(state)) return { status: 'captain' };
+  if (getDeclinedTeamIds(state).includes(teamId)) return { status: 'declined' };
   return { status: 'available' };
 }
 
 /**
  * Why an Alliance Selection action can't happen right now, as the toast to show, or null
- * when it's allowed. Actions: 'pick', 'move', 'remove', 'start-finals'.
+ * when it's allowed. Actions: 'pick', 'decline', 'undo-decline', 'move', 'remove', 'start-finals'.
  * @param {object} state
  * @param {string} action
  * @returns {string|null}

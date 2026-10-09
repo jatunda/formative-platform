@@ -1,6 +1,6 @@
 import { generateQualificationMatches } from './pairing-draw.js';
 import { buildBracket, isBracketComplete, getPlacements } from './bracket.js';
-import { getAllianceSelectionBlockReason } from './alliance-selection.js';
+import { getAllianceSelectionBlockReason, getDeclinedTeamIds } from './alliance-selection.js';
 
 let idCounter = 0;
 function generateId(prefix) {
@@ -69,6 +69,7 @@ export function createInitialState() {
       bracketSize: null,
       includeThirdPlace: true,
       alliances: [],
+      declinedTeamIds: [],
       bracket: null,
     },
     podium: {
@@ -219,6 +220,19 @@ export function removePlayoffAlliance(state, allianceId) {
   };
 }
 
+/** Records that teamId Declined; it then counts against every Alliance Captain until undoDecline. */
+export function declineTeam(state, teamId) {
+  const declinedTeamIds = getDeclinedTeamIds(state);
+  if (declinedTeamIds.includes(teamId)) return state;
+  return { ...state, elimination: { ...state.elimination, declinedTeamIds: [...declinedTeamIds, teamId] } };
+}
+
+/** Undo a Decline. */
+export function undoDecline(state, teamId) {
+  const declinedTeamIds = getDeclinedTeamIds(state).filter((id) => id !== teamId);
+  return { ...state, elimination: { ...state.elimination, declinedTeamIds } };
+}
+
 /**
  * Moves a Playoff Alliance one place up (direction -1) or down (+1) the list, changing
  * its Seed: alliance N in the list is Seed N. A no-op past either end or for an unknown id.
@@ -345,7 +359,7 @@ export function replayReveal(state) {
 
 // ---- Resets ----
 
-/** Reset Results: clears Qualification/Elimination state, keeps the Team roster. */
+/** Reset Results: clears Qualification/Elimination state (alliances and Declines included), keeps the Team roster. */
 export function resetResults(state) {
   const fresh = createInitialState();
   return { ...fresh, teams: state.teams };

@@ -11,13 +11,13 @@ Spec: `.scratch/robotics-alliance-selection-and-finals/spec.md`, user stories 16
 
 **Blocked by:** 03 (Alliance Selection tab).
 
-**Status:** ready-for-agent
+**Status:** closed
 
-- [ ] Tournament state records the Declined Teams. Saved Tournaments without this field load and behave as if no one has Declined
-- [ ] Decline and Undo actions exist. The row shows a "Declined" badge and an Undo button
-- [ ] Picking a Declined Team asks for confirmation first, and forms the alliance only if confirmed
-- [ ] A Declined Team can be the Alliance Captain, and the Captain highlight takes precedence over the Declined badge for highlighting
-- [ ] Removing an alliance doesn't clear any Decline
-- [ ] Reset Results clears Declines, and its confirm text mentions alliances and declines. New Tournament still clears everything
-- [ ] Unit tests cover decline/undo, Captain eligibility, and Reset Results. DOM tests cover the badge, Undo, and the override confirm
-- [ ] `npm run test:coverage` in `web/` passes
+- [x] Tournament state records the Declined Teams. Saved Tournaments without this field load and behave as if no one has Declined
+- [x] Decline and Undo actions exist. The row shows a "Declined" badge and an Undo button
+- [x] Picking a Declined Team asks for confirmation first, and forms the alliance only if confirmed
+- [x] A Declined Team can be the Alliance Captain, and the Captain highlight takes precedence over the Declined badge for highlighting
+- [x] Removing an alliance doesn't clear any Decline
+- [x] Reset Results clears Declines, and its confirm text mentions alliances and declines. New Tournament still clears everything
+- [x] Unit tests cover decline/undo, Captain eligibility, and Reset Results. DOM tests cover the badge, Undo, and the override confirm
+- [x] `npm run test:coverage` in `web/` passes

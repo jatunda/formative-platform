@@ -17,6 +17,8 @@ import {
   setTimelineConfig,
   formPlayoffAlliance,
   removePlayoffAlliance,
+  declineTeam,
+  undoDecline,
   movePlayoffAlliance,
   setBracketConfig,
   startFinals,
@@ -354,7 +356,7 @@ export function renderTeamsTab(state, dispatch) {
     onClick: () => {
       showConfirm({
         title: 'Reset Results?',
-        message: 'This clears the Qualification Round, all Match results, and the Elimination Bracket. The Team roster is kept.',
+        message: 'This clears the Qualification Round, all Match results, alliances and declines, and the Elimination Bracket. The Team roster is kept.',
         confirmLabel: 'Reset Results',
       }).then((confirmed) => {
         if (confirmed) dispatch((s) => resetResults(s));
@@ -881,7 +883,11 @@ function renderSelectionActionButton(state, action, { className, label, ariaLabe
   return btn;
 }
 
-/** The Standings with each row's Alliance Selection status: "Alliance N", the Captain, or a Pick button. */
+/**
+ * The Standings with each row's Alliance Selection status: "Alliance N", the Captain, or Pick
+ * and Declined buttons. A Declined row shows a badge, Pick (which asks before overriding the
+ * Decline), and Undo.
+ */
 function renderSelectionStandings(state, dispatch, captainId) {
   const card = el('div', { className: 'robotics-card robotics-selection-standings' });
   card.appendChild(el('h3', { className: 'robotics-card-title' }, ['Standings']));
@@ -896,20 +902,41 @@ function renderSelectionStandings(state, dispatch, captainId) {
     (s) => formPlayoffAlliance(s, captainId, partnerId),
     () => document.querySelector('.robotics-selection-alliance:last-child')?.classList.add('is-new'),
   );
+  const pickDeclined = (partnerId) => {
+    showConfirm({
+      title: 'Pick a Declined Team?',
+      message: `${teamName(state, partnerId)} declined earlier — pick anyway?`,
+      confirmLabel: 'Pick anyway',
+    }).then((confirmed) => {
+      if (confirmed) pick(partnerId);
+    });
+  };
+  const actionButton = (action, label, className, onAllowed) => renderSelectionActionButton(state, action, {
+    className: `robotics-btn ${className} robotics-btn-sm`,
+    label,
+    onAllowed,
+  });
   const rowStatuses = new Map(standings.map((entry) => [entry.teamId, getSelectionRowStatus(state, entry.teamId)]));
   const statusCell = (entry) => {
-    const rowStatus = rowStatuses.get(entry.teamId);
+    const { teamId } = entry;
+    const rowStatus = rowStatuses.get(teamId);
     if (rowStatus.status === 'in-alliance') {
       return el('span', { className: 'robotics-selection-tag' }, [`Alliance ${rowStatus.allianceNumber}`]);
     }
     if (rowStatus.status === 'captain') {
       return el('span', { className: 'robotics-selection-tag is-captain' }, ['Picking']);
     }
-    return renderSelectionActionButton(state, 'pick', {
-      className: 'robotics-btn robotics-btn-primary robotics-btn-sm',
-      label: 'Pick',
-      onAllowed: () => pick(entry.teamId),
-    });
+    if (rowStatus.status === 'declined') {
+      return el('span', { className: 'robotics-selection-actions' }, [
+        el('span', { className: 'robotics-selection-tag is-declined' }, ['Declined']),
+        actionButton('pick', 'Pick', 'robotics-btn-secondary', () => pickDeclined(teamId)),
+        actionButton('undo-decline', 'Undo', 'robotics-btn-ghost', () => dispatch((s) => undoDecline(s, teamId))),
+      ]);
+    }
+    return el('span', { className: 'robotics-selection-actions' }, [
+      actionButton('pick', 'Pick', 'robotics-btn-primary', () => pick(teamId)),
+      actionButton('decline', 'Declined', 'robotics-btn-ghost', () => dispatch((s) => declineTeam(s, teamId))),
+    ]);
   };
   renderStandingsTable(state, standings, {
     extraColumn: { header: 'Alliance', cell: statusCell },

@@ -1564,12 +1564,15 @@ describe('initRoboticsApp', () => {
     const banner = () => document.querySelector('.robotics-selection-banner').textContent;
     /** Row status class and last-cell text per Team name, in table order. */
     const rows = () => [...document.querySelectorAll('.robotics-selection-row')].map((tr) => {
-      const status = ['is-in-alliance', 'is-captain', 'is-available'].find((c) => tr.classList.contains(c));
+      const status = ['is-in-alliance', 'is-captain', 'is-declined', 'is-available'].find((c) => tr.classList.contains(c));
       return [tr.querySelector('.robotics-standings-team-name').textContent, status, tr.lastElementChild.textContent];
     });
-    const pickButton = (name) => [...document.querySelectorAll('.robotics-selection-row')]
-      .find((tr) => tr.querySelector('.robotics-standings-team-name').textContent === name)
-      .querySelector('button');
+    const rowButton = (name, label) => {
+      const row = [...document.querySelectorAll('.robotics-selection-row')]
+        .find((tr) => tr.querySelector('.robotics-standings-team-name').textContent === name);
+      return [...row.querySelectorAll('button')].find((b) => b.textContent === label);
+    };
+    const pickButton = (name) => rowButton(name, 'Pick');
     const allianceNames = (app) => app.getState().elimination.alliances.map((a) => a.teamIds.map((id) => teamName(app.getState(), id)).join(' & '));
 
     /** NAMES as the roster, with no matches played, so Standings keep roster order. */
@@ -1594,10 +1597,10 @@ describe('initRoboticsApp', () => {
       expect(headers).toEqual(['Rank', 'Team', 'W-L-T', 'Points', 'Alliance']);
       expect(rows()).toEqual([
         ['Alpha', 'is-captain', 'Picking'],
-        ['Bravo', 'is-available', 'Pick'],
-        ['Charlie', 'is-available', 'Pick'],
-        ['Delta', 'is-available', 'Pick'],
-        ['Echo', 'is-available', 'Pick'],
+        ['Bravo', 'is-available', 'PickDeclined'],
+        ['Charlie', 'is-available', 'PickDeclined'],
+        ['Delta', 'is-available', 'PickDeclined'],
+        ['Echo', 'is-available', 'PickDeclined'],
       ]);
     });
 
@@ -1612,8 +1615,8 @@ describe('initRoboticsApp', () => {
         ['Alpha', 'is-in-alliance', 'Alliance 1'],
         ['Bravo', 'is-captain', 'Picking'],
         ['Charlie', 'is-in-alliance', 'Alliance 1'],
-        ['Delta', 'is-available', 'Pick'],
-        ['Echo', 'is-available', 'Pick'],
+        ['Delta', 'is-available', 'PickDeclined'],
+        ['Echo', 'is-available', 'PickDeclined'],
       ]);
       const items = [...document.querySelectorAll('.robotics-selection-alliance')];
       expect(items.map((li) => li.textContent)).toEqual([expect.stringContaining('Alliance 1Alpha & Charlie')]);
@@ -1676,6 +1679,62 @@ describe('initRoboticsApp', () => {
 
       moveButtons('Move alliance down')[0].click();
       expect(allianceNames(app)).toEqual(['Alpha & Bravo', 'Charlie & Delta']);
+    });
+
+    it('Declined marks a Team with a badge and turns the button into Undo, which clears it', async () => {
+      const app = openSelection();
+      rowButton('Charlie', 'Declined').click();
+      expect(app.getState().elimination.declinedTeamIds).toEqual([app.getState().teams[2].id]);
+      await flushRender();
+      expect(rows()[2]).toEqual(['Charlie', 'is-declined', 'DeclinedPickUndo']);
+      expect(document.querySelector('.is-declined .robotics-selection-tag').textContent).toBe('Declined');
+
+      rowButton('Charlie', 'Undo').click();
+      expect(app.getState().elimination.declinedTeamIds).toEqual([]);
+      await flushRender();
+      expect(rows()[2]).toEqual(['Charlie', 'is-available', 'PickDeclined']);
+    });
+
+    it('picking a Declined Team asks first, and forms the alliance only once confirmed', async () => {
+      const app = openSelection();
+      rowButton('Charlie', 'Declined').click();
+      await flushRender();
+
+      pickButton('Charlie').click();
+      const dialog = root().querySelector('.robotics-confirm-dialog');
+      expect(dialog.textContent).toContain('Charlie declined earlier — pick anyway?');
+      await clickDialogButton(root(), 'Cancel');
+      expect(app.getState().elimination.alliances).toHaveLength(0);
+
+      pickButton('Charlie').click();
+      await clickDialogButton(root(), 'Pick anyway');
+      expect(allianceNames(app)).toEqual(['Alpha & Charlie']);
+      await flushRender();
+      expect(rows()[2]).toEqual(['Charlie', 'is-in-alliance', 'Alliance 1']);
+      expect(document.querySelector('.robotics-selection-alliance').classList.contains('is-new')).toBe(true);
+    });
+
+    it('a Declined Team can become Alliance Captain, highlighted as the Captain', async () => {
+      const app = openSelection();
+      rowButton('Bravo', 'Declined').click();
+      await flushRender();
+      pickButton('Charlie').click();
+      expect(allianceNames(app)).toEqual(['Alpha & Charlie']);
+      await flushRender();
+      expect(banner()).toBe('Bravo is picking');
+      expect(rows()[1]).toEqual(['Bravo', 'is-captain', 'Picking']);
+    });
+
+    it('keeps Declines when an alliance is removed', async () => {
+      const app = openSelection();
+      rowButton('Delta', 'Declined').click();
+      await flushRender();
+      pickButton('Bravo').click();
+      await flushRender();
+      clickButtonWithText(root(), 'Remove');
+      await flushRender();
+      expect(app.getState().elimination.alliances).toHaveLength(0);
+      expect(rows()[3]).toEqual(['Delta', 'is-declined', 'DeclinedPickUndo']);
     });
 
     it('Remove deletes an alliance and the Captain is recomputed', async () => {
@@ -2178,6 +2237,7 @@ describe('initRoboticsApp', () => {
       root = document.getElementById('roboticsApp');
       const dialog = root.querySelector('.robotics-confirm-dialog');
       expect(dialog.textContent).toContain('Qualification Round');
+      expect(dialog.textContent).toContain('alliances and declines');
       expect(dialog.textContent).toContain('Team roster is kept');
       expect(app.getState().qualification.matches.length).toBeGreaterThan(0);
 

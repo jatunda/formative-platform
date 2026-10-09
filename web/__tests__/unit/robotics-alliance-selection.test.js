@@ -12,6 +12,8 @@ import {
   recordQualificationResult,
   formPlayoffAlliance,
   removePlayoffAlliance,
+  declineTeam,
+  undoDecline,
 } from '../../robotics/state.js';
 import { computeStandings } from '../../robotics/standings.js';
 
@@ -90,6 +92,71 @@ describe('getSelectionRowStatus', () => {
   });
 });
 
+describe('Declines', () => {
+  /** Five Teams, no matches played, so Standings keep roster order and Alpha is the Captain. */
+  const fiveTeams = () => withTeams(['Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo']);
+
+  it('marks a Declined Team as declined, and Undo makes it available again', () => {
+    let s = fiveTeams();
+    const charlie = idOf(s, 'Charlie');
+    s = declineTeam(s, charlie);
+    expect(getSelectionRowStatus(s, charlie)).toEqual({ status: 'declined' });
+    s = undoDecline(s, charlie);
+    expect(getSelectionRowStatus(s, charlie)).toEqual({ status: 'available' });
+  });
+
+  it('declining twice records one Decline, so a single Undo clears it', () => {
+    let s = fiveTeams();
+    const charlie = idOf(s, 'Charlie');
+    s = declineTeam(declineTeam(s, charlie), charlie);
+    expect(getSelectionRowStatus(undoDecline(s, charlie), charlie)).toEqual({ status: 'available' });
+  });
+
+  it('counts against every later Captain, not just the one who invited', () => {
+    let s = fiveTeams();
+    const delta = idOf(s, 'Delta');
+    s = declineTeam(s, delta);
+    s = formPlayoffAlliance(s, idOf(s, 'Alpha'), idOf(s, 'Bravo'));
+    expect(getAllianceCaptain(s)).toBe(idOf(s, 'Charlie'));
+    expect(getSelectionRowStatus(s, delta)).toEqual({ status: 'declined' });
+  });
+
+  it('stays in place when an alliance is removed', () => {
+    let s = fiveTeams();
+    const charlie = idOf(s, 'Charlie');
+    s = declineTeam(s, charlie);
+    s = formPlayoffAlliance(s, idOf(s, 'Alpha'), idOf(s, 'Bravo'));
+    s = removePlayoffAlliance(s, s.elimination.alliances[0].id);
+    expect(getSelectionRowStatus(s, charlie)).toEqual({ status: 'declined' });
+  });
+
+  it('a Declined Team can still become Alliance Captain, and the Captain status wins', () => {
+    let s = fiveTeams();
+    const alpha = idOf(s, 'Alpha');
+    s = declineTeam(s, alpha);
+    expect(getAllianceCaptain(s)).toBe(alpha);
+    expect(getSelectionRowStatus(s, alpha)).toEqual({ status: 'captain' });
+  });
+
+  it('a Team in an alliance reads as in-alliance even if it Declined earlier', () => {
+    let s = fiveTeams();
+    const charlie = idOf(s, 'Charlie');
+    s = declineTeam(s, charlie);
+    s = formPlayoffAlliance(s, idOf(s, 'Alpha'), charlie);
+    expect(getSelectionRowStatus(s, charlie)).toEqual({ status: 'in-alliance', allianceNumber: 1 });
+  });
+
+  it('treats a Tournament saved before Declines existed as having none', () => {
+    const s = fiveTeams();
+    const { declinedTeamIds, ...elimination } = s.elimination;
+    const saved = { ...s, elimination };
+    const charlie = idOf(s, 'Charlie');
+    expect(getSelectionRowStatus(saved, charlie)).toEqual({ status: 'available' });
+    expect(getSelectionRowStatus(undoDecline(saved, charlie), charlie)).toEqual({ status: 'available' });
+    expect(getSelectionRowStatus(declineTeam(saved, charlie), charlie)).toEqual({ status: 'declined' });
+  });
+});
+
 describe('getAllianceSelectionBlockReason', () => {
   const START_FINALS_MESSAGE = 'Form at least 2 alliances before starting the Finals.';
 
@@ -109,7 +176,7 @@ describe('getAllianceSelectionBlockReason', () => {
 
   it('allows every other action for now', () => {
     const s = createInitialState();
-    for (const action of ['pick', 'move', 'remove']) {
+    for (const action of ['pick', 'move', 'remove', 'decline', 'undo-decline']) {
       expect(getAllianceSelectionBlockReason(s, action)).toBeNull();
     }
   });

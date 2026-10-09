@@ -664,6 +664,23 @@ body {
   font-weight: 700;
 }
 
+.robotics-selection-tag.is-declined {
+  padding: 2px var(--spacing-sm);
+  border-radius: var(--radius-sm);
+  background-color: var(--arena-red-soft);
+  color: var(--arena-danger);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.robotics-selection-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  white-space: nowrap;
+}
+
 .robotics-selection-alliances {
   display: grid;
   gap: var(--spacing-sm);
