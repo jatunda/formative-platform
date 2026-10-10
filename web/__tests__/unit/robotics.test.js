@@ -1561,7 +1561,13 @@ describe('initRoboticsApp', () => {
   describe('alliance selection tab', () => {
     const NAMES = ['Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo'];
     const root = () => document.getElementById('roboticsApp');
-    const banner = () => document.querySelector('.robotics-selection-banner').textContent;
+    const banner = () => document.querySelector('.robotics-selection-banner-text').textContent;
+    const captainSelect = () => document.querySelector('select[aria-label="Change Alliance Captain"]');
+    const chooseCaptain = (name) => {
+      const select = captainSelect();
+      select.value = [...select.options].find((o) => o.textContent === name).value;
+      select.dispatchEvent(new Event('change'));
+    };
     /** Row status class and last-cell text per Team name, in table order. */
     const rows = () => [...document.querySelectorAll('.robotics-selection-row')].map((tr) => {
       const status = ['is-in-alliance', 'is-captain', 'is-declined', 'is-available'].find((c) => tr.classList.contains(c));
@@ -1627,7 +1633,7 @@ describe('initRoboticsApp', () => {
       const [first, second] = document.querySelectorAll('.robotics-selection-alliance');
       expect(first.classList.contains('is-new')).toBe(false);
       expect(second.classList.contains('is-new')).toBe(true);
-      expect(banner()).toBe('Delta is picking');
+      expect(banner()).toBe('Delta is the last Team — no partners left');
     });
 
     it('says no Team is left to pick once every Team is in an alliance', async () => {
@@ -1746,6 +1752,85 @@ describe('initRoboticsApp', () => {
       expect(app.getState().elimination.alliances).toHaveLength(0);
       await flushRender();
       expect(banner()).toBe('Alpha is picking');
+    });
+
+    it('change ▾ makes another available Team the Captain for this turn, and the highlight follows', async () => {
+      const app = openSelection();
+      expect([...captainSelect().options].map((o) => o.textContent)).toEqual(['change ▾', 'Bravo', 'Charlie', 'Delta', 'Echo']);
+      chooseCaptain('Charlie');
+      await flushRender();
+      expect(banner()).toBe('Charlie is picking');
+      expect(rows().slice(0, 3)).toEqual([
+        ['Alpha', 'is-available', 'PickDeclined'],
+        ['Bravo', 'is-available', 'PickDeclined'],
+        ['Charlie', 'is-captain', 'Picking'],
+      ]);
+
+      pickButton('Echo').click();
+      expect(allianceNames(app)).toEqual(['Charlie & Echo']);
+      await flushRender();
+      expect(banner()).toBe('Alpha is picking');
+      expect(rows()[0][1]).toBe('is-captain');
+    });
+
+    it('the Captain override ends when the tab changes', async () => {
+      const app = openSelection();
+      chooseCaptain('Delta');
+      await flushRender();
+      expect(banner()).toBe('Delta is picking');
+      app.setActiveTab('finals');
+      app.setActiveTab('alliance-selection');
+      expect(banner()).toBe('Alpha is picking');
+    });
+
+    it('forming a single-Team alliance by hand asks first', async () => {
+      const app = openSelection();
+      chooseCaptain('Bravo');
+      await flushRender();
+      clickButtonWithText(document.querySelector('.robotics-selection-banner'), 'Form single-Team alliance');
+      expect(root().querySelector('.robotics-confirm-dialog').textContent).toContain('just Bravo');
+      await clickDialogButton(root(), 'Cancel');
+      expect(app.getState().elimination.alliances).toHaveLength(0);
+
+      clickButtonWithText(document.querySelector('.robotics-selection-banner'), 'Form single-Team alliance');
+      await clickDialogButton(root(), 'Form Alliance');
+      expect(allianceNames(app)).toEqual(['Bravo']);
+      await flushRender();
+      expect(banner()).toBe('Alpha is picking');
+      expect(document.querySelector('.robotics-selection-alliance').classList.contains('is-new')).toBe(true);
+    });
+
+    it('when the Captain is the last Team, offers a single-Team alliance with no confirm', async () => {
+      const app = openSelection(['Alpha', 'Bravo', 'Charlie']);
+      pickButton('Bravo').click();
+      await flushRender();
+      expect(banner()).toBe('Charlie is the last Team — no partners left');
+      expect(captainSelect()).toBeNull();
+
+      clickButtonWithText(document.querySelector('.robotics-selection-banner'), 'Form single-Team alliance');
+      expect(root().querySelector('.robotics-confirm-dialog')).toBeFalsy();
+      expect(allianceNames(app)).toEqual(['Alpha & Bravo', 'Charlie']);
+      await flushRender();
+      expect(banner()).toBe('No Teams left to pick');
+    });
+
+    it('when every remaining Team has Declined, offers picking one anyway or a single-Team alliance', async () => {
+      const app = openSelection(['Alpha', 'Bravo', 'Charlie']);
+      rowButton('Bravo', 'Declined').click();
+      rowButton('Charlie', 'Declined').click();
+      await flushRender();
+      expect(banner()).toBe('Alpha is picking — every remaining Team has Declined');
+      expect(document.querySelector('.robotics-selection-banner').textContent)
+        .toContain('Pick a Declined Team anyway, or form a single-Team alliance.');
+
+      pickButton('Charlie').click();
+      expect(root().querySelector('.robotics-confirm-dialog').textContent).toContain('Charlie declined earlier');
+      await clickDialogButton(root(), 'Cancel');
+
+      clickButtonWithText(document.querySelector('.robotics-selection-banner'), 'Form single-Team alliance');
+      expect(root().querySelector('.robotics-confirm-dialog').textContent).toContain('just Alpha');
+      await clickDialogButton(root(), 'Form Alliance');
+      expect(allianceNames(app)).toEqual(['Alpha']);
     });
 
     it('edits Bracket Size and the Third-Place Match here', async () => {

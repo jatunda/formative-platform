@@ -20,25 +20,50 @@ export function getDeclinedTeamIds(state) {
   return state.elimination.declinedTeamIds ?? [];
 }
 
+/** The Teams not yet in a Playoff Alliance, in Standings order (the same computation the Standings tab uses). */
+function availableTeamIds(state) {
+  return computeStandings(state.teams, state.qualification.matches)
+    .map((entry) => entry.teamId)
+    .filter((teamId) => !allianceNumberOf(state, teamId));
+}
+
 /**
- * The Alliance Captain: the highest-ranked Team in Standings (the same computation the
- * Standings tab uses) that is not yet in a Playoff Alliance. A Declined Team is eligible.
+ * The Alliance Captain: the highest-ranked Team in Standings that is not yet in a Playoff
+ * Alliance. A Declined Team is eligible. `overrideId` is the teacher's one-turn override; it
+ * wins while it names a Team still available, and otherwise the default rule applies.
+ * @param {object} state
+ * @param {string|null} [overrideId]
  * @returns {string|null} a Team id, or null when no Team is left to pick
  */
-export function getAllianceCaptain(state) {
-  const standings = computeStandings(state.teams, state.qualification.matches);
-  return standings.find((entry) => !allianceNumberOf(state, entry.teamId))?.teamId ?? null;
+export function getAllianceCaptain(state, overrideId = null) {
+  const available = availableTeamIds(state);
+  if (available.includes(overrideId)) return overrideId;
+  return available[0] ?? null;
+}
+
+/**
+ * The Teams the Captain could pick: every available Team other than the Captain, in
+ * Standings order, each flagged when it has Declined (picking it then needs a confirm).
+ * Empty when the Captain is the last available Team.
+ * @returns {{teamId: string, declined: boolean}[]}
+ */
+export function getPickableTeams(state, captainId) {
+  const declinedTeamIds = getDeclinedTeamIds(state);
+  return availableTeamIds(state)
+    .filter((teamId) => teamId !== captainId)
+    .map((teamId) => ({ teamId, declined: declinedTeamIds.includes(teamId) }));
 }
 
 /**
  * How one Team's row reads on the Alliance Selection tab. A Declined Captain reads as the
- * Captain, and a Declined Team that was picked anyway reads as in its alliance.
+ * Captain, and a Declined Team that was picked anyway reads as in its alliance. `captainId`
+ * defaults to getAllianceCaptain's default rule; pass the overridden Captain when there is one.
  * @returns {{status: 'in-alliance', allianceNumber: number}|{status: 'captain'}|{status: 'declined'}|{status: 'available'}}
  */
-export function getSelectionRowStatus(state, teamId) {
+export function getSelectionRowStatus(state, teamId, captainId = getAllianceCaptain(state)) {
   const allianceNumber = allianceNumberOf(state, teamId);
   if (allianceNumber) return { status: 'in-alliance', allianceNumber };
-  if (teamId === getAllianceCaptain(state)) return { status: 'captain' };
+  if (teamId === captainId) return { status: 'captain' };
   if (getDeclinedTeamIds(state).includes(teamId)) return { status: 'declined' };
   return { status: 'available' };
 }

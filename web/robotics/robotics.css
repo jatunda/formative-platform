@@ -644,6 +644,27 @@ body {
   text-align: center;
 }
 
+/* The teacher's controls under the projected banner text: small, in body type. */
+.robotics-selection-banner-hint,
+.robotics-selection-banner-actions {
+  font-family: var(--arena-font-body);
+  font-size: 0.9rem;
+}
+
+.robotics-selection-banner-hint {
+  margin: var(--spacing-xs) 0 0;
+  color: var(--arena-text-muted);
+}
+
+.robotics-selection-banner-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-sm);
+}
+
 .robotics-selection-row.is-in-alliance {
   opacity: 0.45;
 }

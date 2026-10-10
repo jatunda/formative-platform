@@ -3,6 +3,7 @@ import {
   getAllianceCaptain,
   getSelectionRowStatus,
   getAllianceSelectionBlockReason,
+  getPickableTeams,
 } from '../../robotics/alliance-selection.js';
 import {
   createInitialState,
@@ -67,6 +68,54 @@ describe('getAllianceCaptain', () => {
     let s = withTeams(['Alpha', 'Bravo']);
     s = formPlayoffAlliance(s, idOf(s, 'Alpha'), idOf(s, 'Bravo'));
     expect(getAllianceCaptain(s)).toBeNull();
+  });
+});
+
+describe('Captain override', () => {
+  /** Four Teams, no matches played, so Standings keep roster order and Alpha is the default Captain. */
+  const fourTeams = () => withTeams(['Alpha', 'Bravo', 'Charlie', 'Delta']);
+
+  it('makes an available Team the Captain in place of the default', () => {
+    const s = fourTeams();
+    expect(getAllianceCaptain(s, idOf(s, 'Charlie'))).toBe(idOf(s, 'Charlie'));
+  });
+
+  it('falls back to the default rule when the override is unset, unknown, or already in an alliance', () => {
+    let s = fourTeams();
+    expect(getAllianceCaptain(s, null)).toBe(idOf(s, 'Alpha'));
+    expect(getAllianceCaptain(s, 'no-such-team')).toBe(idOf(s, 'Alpha'));
+    s = formPlayoffAlliance(s, idOf(s, 'Charlie'), idOf(s, 'Delta'));
+    expect(getAllianceCaptain(s, idOf(s, 'Charlie'))).toBe(idOf(s, 'Alpha'));
+  });
+
+  it('moves the captain row status to the overriding Team, and the default Captain reads as it otherwise would', () => {
+    let s = fourTeams();
+    s = declineTeam(s, idOf(s, 'Alpha'));
+    const captainId = idOf(s, 'Charlie');
+    expect(getSelectionRowStatus(s, idOf(s, 'Charlie'), captainId)).toEqual({ status: 'captain' });
+    expect(getSelectionRowStatus(s, idOf(s, 'Alpha'), captainId)).toEqual({ status: 'declined' });
+    expect(getSelectionRowStatus(s, idOf(s, 'Bravo'), captainId)).toEqual({ status: 'available' });
+  });
+});
+
+describe('getPickableTeams', () => {
+  it('lists the available Teams other than the Captain, in Standings order, flagging Declined ones', () => {
+    let s = withPlayedQualification();
+    const [first, second, third, fourth] = rankedTeamIds(s);
+    s = declineTeam(s, fourth);
+    expect(getPickableTeams(s, first)).toEqual([
+      { teamId: second, declined: false },
+      { teamId: third, declined: false },
+      { teamId: fourth, declined: true },
+    ]);
+    s = formPlayoffAlliance(s, first, third);
+    expect(getPickableTeams(s, second)).toEqual([{ teamId: fourth, declined: true }]);
+  });
+
+  it('is empty when the Captain is the last available Team', () => {
+    let s = withTeams(['Alpha', 'Bravo', 'Charlie']);
+    s = formPlayoffAlliance(s, idOf(s, 'Alpha'), idOf(s, 'Bravo'));
+    expect(getPickableTeams(s, idOf(s, 'Charlie'))).toEqual([]);
   });
 });
 

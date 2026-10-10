@@ -45,7 +45,7 @@ import {
 } from './match-timeline.js';
 import { computeStandings, formatRecord } from './standings.js';
 import { resolveMatchSides, getMatchWinner, isBracketComplete, countUndecidedMatches, getPlacements } from './bracket.js';
-import { getAllianceCaptain, getSelectionRowStatus, getAllianceSelectionBlockReason } from './alliance-selection.js';
+import { getAllianceCaptain, getSelectionRowStatus, getAllianceSelectionBlockReason, getPickableTeams } from './alliance-selection.js';
 import { bracketColumnSpacerGrowRatios } from './bracket-layout.js';
 import { launchConfetti } from './confetti.js';
 import { getCurrentMatchIndex, getUpNextMatchIndex } from './current-match.js';
@@ -888,7 +888,7 @@ function renderSelectionActionButton(state, action, { className, label, ariaLabe
  * and Declined buttons. A Declined row shows a badge, Pick (which asks before overriding the
  * Decline), and Undo.
  */
-function renderSelectionStandings(state, dispatch, captainId) {
+function renderSelectionStandings(state, dispatch, captainId, { pick, pickDeclined }) {
   const card = el('div', { className: 'robotics-card robotics-selection-standings' });
   card.appendChild(el('h3', { className: 'robotics-card-title' }, ['Standings']));
   const standings = computeStandings(state.teams, state.qualification.matches);
@@ -897,26 +897,12 @@ function renderSelectionStandings(state, dispatch, captainId) {
     return card;
   }
 
-  // The new alliance is always last in the list; mark it once the rebuilt list exists.
-  const pick = (partnerId) => dispatch(
-    (s) => formPlayoffAlliance(s, captainId, partnerId),
-    () => document.querySelector('.robotics-selection-alliance:last-child')?.classList.add('is-new'),
-  );
-  const pickDeclined = (partnerId) => {
-    showConfirm({
-      title: 'Pick a Declined Team?',
-      message: `${teamName(state, partnerId)} declined earlier — pick anyway?`,
-      confirmLabel: 'Pick anyway',
-    }).then((confirmed) => {
-      if (confirmed) pick(partnerId);
-    });
-  };
   const actionButton = (action, label, className, onAllowed) => renderSelectionActionButton(state, action, {
     className: `robotics-btn ${className} robotics-btn-sm`,
     label,
     onAllowed,
   });
-  const rowStatuses = new Map(standings.map((entry) => [entry.teamId, getSelectionRowStatus(state, entry.teamId)]));
+  const rowStatuses = new Map(standings.map((entry) => [entry.teamId, getSelectionRowStatus(state, entry.teamId, captainId)]));
   const statusCell = (entry) => {
     const { teamId } = entry;
     const rowStatus = rowStatuses.get(teamId);
@@ -1005,11 +991,96 @@ function renderSelectionAllianceList(state, dispatch) {
 }
 
 /**
+ * The pick actions for this turn's Captain. Picking a Declined partner, or forming a
+ * single-Team alliance by choice, asks first. Forming an alliance ends the turn, and with it
+ * any Captain override. The new alliance is always last in the list, so it's marked once
+ * the rebuilt list exists.
+ */
+function selectionPickActions(state, dispatch, captainId, ui) {
+  const pick = (partnerId) => {
+    ui.captainOverride = null;
+    dispatch(
+      (s) => formPlayoffAlliance(s, captainId, partnerId),
+      () => document.querySelector('.robotics-selection-alliance:last-child')?.classList.add('is-new'),
+    );
+  };
+  const pickAfterConfirm = (partnerId, dialog) => {
+    showConfirm(dialog).then((confirmed) => {
+      if (confirmed) pick(partnerId);
+    });
+  };
+  return {
+    pick,
+    pickDeclined: (partnerId) => pickAfterConfirm(partnerId, {
+      title: 'Pick a Declined Team?',
+      message: `${teamName(state, partnerId)} declined earlier — pick anyway?`,
+      confirmLabel: 'Pick anyway',
+    }),
+    formSingleTeam: () => pick(captainId),
+    confirmSingleTeam: () => pickAfterConfirm(captainId, {
+      title: 'Form a Single-Team Alliance?',
+      message: `This forms a Playoff Alliance containing just ${teamName(state, captainId)}.`,
+      confirmLabel: 'Form Alliance',
+    }),
+  };
+}
+
+/**
+ * Whose turn it is, with the controls that keep selection from getting stuck: "change ▾"
+ * overrides the Captain for this turn only, and a single-Team alliance is offered with no
+ * confirm when the Captain has no one left to pick, or with one while partners remain
+ * (prominently once everyone left has Declined).
+ */
+function renderSelectionBanner(state, captainId, actions, ui) {
+  const text = el('div', { className: 'robotics-selection-banner-text' });
+  const banner = el('div', { className: 'robotics-selection-banner' }, [text]);
+  if (!captainId) {
+    text.textContent = 'No Teams left to pick';
+    return banner;
+  }
+  const captain = teamName(state, captainId);
+  const singleTeamButton = (className, onAllowed) => renderSelectionActionButton(state, 'pick', {
+    className: `robotics-btn ${className} robotics-btn-sm`,
+    label: 'Form single-Team alliance',
+    onAllowed,
+  });
+  const pickable = getPickableTeams(state, captainId);
+  if (pickable.length === 0) {
+    text.textContent = `${captain} is the last Team — no partners left`;
+    banner.appendChild(el('div', { className: 'robotics-selection-banner-actions' }, [
+      singleTeamButton('robotics-btn-primary', actions.formSingleTeam),
+    ]));
+    return banner;
+  }
+
+  const captainSelect = el('select', { 'aria-label': 'Change Alliance Captain' }, [
+    el('option', { value: '' }, ['change ▾']),
+    ...pickable.map(({ teamId }) => el('option', { value: teamId }, [teamName(state, teamId)])),
+  ]);
+  captainSelect.addEventListener('change', () => ui.setCaptainOverride(captainSelect.value));
+  const allDeclined = pickable.every((team) => team.declined);
+  if (allDeclined) {
+    text.textContent = `${captain} is picking — every remaining Team has Declined`;
+    banner.appendChild(el('p', { className: 'robotics-selection-banner-hint' }, [
+      'Pick a Declined Team anyway, or form a single-Team alliance.',
+    ]));
+  } else {
+    text.textContent = `${captain} is picking`;
+  }
+  banner.appendChild(el('div', { className: 'robotics-selection-banner-actions' }, [
+    captainSelect,
+    singleTeamButton(allDeclined ? 'robotics-btn-primary' : 'robotics-btn-ghost', actions.confirmSingleTeam),
+  ]));
+  return banner;
+}
+
+/**
  * Alliance Selection: the class watches Playoff Alliances form. Standings (with whose turn
  * it is) in the main column; Bracket settings, the alliance list, and Start Finals beside it.
  */
-export function renderAllianceSelectionTab(state, dispatch, { setActiveTab }) {
-  const captainId = getAllianceCaptain(state);
+export function renderAllianceSelectionTab(state, dispatch, { setActiveTab, ui }) {
+  const captainId = getAllianceCaptain(state, ui.captainOverride);
+  const actions = selectionPickActions(state, dispatch, captainId, ui);
 
   const main = el('div', { className: 'robotics-selection-main' });
   if (state.qualification.matches.some((m) => !m.completed)) {
@@ -1017,10 +1088,8 @@ export function renderAllianceSelectionTab(state, dispatch, { setActiveTab }) {
       'The Qualification Round isn’t finished — Standings and the Alliance Captain may still change.',
     ]));
   }
-  main.appendChild(el('div', { className: 'robotics-selection-banner' }, [
-    captainId ? `${teamName(state, captainId)} is picking` : 'No Teams left to pick',
-  ]));
-  main.appendChild(renderSelectionStandings(state, dispatch, captainId));
+  main.appendChild(renderSelectionBanner(state, captainId, actions, ui));
+  main.appendChild(renderSelectionStandings(state, dispatch, captainId, actions));
 
   const side = el('div', { className: 'robotics-selection-side' }, [
     renderSelectionSettings(state, dispatch),
@@ -1343,6 +1412,13 @@ export function initRoboticsApp({ mountId = 'roboticsApp', storageKey = 'robotic
       ui.prefs = { ...ui.prefs, [key]: value };
       uiStorage.save(ui.prefs);
     },
+    // The teacher's one-turn Alliance Captain override: screen state only, never saved.
+    // It clears when an alliance forms (see selectionPickActions) or the tab changes.
+    captainOverride: null,
+    setCaptainOverride(teamId) {
+      ui.captainOverride = teamId;
+      loop.renderNow();
+    },
   };
 
   // Auto-scroll the Qualification Matches list to the Current Match row, but only once
@@ -1368,6 +1444,7 @@ export function initRoboticsApp({ mountId = 'roboticsApp', storageKey = 'robotic
 
   function setActiveTab(tab) {
     activeTab = tab;
+    ui.captainOverride = null;
     loop.renderNow();
   }
 
