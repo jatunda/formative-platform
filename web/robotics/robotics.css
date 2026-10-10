@@ -1393,6 +1393,27 @@ body {
 
 /* ---- Bracket ---- */
 
+/* Finals: Now Playing on top, then the bracket growing to fill the rest of the
+   viewport height (less the body's vertical padding), so each round column's
+   spacers have room to center its matches. The container query lets Up Next
+   sit beside the Current Match on wide screens, as in the Qualification Round. */
+.robotics-app:has(> .robotics-finals) {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100dvh - 2 * var(--spacing-xl));
+}
+
+.robotics-finals {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  container-type: inline-size;
+}
+
+.robotics-finals > .robotics-bracket {
+  flex: 1;
+}
+
 /* Round columns grow to fill the width; the bracket scrolls inside its own box
    only when the rounds' minimum widths no longer fit. */
 .robotics-bracket {

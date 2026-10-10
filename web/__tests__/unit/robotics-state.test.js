@@ -720,4 +720,13 @@ describe('getAllMatchesInScheduleOrder', () => {
     expect(entries.map((e) => e.globalIndex)).toEqual(entries.map((_, i) => i));
     expect(entries.some((e) => e.match.isBye)).toBe(false);
   });
+
+  it('schedules Elimination Matches in bracket order, the Third-Place Match before the Final', () => {
+    let state = withFourTeams(createInitialState());
+    state.teams.forEach((t) => { state = formPlayoffAlliance(state, t.id, t.id); });
+    state = startFinals(setBracketConfig(state, { includeThirdPlace: true }));
+
+    const rounds = getAllMatchesInScheduleOrder(state).map((e) => e.match.round);
+    expect(rounds).toEqual([1, 1, 'third-place', 'final']);
+  });
 });

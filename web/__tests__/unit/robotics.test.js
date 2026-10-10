@@ -2208,9 +2208,10 @@ describe('initRoboticsApp', () => {
       const scoreInputs = root().querySelectorAll('.robotics-bracket .robotics-score-input');
       scoreInputs[0].value = '80';
       scoreInputs[1].value = '20';
-      clickButtonWithText(root(), 'Mark Complete');
+      clickButtonWithText(root().querySelector('.robotics-bracket'), 'Mark Complete');
       await flushRender();
 
+      expect(root().querySelector('.robotics-now-playing')).toBeNull();
       expect(root().textContent).not.toContain('Champion');
       expect(root().querySelector('.robotics-champion-banner')).toBeFalsy();
       clickButtonWithText(root(), 'Reveal Results →');
@@ -2223,7 +2224,7 @@ describe('initRoboticsApp', () => {
       const scoreInputs = root().querySelectorAll('.robotics-bracket .robotics-score-input');
       scoreInputs[0].value = '80';
       scoreInputs[1].value = '20';
-      clickButtonWithText(root(), 'Mark Complete');
+      clickButtonWithText(root().querySelector('.robotics-bracket'), 'Mark Complete');
       await flushRender();
 
       const matchCard = root().querySelector('.robotics-bracket-match');
@@ -2261,6 +2262,105 @@ describe('initRoboticsApp', () => {
       expect(scoreInputs[1].value).toBe('20');
       const bracketMatch = app.getState().elimination.bracket.matches.find((m) => !m.isBye);
       expect(bracketMatch.completed).toBe(false);
+    });
+
+    describe('Now Playing', () => {
+      const nowPlaying = () => root().querySelector('.robotics-now-playing');
+      const sideNames = (color) => [...nowPlaying().querySelectorAll(`.robotics-now-playing-side.is-${color} .robotics-now-playing-team-name`)]
+        .map((n) => n.textContent);
+      const upNextSides = () => [...root().querySelectorAll('.robotics-up-next-teams')].map((n) => n.textContent);
+      async function scoreInBigDisplay(a, b) {
+        const [scoreA, scoreB] = nowPlaying().querySelectorAll('.robotics-score-input');
+        scoreA.value = String(a);
+        scoreB.value = String(b);
+        nowPlaying().querySelector('.robotics-now-playing-complete').click();
+        await flushRender();
+      }
+
+      it('spotlights the first Elimination Match above the bracket, with the next one Up Next', async () => {
+        // 4 alliances: Round 1 is Seed 1 v Seed 4, then Seed 2 v Seed 3.
+        await openFinals({ teamCount: 8 });
+        const section = root().querySelector('.robotics-finals');
+        expect(section.firstElementChild.classList.contains('robotics-now-playing-layout')).toBe(true);
+        expect(sideNames('red')).toEqual(['Alpha', 'Bravo']);
+        expect(sideNames('blue')).toEqual(['Golf', 'Hotel']);
+        expect(upNextSides()).toEqual(['Charlie & Delta', 'Echo & Foxtrot']);
+      });
+
+      it('scoring through the big display records the result in the bracket and moves on to the next match', async () => {
+        const app = await openFinals({ teamCount: 8 });
+        await scoreInBigDisplay(80, 20);
+
+        const firstCard = root().querySelector('.robotics-bracket-match');
+        expect(firstCard.classList.contains('is-complete')).toBe(true);
+        expect(firstCard.querySelector('.robotics-match-alliance.is-winner').textContent).toContain('Alpha');
+        expect(root().querySelector('.robotics-bracket-round.is-final').textContent).toContain('Alpha');
+        expect(app.getState().elimination.bracket.matches.find((m) => m.round === 1 && m.slot === 0).completed).toBe(true);
+
+        expect(sideNames('red')).toEqual(['Charlie', 'Delta']);
+        expect(upNextSides()).toEqual(['Alpha & Bravo', 'Winner of Round 1 · Match 2']);
+      });
+
+      it('plays the Third-Place Match before the Final', async () => {
+        await openFinals({ teamCount: 8, includeThirdPlace: true });
+        await scoreInBigDisplay(80, 20);
+        await scoreInBigDisplay(80, 20);
+        // Both semis decided (Alpha and Charlie won): the Third-Place Match is Current, the Final Up Next.
+        expect(sideNames('red')).toEqual(['Golf', 'Hotel']);
+        expect(sideNames('blue')).toEqual(['Echo', 'Foxtrot']);
+        expect(upNextSides()).toEqual(['Alpha & Bravo', 'Charlie & Delta']);
+      });
+
+      it('names a Third-Place side not yet decided by the semifinal it loses', async () => {
+        await openFinals({ teamCount: 8, includeThirdPlace: true });
+        await scoreInBigDisplay(80, 20);
+        // Round 1 · Match 2 is Current; the Third-Place Match is Up Next, with Golf & Hotel already in it.
+        expect(upNextSides()).toEqual(['Golf & Hotel', 'Loser of Round 1 · Match 2']);
+      });
+
+      it('keeps a completed Tie as the Current Match until its Score is changed', async () => {
+        await openFinals({ teamCount: 8 });
+        await scoreInBigDisplay(50, 50);
+        expect(sideNames('red')).toEqual(['Alpha', 'Bravo']);
+        expect(nowPlaying().querySelector('.robotics-now-playing-complete').textContent).toBe('Save Edit');
+
+        await scoreInBigDisplay(50, 60);
+        expect(sideNames('red')).toEqual(['Charlie', 'Delta']);
+      });
+
+      it('shares one draft score with the bracket card, both ways', async () => {
+        await openFinals({ teamCount: 8 });
+        const bigInput = () => nowPlaying().querySelectorAll('.robotics-score-input')[0];
+        const cardInput = () => root().querySelectorAll('.robotics-bracket .robotics-score-input')[0];
+
+        bigInput().value = '42';
+        bigInput().dispatchEvent(new Event('change'));
+        await flushRender();
+        expect(cardInput().value).toBe('42');
+
+        cardInput().value = '17';
+        cardInput().dispatchEvent(new Event('change'));
+        await flushRender();
+        expect(bigInput().value).toBe('17');
+      });
+
+      it('toggles a No-Show from the big display', async () => {
+        const app = await openFinals({ teamCount: 8 });
+        [...nowPlaying().querySelectorAll('.robotics-now-playing-team-name')].find((n) => n.textContent === 'Golf').click();
+        await flushRender();
+        const golfId = app.getState().teams.find((t) => t.name === 'Golf').id;
+        const current = app.getState().elimination.bracket.matches.find((m) => m.round === 1 && m.slot === 0);
+        expect(current.noShow[golfId]).toBe(true);
+        expect(root().querySelector('.robotics-bracket .robotics-team-toggle.is-no-show').textContent).toBe('Golf');
+      });
+
+      it('shows Match Time and Field on the Current and Up Next cards', async () => {
+        const app = await openFinals({ teamCount: 8 });
+        app.dispatch((s) => setTimelineConfig(s, { fieldCount: 2 }));
+        await flushRender();
+        expect(root().querySelector('.robotics-now-playing-meta').textContent).toContain('Field 1');
+        expect(root().querySelector('.robotics-up-next-meta').textContent).toContain('Field 2');
+      });
     });
 
     it('renders the Third-Place Match column positioned to the left of the Final', async () => {

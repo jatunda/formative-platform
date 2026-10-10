@@ -180,6 +180,43 @@ export function getPlayedEliminationMatches(bracket) {
   return bracket.matches.filter((m) => !m.isBye);
 }
 
+// Numbered rounds first, then the Third-Place Match, then the Final. Finite
+// keys, since Infinity - 1 === Infinity would tie the two named rounds.
+const NAMED_ROUND_KEY = { 'third-place': Number.MAX_SAFE_INTEGER - 1, final: Number.MAX_SAFE_INTEGER };
+
+function roundKey(match) {
+  return typeof match.round === 'number' ? match.round : NAMED_ROUND_KEY[match.round];
+}
+
+function compareBracketOrder(a, b) {
+  return roundKey(a) - roundKey(b) || a.slot - b.slot;
+}
+
+/**
+ * Played Elimination Matches in bracket order: by round, then slot, with the
+ * Third-Place Match before the Final. The one definition of bracket order,
+ * shared by the schedule and the Finals Current Match.
+ */
+export function getMatchesInBracketOrder(bracket) {
+  return getPlayedEliminationMatches(bracket).sort(compareBracketOrder);
+}
+
+/**
+ * Where a match's side comes from, while it isn't decided yet: "Winner of
+ * Round 2 · Match 1" (or "Loser of …" for the Third-Place Match). Null for a
+ * Round 1 side, which is a Seed rather than a feeder match.
+ * @param {object} bracket
+ * @param {string} matchId
+ * @param {'A'|'B'} side
+ * @returns {string|null}
+ */
+export function sideSourceLabel(bracket, matchId, side) {
+  const match = findMatch(bracket, matchId);
+  if (match.fromMatch === null) return null;
+  const feeder = findMatch(bracket, match.fromMatch[side === 'A' ? 0 : 1]);
+  return `${match.resolveAs === 'loser' ? 'Loser' : 'Winner'} of ${eliminationMatchLabel(feeder)}`;
+}
+
 /**
  * How many played Elimination Matches (Third-Place Match included) are still
  * undecided. A match marked complete with a tie (or with a side still TBD)

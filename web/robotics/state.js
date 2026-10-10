@@ -1,5 +1,5 @@
 import { generateQualificationMatches } from './pairing-draw.js';
-import { buildBracket, isBracketComplete, getPlacements } from './bracket.js';
+import { buildBracket, isBracketComplete, getPlacements, getMatchesInBracketOrder } from './bracket.js';
 import { getAllianceSelectionBlockReason, getDeclinedTeamIds, getEffectiveBracketSize } from './alliance-selection.js';
 
 let idCounter = 0;
@@ -317,15 +317,7 @@ export function setEliminationNoShow(state, matchId, teamId, flag) {
 export function getAllMatchesInScheduleOrder(state) {
   const entries = state.qualification.matches.map((match, i) => ({ kind: 'qualification', match, qualIndex: i }));
   if (state.elimination.bracket) {
-    const order = { 'third-place': Infinity - 1, final: Infinity };
-    const sortedElimMatches = [...state.elimination.bracket.matches]
-      .filter((m) => !m.isBye)
-      .sort((a, b) => {
-        const aKey = typeof a.round === 'number' ? a.round : order[a.round];
-        const bKey = typeof b.round === 'number' ? b.round : order[b.round];
-        return aKey - bKey || a.slot - b.slot;
-      });
-    for (const match of sortedElimMatches) {
+    for (const match of getMatchesInBracketOrder(state.elimination.bracket)) {
       entries.push({ kind: 'elimination', match });
     }
   }

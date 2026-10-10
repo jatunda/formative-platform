@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { nextPowerOfTwo, seedOrder, buildBracket, resolveMatchSides, getBracketWinner, countUndecidedMatches, isBracketComplete, getPlacements, eliminationMatchLabel } from '../../robotics/bracket.js';
+import { nextPowerOfTwo, seedOrder, buildBracket, resolveMatchSides, getBracketWinner, countUndecidedMatches, isBracketComplete, getPlacements, eliminationMatchLabel, getMatchesInBracketOrder, sideSourceLabel } from '../../robotics/bracket.js';
 
 describe('nextPowerOfTwo', () => {
   it('returns the same number when already a power of two', () => {
@@ -215,5 +215,47 @@ describe('eliminationMatchLabel', () => {
     expect(labels).toContain('Round 2 · Match 2');
     expect(labels).toContain('Final');
     expect(labels).toContain('Third-Place Match');
+  });
+});
+
+describe('getMatchesInBracketOrder', () => {
+  it('orders played matches by round, then slot, with the Third-Place Match before the Final', () => {
+    const bracket = buildBracket({ bracketSize: 8, seeds: ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'], includeThirdPlace: true });
+    expect(getMatchesInBracketOrder(bracket).map(eliminationMatchLabel)).toEqual([
+      'Round 1 · Match 1', 'Round 1 · Match 2', 'Round 1 · Match 3', 'Round 1 · Match 4',
+      'Round 2 · Match 1', 'Round 2 · Match 2',
+      'Third-Place Match', 'Final',
+    ]);
+  });
+
+  it('skips Byes', () => {
+    // 3 alliances: Seed 1 has a Bye in Round 1, leaving one Round 1 match and the Final.
+    const bracket = buildBracket({ bracketSize: 3, seeds: ['a1', 'a2', 'a3'], includeThirdPlace: false });
+    expect(getMatchesInBracketOrder(bracket).map(eliminationMatchLabel)).toEqual(['Round 1 · Match 2', 'Final']);
+  });
+});
+
+describe('sideSourceLabel', () => {
+  const eight = () => buildBracket({ bracketSize: 8, seeds: ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'], includeThirdPlace: true });
+  const byLabel = (bracket, label) => bracket.matches.find((m) => eliminationMatchLabel(m) === label);
+
+  it('names the match feeding each side of a later-round match', () => {
+    const bracket = eight();
+    const semi2 = byLabel(bracket, 'Round 2 · Match 2');
+    expect(sideSourceLabel(bracket, semi2.id, 'A')).toBe('Winner of Round 1 · Match 3');
+    expect(sideSourceLabel(bracket, semi2.id, 'B')).toBe('Winner of Round 1 · Match 4');
+    const final = byLabel(bracket, 'Final');
+    expect(sideSourceLabel(bracket, final.id, 'A')).toBe('Winner of Round 2 · Match 1');
+  });
+
+  it('names the semifinal losers feeding the Third-Place Match', () => {
+    const bracket = eight();
+    const thirdPlace = byLabel(bracket, 'Third-Place Match');
+    expect(sideSourceLabel(bracket, thirdPlace.id, 'B')).toBe('Loser of Round 2 · Match 2');
+  });
+
+  it('is null for a Round 1 side, which is a Seed rather than a feeder match', () => {
+    const bracket = eight();
+    expect(sideSourceLabel(bracket, byLabel(bracket, 'Round 1 · Match 1').id, 'A')).toBeNull();
   });
 });

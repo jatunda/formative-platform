@@ -45,7 +45,7 @@ import {
   timeOfDayToEpochMs,
 } from './match-timeline.js';
 import { computeStandings, formatRecord } from './standings.js';
-import { resolveMatchSides, getMatchWinner, isBracketComplete, countUndecidedMatches, getPlacements, getPlayedEliminationMatches, eliminationMatchLabel } from './bracket.js';
+import { resolveMatchSides, getMatchWinner, isBracketComplete, countUndecidedMatches, getPlacements, getPlayedEliminationMatches, eliminationMatchLabel, sideSourceLabel } from './bracket.js';
 import {
   getAllianceCaptain,
   getSelectionRowStatus,
@@ -56,7 +56,7 @@ import {
 } from './alliance-selection.js';
 import { bracketColumnSpacerGrowRatios } from './bracket-layout.js';
 import { launchConfetti } from './confetti.js';
-import { getCurrentMatchIndex, getUpNextMatchIndex } from './current-match.js';
+import { getCurrentMatchIndex, getUpNextMatchIndex, getEliminationCurrentMatchId, getEliminationUpNextMatchId } from './current-match.js';
 import { exportStandingsMarkdown, exportMatchesMarkdown, exportRosterMarkdown, exportPlacementsMarkdown } from './markdown-export.js';
 import { createToastContainer, showToast } from './toast.js';
 import { createConfirmDialogContainer, showConfirm } from './confirm-dialog.js';
@@ -1301,9 +1301,43 @@ function renderBracket(state, dispatch) {
   return container;
 }
 
-/** The Elimination Bracket, or where to go to start one. Playoff setup lives on the Alliance Selection tab. */
+/**
+ * The Finals' Now Playing: the Elimination Current Match and Up Next, scored
+ * with the same actions as the bracket cards. An Up Next side not yet decided
+ * names the match it comes from. Null once every Elimination Match has a winner.
+ */
+function renderFinalsNowPlaying(state, dispatch) {
+  const { bracket } = state.elimination;
+  const currentId = getEliminationCurrentMatchId(bracket);
+  if (currentId === null) return null;
+  const upNextId = getEliminationUpNextMatchId(bracket, currentId);
+
+  const entries = getAllMatchesInScheduleOrder(state).filter((e) => e.kind === 'elimination');
+  const entryFor = (matchId) => entries.find((e) => e.match.id === matchId);
+  const currentSides = resolveMatchSides(bracket, currentId);
+  let upNext = null;
+  if (upNextId !== null) {
+    const sides = resolveMatchSides(bracket, upNextId);
+    const sideLabel = (allianceId, side) => (allianceId ? playoffAllianceLabel(state, allianceId) : sideSourceLabel(bracket, upNextId, side));
+    upNext = { entry: entryFor(upNextId), labelA: sideLabel(sides.allianceA, 'A'), labelB: sideLabel(sides.allianceB, 'B') };
+  }
+
+  return renderNowPlaying(state, dispatch, {
+    current: {
+      entry: entryFor(currentId),
+      matchRef: currentId,
+      teamsA: playoffAllianceTeamIds(state, currentSides.allianceA),
+      teamsB: playoffAllianceTeamIds(state, currentSides.allianceB),
+    },
+    upNext,
+    actions: ELIMINATION_MATCH_ACTIONS,
+    placeholder: null,
+  });
+}
+
+/** The Elimination Bracket under its Now Playing, or where to go to start one. Playoff setup lives on the Alliance Selection tab. */
 export function renderFinalsTab(state, dispatch, { setActiveTab }) {
-  const section = el('div', { className: 'robotics-section' });
+  const section = el('div', { className: 'robotics-section robotics-finals' });
 
   if (!state.elimination.bracket) {
     section.appendChild(el('div', { className: 'robotics-card' }, [
@@ -1312,6 +1346,8 @@ export function renderFinalsTab(state, dispatch, { setActiveTab }) {
     return section;
   }
 
+  const nowPlaying = renderFinalsNowPlaying(state, dispatch);
+  if (nowPlaying) section.appendChild(nowPlaying);
   section.appendChild(renderBracket(state, dispatch));
 
   if (isBracketComplete(state.elimination.bracket)) {
