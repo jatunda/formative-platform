@@ -2018,6 +2018,140 @@ describe('initRoboticsApp', () => {
       });
     });
 
+    describe('locked once the Finals have started', () => {
+      const LOCKED = 'Locked — the Finals have started. Discard Bracket to change alliances.';
+      const toastText = () => document.querySelector('.robotics-toast-visible')?.textContent;
+      const sizeInput = () => document.querySelector('.robotics-selection-side input[type="number"]');
+      const thirdPlace = () => document.querySelector('.robotics-selection-side input[type="checkbox"]');
+      const card = () => document.querySelector('.robotics-finals-in-progress');
+
+      /**
+       * Six Teams, Foxtrot Declined, Bracket Size 2: Alpha & Bravo and Charlie & Delta formed,
+       * Finals started, then back on Alliance Selection.
+       */
+      async function lockedSelection() {
+        const app = openSelection(['Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo', 'Foxtrot']);
+        rowButton('Foxtrot', 'Declined').click();
+        await flushRender();
+        sizeInput().value = '2';
+        sizeInput().dispatchEvent(new Event('change'));
+        await flushRender();
+        pickButton('Bravo').click();
+        await flushRender();
+        pickButton('Delta').click();
+        await flushRender();
+        clickButtonWithText(root(), 'Start Finals →');
+        await flushRender();
+        app.setActiveTab('alliance-selection');
+        return app;
+      }
+
+      it('keeps Standings and the alliance list on screen, with a Finals in progress card in place of the banner and Start Finals', async () => {
+        await lockedSelection();
+        expect(card().textContent).toContain('Finals in progress');
+        expect(document.querySelector('.robotics-selection-banner')).toBeNull();
+        expect([...root().querySelectorAll('button')].some((b) => b.textContent === 'Start Finals →')).toBe(false);
+        expect(rows().map(([name, , cell]) => [name, cell])).toEqual([
+          ['Alpha', 'Alliance 1'],
+          ['Bravo', 'Alliance 1'],
+          ['Charlie', 'Alliance 2'],
+          ['Delta', 'Alliance 2'],
+          ['Echo', 'Not advancingPickDeclined'],
+          ['Foxtrot', 'Not advancingDeclinedPickUndo'],
+        ]);
+        expect([...document.querySelectorAll('.robotics-selection-alliance-teams')].map((e) => e.textContent))
+          .toEqual(['Alpha & Bravo', 'Charlie & Delta']);
+      });
+
+      it('every Alliance Selection control stays clickable but only explains the lock', async () => {
+        const app = await lockedSelection();
+        const before = app.getState();
+        const controls = [
+          rowButton('Echo', 'Pick'),
+          rowButton('Echo', 'Declined'),
+          rowButton('Foxtrot', 'Pick'),
+          rowButton('Foxtrot', 'Undo'),
+          ...document.querySelectorAll('[aria-label="Move alliance up"]'),
+          ...document.querySelectorAll('[aria-label="Move alliance down"]'),
+          ...[...document.querySelectorAll('.robotics-selection-alliance button')].filter((b) => b.textContent === 'Remove'),
+        ];
+        for (const control of controls) {
+          expect(control.classList.contains('is-locked')).toBe(true);
+          document.querySelector('.robotics-toast-visible')?.classList.remove('robotics-toast-visible');
+          control.click();
+          expect(app.getState()).toBe(before);
+          expect(toastText()).toBe(LOCKED);
+        }
+      });
+
+      it('Bracket Size and Third-Place only explain the lock', async () => {
+        const app = await lockedSelection();
+        const before = app.getState();
+
+        expect(sizeInput().readOnly).toBe(true);
+        sizeInput().click();
+        expect(toastText()).toBe(LOCKED);
+        sizeInput().value = '4';
+        sizeInput().dispatchEvent(new Event('change'));
+        expect(app.getState()).toBe(before);
+        expect(sizeInput().value).toBe('2');
+
+        document.querySelector('.robotics-toast-visible').classList.remove('robotics-toast-visible');
+        const wasChecked = thirdPlace().checked;
+        thirdPlace().click();
+        expect(thirdPlace().checked).toBe(wasChecked);
+        expect(toastText()).toBe(LOCKED);
+        thirdPlace().checked = !wasChecked;
+        thirdPlace().dispatchEvent(new Event('change'));
+        expect(app.getState()).toBe(before);
+        expect(thirdPlace().checked).toBe(wasChecked);
+      });
+
+      it('On to Finals → switches to the Finals tab', async () => {
+        await lockedSelection();
+        clickButtonWithText(card(), 'On to Finals →');
+        expect(document.querySelector('.robotics-tab-btn.active').dataset.tabKey).toBe('finals');
+      });
+
+      it('Discard Bracket names the results it will lose, and Cancel changes nothing', async () => {
+        const app = await lockedSelection();
+        const final = app.getState().elimination.bracket.matches.find((m) => m.round === 'final');
+        app.dispatch((s) => recordEliminationResult(s, final.id, { scoreA: 5, scoreB: 1 }));
+        await flushRender();
+        const before = app.getState();
+
+        clickButtonWithText(card(), 'Discard Bracket');
+        expect(root().querySelector('.robotics-confirm-dialog').textContent)
+          .toContain('Final (Alpha & Bravo 5–1 Charlie & Delta)');
+        await clickDialogButton(root(), 'Cancel');
+        expect(app.getState()).toBe(before);
+      });
+
+      it('Discard Bracket says when no results will be lost, then unlocks Alliance Selection for a new Start Finals', async () => {
+        const app = await lockedSelection();
+        const { alliances, declinedTeamIds, bracketSize, includeThirdPlace } = app.getState().elimination;
+
+        clickButtonWithText(card(), 'Discard Bracket');
+        expect(root().querySelector('.robotics-confirm-dialog').textContent).toContain('No Elimination results have been recorded yet.');
+        await clickDialogButton(root(), 'Discard Bracket');
+        await flushRender();
+        const { elimination } = app.getState();
+        expect(elimination.bracket).toBeNull();
+        expect(elimination.alliances).toEqual(alliances);
+        expect(elimination.declinedTeamIds).toEqual(declinedTeamIds);
+        expect(elimination.bracketSize).toBe(bracketSize);
+        expect(elimination.includeThirdPlace).toBe(includeThirdPlace);
+        expect(document.querySelector('.robotics-tab-btn.active').dataset.tabKey).toBe('alliance-selection');
+        expect(card()).toBeNull();
+
+        document.querySelectorAll('[aria-label="Move alliance up"]')[1].click();
+        await flushRender();
+        expect(allianceNames(app)).toEqual(['Charlie & Delta', 'Alpha & Bravo']);
+        clickButtonWithText(root(), 'Start Finals →');
+        expect(app.getState().elimination.bracket.seeds).toEqual(app.getState().elimination.alliances.map((a) => a.id));
+      });
+    });
+
     it('loads a Tournament saved with the old per-number seed map, and Start Finals ignores it', () => {
       let s = createInitialState();
       ['Alpha', 'Bravo'].forEach((name) => { s = addTeam(s, { name, members: [] }); });

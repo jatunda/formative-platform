@@ -19,6 +19,8 @@ import {
   undoDecline,
   setBracketConfig,
   setTimelineConfig,
+  startFinals,
+  discardBracket,
 } from '../../robotics/state.js';
 import { computeStandings } from '../../robotics/standings.js';
 
@@ -258,6 +260,26 @@ describe('getAllianceSelectionBlockReason', () => {
     expect(getAllianceSelectionBlockReason(s, 'set-bracket-size', { bracketSize: null })).toBeNull();
     s = setTimelineConfig(s, { estimatedBracketSize: 2 });
     expect(getAllianceSelectionBlockReason(s, 'set-bracket-size', { bracketSize: null })).toContain('3 alliances are already formed');
+  });
+});
+
+describe('Alliance Selection locked while a Bracket exists', () => {
+  const LOCKED_MESSAGE = 'Locked — the Finals have started. Discard Bracket to change alliances.';
+  const ACTIONS = ['pick', 'decline', 'undo-decline', 'move', 'remove', 'start-finals', 'set-bracket-size', 'set-third-place'];
+
+  it('blocks every Alliance Selection action with the lock message', () => {
+    const s = startFinals(withTwoAlliancesOfTwo());
+    for (const action of ACTIONS) {
+      expect(getAllianceSelectionBlockReason(s, action)).toBe(LOCKED_MESSAGE);
+    }
+    expect(getAllianceSelectionBlockReason(s, 'set-bracket-size', { bracketSize: 6 })).toBe(LOCKED_MESSAGE);
+  });
+
+  it('unblocks them once the Bracket is discarded', () => {
+    const s = discardBracket(startFinals(withTwoAlliancesOfTwo()));
+    for (const action of ['undo-decline', 'move', 'remove', 'start-finals', 'set-third-place']) {
+      expect(getAllianceSelectionBlockReason(s, action)).toBeNull();
+    }
   });
 });
 

@@ -20,7 +20,9 @@ import {
   setBracketConfig,
   movePlayoffAlliance,
   declineTeam,
+  undoDecline,
   startFinals,
+  discardBracket,
   recordEliminationResult,
   setEliminationNoShow,
   setEliminationDraftScore,
@@ -423,6 +425,68 @@ describe('startFinals', () => {
   });
 });
 
+describe('Alliance Selection locked while a Bracket exists', () => {
+  /** Two alliances (Alpha & Bravo, Charlie alone), Delta Declined, then Start Finals. */
+  function withBracket() {
+    let s = setBracketConfig(withFourTeams(createInitialState()), { bracketSize: 3, includeThirdPlace: false });
+    const [a, b, c, d] = s.teams.map((t) => t.id);
+    s = formPlayoffAlliance(s, a, b);
+    s = formPlayoffAlliance(s, c, c);
+    s = declineTeam(s, d);
+    return startFinals(s);
+  }
+
+  it('every Alliance Selection action is a no-op', () => {
+    const s = withBracket();
+    const [allianceA, allianceB] = s.elimination.alliances.map((a) => a.id);
+    const delta = s.teams[3].id;
+    expect(formPlayoffAlliance(s, delta, delta)).toBe(s);
+    expect(removePlayoffAlliance(s, allianceA)).toBe(s);
+    expect(movePlayoffAlliance(s, allianceB, -1)).toBe(s);
+    expect(undoDecline(s, delta)).toBe(s);
+    expect(setBracketConfig(s, { bracketSize: 4 })).toBe(s);
+    expect(setBracketConfig(s, { includeThirdPlace: true })).toBe(s);
+    expect(startFinals(s)).toBe(s);
+  });
+
+  it('declining is a no-op', () => {
+    // Raise Bracket Size behind the lock's back, so only the lock can refuse the Decline.
+    const locked = withBracket();
+    const s = { ...locked, elimination: { ...locked.elimination, bracketSize: 8, declinedTeamIds: [] } };
+    expect(declineTeam(s, s.teams[3].id)).toBe(s);
+  });
+
+  it('Discard Bracket clears the Bracket and the Podium reveal, and keeps alliances, Declines, and settings', () => {
+    let s = withBracket();
+    const final = s.elimination.bracket.matches.find((m) => m.round === 'final');
+    s = recordEliminationResult(s, final.id, { scoreA: 5, scoreB: 1 });
+    s = revealNextPlacement(s);
+    expect(getRevealedCount(s)).toBe(1);
+
+    const next = discardBracket(s);
+    expect(next.elimination.bracket).toBeNull();
+    expect(next.podium).toEqual(createInitialState().podium);
+    expect(next.elimination.alliances).toBe(s.elimination.alliances);
+    expect(next.elimination.declinedTeamIds).toBe(s.elimination.declinedTeamIds);
+    expect(next.elimination.bracketSize).toBe(2);
+    expect(next.elimination.includeThirdPlace).toBe(false);
+  });
+
+  it('after Discard Bracket, Alliance Selection is editable and Start Finals builds a new Bracket', () => {
+    let s = discardBracket(withBracket());
+    const [, allianceB] = s.elimination.alliances.map((a) => a.id);
+    s = movePlayoffAlliance(s, allianceB, -1);
+    expect(s.elimination.alliances[0].id).toBe(allianceB);
+    s = startFinals(s);
+    expect(s.elimination.bracket.seeds[0]).toBe(allianceB);
+  });
+
+  it('Discard Bracket is a no-op with no Bracket', () => {
+    const s = withFourTeams(createInitialState());
+    expect(discardBracket(s)).toBe(s);
+  });
+});
+
 describe('elimination results', () => {
 
   it('records an elimination match result', () => {
@@ -607,9 +671,9 @@ describe('Podium reveal', () => {
     expect([...getRevealedPlaces(s)]).toEqual([2]);
   });
 
-  it('starting the Finals again clears reveal progress', () => {
+  it('discarding the Bracket and starting the Finals again clears reveal progress', () => {
     const s = revealNextPlacement(completeAll(withBracket()));
-    expect(startFinals(s).podium.revealedCount).toBe(0);
+    expect(startFinals(discardBracket(s)).podium.revealedCount).toBe(0);
   });
 
   it('Reset Results and New Tournament clear reveal progress', () => {

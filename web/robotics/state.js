@@ -203,7 +203,7 @@ export function playoffAllianceTeamIds(state, allianceId) {
   return state.elimination.alliances.find((a) => a.id === allianceId)?.teamIds ?? [];
 }
 
-/** A no-op once selection is complete (getAllianceSelectionBlockReason blocks 'pick'). */
+/** A no-op once selection is complete or while a Bracket exists (getAllianceSelectionBlockReason blocks 'pick'). */
 export function formPlayoffAlliance(state, teamIdA, teamIdB) {
   if (getAllianceSelectionBlockReason(state, 'pick')) return state;
   const teamIds = teamIdA === teamIdB ? [teamIdA] : [teamIdA, teamIdB];
@@ -215,7 +215,9 @@ export function formPlayoffAlliance(state, teamIdA, teamIdB) {
   return { ...state, elimination: { ...state.elimination, alliances: [...state.elimination.alliances, alliance] } };
 }
 
+/** A no-op while a Bracket exists. */
 export function removePlayoffAlliance(state, allianceId) {
+  if (getAllianceSelectionBlockReason(state, 'remove')) return state;
   return {
     ...state,
     elimination: { ...state.elimination, alliances: state.elimination.alliances.filter((a) => a.id !== allianceId) },
@@ -224,7 +226,7 @@ export function removePlayoffAlliance(state, allianceId) {
 
 /**
  * Records that teamId Declined; it then counts against every Alliance Captain until undoDecline.
- * A no-op once selection is complete (getAllianceSelectionBlockReason blocks 'decline').
+ * A no-op once selection is complete or while a Bracket exists (getAllianceSelectionBlockReason blocks 'decline').
  */
 export function declineTeam(state, teamId) {
   const declinedTeamIds = getDeclinedTeamIds(state);
@@ -232,17 +234,20 @@ export function declineTeam(state, teamId) {
   return { ...state, elimination: { ...state.elimination, declinedTeamIds: [...declinedTeamIds, teamId] } };
 }
 
-/** Undo a Decline. */
+/** Undo a Decline. A no-op while a Bracket exists. */
 export function undoDecline(state, teamId) {
+  if (getAllianceSelectionBlockReason(state, 'undo-decline')) return state;
   const declinedTeamIds = getDeclinedTeamIds(state).filter((id) => id !== teamId);
   return { ...state, elimination: { ...state.elimination, declinedTeamIds } };
 }
 
 /**
  * Moves a Playoff Alliance one place up (direction -1) or down (+1) the list, changing
- * its Seed: alliance N in the list is Seed N. A no-op past either end or for an unknown id.
+ * its Seed: alliance N in the list is Seed N. A no-op past either end, for an unknown id, or
+ * while a Bracket exists.
  */
 export function movePlayoffAlliance(state, allianceId, direction) {
+  if (getAllianceSelectionBlockReason(state, 'move')) return state;
   const alliances = state.elimination.alliances;
   const index = alliances.findIndex((a) => a.id === allianceId);
   const other = index + direction;
@@ -254,10 +259,12 @@ export function movePlayoffAlliance(state, allianceId, direction) {
 
 /**
  * Sets Bracket Size and/or the Third-Place Match toggle; fields left out of the patch are kept.
- * A no-op when the patch would lower Bracket Size below the number of alliances formed.
+ * A no-op when the patch would lower Bracket Size below the number of alliances formed, or
+ * while a Bracket exists.
  */
 export function setBracketConfig(state, patch) {
   if ('bracketSize' in patch && getAllianceSelectionBlockReason(state, 'set-bracket-size', patch)) return state;
+  if ('includeThirdPlace' in patch && getAllianceSelectionBlockReason(state, 'set-third-place')) return state;
   return { ...state, elimination: { ...state.elimination, ...patch } };
 }
 
@@ -266,7 +273,7 @@ export function setBracketConfig(state, patch) {
  * Alliances in list order (alliance N is Seed N), using the effective Bracket Size (the
  * Estimated Bracket Size until one is set). With fewer alliances formed than that, Bracket
  * Size becomes the number formed. A no-op while getAllianceSelectionBlockReason blocks
- * 'start-finals' (fewer than 2 alliances). Tournaments saved before Seeds became list
+ * 'start-finals' (fewer than 2 alliances, or a Bracket already exists). Tournaments saved before Seeds became list
  * order still carry a per-number `seeds` map; it's ignored here.
  */
 export function startFinals(state) {
@@ -277,6 +284,16 @@ export function startFinals(state) {
   const bracket = buildBracket({ bracketSize, seeds, includeThirdPlace });
   // A new bracket has new Placements, so any earlier Podium reveal no longer applies.
   return { ...state, elimination: { ...state.elimination, bracketSize, bracket }, podium: createInitialState().podium };
+}
+
+/**
+ * Discard Bracket: deletes the Elimination Bracket and its results, unlocking Alliance
+ * Selection, and resets the Podium reveal. Alliances, Declines, Bracket Size, and the
+ * Third-Place setting are kept, so Start Finals can build a new Bracket. A no-op with no Bracket.
+ */
+export function discardBracket(state) {
+  if (!state.elimination.bracket) return state;
+  return { ...state, elimination: { ...state.elimination, bracket: null }, podium: createInitialState().podium };
 }
 
 export function recordEliminationResult(state, matchId, { scoreA, scoreB }) {

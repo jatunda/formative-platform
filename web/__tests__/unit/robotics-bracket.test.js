@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { nextPowerOfTwo, seedOrder, buildBracket, resolveMatchSides, getBracketWinner, countUndecidedMatches, isBracketComplete, getPlacements } from '../../robotics/bracket.js';
+import { nextPowerOfTwo, seedOrder, buildBracket, resolveMatchSides, getBracketWinner, countUndecidedMatches, isBracketComplete, getPlacements, eliminationMatchLabel } from '../../robotics/bracket.js';
 
 describe('nextPowerOfTwo', () => {
   it('returns the same number when already a power of two', () => {
@@ -204,5 +204,16 @@ describe('getPlacements', () => {
       { place: 2, allianceId: 'a2' },
       { place: 3, allianceId: 'a3' },
     ]);
+  });
+});
+
+describe('eliminationMatchLabel', () => {
+  it('names a numbered-round match by round and 1-based slot, and the Final and Third-Place Match by name', () => {
+    const bracket = buildBracket({ bracketSize: 8, seeds: ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'], includeThirdPlace: true });
+    const labels = bracket.matches.map(eliminationMatchLabel);
+    expect(labels.slice(0, 4)).toEqual(['Round 1 · Match 1', 'Round 1 · Match 2', 'Round 1 · Match 3', 'Round 1 · Match 4']);
+    expect(labels).toContain('Round 2 · Match 2');
+    expect(labels).toContain('Final');
+    expect(labels).toContain('Third-Place Match');
   });
 });

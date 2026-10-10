@@ -760,6 +760,18 @@ body {
   text-transform: uppercase;
 }
 
+/* Stands in for Start Finals while a Bracket locks Alliance Selection. */
+.robotics-card.robotics-finals-in-progress {
+  display: grid;
+  gap: var(--spacing-sm);
+  border-color: var(--arena-live);
+}
+
+.robotics-finals-in-progress p {
+  margin: 0;
+  color: var(--arena-text-muted);
+}
+
 .robotics-card {
   border: 1px solid var(--arena-border);
   border-radius: var(--radius-2xl);

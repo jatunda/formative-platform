@@ -22,6 +22,7 @@ import {
   movePlayoffAlliance,
   setBracketConfig,
   startFinals,
+  discardBracket,
   recordEliminationResult,
   setEliminationNoShow,
   setEliminationDraftScore,
@@ -44,7 +45,7 @@ import {
   timeOfDayToEpochMs,
 } from './match-timeline.js';
 import { computeStandings, formatRecord } from './standings.js';
-import { resolveMatchSides, getMatchWinner, isBracketComplete, countUndecidedMatches, getPlacements } from './bracket.js';
+import { resolveMatchSides, getMatchWinner, isBracketComplete, countUndecidedMatches, getPlacements, getPlayedEliminationMatches, eliminationMatchLabel } from './bracket.js';
 import {
   getAllianceCaptain,
   getSelectionRowStatus,
@@ -182,6 +183,20 @@ function markLocked(control, reason) {
   control.classList.add('is-locked');
 }
 
+/**
+ * A locked input stays visible and focusable, but reads as locked and a click only explains
+ * why. A checkbox's click is cancelled, so it never toggles.
+ */
+function lockField(input, reason) {
+  input.readOnly = true;
+  input.title = reason;
+  input.classList.add('robotics-locked-field');
+  input.addEventListener('click', (e) => {
+    if (input.type === 'checkbox') e.preventDefault();
+    showToast(reason, { isError: true });
+  });
+}
+
 // ---- Tab: Teams ----
 
 function renderRegenerateMatchupsButton(state, dispatch) {
@@ -259,12 +274,7 @@ export function renderTeamsTab(state, dispatch) {
     }
   });
   if (locked) {
-    [nameInput, membersInput].forEach((input) => {
-      input.readOnly = true;
-      input.title = lockHint;
-      input.classList.add('robotics-locked-field');
-      input.addEventListener('click', () => showToast(lockHint, { isError: true }));
-    });
+    [nameInput, membersInput].forEach((input) => lockField(input, lockHint));
     markLocked(addBtn, lockHint);
   }
   section.appendChild(el('div', { className: 'robotics-card robotics-teams-add' }, [
@@ -947,7 +957,8 @@ function renderSelectionStandings(state, dispatch, captainId, { pick, pickDeclin
 /**
  * Bracket Size and the Third-Place Match toggle, each saved as soon as it changes. Bracket
  * Size shows the Estimated Bracket Size until the teacher sets it. Lowering it below the
- * number of alliances formed is refused with a toast, and the input reverts.
+ * number of alliances formed is refused with a toast, and the input reverts. Both are
+ * locked while a Bracket exists.
  */
 function renderSelectionSettings(state, dispatch) {
   const card = el('div', { className: 'robotics-card robotics-selection-settings' });
@@ -967,9 +978,18 @@ function renderSelectionSettings(state, dispatch) {
   });
   const thirdPlaceInput = el('input', { type: 'checkbox' });
   thirdPlaceInput.checked = state.elimination.includeThirdPlace;
+  const thirdPlaceReason = getAllianceSelectionBlockReason(state, 'set-third-place');
   thirdPlaceInput.addEventListener('change', () => {
+    if (thirdPlaceReason) {
+      showToast(thirdPlaceReason, { isError: true });
+      thirdPlaceInput.checked = state.elimination.includeThirdPlace;
+      return;
+    }
     dispatch((s) => setBracketConfig(s, { includeThirdPlace: thirdPlaceInput.checked }));
   });
+  const sizeReason = getAllianceSelectionBlockReason(state, 'set-bracket-size', { bracketSize: savedSize });
+  if (sizeReason) lockField(sizeInput, sizeReason);
+  if (thirdPlaceReason) lockField(thirdPlaceInput, thirdPlaceReason);
   card.appendChild(el('label', { className: 'robotics-field' }, ['Bracket size', sizeInput]));
   card.appendChild(el('label', { className: 'robotics-field robotics-checkbox-field' }, [thirdPlaceInput, 'Include third-place match']));
   return card;
@@ -993,8 +1013,9 @@ function renderSelectionAllianceList(state, dispatch) {
         ariaLabel,
         onAllowed: () => dispatch((s) => movePlayoffAlliance(s, alliance.id, direction)),
       });
+      // Past either end there's nowhere to move, but a locked button still explains the lock.
       const target = i + direction;
-      btn.disabled = target < 0 || target >= alliances.length;
+      btn.disabled = !btn.classList.contains('is-locked') && (target < 0 || target >= alliances.length);
       return btn;
     };
     list.appendChild(el('li', { className: 'robotics-selection-alliance' }, [
@@ -1127,9 +1148,51 @@ function startFinalsAfterConfirmIfShort(state, dispatch, setActiveTab) {
   });
 }
 
+/** "Final (Alpha & Bravo 5–1 Charlie & Delta)" for each Elimination Match marked complete. */
+function describeRecordedEliminationResults(state) {
+  const { bracket } = state.elimination;
+  return getPlayedEliminationMatches(bracket).filter((m) => m.completed).map((match) => {
+    const sides = resolveMatchSides(bracket, match.id);
+    return `${eliminationMatchLabel(match)} (${playoffAllianceLabel(state, sides.allianceA)} ${match.scoreA}–${match.scoreB} ${playoffAllianceLabel(state, sides.allianceB)})`;
+  });
+}
+
+/** Discard Bracket, after a confirm naming every recorded Elimination result it deletes. */
+function discardBracketAfterConfirm(state, dispatch) {
+  const results = describeRecordedEliminationResults(state);
+  const lost = results.length
+    ? `This deletes the Elimination Bracket and its recorded results: ${results.join('; ')}.`
+    : 'This deletes the Elimination Bracket. No Elimination results have been recorded yet.';
+  showConfirm({
+    title: 'Discard Bracket?',
+    message: `${lost} Alliances, Declines, and Bracket settings are kept, so Start Finals can build a new Bracket.`,
+    confirmLabel: 'Discard Bracket',
+  }).then((confirmed) => {
+    if (confirmed) dispatch((s) => discardBracket(s));
+  });
+}
+
+/** Shown in place of the Captain banner and Start Finals while a Bracket locks Alliance Selection. */
+function renderFinalsInProgressCard(state, dispatch, setActiveTab) {
+  return el('div', { className: 'robotics-card robotics-finals-in-progress' }, [
+    el('h3', { className: 'robotics-card-title' }, ['Finals in progress']),
+    el('p', {}, ['Alliance Selection is locked while the Bracket exists.']),
+    el('button', {
+      className: 'robotics-btn robotics-btn-primary robotics-start-finals-btn',
+      onClick: () => setActiveTab('finals'),
+    }, ['On to Finals →']),
+    el('button', {
+      className: 'robotics-btn robotics-btn-secondary',
+      onClick: () => discardBracketAfterConfirm(state, dispatch),
+    }, ['Discard Bracket']),
+  ]);
+}
+
 /**
  * Alliance Selection: the class watches Playoff Alliances form. Standings (with whose turn
  * it is) in the main column; Bracket settings, the alliance list, and Start Finals beside it.
+ * Once the Finals have started, the Standings and alliances stay up but every control is
+ * locked, and a "Finals in progress" card replaces the banner and Start Finals.
  */
 export function renderAllianceSelectionTab(state, dispatch, { setActiveTab, ui }) {
   const captainId = getAllianceCaptain(state, ui.captainOverride);
@@ -1141,17 +1204,20 @@ export function renderAllianceSelectionTab(state, dispatch, { setActiveTab, ui }
       'The Qualification Round isn’t finished — Standings and the Alliance Captain may still change.',
     ]));
   }
-  main.appendChild(renderSelectionBanner(state, captainId, actions, ui));
+  const finalsStarted = Boolean(state.elimination.bracket);
+  if (!finalsStarted) main.appendChild(renderSelectionBanner(state, captainId, actions, ui));
   main.appendChild(renderSelectionStandings(state, dispatch, captainId, actions));
 
   const side = el('div', { className: 'robotics-selection-side' }, [
     renderSelectionSettings(state, dispatch),
     renderSelectionAllianceList(state, dispatch),
-    renderSelectionActionButton(state, 'start-finals', {
-      className: 'robotics-btn robotics-btn-primary robotics-start-finals-btn',
-      label: 'Start Finals →',
-      onAllowed: () => startFinalsAfterConfirmIfShort(state, dispatch, setActiveTab),
-    }),
+    finalsStarted
+      ? renderFinalsInProgressCard(state, dispatch, setActiveTab)
+      : renderSelectionActionButton(state, 'start-finals', {
+        className: 'robotics-btn robotics-btn-primary robotics-start-finals-btn',
+        label: 'Start Finals →',
+        onAllowed: () => startFinalsAfterConfirmIfShort(state, dispatch, setActiveTab),
+      }),
   ]);
   return el('div', { className: 'robotics-selection-layout' }, [main, side]);
 }

@@ -5,6 +5,7 @@ import { computeStandings } from './standings.js';
 // state actions that enforce a rule ask the same ones, so the two can never disagree.
 
 const MIN_ALLIANCES_TO_START_FINALS = 2;
+const LOCKED_MESSAGE = 'Locked — the Finals have started. Discard Bracket to change alliances.';
 
 /** @returns {number} the 1-based alliance number (its Seed) of the Playoff Alliance holding teamId, or 0 if none does. */
 function allianceNumberOf(state, teamId) {
@@ -94,14 +95,16 @@ export function getSelectionRowStatus(state, teamId, captainId = getAllianceCapt
 /**
  * Why an Alliance Selection action can't happen right now, as the toast to show, or null
  * when it's allowed. Actions: 'pick', 'decline', 'undo-decline', 'move', 'remove',
- * 'start-finals', and 'set-bracket-size', which also takes the `bracketSize` being set
- * (null clears it back to the Estimated Bracket Size).
+ * 'start-finals', 'set-third-place', and 'set-bracket-size', which also takes the
+ * `bracketSize` being set (null clears it back to the Estimated Bracket Size). Every action
+ * is locked while an Elimination Bracket exists, until Discard Bracket.
  * @param {object} state
  * @param {string} action
  * @param {{bracketSize?: number|null}} [args]
  * @returns {string|null}
  */
 export function getAllianceSelectionBlockReason(state, action, { bracketSize } = {}) {
+  if (state.elimination.bracket) return LOCKED_MESSAGE;
   const formed = state.elimination.alliances.length;
   if (action === 'start-finals' && formed < MIN_ALLIANCES_TO_START_FINALS) {
     return `Form at least ${MIN_ALLIANCES_TO_START_FINALS} alliances before starting the Finals.`;

@@ -168,6 +168,13 @@ export function getBracketWinner(bracket) {
   return final ? getMatchWinner(bracket, final.id) : null;
 }
 
+/** How an Elimination Match is named to the teacher: "Round R · Match S", "Third-Place Match", or "Final". */
+export function eliminationMatchLabel(match) {
+  if (match.round === 'final') return 'Final';
+  if (match.round === 'third-place') return 'Third-Place Match';
+  return `Round ${match.round} · Match ${match.slot + 1}`;
+}
+
 /** Elimination Matches actually played - Byes occupy no slot and never complete. */
 export function getPlayedEliminationMatches(bracket) {
   return bracket.matches.filter((m) => !m.isBye);
