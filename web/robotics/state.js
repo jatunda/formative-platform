@@ -1,6 +1,6 @@
 import { generateQualificationMatches } from './pairing-draw.js';
 import { buildBracket, isBracketComplete, getPlacements } from './bracket.js';
-import { getAllianceSelectionBlockReason, getDeclinedTeamIds } from './alliance-selection.js';
+import { getAllianceSelectionBlockReason, getDeclinedTeamIds, getEffectiveBracketSize } from './alliance-selection.js';
 
 let idCounter = 0;
 function generateId(prefix) {
@@ -203,7 +203,9 @@ export function playoffAllianceTeamIds(state, allianceId) {
   return state.elimination.alliances.find((a) => a.id === allianceId)?.teamIds ?? [];
 }
 
+/** A no-op once selection is complete (getAllianceSelectionBlockReason blocks 'pick'). */
 export function formPlayoffAlliance(state, teamIdA, teamIdB) {
+  if (getAllianceSelectionBlockReason(state, 'pick')) return state;
   const teamIds = teamIdA === teamIdB ? [teamIdA] : [teamIdA, teamIdB];
   const alreadyUsed = new Set(state.elimination.alliances.flatMap((a) => a.teamIds));
   if (teamIds.some((id) => alreadyUsed.has(id))) {
@@ -220,10 +222,13 @@ export function removePlayoffAlliance(state, allianceId) {
   };
 }
 
-/** Records that teamId Declined; it then counts against every Alliance Captain until undoDecline. */
+/**
+ * Records that teamId Declined; it then counts against every Alliance Captain until undoDecline.
+ * A no-op once selection is complete (getAllianceSelectionBlockReason blocks 'decline').
+ */
 export function declineTeam(state, teamId) {
   const declinedTeamIds = getDeclinedTeamIds(state);
-  if (declinedTeamIds.includes(teamId)) return state;
+  if (declinedTeamIds.includes(teamId) || getAllianceSelectionBlockReason(state, 'decline')) return state;
   return { ...state, elimination: { ...state.elimination, declinedTeamIds: [...declinedTeamIds, teamId] } };
 }
 
@@ -247,23 +252,27 @@ export function movePlayoffAlliance(state, allianceId, direction) {
   return { ...state, elimination: { ...state.elimination, alliances: reordered } };
 }
 
-/** Sets Bracket Size and/or the Third-Place Match toggle; fields left out of the patch are kept. */
+/**
+ * Sets Bracket Size and/or the Third-Place Match toggle; fields left out of the patch are kept.
+ * A no-op when the patch would lower Bracket Size below the number of alliances formed.
+ */
 export function setBracketConfig(state, patch) {
+  if ('bracketSize' in patch && getAllianceSelectionBlockReason(state, 'set-bracket-size', patch)) return state;
   return { ...state, elimination: { ...state.elimination, ...patch } };
 }
 
 /**
  * Start Finals: builds the Elimination Bracket from the first Bracket Size Playoff
- * Alliances in list order (alliance N is Seed N). With no usable Bracket Size, or fewer
- * alliances formed than it, Bracket Size becomes the number formed. A no-op while
- * getAllianceSelectionBlockReason blocks 'start-finals' (fewer than 2 alliances).
- * Tournaments saved before Seeds became list order still carry a per-number `seeds`
- * map; it's ignored here.
+ * Alliances in list order (alliance N is Seed N), using the effective Bracket Size (the
+ * Estimated Bracket Size until one is set). With fewer alliances formed than that, Bracket
+ * Size becomes the number formed. A no-op while getAllianceSelectionBlockReason blocks
+ * 'start-finals' (fewer than 2 alliances). Tournaments saved before Seeds became list
+ * order still carry a per-number `seeds` map; it's ignored here.
  */
 export function startFinals(state) {
   if (getAllianceSelectionBlockReason(state, 'start-finals')) return state;
-  const { alliances, bracketSize: chosenSize, includeThirdPlace } = state.elimination;
-  const bracketSize = chosenSize >= 2 ? Math.min(chosenSize, alliances.length) : alliances.length;
+  const { alliances, includeThirdPlace } = state.elimination;
+  const bracketSize = Math.min(getEffectiveBracketSize(state), alliances.length);
   const seeds = alliances.slice(0, bracketSize).map((a) => a.id);
   const bracket = buildBracket({ bracketSize, seeds, includeThirdPlace });
   // A new bracket has new Placements, so any earlier Podium reveal no longer applies.

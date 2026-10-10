@@ -685,6 +685,14 @@ body {
   font-weight: 700;
 }
 
+.robotics-selection-row.is-not-advancing {
+  opacity: 0.7;
+}
+
+.robotics-selection-tag.is-not-advancing {
+  font-style: italic;
+}
+
 .robotics-selection-tag.is-declined {
   padding: 2px var(--spacing-sm);
   border-radius: var(--radius-sm);

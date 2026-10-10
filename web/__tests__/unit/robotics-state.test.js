@@ -316,6 +316,23 @@ describe('playoff alliances and bracket generation', () => {
     expect(state.elimination.bracketSize).toBe(4);
     expect(state.elimination.includeThirdPlace).toBe(false);
   });
+
+  it('setBracketConfig refuses a Bracket Size below the number of alliances formed', () => {
+    let state = withFourTeams(createInitialState());
+    state.teams.slice(0, 3).forEach((t) => { state = formPlayoffAlliance(state, t.id, t.id); });
+    expect(setBracketConfig(state, { bracketSize: 2 })).toBe(state);
+    expect(setBracketConfig(state, { bracketSize: 3 }).elimination.bracketSize).toBe(3);
+    expect(setBracketConfig(state, { includeThirdPlace: false }).elimination.includeThirdPlace).toBe(false);
+  });
+
+  it('forming an alliance or declining is a no-op once Bracket Size alliances have formed', () => {
+    let state = setBracketConfig(withFourTeams(createInitialState()), { bracketSize: 2 });
+    const [t1, t2, t3, t4] = state.teams;
+    state = formPlayoffAlliance(state, t1.id, t1.id);
+    state = formPlayoffAlliance(state, t2.id, t2.id);
+    expect(formPlayoffAlliance(state, t3.id, t4.id)).toBe(state);
+    expect(declineTeam(state, t3.id)).toBe(state);
+  });
 });
 
 describe('movePlayoffAlliance', () => {
@@ -361,7 +378,7 @@ describe('startFinals', () => {
     expect(startFinals(one)).toBe(one);
   });
 
-  it('builds the Bracket from every alliance, seeded in list order, when no Bracket Size is set', () => {
+  it('builds the Bracket from every alliance, seeded in list order, when fewer than the Estimated Bracket Size have formed', () => {
     let s = withAlliances(3);
     s = movePlayoffAlliance(s, s.elimination.alliances[2].id, -1);
     const next = startFinals(s);
@@ -370,8 +387,17 @@ describe('startFinals', () => {
   });
 
   it('enters only the first Bracket Size alliances when more have formed', () => {
-    const s = setBracketConfig(withAlliances(4), { bracketSize: 2 });
+    // Only reachable from a Tournament saved before Bracket Size capped Alliance Selection.
+    const formed = withAlliances(4);
+    const s = { ...formed, elimination: { ...formed.elimination, bracketSize: 2 } };
     expect(startFinals(s).elimination.bracket.seeds).toEqual(allianceIds(s).slice(0, 2));
+  });
+
+  it('falls back to the Estimated Bracket Size when no Bracket Size is set', () => {
+    const s = setTimelineConfig(withAlliances(4), { estimatedBracketSize: 2 });
+    const next = startFinals(s);
+    expect(next.elimination.bracket.seeds).toEqual(allianceIds(s).slice(0, 2));
+    expect(next.elimination.bracketSize).toBe(2);
   });
 
   it('shrinks Bracket Size to the number of alliances formed when fewer have', () => {

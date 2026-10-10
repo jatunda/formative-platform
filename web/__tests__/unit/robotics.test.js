@@ -1570,7 +1570,7 @@ describe('initRoboticsApp', () => {
     };
     /** Row status class and last-cell text per Team name, in table order. */
     const rows = () => [...document.querySelectorAll('.robotics-selection-row')].map((tr) => {
-      const status = ['is-in-alliance', 'is-captain', 'is-declined', 'is-available'].find((c) => tr.classList.contains(c));
+      const status = ['is-in-alliance', 'is-captain', 'is-declined', 'is-available', 'is-not-advancing'].find((c) => tr.classList.contains(c));
       return [tr.querySelector('.robotics-standings-team-name').textContent, status, tr.lastElementChild.textContent];
     });
     const rowButton = (name, label) => {
@@ -1884,12 +1884,138 @@ describe('initRoboticsApp', () => {
       const startBtn = [...root().querySelectorAll('button')].find((b) => b.textContent === 'Start Finals →');
       expect(startBtn.classList.contains('is-locked')).toBe(false);
       startBtn.click();
+      await clickDialogButton(root(), 'Start Finals');
       const { elimination, podium } = app.getState();
       expect(elimination.bracket.seeds).toEqual(elimination.alliances.map((a) => a.id));
       expect(allianceNames(app)).toEqual(['Charlie & Delta', 'Alpha & Bravo']);
       expect(podium.revealedCount).toBe(0);
       expect(document.querySelector('.robotics-tab-btn.active').dataset.tabKey).toBe('finals');
       expect(document.querySelector('.robotics-bracket')).toBeTruthy();
+    });
+
+    describe('Bracket Size caps Alliance Selection', () => {
+      const sizeInput = () => document.querySelector('.robotics-selection-side input[type="number"]');
+      const setSize = (value) => {
+        sizeInput().value = value;
+        sizeInput().dispatchEvent(new Event('change'));
+      };
+      const toastText = () => document.querySelector('.robotics-toast-visible')?.textContent;
+
+      /** NAMES with Bracket Size 2, and Alpha & Bravo and Charlie & Delta formed, leaving Echo. */
+      async function selectionComplete() {
+        const app = openSelection();
+        setSize('2');
+        await flushRender();
+        pickButton('Bravo').click();
+        await flushRender();
+        pickButton('Delta').click();
+        await flushRender();
+        return app;
+      }
+
+      it('prefills Bracket Size from the Estimated Bracket Size until the teacher sets it', async () => {
+        const app = openSelection();
+        expect(sizeInput().value).toBe('8');
+        app.dispatch((s) => setTimelineConfig(s, { estimatedBracketSize: 4 }));
+        await flushRender();
+        expect(sizeInput().value).toBe('4');
+        setSize('3');
+        await flushRender();
+        expect(app.getState().elimination.bracketSize).toBe(3);
+        expect(sizeInput().value).toBe('3');
+      });
+
+      it('once Bracket Size alliances have formed, says so and tags the rest not advancing', async () => {
+        await selectionComplete();
+        expect(banner()).toBe('All 2 alliances formed');
+        expect(captainSelect()).toBeNull();
+        expect(rows()).toEqual([
+          ['Alpha', 'is-in-alliance', 'Alliance 1'],
+          ['Bravo', 'is-in-alliance', 'Alliance 1'],
+          ['Charlie', 'is-in-alliance', 'Alliance 2'],
+          ['Delta', 'is-in-alliance', 'Alliance 2'],
+          ['Echo', 'is-not-advancing', 'Not advancingPickDeclined'],
+        ]);
+      });
+
+      it('leaves Pick and Declined visible but inactive, explaining in a toast', async () => {
+        const app = await selectionComplete();
+        const before = app.getState();
+        const message = 'All 2 alliances are formed. Raise Bracket Size to keep picking.';
+        for (const label of ['Pick', 'Declined']) {
+          const btn = rowButton('Echo', label);
+          expect(btn.classList.contains('is-locked')).toBe(true);
+          btn.click();
+          expect(app.getState()).toBe(before);
+          expect(toastText()).toBe(message);
+        }
+      });
+
+      it('keeps a Declined badge and Undo on a Team that Declined before the cut', async () => {
+        const app = openSelection();
+        rowButton('Echo', 'Declined').click();
+        await flushRender();
+        setSize('2');
+        await flushRender();
+        pickButton('Bravo').click();
+        await flushRender();
+        pickButton('Delta').click();
+        await flushRender();
+        expect(rows()[4]).toEqual(['Echo', 'is-not-advancing', 'Not advancingDeclinedPickUndo']);
+        rowButton('Echo', 'Undo').click();
+        expect(app.getState().elimination.declinedTeamIds).toEqual([]);
+      });
+
+      it('raising Bracket Size resumes picking', async () => {
+        const app = await selectionComplete();
+        setSize('3');
+        await flushRender();
+        expect(app.getState().elimination.bracketSize).toBe(3);
+        expect(banner()).toBe('Echo is the last Team — no partners left');
+        expect(rows()[4][1]).toBe('is-captain');
+      });
+
+      it('refuses lowering Bracket Size below the number formed, and reverts the input', async () => {
+        const app = await selectionComplete();
+        setSize('3');
+        await flushRender();
+        clickButtonWithText(document.querySelector('.robotics-selection-banner'), 'Form single-Team alliance');
+        await flushRender();
+        expect(app.getState().elimination.alliances).toHaveLength(3);
+
+        const before = app.getState();
+        setSize('2');
+        expect(app.getState()).toBe(before);
+        expect(toastText()).toBe('3 alliances are already formed. Remove alliances before lowering Bracket Size below 3.');
+        expect(document.querySelector('.robotics-toast-visible').className).toContain('robotics-toast-error');
+        expect(sizeInput().value).toBe('3');
+      });
+
+      it('Start Finals short of Bracket Size asks first, and shrinks Bracket Size to match if confirmed', async () => {
+        const app = openSelection(['Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo', 'Foxtrot']);
+        setSize('4');
+        await flushRender();
+        pickButton('Bravo').click();
+        await flushRender();
+        pickButton('Delta').click();
+        await flushRender();
+        pickButton('Foxtrot').click();
+        await flushRender();
+
+        const before = app.getState();
+        clickButtonWithText(root(), 'Start Finals →');
+        expect(root().querySelector('.robotics-confirm-dialog').textContent)
+          .toContain('Only 3 of 4 alliances formed — start Finals with 3?');
+        await clickDialogButton(root(), 'Cancel');
+        expect(app.getState()).toBe(before);
+        expect(document.querySelector('.robotics-tab-btn.active').dataset.tabKey).toBe('alliance-selection');
+
+        clickButtonWithText(root(), 'Start Finals →');
+        await clickDialogButton(root(), 'Start Finals');
+        expect(app.getState().elimination.bracketSize).toBe(3);
+        expect(app.getState().elimination.bracket.bracketSize).toBe(3);
+        expect(document.querySelector('.robotics-tab-btn.active').dataset.tabKey).toBe('finals');
+      });
     });
 
     it('loads a Tournament saved with the old per-number seed map, and Start Finals ignores it', () => {

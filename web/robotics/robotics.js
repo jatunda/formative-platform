@@ -45,7 +45,14 @@ import {
 } from './match-timeline.js';
 import { computeStandings, formatRecord } from './standings.js';
 import { resolveMatchSides, getMatchWinner, isBracketComplete, countUndecidedMatches, getPlacements } from './bracket.js';
-import { getAllianceCaptain, getSelectionRowStatus, getAllianceSelectionBlockReason, getPickableTeams } from './alliance-selection.js';
+import {
+  getAllianceCaptain,
+  getSelectionRowStatus,
+  getAllianceSelectionBlockReason,
+  getPickableTeams,
+  getEffectiveBracketSize,
+  isSelectionComplete,
+} from './alliance-selection.js';
 import { bracketColumnSpacerGrowRatios } from './bracket-layout.js';
 import { launchConfetti } from './confetti.js';
 import { getCurrentMatchIndex, getUpNextMatchIndex } from './current-match.js';
@@ -886,7 +893,8 @@ function renderSelectionActionButton(state, action, { className, label, ariaLabe
 /**
  * The Standings with each row's Alliance Selection status: "Alliance N", the Captain, or Pick
  * and Declined buttons. A Declined row shows a badge, Pick (which asks before overriding the
- * Decline), and Undo.
+ * Decline), and Undo. Once selection is complete, the Teams left over are tagged "Not
+ * advancing" and keep their buttons, which then only explain why they're inactive.
  */
 function renderSelectionStandings(state, dispatch, captainId, { pick, pickDeclined }) {
   const card = el('div', { className: 'robotics-card robotics-selection-standings' });
@@ -912,14 +920,19 @@ function renderSelectionStandings(state, dispatch, captainId, { pick, pickDeclin
     if (rowStatus.status === 'captain') {
       return el('span', { className: 'robotics-selection-tag is-captain' }, ['Picking']);
     }
-    if (rowStatus.status === 'declined') {
+    const tags = rowStatus.status === 'not-advancing'
+      ? [el('span', { className: 'robotics-selection-tag is-not-advancing' }, ['Not advancing'])]
+      : [];
+    if (rowStatus.status === 'declined' || rowStatus.declined) {
       return el('span', { className: 'robotics-selection-actions' }, [
+        ...tags,
         el('span', { className: 'robotics-selection-tag is-declined' }, ['Declined']),
         actionButton('pick', 'Pick', 'robotics-btn-secondary', () => pickDeclined(teamId)),
         actionButton('undo-decline', 'Undo', 'robotics-btn-ghost', () => dispatch((s) => undoDecline(s, teamId))),
       ]);
     }
     return el('span', { className: 'robotics-selection-actions' }, [
+      ...tags,
       actionButton('pick', 'Pick', 'robotics-btn-primary', () => pick(teamId)),
       actionButton('decline', 'Declined', 'robotics-btn-ghost', () => dispatch((s) => declineTeam(s, teamId))),
     ]);
@@ -931,14 +944,26 @@ function renderSelectionStandings(state, dispatch, captainId, { pick, pickDeclin
   return card;
 }
 
-/** Bracket Size and the Third-Place Match toggle, each saved as soon as it changes. */
+/**
+ * Bracket Size and the Third-Place Match toggle, each saved as soon as it changes. Bracket
+ * Size shows the Estimated Bracket Size until the teacher sets it. Lowering it below the
+ * number of alliances formed is refused with a toast, and the input reverts.
+ */
 function renderSelectionSettings(state, dispatch) {
   const card = el('div', { className: 'robotics-card robotics-selection-settings' });
   card.appendChild(el('h3', { className: 'robotics-card-title' }, ['Bracket']));
-  const sizeInput = el('input', { type: 'number', min: '2', value: state.elimination.bracketSize ?? '' });
+  const savedSize = getEffectiveBracketSize(state);
+  const sizeInput = el('input', { type: 'number', min: '2', value: savedSize });
   sizeInput.addEventListener('change', () => {
     const size = parseInt(sizeInput.value, 10);
-    dispatch((s) => setBracketConfig(s, { bracketSize: size >= 2 ? size : null }));
+    const bracketSize = size >= 2 ? size : null;
+    const reason = getAllianceSelectionBlockReason(state, 'set-bracket-size', { bracketSize });
+    if (reason) {
+      showToast(reason, { isError: true });
+      sizeInput.value = savedSize;
+      return;
+    }
+    dispatch((s) => setBracketConfig(s, { bracketSize }));
   });
   const thirdPlaceInput = el('input', { type: 'checkbox' });
   thirdPlaceInput.checked = state.elimination.includeThirdPlace;
@@ -1034,6 +1059,10 @@ function selectionPickActions(state, dispatch, captainId, ui) {
 function renderSelectionBanner(state, captainId, actions, ui) {
   const text = el('div', { className: 'robotics-selection-banner-text' });
   const banner = el('div', { className: 'robotics-selection-banner' }, [text]);
+  if (isSelectionComplete(state)) {
+    text.textContent = `All ${getEffectiveBracketSize(state)} alliances formed`;
+    return banner;
+  }
   if (!captainId) {
     text.textContent = 'No Teams left to pick';
     return banner;
@@ -1075,6 +1104,30 @@ function renderSelectionBanner(state, captainId, actions, ui) {
 }
 
 /**
+ * Start Finals, asking first when fewer alliances have formed than Bracket Size; startFinals
+ * then shrinks Bracket Size to the number formed.
+ */
+function startFinalsAfterConfirmIfShort(state, dispatch, setActiveTab) {
+  const start = () => {
+    dispatch((s) => startFinals(s));
+    setActiveTab('finals');
+  };
+  if (isSelectionComplete(state)) {
+    start();
+    return;
+  }
+  const formed = state.elimination.alliances.length;
+  const size = getEffectiveBracketSize(state);
+  showConfirm({
+    title: 'Start Finals Early?',
+    message: `Only ${formed} of ${size} alliances formed — start Finals with ${formed}?`,
+    confirmLabel: 'Start Finals',
+  }).then((confirmed) => {
+    if (confirmed) start();
+  });
+}
+
+/**
  * Alliance Selection: the class watches Playoff Alliances form. Standings (with whose turn
  * it is) in the main column; Bracket settings, the alliance list, and Start Finals beside it.
  */
@@ -1097,10 +1150,7 @@ export function renderAllianceSelectionTab(state, dispatch, { setActiveTab, ui }
     renderSelectionActionButton(state, 'start-finals', {
       className: 'robotics-btn robotics-btn-primary robotics-start-finals-btn',
       label: 'Start Finals →',
-      onAllowed: () => {
-        dispatch((s) => startFinals(s));
-        setActiveTab('finals');
-      },
+      onAllowed: () => startFinalsAfterConfirmIfShort(state, dispatch, setActiveTab),
     }),
   ]);
   return el('div', { className: 'robotics-selection-layout' }, [main, side]);

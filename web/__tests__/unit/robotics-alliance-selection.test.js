@@ -4,6 +4,8 @@ import {
   getSelectionRowStatus,
   getAllianceSelectionBlockReason,
   getPickableTeams,
+  getEffectiveBracketSize,
+  isSelectionComplete,
 } from '../../robotics/alliance-selection.js';
 import {
   createInitialState,
@@ -15,6 +17,8 @@ import {
   removePlayoffAlliance,
   declineTeam,
   undoDecline,
+  setBracketConfig,
+  setTimelineConfig,
 } from '../../robotics/state.js';
 import { computeStandings } from '../../robotics/standings.js';
 
@@ -223,10 +227,95 @@ describe('getAllianceSelectionBlockReason', () => {
     expect(getAllianceSelectionBlockReason(s, 'start-finals')).toBeNull();
   });
 
-  it('allows every other action for now', () => {
+  it('allows every other action while selection is open', () => {
     const s = createInitialState();
-    for (const action of ['pick', 'move', 'remove', 'decline', 'undo-decline']) {
+    for (const action of ['pick', 'move', 'remove', 'decline', 'undo-decline', 'set-bracket-size']) {
       expect(getAllianceSelectionBlockReason(s, action)).toBeNull();
     }
+  });
+
+  it('blocks Pick and Declined once selection is complete, but not Undo, ↑/↓, or Remove', () => {
+    const s = withTwoAlliancesOfTwo();
+    expect(getAllianceSelectionBlockReason(s, 'pick')).toBe('All 2 alliances are formed. Raise Bracket Size to keep picking.');
+    expect(getAllianceSelectionBlockReason(s, 'decline')).toBe('All 2 alliances are formed. Raise Bracket Size to keep picking.');
+    for (const action of ['undo-decline', 'move', 'remove', 'start-finals']) {
+      expect(getAllianceSelectionBlockReason(s, action)).toBeNull();
+    }
+  });
+
+  it('blocks a Bracket Size below the number of alliances formed', () => {
+    let s = withTeams(['Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo']);
+    ['Alpha', 'Bravo', 'Charlie'].forEach((name) => { s = formPlayoffAlliance(s, idOf(s, name), idOf(s, name)); });
+    const message = '3 alliances are already formed. Remove alliances before lowering Bracket Size below 3.';
+    expect(getAllianceSelectionBlockReason(s, 'set-bracket-size', { bracketSize: 2 })).toBe(message);
+    expect(getAllianceSelectionBlockReason(s, 'set-bracket-size', { bracketSize: 3 })).toBeNull();
+    expect(getAllianceSelectionBlockReason(s, 'set-bracket-size', { bracketSize: 6 })).toBeNull();
+  });
+
+  it('judges clearing Bracket Size by the Estimated Bracket Size it falls back to', () => {
+    let s = withTeams(['Alpha', 'Bravo', 'Charlie']);
+    ['Alpha', 'Bravo', 'Charlie'].forEach((name) => { s = formPlayoffAlliance(s, idOf(s, name), idOf(s, name)); });
+    expect(getAllianceSelectionBlockReason(s, 'set-bracket-size', { bracketSize: null })).toBeNull();
+    s = setTimelineConfig(s, { estimatedBracketSize: 2 });
+    expect(getAllianceSelectionBlockReason(s, 'set-bracket-size', { bracketSize: null })).toContain('3 alliances are already formed');
+  });
+});
+
+/** Alpha & Bravo, Charlie & Delta formed, with Bracket Size 2 and Echo and Foxtrot left over. */
+function withTwoAlliancesOfTwo() {
+  let s = withTeams(['Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo', 'Foxtrot']);
+  s = setBracketConfig(s, { bracketSize: 2 });
+  s = formPlayoffAlliance(s, idOf(s, 'Alpha'), idOf(s, 'Bravo'));
+  return formPlayoffAlliance(s, idOf(s, 'Charlie'), idOf(s, 'Delta'));
+}
+
+describe('getEffectiveBracketSize', () => {
+  it('is the Estimated Bracket Size until a Bracket Size is set', () => {
+    let s = setTimelineConfig(createInitialState(), { estimatedBracketSize: 6 });
+    expect(getEffectiveBracketSize(s)).toBe(6);
+    s = setBracketConfig(s, { bracketSize: 4 });
+    expect(getEffectiveBracketSize(s)).toBe(4);
+    s = setBracketConfig(s, { bracketSize: null });
+    expect(getEffectiveBracketSize(s)).toBe(6);
+  });
+});
+
+describe('selection complete at Bracket Size', () => {
+  it('is complete once the number of alliances formed reaches the effective Bracket Size', () => {
+    let s = withTeams(['Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo', 'Foxtrot']);
+    s = setBracketConfig(s, { bracketSize: 2 });
+    expect(isSelectionComplete(s)).toBe(false);
+    s = formPlayoffAlliance(s, idOf(s, 'Alpha'), idOf(s, 'Bravo'));
+    expect(isSelectionComplete(s)).toBe(false);
+    s = formPlayoffAlliance(s, idOf(s, 'Charlie'), idOf(s, 'Delta'));
+    expect(isSelectionComplete(s)).toBe(true);
+  });
+
+  it('falls back to the Estimated Bracket Size', () => {
+    let s = setTimelineConfig(withTeams(['Alpha', 'Bravo', 'Charlie', 'Delta']), { estimatedBracketSize: 2 });
+    s = formPlayoffAlliance(s, idOf(s, 'Alpha'), idOf(s, 'Bravo'));
+    s = formPlayoffAlliance(s, idOf(s, 'Charlie'), idOf(s, 'Delta'));
+    expect(isSelectionComplete(s)).toBe(true);
+  });
+
+  it('has no Captain, and tags the leftover Teams not advancing, noting any that Declined', () => {
+    let s = withTeams(['Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo', 'Foxtrot']);
+    s = declineTeam(s, idOf(s, 'Foxtrot'));
+    s = setBracketConfig(s, { bracketSize: 2 });
+    s = formPlayoffAlliance(s, idOf(s, 'Alpha'), idOf(s, 'Bravo'));
+    s = formPlayoffAlliance(s, idOf(s, 'Charlie'), idOf(s, 'Delta'));
+    expect(getAllianceCaptain(s)).toBeNull();
+    expect(getAllianceCaptain(s, idOf(s, 'Echo'))).toBeNull();
+    expect(getSelectionRowStatus(s, idOf(s, 'Alpha'))).toEqual({ status: 'in-alliance', allianceNumber: 1 });
+    expect(getSelectionRowStatus(s, idOf(s, 'Echo'))).toEqual({ status: 'not-advancing', declined: false });
+    expect(getSelectionRowStatus(s, idOf(s, 'Foxtrot'))).toEqual({ status: 'not-advancing', declined: true });
+  });
+
+  it('raising Bracket Size makes picking available again', () => {
+    let s = withTwoAlliancesOfTwo();
+    s = setBracketConfig(s, { bracketSize: 3 });
+    expect(isSelectionComplete(s)).toBe(false);
+    expect(getAllianceCaptain(s)).toBe(idOf(s, 'Echo'));
+    expect(getAllianceSelectionBlockReason(s, 'pick')).toBeNull();
   });
 });
