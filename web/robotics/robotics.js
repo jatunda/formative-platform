@@ -1304,12 +1304,23 @@ function renderBracket(state, dispatch) {
 /**
  * The Finals' Now Playing: the Elimination Current Match and Up Next, scored
  * with the same actions as the bracket cards. An Up Next side not yet decided
- * names the match it comes from. Null once every Elimination Match has a winner.
+ * names the match it comes from. Once every Elimination Match has a winner,
+ * the Playoffs complete card takes its place.
  */
-function renderFinalsNowPlaying(state, dispatch) {
+function renderFinalsNowPlaying(state, dispatch, setActiveTab) {
   const { bracket } = state.elimination;
   const currentId = getEliminationCurrentMatchId(bracket);
-  if (currentId === null) return null;
+  if (currentId === null) {
+    return renderNowPlaying(state, dispatch, {
+      current: null,
+      placeholder: renderPhaseCompleteCard({
+        message: 'Playoffs complete',
+        buttonLabel: 'Reveal Results →',
+        destinationTab: 'results',
+        setActiveTab,
+      }),
+    });
+  }
   const upNextId = getEliminationUpNextMatchId(bracket, currentId);
 
   const entries = getAllMatchesInScheduleOrder(state).filter((e) => e.kind === 'elimination');
@@ -1331,7 +1342,6 @@ function renderFinalsNowPlaying(state, dispatch) {
     },
     upNext,
     actions: ELIMINATION_MATCH_ACTIONS,
-    placeholder: null,
   });
 }
 
@@ -1346,17 +1356,8 @@ export function renderFinalsTab(state, dispatch, { setActiveTab }) {
     return section;
   }
 
-  const nowPlaying = renderFinalsNowPlaying(state, dispatch);
-  if (nowPlaying) section.appendChild(nowPlaying);
+  section.appendChild(renderFinalsNowPlaying(state, dispatch, setActiveTab));
   section.appendChild(renderBracket(state, dispatch));
-
-  if (isBracketComplete(state.elimination.bracket)) {
-    section.appendChild(el('button', {
-      className: 'robotics-btn robotics-btn-primary robotics-reveal-results-btn',
-      onClick: () => setActiveTab('results'),
-    }, ['Reveal Results →']));
-  }
-
   return section;
 }
 

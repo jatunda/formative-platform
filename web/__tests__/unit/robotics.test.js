@@ -2203,20 +2203,49 @@ describe('initRoboticsApp', () => {
       expect(root().querySelector('.robotics-bracket')).toBeNull();
     });
 
-    it('records an elimination result and offers Reveal Results (no Champion banner) once the final completes', async () => {
-      await openFinals();
-      const scoreInputs = root().querySelectorAll('.robotics-bracket .robotics-score-input');
-      scoreInputs[0].value = '80';
-      scoreInputs[1].value = '20';
-      clickButtonWithText(root().querySelector('.robotics-bracket'), 'Mark Complete');
-      await flushRender();
+    describe('Playoffs complete card', () => {
+      const card = () => root().querySelector('.robotics-now-playing');
+      async function completeFinal(scoreA, scoreB) {
+        const scoreInputs = root().querySelectorAll('.robotics-bracket .robotics-score-input');
+        scoreInputs[0].value = String(scoreA);
+        scoreInputs[1].value = String(scoreB);
+        root().querySelector('.robotics-bracket .robotics-match-actions button').click();
+        await flushRender();
+      }
 
-      expect(root().querySelector('.robotics-now-playing')).toBeNull();
-      expect(root().textContent).not.toContain('Champion');
-      expect(root().querySelector('.robotics-champion-banner')).toBeFalsy();
-      clickButtonWithText(root(), 'Reveal Results →');
-      expect(document.querySelector('.robotics-tab-btn.active').dataset.tabKey).toBe('results');
-      expect(document.querySelector('.robotics-podium')).toBeTruthy();
+      it('takes the Current Match area above the bracket once the Final has a winner, with no Champion banner', async () => {
+        await openFinals();
+        await completeFinal(80, 20);
+
+        const section = root().querySelector('.robotics-finals');
+        expect(section.firstElementChild.classList.contains('robotics-now-playing-layout')).toBe(true);
+        expect(section.firstElementChild.nextElementSibling.classList.contains('robotics-bracket')).toBe(true);
+        expect(card().classList.contains('is-finished')).toBe(true);
+        expect(card().querySelector('.robotics-now-playing-message').textContent).toBe('Playoffs complete');
+        expect(card().querySelector('.robotics-score-input')).toBeNull();
+        expect(root().querySelector('.robotics-reveal-results-btn')).toBeNull();
+        expect(root().textContent).not.toContain('Champion');
+        expect(root().querySelector('.robotics-champion-banner')).toBeFalsy();
+      });
+
+      it('Reveal Results → switches to the Results tab', async () => {
+        await openFinals();
+        await completeFinal(80, 20);
+        clickButtonWithText(card(), 'Reveal Results →');
+        expect(document.querySelector('.robotics-tab-btn.active').dataset.tabKey).toBe('results');
+        expect(document.querySelector('.robotics-podium')).toBeTruthy();
+      });
+
+      it('gives way to the Current Match again when an edit leaves the Final undecided', async () => {
+        await openFinals();
+        await completeFinal(80, 20);
+        expect(card().classList.contains('is-finished')).toBe(true);
+
+        await completeFinal(50, 50);
+        expect(card().classList.contains('is-finished')).toBe(false);
+        expect(root().textContent).not.toContain('Playoffs complete');
+        expect(card().querySelector('.robotics-now-playing-complete').textContent).toBe('Save Edit');
+      });
     });
 
     it('marks the winning side of a completed elimination match with is-winner, and the card as is-complete', async () => {
@@ -2376,7 +2405,7 @@ describe('initRoboticsApp', () => {
       expect(byes).toEqual(['BYE → Alpha']);
     });
 
-    it('shows no Reveal Results button while the Third-Place Match is still undecided, and no place banners at any point', async () => {
+    it('shows no Playoffs complete card while the Third-Place Match is still undecided, and no place banners at any point', async () => {
       const app = await openFinals({ teamCount: 8, includeThirdPlace: true });
 
       // Semis (inputs 0-3), then the Final (inputs 6-7), leaving the Third-Place Match (inputs 4-5).
@@ -2389,7 +2418,8 @@ describe('initRoboticsApp', () => {
       }
 
       expect(app.getState().elimination.bracket.matches.find((m) => m.round === 'final').completed).toBe(true);
-      expect(root().querySelector('.robotics-reveal-results-btn')).toBeFalsy();
+      expect(root().textContent).not.toContain('Playoffs complete');
+      expect(root().textContent).not.toContain('Reveal Results →');
       expect(root().querySelector('.robotics-champion-banner, .robotics-second-place-banner, .robotics-third-place-banner')).toBeFalsy();
 
       const scoreInputs = root().querySelectorAll('.robotics-bracket .robotics-score-input');
@@ -2398,7 +2428,8 @@ describe('initRoboticsApp', () => {
       scoreInputs[4].closest('.robotics-bracket-match').querySelector('.robotics-match-actions button').click();
       await flushRender();
 
-      expect(root().querySelector('.robotics-reveal-results-btn')?.textContent).toBe('Reveal Results →');
+      expect(root().querySelector('.robotics-now-playing-message').textContent).toBe('Playoffs complete');
+      expect(root().querySelector('.robotics-now-playing').textContent).toContain('Reveal Results →');
       expect(root().querySelector('.robotics-third-place-banner')).toBeFalsy();
       expect([...root().querySelectorAll('button')].some((b) => b.textContent === 'Copy Placements to Clipboard')).toBe(false);
     });
