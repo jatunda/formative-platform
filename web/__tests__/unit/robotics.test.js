@@ -2315,7 +2315,7 @@ describe('initRoboticsApp', () => {
         await openFinals({ teamCount: 8, includeThirdPlace: true });
         await scoreInBigDisplay(80, 20);
         // Round 1 · Match 2 is Current; the Third-Place Match is Up Next, with Golf & Hotel already in it.
-        expect(upNextSides()).toEqual(['Golf & Hotel', 'Loser of Round 1 · Match 2']);
+        expect(upNextSides()).toEqual(['Golf & Hotel', 'Runner-up of Round 1 · Match 2']);
       });
 
       it('keeps a completed Tie as the Current Match until its Score is changed', async () => {

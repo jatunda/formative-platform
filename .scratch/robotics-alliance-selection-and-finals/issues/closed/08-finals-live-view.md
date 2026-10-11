@@ -28,7 +28,7 @@ Spec: `.scratch/robotics-alliance-selection-and-finals/spec.md`, user stories 49
 
 ## Comments
 
-- **Third-Place sides read "Loser of Round R · Match S"**, not "Winner of": they are filled by the semifinal losers, so "Winner of" would be false. `CONTEXT.md`'s **Up Next** entry records this.
+- **Third-Place sides read "Runner-up of Round R · Match S"**, not "Winner of": they are filled by the semifinal runners-up, so "Winner of" would be false. "Loser of" was tried and rejected by Eric as too negative. `CONTEXT.md`'s **Up Next** entry records this.
 - **Only Up Next uses the source label.** Bracket cards still read "TBD", since their position in the bracket already shows where a side comes from.
 - **Once every Elimination Match has a winner, the Now Playing area is omitted.** Ticket 09 puts the "Playoffs complete" card there.
 - **Bug fixed along the way:** the old schedule sort keyed the Third-Place Match as `Infinity - 1`, which equals `Infinity`, so it tied with the Final and was scheduled after it. Bracket order now lives once in `getMatchesInBracketOrder` (`bracket.js`), with finite keys.

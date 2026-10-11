@@ -203,7 +203,7 @@ export function getMatchesInBracketOrder(bracket) {
 
 /**
  * Where a match's side comes from, while it isn't decided yet: "Winner of
- * Round 2 · Match 1" (or "Loser of …" for the Third-Place Match). Null for a
+ * Round 2 · Match 1" (or "Runner-up of …" for the Third-Place Match). Null for a
  * Round 1 side, which is a Seed rather than a feeder match.
  * @param {object} bracket
  * @param {string} matchId
@@ -214,7 +214,7 @@ export function sideSourceLabel(bracket, matchId, side) {
   const match = findMatch(bracket, matchId);
   if (match.fromMatch === null) return null;
   const feeder = findMatch(bracket, match.fromMatch[side === 'A' ? 0 : 1]);
-  return `${match.resolveAs === 'loser' ? 'Loser' : 'Winner'} of ${eliminationMatchLabel(feeder)}`;
+  return `${match.resolveAs === 'loser' ? 'Runner-up' : 'Winner'} of ${eliminationMatchLabel(feeder)}`;
 }
 
 /**

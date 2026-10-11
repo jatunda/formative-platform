@@ -248,10 +248,10 @@ describe('sideSourceLabel', () => {
     expect(sideSourceLabel(bracket, final.id, 'A')).toBe('Winner of Round 2 · Match 1');
   });
 
-  it('names the semifinal losers feeding the Third-Place Match', () => {
+  it('names the semifinal runners-up feeding the Third-Place Match', () => {
     const bracket = eight();
     const thirdPlace = byLabel(bracket, 'Third-Place Match');
-    expect(sideSourceLabel(bracket, thirdPlace.id, 'B')).toBe('Loser of Round 2 · Match 2');
+    expect(sideSourceLabel(bracket, thirdPlace.id, 'B')).toBe('Runner-up of Round 2 · Match 2');
   });
 
   it('is null for a Round 1 side, which is a Seed rather than a feeder match', () => {
