@@ -29,8 +29,9 @@ function availableTeamIds(state) {
 }
 
 /**
- * How many Playoff Alliances Alliance Selection forms: the Bracket Size the teacher set, or
- * the Estimated Bracket Size from the Match Timeline settings until one is set.
+ * How many Playoff Alliances Alliance Selection forms: the saved Bracket Size, or the
+ * Estimated Bracket Size from the Match Timeline settings until one is saved. Bracket Size is
+ * saved when the teacher sets it or the first Playoff Alliance forms, and stays saved until a reset.
  * @returns {number}
  */
 export function getEffectiveBracketSize(state) {
@@ -39,7 +40,12 @@ export function getEffectiveBracketSize(state) {
 
 /** The effective Bracket Size if Bracket Size were `bracketSize` (null or below 2 means unset). */
 function effectiveBracketSizeFor(state, bracketSize) {
-  return bracketSize >= 2 ? bracketSize : state.timeline.estimatedBracketSize;
+  return isBracketSizeSaved(bracketSize) ? bracketSize : state.timeline.estimatedBracketSize;
+}
+
+/** Whether `bracketSize` is a saved Bracket Size (null or below 2 means none is saved). */
+export function isBracketSizeSaved(bracketSize) {
+  return bracketSize >= 2;
 }
 
 /** Whether Alliance Selection is over: as many alliances have formed as the effective Bracket Size. */
@@ -96,8 +102,9 @@ export function getSelectionRowStatus(state, teamId, captainId = getAllianceCapt
  * Why an Alliance Selection action can't happen right now, as the toast to show, or null
  * when it's allowed. Actions: 'pick', 'decline', 'undo-decline', 'move', 'remove',
  * 'start-finals', 'set-third-place', and 'set-bracket-size', which also takes the
- * `bracketSize` being set (null clears it back to the Estimated Bracket Size). Every action
- * is locked while an Elimination Bracket exists, until Discard Bracket.
+ * `bracketSize` being set (null clears it back to the Estimated Bracket Size, allowed only
+ * until Bracket Size is saved). Every action is locked while an Elimination Bracket exists,
+ * until Discard Bracket.
  * @param {object} state
  * @param {string} action
  * @param {{bracketSize?: number|null}} [args]
@@ -113,6 +120,9 @@ export function getAllianceSelectionBlockReason(state, action, { bracketSize } =
     return `All ${getEffectiveBracketSize(state)} alliances are formed. Raise Bracket Size to keep picking.`;
   }
   if (action === 'set-bracket-size') {
+    if (isBracketSizeSaved(state.elimination.bracketSize) && !isBracketSizeSaved(bracketSize)) {
+      return 'Enter a Bracket Size of 2 or more.';
+    }
     if (effectiveBracketSizeFor(state, bracketSize) < formed) {
       return `${formed} alliances are already formed. Remove alliances before lowering Bracket Size below ${formed}.`;
     }

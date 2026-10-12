@@ -1,6 +1,6 @@
 import { generateQualificationMatches } from './pairing-draw.js';
 import { buildBracket, isBracketComplete, getPlacements, getMatchesInBracketOrder } from './bracket.js';
-import { getAllianceSelectionBlockReason, getDeclinedTeamIds, getEffectiveBracketSize } from './alliance-selection.js';
+import { getAllianceSelectionBlockReason, getDeclinedTeamIds, getEffectiveBracketSize, isBracketSizeSaved } from './alliance-selection.js';
 
 let idCounter = 0;
 function generateId(prefix) {
@@ -77,6 +77,23 @@ export function createInitialState() {
       revealedFor: null,
     },
   };
+}
+
+/**
+ * Brings a Tournament read from storage up to date. A Tournament stored mid-selection by an
+ * older version can have alliances but no Bracket Size; Bracket Size is saved now as the
+ * effective Bracket Size, raised to the number of alliances formed so none are dropped.
+ */
+export function upgradeSavedTournament(state) {
+  const { alliances, bracketSize } = state.elimination;
+  if (alliances.length === 0 || isBracketSizeSaved(bracketSize)) return state;
+  const savedBracketSize = Math.max(savableBracketSize(state), alliances.length);
+  return { ...state, elimination: { ...state.elimination, bracketSize: savedBracketSize } };
+}
+
+/** The effective Bracket Size, raised to 2 so an Estimated Bracket Size of 1 still saves as set. */
+function savableBracketSize(state) {
+  return Math.max(getEffectiveBracketSize(state), 2);
 }
 
 // ---- Teams ----
@@ -203,7 +220,11 @@ export function playoffAllianceTeamIds(state, allianceId) {
   return state.elimination.alliances.find((a) => a.id === allianceId)?.teamIds ?? [];
 }
 
-/** A no-op once selection is complete or while a Bracket exists (getAllianceSelectionBlockReason blocks 'pick'). */
+/**
+ * Forms a Playoff Alliance, saving the effective Bracket Size as Bracket Size so it stops
+ * following the Estimated Bracket Size. A no-op once selection is complete or while a Bracket
+ * exists (getAllianceSelectionBlockReason blocks 'pick').
+ */
 export function formPlayoffAlliance(state, teamIdA, teamIdB) {
   if (getAllianceSelectionBlockReason(state, 'pick')) return state;
   const teamIds = teamIdA === teamIdB ? [teamIdA] : [teamIdA, teamIdB];
@@ -212,7 +233,8 @@ export function formPlayoffAlliance(state, teamIdA, teamIdB) {
     throw new Error('A team can only belong to one Playoff Alliance.');
   }
   const alliance = { id: generateId('alliance'), teamIds };
-  return { ...state, elimination: { ...state.elimination, alliances: [...state.elimination.alliances, alliance] } };
+  const bracketSize = savableBracketSize(state);
+  return { ...state, elimination: { ...state.elimination, bracketSize, alliances: [...state.elimination.alliances, alliance] } };
 }
 
 /** A no-op while a Bracket exists. */
@@ -271,7 +293,7 @@ export function setBracketConfig(state, patch) {
 /**
  * Start Finals: builds the Elimination Bracket from the first Bracket Size Playoff
  * Alliances in list order (alliance N is Seed N), using the effective Bracket Size (the
- * Estimated Bracket Size until one is set). With fewer alliances formed than that, Bracket
+ * Estimated Bracket Size until one is saved). With fewer alliances formed than that, Bracket
  * Size becomes the number formed. A no-op while getAllianceSelectionBlockReason blocks
  * 'start-finals' (fewer than 2 alliances, or a Bracket already exists). Tournaments saved before Seeds became list
  * order still carry a per-number `seeds` map; it's ignored here.
@@ -377,7 +399,7 @@ export function replayReveal(state) {
 
 // ---- Resets ----
 
-/** Reset Results: clears Qualification/Elimination state (alliances and Declines included), keeps the Team roster. */
+/** Reset Results: clears Qualification/Elimination state (alliances, Declines, and Bracket Size included), keeps the Team roster. */
 export function resetResults(state) {
   const fresh = createInitialState();
   return { ...fresh, teams: state.teams };

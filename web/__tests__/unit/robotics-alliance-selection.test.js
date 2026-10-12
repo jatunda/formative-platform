@@ -254,12 +254,13 @@ describe('getAllianceSelectionBlockReason', () => {
     expect(getAllianceSelectionBlockReason(s, 'set-bracket-size', { bracketSize: 6 })).toBeNull();
   });
 
-  it('judges clearing Bracket Size by the Estimated Bracket Size it falls back to', () => {
+  it('allows clearing Bracket Size until one is saved, then refuses it', () => {
     let s = withTeams(['Alpha', 'Bravo', 'Charlie']);
-    ['Alpha', 'Bravo', 'Charlie'].forEach((name) => { s = formPlayoffAlliance(s, idOf(s, name), idOf(s, name)); });
     expect(getAllianceSelectionBlockReason(s, 'set-bracket-size', { bracketSize: null })).toBeNull();
-    s = setTimelineConfig(s, { estimatedBracketSize: 2 });
-    expect(getAllianceSelectionBlockReason(s, 'set-bracket-size', { bracketSize: null })).toContain('3 alliances are already formed');
+    s = formPlayoffAlliance(s, idOf(s, 'Alpha'), idOf(s, 'Alpha'));
+    const message = 'Enter a Bracket Size of 2 or more.';
+    expect(getAllianceSelectionBlockReason(s, 'set-bracket-size', { bracketSize: null })).toBe(message);
+    expect(getAllianceSelectionBlockReason(s, 'set-bracket-size', { bracketSize: 1 })).toBe(message);
   });
 });
 
@@ -297,8 +298,58 @@ describe('getEffectiveBracketSize', () => {
     expect(getEffectiveBracketSize(s)).toBe(6);
     s = setBracketConfig(s, { bracketSize: 4 });
     expect(getEffectiveBracketSize(s)).toBe(4);
-    s = setBracketConfig(s, { bracketSize: null });
-    expect(getEffectiveBracketSize(s)).toBe(6);
+  });
+});
+
+describe('Bracket Size saved once Alliance Selection starts', () => {
+  it('saves the Estimated Bracket Size as Bracket Size when the first alliance forms', () => {
+    let s = setTimelineConfig(withTeams(['Alpha', 'Bravo', 'Charlie']), { estimatedBracketSize: 3 });
+    expect(s.elimination.bracketSize).toBeNull();
+    s = formPlayoffAlliance(s, idOf(s, 'Alpha'), idOf(s, 'Bravo'));
+    expect(s.elimination.bracketSize).toBe(3);
+  });
+
+  it('leaves a Bracket Size already set alone', () => {
+    let s = setBracketConfig(withTeams(['Alpha', 'Bravo', 'Charlie']), { bracketSize: 5 });
+    s = formPlayoffAlliance(s, idOf(s, 'Alpha'), idOf(s, 'Bravo'));
+    expect(s.elimination.bracketSize).toBe(5);
+  });
+
+  it('no longer follows the Estimated Bracket Size once saved', () => {
+    let s = withTeams(['Alpha', 'Bravo', 'Charlie', 'Delta']);
+    ['Alpha', 'Bravo', 'Charlie'].forEach((name) => { s = formPlayoffAlliance(s, idOf(s, name), idOf(s, name)); });
+    s = setTimelineConfig(s, { estimatedBracketSize: 2 });
+    expect(getEffectiveBracketSize(s)).toBe(8);
+    expect(isSelectionComplete(s)).toBe(false);
+    expect(getAllianceCaptain(s)).toBe(idOf(s, 'Delta'));
+    expect(startFinals(s).elimination.bracket.seeds).toHaveLength(3);
+  });
+
+  it('keeps the saved Bracket Size when every alliance is removed', () => {
+    let s = withTeams(['Alpha', 'Bravo']);
+    s = formPlayoffAlliance(s, idOf(s, 'Alpha'), idOf(s, 'Bravo'));
+    s = removePlayoffAlliance(s, s.elimination.alliances[0].id);
+    s = setTimelineConfig(s, { estimatedBracketSize: 4 });
+    expect(getEffectiveBracketSize(s)).toBe(8);
+  });
+
+  it('saves at least 2, so an Estimated Bracket Size of 1 still saves', () => {
+    let s = setTimelineConfig(withTeams(['Alpha', 'Bravo', 'Charlie']), { estimatedBracketSize: 1 });
+    s = formPlayoffAlliance(s, idOf(s, 'Alpha'), idOf(s, 'Alpha'));
+    expect(s.elimination.bracketSize).toBe(2);
+    s = setTimelineConfig(s, { estimatedBracketSize: 6 });
+    expect(getEffectiveBracketSize(s)).toBe(2);
+  });
+
+  it('keeps the saved Bracket Size through Discard Bracket', () => {
+    const s = setTimelineConfig(discardBracket(startFinals(withTwoAlliancesOfTwo())), { estimatedBracketSize: 6 });
+    expect(getEffectiveBracketSize(s)).toBe(2);
+  });
+
+  it('refuses to clear a saved Bracket Size', () => {
+    let s = withTeams(['Alpha', 'Bravo']);
+    s = formPlayoffAlliance(s, idOf(s, 'Alpha'), idOf(s, 'Bravo'));
+    expect(setBracketConfig(s, { bracketSize: null })).toBe(s);
   });
 });
 

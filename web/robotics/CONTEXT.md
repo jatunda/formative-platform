@@ -100,7 +100,7 @@ The single-elimination bracket of Playoff Alliances played after Alliance Select
 The action that deletes the Elimination Bracket and its results, unlocking Alliance Selection. Playoff Alliances, Declines, and Seeds are kept. Requires confirming a dialog that names any recorded Elimination Match results that will be lost.
 
 **Bracket Size**:
-The number of Playoff Alliances the teacher chooses to enter into the Elimination Bracket — any positive integer, not restricted to a power of two. Also the number of Playoff Alliances that Alliance Selection forms before it ends. Prefilled from the Estimated Bracket Size but set independently of it. If the Finals start with fewer Playoff Alliances formed, Bracket Size shrinks to match.
+The number of Playoff Alliances the teacher chooses to enter into the Elimination Bracket — any positive integer, not restricted to a power of two. Also the number of Playoff Alliances that Alliance Selection forms before it ends. Follows the Estimated Bracket Size only until the first Playoff Alliance forms, which saves it; from then on only the teacher changes it, until Reset Results or New Tournament clears it back to following the estimate. If the Finals start with fewer Playoff Alliances formed, Bracket Size shrinks to match.
 
 **Bracket Slot**:
 One seeded position within the Elimination Bracket. If Bracket Size isn't a power of two, the bracket pads to the next power of two, with the extra Bracket Slots resolved as Byes for the top Seeds.

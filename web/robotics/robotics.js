@@ -15,6 +15,7 @@ import {
   canMoveQualificationMatch,
   reorderQualificationMatch,
   setTimelineConfig,
+  upgradeSavedTournament,
   formPlayoffAlliance,
   removePlayoffAlliance,
   declineTeam,
@@ -956,9 +957,9 @@ function renderSelectionStandings(state, dispatch, captainId, { pick, pickDeclin
 
 /**
  * Bracket Size and the Third-Place Match toggle, each saved as soon as it changes. Bracket
- * Size shows the Estimated Bracket Size until the teacher sets it. Lowering it below the
- * number of alliances formed is refused with a toast, and the input reverts. Both are
- * locked while a Bracket exists.
+ * Size shows the Estimated Bracket Size until it's saved (the teacher sets it, or the first
+ * alliance forms). Lowering it below the number of alliances formed, or clearing it once
+ * saved, is refused with a toast, and the input reverts. Both are locked while a Bracket exists.
  */
 function renderSelectionSettings(state, dispatch) {
   const card = el('div', { className: 'robotics-card robotics-selection-settings' });
@@ -1553,7 +1554,8 @@ export function initRoboticsApp({ mountId = 'roboticsApp', storageKey = 'robotic
   if (!mount) return null;
 
   const storage = createLocalStorageAdapter(storageKey);
-  let state = storage.load() ?? createInitialState();
+  const saved = storage.load();
+  let state = saved ? upgradeSavedTournament(saved) : createInitialState();
   let activeTab = 'teams';
 
   // UI preferences (e.g. whether the Match Timeline is open) persist under their own key,

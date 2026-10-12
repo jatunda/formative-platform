@@ -1845,7 +1845,9 @@ describe('initRoboticsApp', () => {
 
       sizeInput().value = '';
       sizeInput().dispatchEvent(new Event('change'));
-      expect(app.getState().elimination.bracketSize).toBeNull();
+      expect(app.getState().elimination.bracketSize).toBe(4);
+      expect(sizeInput().value).toBe('4');
+      expect(document.querySelector('.robotics-toast-visible')?.textContent).toBe('Enter a Bracket Size of 2 or more.');
 
       await flushRender();
       thirdPlace().checked = false;
@@ -1923,6 +1925,49 @@ describe('initRoboticsApp', () => {
         await flushRender();
         expect(app.getState().elimination.bracketSize).toBe(3);
         expect(sizeInput().value).toBe('3');
+      });
+
+      it('stops following the Estimated Bracket Size in Tournament Settings once the first alliance forms', async () => {
+        const app = openSelection([...NAMES, 'Foxtrot']);
+        pickButton('Bravo').click();
+        await flushRender();
+        expect(app.getState().elimination.bracketSize).toBe(8);
+        pickButton('Delta').click();
+        await flushRender();
+
+        app.setActiveTab('teams');
+        const estBracketInput = [...root().querySelectorAll('input[type="number"]')].find((i) =>
+          i.closest('label')?.textContent.includes('Estimated bracket size')
+        );
+        estBracketInput.value = '2';
+        estBracketInput.dispatchEvent(new Event('change'));
+        expect(app.getState().timeline.estimatedBracketSize).toBe(2);
+
+        app.setActiveTab('alliance-selection');
+        expect(sizeInput().value).toBe('8');
+        expect(banner()).toBe('Echo is picking');
+        expect(rows().find((r) => r[0] === 'Echo')[1]).toBe('is-captain');
+      });
+
+      it('saves Bracket Size when loading a Tournament saved mid-selection without one, keeping every alliance', async () => {
+        const first = openSelection();
+        pickButton('Bravo').click();
+        await flushRender();
+        pickButton('Delta').click();
+        await flushRender();
+        const { elimination, timeline } = first.getState();
+        const legacy = {
+          ...first.getState(),
+          timeline: { ...timeline, estimatedBracketSize: 1 },
+          elimination: { ...elimination, bracketSize: null },
+        };
+        localStorage.setItem('robotics-tournament-state', JSON.stringify(legacy));
+        document.getElementById('roboticsApp').innerHTML = '';
+
+        const app = initRoboticsApp();
+        expect(app.getState().elimination.bracketSize).toBe(2);
+        app.setActiveTab('alliance-selection');
+        expect(banner()).toBe('All 2 alliances formed');
       });
 
       it('once Bracket Size alliances have formed, says so and tags the rest not advancing', async () => {

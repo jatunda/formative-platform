@@ -23,6 +23,7 @@ import {
   undoDecline,
   startFinals,
   discardBracket,
+  upgradeSavedTournament,
   recordEliminationResult,
   setEliminationNoShow,
   setEliminationDraftScore,
@@ -396,7 +397,9 @@ describe('startFinals', () => {
   });
 
   it('falls back to the Estimated Bracket Size when no Bracket Size is set', () => {
-    const s = setTimelineConfig(withAlliances(4), { estimatedBracketSize: 2 });
+    // Only reachable from a Tournament saved before forming an alliance saved Bracket Size.
+    const formed = setTimelineConfig(withAlliances(4), { estimatedBracketSize: 2 });
+    const s = { ...formed, elimination: { ...formed.elimination, bracketSize: null } };
     const next = startFinals(s);
     expect(next.elimination.bracket.seeds).toEqual(allianceIds(s).slice(0, 2));
     expect(next.elimination.bracketSize).toBe(2);
@@ -569,8 +572,43 @@ describe('resetting Declines', () => {
     expect(state.teams).toHaveLength(4);
   });
 
+  it('Reset Results and New Tournament clear the saved Bracket Size, so it follows the estimate again', () => {
+    const saved = withAllianceAndDecline();
+    expect(saved.elimination.bracketSize).toBe(8);
+    expect(resetResults(saved).elimination.bracketSize).toBeNull();
+    expect(newTournament(saved).elimination.bracketSize).toBeNull();
+  });
+
   it('New Tournament clears Declines along with everything else', () => {
     expect(newTournament(withAllianceAndDecline()).elimination.declinedTeamIds).toEqual([]);
+  });
+});
+
+describe('upgradeSavedTournament', () => {
+  function legacy({ allianceCount, estimatedBracketSize }) {
+    let s = withFourTeams(createInitialState());
+    s.teams.slice(0, allianceCount).forEach((t) => { s = formPlayoffAlliance(s, t.id, t.id); });
+    s = setTimelineConfig(s, { estimatedBracketSize });
+    return { ...s, elimination: { ...s.elimination, bracketSize: null } };
+  }
+
+  it('saves the Estimated Bracket Size as Bracket Size for a Tournament saved mid-selection without one', () => {
+    expect(upgradeSavedTournament(legacy({ allianceCount: 2, estimatedBracketSize: 4 })).elimination.bracketSize).toBe(4);
+  });
+
+  it('raises it to the number of alliances formed, so none are dropped', () => {
+    expect(upgradeSavedTournament(legacy({ allianceCount: 3, estimatedBracketSize: 2 })).elimination.bracketSize).toBe(3);
+  });
+
+  it('saves at least 2 when the Estimated Bracket Size is 1', () => {
+    expect(upgradeSavedTournament(legacy({ allianceCount: 1, estimatedBracketSize: 1 })).elimination.bracketSize).toBe(2);
+  });
+
+  it('leaves a Tournament with no alliances, or a saved Bracket Size, unchanged', () => {
+    const none = legacy({ allianceCount: 0, estimatedBracketSize: 4 });
+    expect(upgradeSavedTournament(none)).toBe(none);
+    const saved = setBracketConfig(withFourTeams(createInitialState()), { bracketSize: 3 });
+    expect(upgradeSavedTournament(saved)).toBe(saved);
   });
 });
 
