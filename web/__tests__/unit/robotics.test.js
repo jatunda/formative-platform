@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   initRoboticsApp,
-  teamName,
   nameFitStyle,
 } from '../../robotics/robotics.js';
 import {
+  teamName,
   createInitialState,
   addTeam,
   setMatchesPerTeam,
@@ -2248,6 +2248,64 @@ describe('initRoboticsApp', () => {
       expect(root().querySelector('.robotics-bracket')).toBeNull();
     });
 
+    it('marks only the Elimination Current Match card as current, and auto-scrolls to it once it advances', async () => {
+      await openFinals({ teamCount: 4, singles: true });
+      const scrollIntoView = vi.fn();
+      Element.prototype.scrollIntoView = scrollIntoView;
+      const nextTick = () => new Promise((resolve) => setTimeout(resolve, 0));
+      const currentCards = () => [...root().querySelectorAll('.robotics-bracket-match.is-current')];
+      expect(currentCards()).toHaveLength(1);
+      expect(currentCards()[0].textContent).toContain('Alpha');
+
+      const nowPlaying = root().querySelector('.robotics-now-playing');
+      const [scoreA, scoreB] = nowPlaying.querySelectorAll('.robotics-score-input');
+      scoreA.value = '10';
+      scoreA.dispatchEvent(new Event('change'));
+      await nextTick();
+      expect(scrollIntoView).not.toHaveBeenCalled();
+
+      scoreB.value = '0';
+      root().querySelector('.robotics-now-playing-complete').click();
+      await nextTick();
+
+      expect(currentCards()).toHaveLength(1);
+      expect(currentCards()[0].textContent).toContain('Bravo');
+      expect(scrollIntoView).toHaveBeenCalledTimes(1);
+      expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest' });
+      expect(scrollIntoView.mock.instances[0]).toBe(currentCards()[0]);
+
+      delete Element.prototype.scrollIntoView;
+    });
+
+    it('does not auto-scroll on first arriving at the Finals tab after watching Qualification on the Schedule tab', async () => {
+      const app = initRoboticsApp();
+      app.dispatch((s) => {
+        let next = s;
+        NAMES.slice(0, 4).forEach((name) => { next = addTeam(next, { name, members: [] }); });
+        return regenerateMatchups(setMatchesPerTeam(next, 1));
+      });
+      app.setActiveTab('schedule');
+      await flushRender();
+
+      app.setActiveTab('teams');
+      app.dispatch((s) => {
+        let next = s;
+        next.qualification.matches.forEach((_m, i) => { next = recordQualificationResult(next, i, { scoreA: 1, scoreB: 0 }); });
+        next.teams.forEach((t) => { next = formPlayoffAlliance(next, t.id, t.id); });
+        return startFinals(next);
+      });
+      await flushRender();
+      const scrollIntoView = vi.fn();
+      Element.prototype.scrollIntoView = scrollIntoView;
+
+      app.setActiveTab('finals');
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(root().querySelector('.robotics-bracket-match.is-current')).not.toBeNull();
+      expect(scrollIntoView).not.toHaveBeenCalled();
+
+      delete Element.prototype.scrollIntoView;
+    });
+
     describe('Playoffs complete card', () => {
       const card = () => root().querySelector('.robotics-now-playing');
       async function completeFinal(scoreA, scoreB) {
@@ -2874,6 +2932,26 @@ describe('live status header', () => {
     expect(text('.robotics-status-progress')).toBe('Match 2 of 2');
     // Match 2 is scheduled 5 min after Start Time, and it is still the Start Time.
     expect(text('.robotics-status-drift')).toBe('5 min ahead');
+  });
+
+  it('shows Elimination progress and drift against the Elimination Current Match during the Finals', () => {
+    app = initRoboticsApp();
+    app.dispatch((s) => {
+      let next = s;
+      ['Alpha', 'Bravo', 'Charlie', 'Delta'].forEach((name) => { next = addTeam(next, { name, members: [] }); });
+      next.teams.forEach((t) => { next = formPlayoffAlliance(next, t.id, t.id); });
+      next = startFinals(setBracketConfig(next, { includeThirdPlace: false }));
+      return setTimelineConfig(next, { startTime: START, matchDurationMin: 5, gapMin: 0, fieldCount: 1 });
+    });
+    app.dispatch((s) => recordEliminationResult(s, 'm1', { scoreA: 1, scoreB: 0 }));
+    vi.advanceTimersByTime(0);
+    expect(text('.robotics-status-phase')).toBe('Elimination');
+    expect(text('.robotics-status-progress')).toBe('Elimination 2 of 3');
+    // The second Elimination Match is scheduled 5 min after Start Time, and it is still the Start Time.
+    expect(text('.robotics-status-drift')).toBe('5 min ahead');
+
+    vi.advanceTimersByTime(9 * 60 * 1000);
+    expect(text('.robotics-status-drift')).toBe('4 min behind');
   });
 
   it('hides drift when there is no Start Time', () => {

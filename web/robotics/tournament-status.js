@@ -1,6 +1,5 @@
-import { computeMatchTime, MINUTE_MS } from './match-timeline.js';
-import { getCurrentMatchIndex } from './current-match.js';
-import { getPlayedEliminationMatches, countUndecidedMatches, isBracketComplete } from './bracket.js';
+import { MINUTE_MS } from './match-timeline.js';
+import { isBracketComplete } from './bracket.js';
 
 export const PHASE_LABELS = {
   setup: 'Setup',
@@ -28,36 +27,16 @@ export function getTournamentPhase(state) {
 }
 
 /**
- * Match progress for the header: the Current Match's position during
- * Qualification ("Match 7 of 24"), the next undecided Elimination Match's
- * number during Elimination ("Elimination 3 of 7"), or null when nothing is
- * in play.
- * @param {object} state
- * @param {string} [phase] - getTournamentPhase(state), if the caller already has it
+ * Match progress for the header: the Current Match's position among its
+ * phase's matches, "Match 7 of 24" during Qualification or "Elimination 3 of
+ * 7" during Elimination, or null when nothing is in play.
+ * @param {import('./live-match.js').LiveMatch|null} liveMatch - getLiveMatch(state)
  * @returns {string|null}
  */
-export function getMatchProgress(state, phase = getTournamentPhase(state)) {
-  if (phase === 'qualification') {
-    const matches = state.qualification.matches;
-    return `Match ${getCurrentMatchIndex(matches) + 1} of ${matches.length}`;
-  }
-  if (phase === 'elimination') {
-    const { bracket } = state.elimination;
-    const played = getPlayedEliminationMatches(bracket).length;
-    return `Elimination ${played - countUndecidedMatches(bracket) + 1} of ${played}`;
-  }
-  return null;
-}
-
-/**
- * The Current Match's Match Time (Qualification Matches lead the schedule,
- * so its qualification index is also its schedule position).
- * @returns {number|null} epoch ms, or null with no Current Match or Start Time
- */
-export function getCurrentMatchTime(state) {
-  const currentIndex = getCurrentMatchIndex(state.qualification.matches);
-  if (currentIndex === null) return null;
-  return computeMatchTime(state.timeline, currentIndex);
+export function getMatchProgress(liveMatch) {
+  if (!liveMatch) return null;
+  const prefix = liveMatch.phase === 'qualification' ? 'Match' : 'Elimination';
+  return `${prefix} ${liveMatch.position} of ${liveMatch.total}`;
 }
 
 /**

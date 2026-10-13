@@ -34,6 +34,9 @@ import {
   revealNextPlacement,
   replayReveal,
   playoffAllianceTeamIds,
+  teamName,
+  allianceTeamNames,
+  playoffAllianceLabel,
   getAllMatchesInScheduleOrder,
 } from './state.js';
 import {
@@ -62,7 +65,8 @@ import { exportStandingsMarkdown, exportMatchesMarkdown, exportRosterMarkdown, e
 import { createToastContainer, showToast } from './toast.js';
 import { createConfirmDialogContainer, showConfirm } from './confirm-dialog.js';
 import { createRenderLoop } from './render-loop.js';
-import { getTournamentPhase, PHASE_LABELS, getMatchProgress, getCurrentMatchTime, getScheduleDrift, formatScheduleDrift } from './tournament-status.js';
+import { getTournamentPhase, PHASE_LABELS, getMatchProgress, getScheduleDrift, formatScheduleDrift } from './tournament-status.js';
+import { getLiveMatch } from './live-match.js';
 
 const TABS = [
   { key: 'teams', label: 'Teams' },
@@ -71,16 +75,6 @@ const TABS = [
   { key: 'finals', label: 'Finals' },
   { key: 'results', label: 'Results' },
 ];
-
-// ---- Selectors ----
-
-export function teamName(state, teamId) {
-  return state.teams.find((t) => t.id === teamId)?.name ?? '(unknown team)';
-}
-
-function allianceTeamNames(state, teamIds) {
-  return teamIds.map((id) => teamName(state, id)).join(' & ');
-}
 
 // ---- Long-name shrink-to-fit ----
 // Names this short always render at normal size (no style attribute at all).
@@ -115,11 +109,6 @@ function nameFitProps(text) {
   const fit = nameFitStyle(text);
   if (!fit) return { fitClass: '', style: null };
   return { fitClass: fit.fitsOneLine ? ' robotics-fit-name' : '', style: fit.style };
-}
-
-function playoffAllianceLabel(state, allianceId) {
-  const teamIds = playoffAllianceTeamIds(state, allianceId);
-  return teamIds.length ? allianceTeamNames(state, teamIds) : '(unassigned)';
 }
 
 /**
@@ -1228,6 +1217,7 @@ export function renderAllianceSelectionTab(state, dispatch, { setActiveTab, ui }
 function renderBracketMatch(state, dispatch, match) {
   const sides = resolveMatchSides(state.elimination.bracket, match.id);
   const cardClassNames = ['robotics-card', 'robotics-bracket-match'];
+  if (match.id === getEliminationCurrentMatchId(state.elimination.bracket)) cardClassNames.push('is-current');
   if (match.completed) cardClassNames.push('is-complete');
   const card = el('div', { className: cardClassNames.join(' ') });
   if (match.isBye) {
@@ -1493,7 +1483,7 @@ const CLOCK_TICK_MS = 1000;
  */
 function renderStatusHeader(state) {
   const phase = getTournamentPhase(state);
-  const progress = getMatchProgress(state, phase);
+  const progress = getMatchProgress(getLiveMatch(state));
   const header = el('header', { className: 'robotics-header' }, [
     el('h1', { className: 'robotics-title' }, ['Robotics Tournament']),
     el('div', { className: 'robotics-status-strip' }, [
@@ -1511,11 +1501,17 @@ function renderStatusHeader(state) {
 function updateLiveStatus(root, state, now) {
   root.querySelector('.robotics-status-clock').textContent = new Date(now).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   const driftEl = root.querySelector('.robotics-status-drift');
-  const drift = getScheduleDrift(now, getCurrentMatchTime(state));
+  const drift = getScheduleDrift(now, getLiveMatch(state)?.current.matchTime);
   driftEl.hidden = !drift;
   driftEl.textContent = formatScheduleDrift(drift) ?? '';
   driftEl.dataset.drift = drift?.status ?? '';
 }
+
+// Where each live tab shows its Current Match, for auto-scroll.
+const CURRENT_MATCH_SELECTOR_BY_TAB = {
+  schedule: '.robotics-match-row.is-current',
+  finals: '.robotics-bracket-match.is-current',
+};
 
 // Only one control panel runs per page; initialising another stops the previous clock and Space handler.
 let stopActiveClock = null;
@@ -1576,19 +1572,22 @@ export function initRoboticsApp({ mountId = 'roboticsApp', storageKey = 'robotic
     },
   };
 
-  // Auto-scroll the Qualification Matches list to the Current Match row, but only once
-  // the Current Match actually advances to a different one - not on every re-render on
-  // the Schedule tab, so editing a draft score doesn't yank the teacher's scroll position.
-  // `undefined` means "haven't observed the Current Match on this tab yet", which skips
-  // the very first observation (e.g. switching onto the tab) rather than treating it as a change.
-  let lastCurrentMatchIndex;
+  // Auto-scroll to the Current Match (its Qualification Matches row on the Schedule tab, its
+  // bracket card on the Finals tab), but only once the Current Match actually advances to a
+  // different one - not on every re-render, so editing a draft score doesn't yank the
+  // teacher's scroll position. Each tab remembers the Current Match it last showed; none yet
+  // (`undefined`) skips the very first observation on that tab (e.g. switching onto it)
+  // rather than treating it as a change.
+  const lastCurrentMatchRefByTab = {};
   function autoScrollToCurrentMatchIfAdvanced() {
-    if (activeTab !== 'schedule') return;
-    const currentIndex = getCurrentMatchIndex(state.qualification.matches);
-    if (lastCurrentMatchIndex !== undefined && currentIndex !== lastCurrentMatchIndex) {
-      mount.querySelector('.robotics-match-row.is-current')?.scrollIntoView?.({ block: 'nearest' });
+    const selector = CURRENT_MATCH_SELECTOR_BY_TAB[activeTab];
+    if (!selector) return;
+    const currentRef = getLiveMatch(state)?.current.ref ?? null;
+    const lastRef = lastCurrentMatchRefByTab[activeTab];
+    if (lastRef !== undefined && currentRef !== lastRef) {
+      mount.querySelector(selector)?.scrollIntoView?.({ block: 'nearest' });
     }
-    lastCurrentMatchIndex = currentIndex;
+    lastCurrentMatchRefByTab[activeTab] = currentRef;
   }
 
   function dispatch(updater, afterRender) {

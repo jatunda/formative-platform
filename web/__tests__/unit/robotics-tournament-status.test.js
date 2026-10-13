@@ -3,16 +3,16 @@ import {
   getTournamentPhase,
   PHASE_LABELS,
   getMatchProgress,
-  getCurrentMatchTime,
   getScheduleDrift,
   formatScheduleDrift,
 } from '../../robotics/tournament-status.js';
 import { buildBracket } from '../../robotics/bracket.js';
+import { getLiveMatch } from '../../robotics/live-match.js';
 
 const MINUTE = 60 * 1000;
 
 function qualMatches(completedFlags) {
-  return completedFlags.map((completed) => ({ completed }));
+  return completedFlags.map((completed) => ({ completed, allianceA: [], allianceB: [] }));
 }
 
 /**
@@ -36,7 +36,8 @@ function threeAllianceBracket(results = []) {
 function makeState({ qual = [], bracket = null, startTime = null } = {}) {
   return {
     qualification: { matches: qualMatches(qual) },
-    elimination: { bracket },
+    teams: [],
+    elimination: { alliances: [], bracket },
     timeline: { startTime, matchDurationMin: 5, gapMin: 1, fieldCount: 1 },
   };
 }
@@ -82,43 +83,29 @@ describe('getTournamentPhase', () => {
 });
 
 describe('getMatchProgress', () => {
+  const progress = (state) => getMatchProgress(getLiveMatch(state));
+
   it('shows the Current Match position out of all Qualification Matches during Qualification', () => {
-    expect(getMatchProgress(makeState({ qual: [true, true, false, false] }))).toBe('Match 3 of 4');
+    expect(progress(makeState({ qual: [true, true, false, false] }))).toBe('Match 3 of 4');
   });
 
   it('counts by Current Match position even when later matches were completed out of order', () => {
-    expect(getMatchProgress(makeState({ qual: [true, false, true, false] }))).toBe('Match 2 of 4');
+    expect(progress(makeState({ qual: [true, false, true, false] }))).toBe('Match 2 of 4');
   });
 
-  it('shows the next undecided Elimination Match number out of played matches during Elimination', () => {
-    expect(getMatchProgress(makeState({ qual: [true], bracket: threeAllianceBracket() }))).toBe('Elimination 1 of 2');
-    expect(getMatchProgress(makeState({ qual: [true], bracket: threeAllianceBracket([[5, 3]]) }))).toBe('Elimination 2 of 2');
+  it('shows the Elimination Current Match position out of played matches during Elimination', () => {
+    expect(progress(makeState({ qual: [true], bracket: threeAllianceBracket() }))).toBe('Elimination 1 of 2');
+    expect(progress(makeState({ qual: [true], bracket: threeAllianceBracket([[5, 3]]) }))).toBe('Elimination 2 of 2');
   });
 
   it('does not count a tied Elimination Match as decided', () => {
-    expect(getMatchProgress(makeState({ qual: [true], bracket: threeAllianceBracket([[3, 3]]) }))).toBe('Elimination 1 of 2');
+    expect(progress(makeState({ qual: [true], bracket: threeAllianceBracket([[3, 3]]) }))).toBe('Elimination 1 of 2');
   });
 
   it('is null in phases with no match in progress', () => {
-    expect(getMatchProgress(makeState())).toBeNull();
-    expect(getMatchProgress(makeState({ qual: [true] }))).toBeNull();
-    expect(getMatchProgress(makeState({ qual: [true], bracket: threeAllianceBracket([[5, 3], [4, 2]]) }))).toBeNull();
-  });
-});
-
-describe('getCurrentMatchTime', () => {
-  it("is the Current Match's Match Time", () => {
-    const state = makeState({ qual: [true, true, false], startTime: 1000 });
-    expect(getCurrentMatchTime(state)).toBe(1000 + 2 * 6 * MINUTE);
-  });
-
-  it('is null when there is no Start Time', () => {
-    expect(getCurrentMatchTime(makeState({ qual: [false] }))).toBeNull();
-  });
-
-  it('is null when there is no Current Match', () => {
-    expect(getCurrentMatchTime(makeState({ qual: [true], startTime: 1000 }))).toBeNull();
-    expect(getCurrentMatchTime(makeState({ startTime: 1000 }))).toBeNull();
+    expect(progress(makeState())).toBeNull();
+    expect(progress(makeState({ qual: [true] }))).toBeNull();
+    expect(progress(makeState({ qual: [true], bracket: threeAllianceBracket([[5, 3], [4, 2]]) }))).toBeNull();
   });
 });
 

@@ -220,6 +220,21 @@ export function playoffAllianceTeamIds(state, allianceId) {
   return state.elimination.alliances.find((a) => a.id === allianceId)?.teamIds ?? [];
 }
 
+export function teamName(state, teamId) {
+  return state.teams.find((t) => t.id === teamId)?.name ?? '(unknown team)';
+}
+
+/** Team names joined " & ", e.g. "Alpha & Bravo". */
+export function allianceTeamNames(state, teamIds) {
+  return teamIds.map((id) => teamName(state, id)).join(' & ');
+}
+
+/** A Playoff Alliance's Team names, or "(unassigned)" if allianceId doesn't resolve. */
+export function playoffAllianceLabel(state, allianceId) {
+  const teamIds = playoffAllianceTeamIds(state, allianceId);
+  return teamIds.length ? allianceTeamNames(state, teamIds) : '(unassigned)';
+}
+
 /**
  * Forms a Playoff Alliance, saving the effective Bracket Size as Bracket Size so it stops
  * following the Estimated Bracket Size. A no-op once selection is complete or while a Bracket
