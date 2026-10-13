@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getLiveMatch } from '../../robotics/live-match.js';
+import { getLiveMatch, getQualificationLiveMatch, getEliminationLiveMatch } from '../../robotics/live-match.js';
 import { buildBracket } from '../../robotics/bracket.js';
 
 const MINUTE = 60 * 1000;
@@ -162,5 +162,32 @@ describe('getLiveMatch: Elimination Bracket', () => {
     const bracket = buildBracket({ bracketSize: 2, seeds: ['p1', 'gone'], includeThirdPlace: false });
     const live = getLiveMatch(makeState({ qual: twoQualMatches(true, true), bracket }));
     expect(live.current.sideB).toEqual({ teamIds: [], label: '(unassigned)' });
+  });
+});
+
+describe('phase-specific Live Match queries', () => {
+  it('getQualificationLiveMatch still answers for the Qualification Round once a Bracket exists', () => {
+    const live = getQualificationLiveMatch(makeState({ qual: twoQualMatches(true, false), bracket: fourAllianceBracket() }));
+    expect(live).toMatchObject({ phase: 'qualification', position: 2 });
+    expect(live.current.ref).toBe(1);
+  });
+
+  it('getQualificationLiveMatch is null when every Qualification Match is complete', () => {
+    expect(getQualificationLiveMatch(makeState({ qual: twoQualMatches(true, true) }))).toBeNull();
+  });
+
+  it('getEliminationLiveMatch is null without a Bracket, even mid-Qualification', () => {
+    expect(getEliminationLiveMatch(makeState({ qual: twoQualMatches() }))).toBeNull();
+  });
+
+  it('getEliminationLiveMatch answers for the Bracket even while Qualification is incomplete', () => {
+    const live = getEliminationLiveMatch(makeState({ qual: twoQualMatches(), bracket: fourAllianceBracket() }));
+    expect(live).toMatchObject({ phase: 'elimination', position: 1 });
+    expect(live.current.ref).toBe('m1');
+  });
+
+  it('getEliminationLiveMatch is null once every Elimination Match has a winner', () => {
+    const bracket = fourAllianceBracket({ results: [['m1', 5, 0], ['m2', 5, 0], ['m3', 5, 0]] });
+    expect(getEliminationLiveMatch(makeState({ qual: twoQualMatches(true, true), bracket }))).toBeNull();
   });
 });

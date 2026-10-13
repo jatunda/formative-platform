@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getInferredCurrentMatchIndex, getCurrentMatchIndex, getUpNextMatchIndex, getEliminationCurrentMatchId, getEliminationUpNextMatchId } from '../../robotics/current-match.js';
+import { getInferredCurrentMatchIndex, getUpNextMatchIndex, getEliminationCurrentMatchId, getEliminationUpNextMatchId } from '../../robotics/current-match.js';
 import { buildBracket, eliminationMatchLabel } from '../../robotics/bracket.js';
 
 function matches(completedFlags) {
@@ -17,16 +17,6 @@ describe('getInferredCurrentMatchIndex', () => {
 
   it('returns null when there are no matches', () => {
     expect(getInferredCurrentMatchIndex([])).toBeNull();
-  });
-});
-
-describe('getCurrentMatchIndex', () => {
-  it('is always the inferred match - there is no override', () => {
-    expect(getCurrentMatchIndex(matches([true, false, false]))).toBe(1);
-  });
-
-  it('returns null when every match is complete', () => {
-    expect(getCurrentMatchIndex(matches([true, true]))).toBeNull();
   });
 });
 

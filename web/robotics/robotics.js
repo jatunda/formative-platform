@@ -49,7 +49,7 @@ import {
   timeOfDayToEpochMs,
 } from './match-timeline.js';
 import { computeStandings, formatRecord } from './standings.js';
-import { resolveMatchSides, getMatchWinner, isBracketComplete, countUndecidedMatches, getPlacements, getPlayedEliminationMatches, eliminationMatchLabel, sideSourceLabel } from './bracket.js';
+import { resolveMatchSides, getMatchWinner, isBracketComplete, countUndecidedMatches, getPlacements, getPlayedEliminationMatches, eliminationMatchLabel } from './bracket.js';
 import {
   getAllianceCaptain,
   getSelectionRowStatus,
@@ -60,13 +60,13 @@ import {
 } from './alliance-selection.js';
 import { bracketColumnSpacerGrowRatios } from './bracket-layout.js';
 import { launchConfetti } from './confetti.js';
-import { getCurrentMatchIndex, getUpNextMatchIndex, getEliminationCurrentMatchId, getEliminationUpNextMatchId } from './current-match.js';
+import { getEliminationCurrentMatchId } from './current-match.js';
 import { exportStandingsMarkdown, exportMatchesMarkdown, exportRosterMarkdown, exportPlacementsMarkdown } from './markdown-export.js';
 import { createToastContainer, showToast } from './toast.js';
 import { createConfirmDialogContainer, showConfirm } from './confirm-dialog.js';
 import { createRenderLoop } from './render-loop.js';
 import { getTournamentPhase, PHASE_LABELS, getMatchProgress, getScheduleDrift, formatScheduleDrift } from './tournament-status.js';
-import { getLiveMatch } from './live-match.js';
+import { getLiveMatch, getQualificationLiveMatch, getEliminationLiveMatch } from './live-match.js';
 
 const TABS = [
   { key: 'teams', label: 'Teams' },
@@ -436,11 +436,11 @@ function renderMarkMatchCompleteButton(dispatch, match, matchRef, { scoreA, scor
   }, [match.completed ? 'Save Edit' : 'Mark Complete']);
 }
 
-function renderMatchRow(state, dispatch, entry, { currentIndex, upNextIndex }) {
+function renderMatchRow(state, dispatch, entry, liveMatch) {
   const { match, qualIndex } = entry;
   const isQual = entry.kind === 'qualification';
-  const isCurrent = isQual && qualIndex === currentIndex;
-  const isUpNext = isQual && qualIndex === upNextIndex;
+  const isCurrent = isQual && qualIndex === liveMatch?.current.ref;
+  const isUpNext = isQual && qualIndex === liveMatch?.upNext?.ref;
 
   const field = matchField(state.timeline.fieldCount, entry.globalIndex);
   const classNames = ['robotics-match-row', 'robotics-match-grid'];
@@ -605,11 +605,11 @@ function formatMatchClock(epochMs) {
   return epochMs == null ? '--' : formatClock(epochMs);
 }
 
-/** "2:05 PM · Field 2" (Field only when more than one runs). */
-function renderMatchMeta(state, entry, className) {
+/** A Live Match slot's "2:05 PM · Field 2" (Field only when more than one runs). */
+function renderMatchMeta(state, { entry, matchTime }, className) {
   const field = matchField(state.timeline.fieldCount, entry.globalIndex);
   return el('div', { className }, [
-    el('span', { className: 'robotics-now-playing-time' }, [formatMatchClock(computeMatchTime(state.timeline, entry.globalIndex))]),
+    el('span', { className: 'robotics-now-playing-time' }, [formatMatchClock(matchTime)]),
     ...(field ? [el('span', { className: 'robotics-now-playing-field' }, [`Field ${field}`])] : []),
   ]);
 }
@@ -636,16 +636,16 @@ function renderNowPlayingSide(state, match, teamIds, onToggleNoShow, color) {
 }
 
 /**
- * Read-only preview of the Up Next match: its time and who plays. Each side is
- * a ready-made label, so a side not yet decided can say where it comes from.
+ * Read-only preview of the Live Match's Up Next: its time and who plays. A
+ * side not yet decided is labelled by the match it comes from.
  */
-function renderUpNext(state, { entry, labelA, labelB }) {
+function renderUpNext(state, upNext) {
   return el('aside', { className: 'robotics-up-next' }, [
     el('div', { className: 'robotics-now-playing-kicker' }, ['Up Next']),
-    renderMatchMeta(state, entry, 'robotics-up-next-meta'),
-    el('div', { className: 'robotics-up-next-teams is-red' }, [labelA]),
+    renderMatchMeta(state, upNext, 'robotics-up-next-meta'),
+    el('div', { className: 'robotics-up-next-teams is-red' }, [upNext.sideA.label]),
     el('div', { className: 'robotics-match-vs' }, ['vs']),
-    el('div', { className: 'robotics-up-next-teams is-blue' }, [labelB]),
+    el('div', { className: 'robotics-up-next-teams is-blue' }, [upNext.sideB.label]),
   ]);
 }
 
@@ -669,40 +669,38 @@ function renderPhaseCompleteCard({ message, buttonLabel, destinationTab, setActi
 }
 
 /**
- * The Current Match spotlighted for the projected audience, beside an Up Next
- * preview. Works for any match kind: the caller supplies the match, the Team
- * ids on each side, and the actions to dispatch. Those are the same actions as
- * the match's list row or bracket card, so both always show the same draft.
+ * A Live Match's Current Match spotlighted for the projected audience, beside
+ * its Up Next preview. Works for either phase: the caller supplies the actions
+ * to dispatch, the same ones as the match's list row or bracket card, so both
+ * always show the same draft.
  *
- * - current: { entry, matchRef, teamsA, teamsB } or null, where entry is the
- *   schedule entry (its globalIndex gives the match meta)
- * - upNext: { entry, labelA, labelB } or null
+ * - liveMatch: getQualificationLiveMatch / getEliminationLiveMatch, or null
  * - actions: { setDraftScore, recordResult, setNoShow }, each (state, matchRef, ...)
- * - placeholder: the card shown when there is no Current Match
+ * - placeholder: the card shown when there is no Live Match
  */
-function renderNowPlaying(state, dispatch, { current, upNext, actions, placeholder }) {
+function renderNowPlaying(state, dispatch, { liveMatch, actions, placeholder }) {
   const wrap = el('div', { className: 'robotics-now-playing-layout' });
-  if (!current) {
+  if (!liveMatch) {
     wrap.appendChild(placeholder);
     return wrap;
   }
 
-  const { entry, matchRef, teamsA, teamsB } = current;
-  const { match } = entry;
+  const { current, upNext } = liveMatch;
+  const { ref: matchRef, entry: { match } } = current;
   const toggleNoShow = (teamId, next) => dispatch((s) => actions.setNoShow(s, matchRef, teamId, next));
   const scores = renderScoreInputs(dispatch, match, matchRef, actions.setDraftScore);
 
   wrap.appendChild(el('section', { className: 'robotics-now-playing', 'aria-label': 'Now Playing' }, [
     el('div', { className: 'robotics-now-playing-header' }, [
       el('div', { className: 'robotics-now-playing-kicker' }, ['Now Playing']),
-      renderMatchMeta(state, entry, 'robotics-now-playing-meta'),
+      renderMatchMeta(state, current, 'robotics-now-playing-meta'),
     ]),
     el('div', { className: 'robotics-now-playing-arena' }, [
-      renderNowPlayingSide(state, match, teamsA, toggleNoShow, 'red'),
+      renderNowPlayingSide(state, match, current.sideA.teamIds, toggleNoShow, 'red'),
       scores.scoreA,
       el('div', { className: 'robotics-match-vs' }, ['vs']),
       scores.scoreB,
-      renderNowPlayingSide(state, match, teamsB, toggleNoShow, 'blue'),
+      renderNowPlayingSide(state, match, current.sideB.teamIds, toggleNoShow, 'blue'),
     ]),
     renderMarkMatchCompleteButton(dispatch, match, matchRef, scores, 'robotics-btn robotics-btn-primary robotics-now-playing-complete', actions.recordResult),
   ]));
@@ -711,13 +709,10 @@ function renderNowPlaying(state, dispatch, { current, upNext, actions, placehold
   return wrap;
 }
 
-/** The Qualification Round's Now Playing: its Current Match, Up Next, and end-of-round card. */
-function renderQualificationNowPlaying(state, dispatch, { currentIndex, upNextIndex, setActiveTab }) {
-  const entries = getAllMatchesInScheduleOrder(state);
-  const currentEntry = currentIndex === null ? null : entries[currentIndex];
-  const upNextEntry = upNextIndex === null ? null : entries[upNextIndex];
+/** The Qualification Round's Now Playing: its Live Match, or the idle / end-of-round card. */
+function renderQualificationNowPlaying(state, dispatch, liveMatch, setActiveTab) {
   let placeholder = null;
-  if (!currentEntry) {
+  if (!liveMatch) {
     placeholder = state.qualification.matches.length === 0
       ? renderNowPlayingIdle('No Qualification Matches scheduled yet.')
       : renderPhaseCompleteCard({
@@ -727,30 +722,15 @@ function renderQualificationNowPlaying(state, dispatch, { currentIndex, upNextIn
         setActiveTab,
       });
   }
-  return renderNowPlaying(state, dispatch, {
-    current: currentEntry && {
-      entry: currentEntry,
-      matchRef: currentIndex,
-      teamsA: currentEntry.match.allianceA,
-      teamsB: currentEntry.match.allianceB,
-    },
-    upNext: upNextEntry && {
-      entry: upNextEntry,
-      labelA: allianceTeamNames(state, upNextEntry.match.allianceA),
-      labelB: allianceTeamNames(state, upNextEntry.match.allianceB),
-    },
-    actions: QUALIFICATION_MATCH_ACTIONS,
-    placeholder,
-  });
+  return renderNowPlaying(state, dispatch, { liveMatch, actions: QUALIFICATION_MATCH_ACTIONS, placeholder });
 }
 
 export function renderScheduleTab(state, dispatch, { setActiveTab }) {
   const section = el('div', { className: 'robotics-section' });
 
-  const currentIndex = getCurrentMatchIndex(state.qualification.matches);
-  const upNextIndex = getUpNextMatchIndex(state.qualification.matches, currentIndex);
+  const liveMatch = getQualificationLiveMatch(state);
 
-  section.appendChild(renderQualificationNowPlaying(state, dispatch, { currentIndex, upNextIndex, setActiveTab }));
+  section.appendChild(renderQualificationNowPlaying(state, dispatch, liveMatch, setActiveTab));
 
   const matchList = el('div', { className: 'robotics-card' });
   matchList.appendChild(el('h3', { className: 'robotics-card-title' }, ['Qualification Matches']));
@@ -759,7 +739,7 @@ export function renderScheduleTab(state, dispatch, { setActiveTab }) {
   if (entries.length === 0) {
     matchList.appendChild(el('p', { className: 'robotics-empty' }, ['No matches scheduled yet — add teams and regenerate matchups from the Teams tab.']));
   }
-  entries.forEach((entry) => matchList.appendChild(renderMatchRow(state, dispatch, entry, { currentIndex, upNextIndex })));
+  entries.forEach((entry) => matchList.appendChild(renderMatchRow(state, dispatch, entry, liveMatch)));
   section.appendChild(matchList);
 
   section.appendChild(el('button', {
@@ -1293,47 +1273,19 @@ function renderBracket(state, dispatch) {
 }
 
 /**
- * The Finals' Now Playing: the Elimination Current Match and Up Next, scored
- * with the same actions as the bracket cards. An Up Next side not yet decided
- * names the match it comes from. Once every Elimination Match has a winner,
- * the Playoffs complete card takes its place.
+ * The Finals' Now Playing: the Elimination Live Match, scored with the same
+ * actions as the bracket cards. Once every Elimination Match has a winner, the
+ * Playoffs complete card takes its place.
  */
 function renderFinalsNowPlaying(state, dispatch, setActiveTab) {
-  const { bracket } = state.elimination;
-  const currentId = getEliminationCurrentMatchId(bracket);
-  if (currentId === null) {
-    return renderNowPlaying(state, dispatch, {
-      current: null,
-      placeholder: renderPhaseCompleteCard({
-        message: 'Playoffs complete',
-        buttonLabel: 'Reveal Results →',
-        destinationTab: 'results',
-        setActiveTab,
-      }),
-    });
-  }
-  const upNextId = getEliminationUpNextMatchId(bracket, currentId);
-
-  const entries = getAllMatchesInScheduleOrder(state).filter((e) => e.kind === 'elimination');
-  const entryFor = (matchId) => entries.find((e) => e.match.id === matchId);
-  const currentSides = resolveMatchSides(bracket, currentId);
-  let upNext = null;
-  if (upNextId !== null) {
-    const sides = resolveMatchSides(bracket, upNextId);
-    const sideLabel = (allianceId, side) => (allianceId ? playoffAllianceLabel(state, allianceId) : sideSourceLabel(bracket, upNextId, side));
-    upNext = { entry: entryFor(upNextId), labelA: sideLabel(sides.allianceA, 'A'), labelB: sideLabel(sides.allianceB, 'B') };
-  }
-
-  return renderNowPlaying(state, dispatch, {
-    current: {
-      entry: entryFor(currentId),
-      matchRef: currentId,
-      teamsA: playoffAllianceTeamIds(state, currentSides.allianceA),
-      teamsB: playoffAllianceTeamIds(state, currentSides.allianceB),
-    },
-    upNext,
-    actions: ELIMINATION_MATCH_ACTIONS,
+  const liveMatch = getEliminationLiveMatch(state);
+  const placeholder = liveMatch ? null : renderPhaseCompleteCard({
+    message: 'Playoffs complete',
+    buttonLabel: 'Reveal Results →',
+    destinationTab: 'results',
+    setActiveTab,
   });
+  return renderNowPlaying(state, dispatch, { liveMatch, actions: ELIMINATION_MATCH_ACTIONS, placeholder });
 }
 
 /** The Elimination Bracket under its Now Playing, or where to go to start one. Playoff setup lives on the Alliance Selection tab. */

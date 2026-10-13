@@ -1,6 +1,6 @@
 import { getAllMatchesInScheduleOrder, allianceTeamNames, playoffAllianceTeamIds, playoffAllianceLabel } from './state.js';
 import { computeMatchTime } from './match-timeline.js';
-import { getCurrentMatchIndex, getUpNextMatchIndex, getEliminationCurrentMatchId, getEliminationUpNextMatchId } from './current-match.js';
+import { getInferredCurrentMatchIndex, getUpNextMatchIndex, getEliminationCurrentMatchId, getEliminationUpNextMatchId } from './current-match.js';
 import { resolveMatchSides, sideSourceLabel, getMatchesInBracketOrder, isBracketComplete } from './bracket.js';
 
 /**
@@ -29,10 +29,16 @@ function qualificationSide(state, teamIds) {
   return { teamIds, label: allianceTeamNames(state, teamIds) };
 }
 
-function qualificationLiveMatch(state, entries) {
+/**
+ * The Qualification Round's Live Match, whether or not a Bracket exists yet.
+ * Null when there are no Qualification Matches or every one is complete.
+ * @returns {LiveMatch|null}
+ */
+export function getQualificationLiveMatch(state) {
   const { matches } = state.qualification;
-  const currentIndex = getCurrentMatchIndex(matches);
+  const currentIndex = getInferredCurrentMatchIndex(matches);
   if (currentIndex === null) return null;
+  const entries = getAllMatchesInScheduleOrder(state);
   const qualSlot = (index) => {
     const { match } = entries[index];
     return slot(state, entries[index], index, qualificationSide(state, match.allianceA), qualificationSide(state, match.allianceB));
@@ -53,8 +59,16 @@ function eliminationSide(state, bracket, matchId, allianceId, side) {
   return { teamIds: playoffAllianceTeamIds(state, allianceId), label: playoffAllianceLabel(state, allianceId) };
 }
 
-function eliminationLiveMatch(state, entries) {
+/**
+ * The Elimination Bracket's Live Match, whether or not Qualification is
+ * complete. Null without a Bracket, or once every Elimination Match has a
+ * winner.
+ * @returns {LiveMatch|null}
+ */
+export function getEliminationLiveMatch(state) {
   const { bracket } = state.elimination;
+  if (!bracket || isBracketComplete(bracket)) return null;
+  const entries = getAllMatchesInScheduleOrder(state);
   const currentId = getEliminationCurrentMatchId(bracket);
   const elimSlot = (matchId) => {
     const { allianceA, allianceB } = resolveMatchSides(bracket, matchId);
@@ -85,8 +99,5 @@ function eliminationLiveMatch(state, entries) {
  * @returns {LiveMatch|null}
  */
 export function getLiveMatch(state) {
-  const entries = getAllMatchesInScheduleOrder(state);
-  const { bracket } = state.elimination;
-  if (bracket) return isBracketComplete(bracket) ? null : eliminationLiveMatch(state, entries);
-  return qualificationLiveMatch(state, entries);
+  return state.elimination.bracket ? getEliminationLiveMatch(state) : getQualificationLiveMatch(state);
 }

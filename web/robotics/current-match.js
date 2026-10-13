@@ -2,25 +2,16 @@ import { getMatchesInBracketOrder, getMatchWinner } from './bracket.js';
 
 /**
  * The Inferred Current Match: the first not-yet-complete match in schedule
- * order, or null if every match is complete (or there are none).
+ * order, or null if every match is complete (or there are none). It is always
+ * the Current Match - there is no override. Schedule order itself is manually
+ * reorderable (see reorderQualificationMatch in state.js), which is how the
+ * teacher controls which match ends up here.
  * @param {{completed: boolean}[]} matches
  * @returns {number|null}
  */
 export function getInferredCurrentMatchIndex(matches) {
   const index = matches.findIndex((m) => !m.completed);
   return index === -1 ? null : index;
-}
-
-/**
- * The Current Match: always the Inferred Current Match - there is no
- * override. Schedule order itself is manually reorderable (see
- * reorderQualificationMatch in state.js), which is how the teacher controls
- * which match ends up here.
- * @param {{completed: boolean}[]} matches
- * @returns {number|null}
- */
-export function getCurrentMatchIndex(matches) {
-  return getInferredCurrentMatchIndex(matches);
 }
 
 /**
