@@ -19,7 +19,7 @@ import {
   insertDayAt,
   deleteDayAt,
 } from '../../database-utils.js';
-import { DEFAULT_LESSON_TITLE, UNTITLED_LESSON } from '../../constants.js';
+import { UNTITLED_LESSON } from '../../constants.js';
 
 // Mock Firebase
 let mockData = {};

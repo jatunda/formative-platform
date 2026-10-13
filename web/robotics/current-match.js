@@ -1,3 +1,4 @@
+// @ts-check
 import { getMatchesInBracketOrder, getMatchWinner } from './bracket.js';
 
 /**
@@ -40,7 +41,7 @@ function undecidedEliminationMatchIds(bracket) {
  * The Elimination Current Match: the first undecided Elimination Match in
  * bracket order (Byes skipped). A completed Tie has no winner, so it stays
  * Current until its Score is changed. Null once every match has a winner.
- * @param {object} bracket
+ * @param {import('./bracket.js').Bracket} bracket
  * @returns {string|null}
  */
 export function getEliminationCurrentMatchId(bracket) {
@@ -50,7 +51,7 @@ export function getEliminationCurrentMatchId(bracket) {
 /**
  * Elimination Up Next: the next undecided Elimination Match after the Current
  * Match, in bracket order.
- * @param {object} bracket
+ * @param {import('./bracket.js').Bracket} bracket
  * @param {string|null} currentId
  * @returns {string|null}
  */

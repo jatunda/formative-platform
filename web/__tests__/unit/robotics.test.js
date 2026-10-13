@@ -169,7 +169,7 @@ describe('initRoboticsApp', () => {
 
   it('copies the roster to the clipboard and shows a confirmation toast', async () => {
     const writeText = setClipboardMock();
-    const app = initRoboticsApp();
+    initRoboticsApp();
     const root = document.getElementById('roboticsApp');
     addTeamViaForm(root, 'Alpha', 'Ann');
     await flushRender();
@@ -446,13 +446,12 @@ describe('initRoboticsApp', () => {
 
     it('regenerate is disabled once a match is complete, and reset re-enables it', async () => {
       const app = initRoboticsApp();
-      let root = setupFourTeams(app);
-      const matchesInput = [...root.querySelectorAll('input')].find((i) => i.previousSibling?.textContent?.includes('Matches per team') || true);
+      setupFourTeams(app);
       // directly dispatch config + regenerate to keep this test focused on the lock behavior
       app.dispatch((s) => setMatchesPerTeam(s, 2));
       app.dispatch((s) => regenerateMatchups(s));
       await flushRender();
-      root = document.getElementById('roboticsApp');
+      let root = document.getElementById('roboticsApp');
       expect([...root.querySelectorAll('button')].find((b) => b.textContent === 'Regenerate Matchups').getAttribute('aria-disabled')).toBeNull();
 
       app.setActiveTab('schedule');
@@ -493,11 +492,11 @@ describe('initRoboticsApp', () => {
 
     it('shows an error toast with the reset hint when clicking the locked Regenerate Matchups button', () => {
       const app = initRoboticsApp();
-      let root = setupFourTeams(app);
+      setupFourTeams(app);
       app.dispatch((s) => setMatchesPerTeam(s, 2));
       app.dispatch((s) => regenerateMatchups(s));
       app.setActiveTab('schedule');
-      root = document.getElementById('roboticsApp');
+      let root = document.getElementById('roboticsApp');
       const scoreInputs = root.querySelectorAll('.robotics-score-input');
       scoreInputs[0].value = '50';
       scoreInputs[1].value = '10';
@@ -515,11 +514,11 @@ describe('initRoboticsApp', () => {
 
     it('locks the Add a Team form once a Qualification Match is complete, with a hint on hover and click', () => {
       const app = initRoboticsApp();
-      let root = setupFourTeams(app);
+      setupFourTeams(app);
       app.dispatch((s) => setMatchesPerTeam(s, 2));
       app.dispatch((s) => regenerateMatchups(s));
       app.setActiveTab('schedule');
-      root = document.getElementById('roboticsApp');
+      let root = document.getElementById('roboticsApp');
       const scoreInputs = root.querySelectorAll('.robotics-score-input');
       scoreInputs[0].value = '50';
       scoreInputs[1].value = '10';
@@ -1515,7 +1514,7 @@ describe('initRoboticsApp', () => {
   describe('clipboard copy confirmation toast', () => {
     it('shows an error toast when navigator.clipboard is unavailable', () => {
       Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true });
-      const app = initRoboticsApp();
+      initRoboticsApp();
       const root = document.getElementById('roboticsApp');
       addTeamViaForm(root, 'Alpha');
       clickButtonWithText(root, 'Copy Roster to Clipboard');
@@ -1529,7 +1528,7 @@ describe('initRoboticsApp', () => {
         value: { writeText: vi.fn().mockRejectedValue(new Error('denied')) },
         configurable: true,
       });
-      const app = initRoboticsApp();
+      initRoboticsApp();
       const root = document.getElementById('roboticsApp');
       addTeamViaForm(root, 'Alpha');
       clickButtonWithText(root, 'Copy Roster to Clipboard');
@@ -1544,7 +1543,7 @@ describe('initRoboticsApp', () => {
       vi.useFakeTimers();
       try {
         setClipboardMock();
-        const app = initRoboticsApp();
+        initRoboticsApp();
         const root = document.getElementById('roboticsApp');
         addTeamViaForm(root, 'Alpha');
         clickButtonWithText(root, 'Copy Roster to Clipboard');

@@ -6,7 +6,6 @@ import {
   getAllQuestions,
   saveQuestion,
   resolveClassNameToId,
-  getAllQuestionSlugs,
   assignQuestionSlug,
   removeQuestionSlug,
   renameQuestionSlug,

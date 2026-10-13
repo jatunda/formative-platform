@@ -75,6 +75,8 @@ From the `web/` directory:
 - **Run tests once**: `npm run test:run`
 - **Run tests with UI**: `npm run test:ui`
 - **Run tests with coverage**: `npm run test:coverage`
+- **Lint**: `npm run lint` (ESLint, `eslint.config.js`)
+- **Type-check**: `npm run typecheck` (TypeScript reads the JSDoc in files that start with `// @ts-check`; see `jsconfig.json`)
 
 ### Test Structure
 

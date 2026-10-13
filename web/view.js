@@ -2,7 +2,7 @@
 import { ref, get } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js";
 import { db } from './firebase-config.js';
 import { initializeDateUtils, getTodayDayIndex } from './date-utils.js';
-import { renderContent, renderMultipleContent } from './content-renderer.js';
+import { renderMultipleContent } from './content-renderer.js';
 import { initializeQuestionDatabase } from './question-database-utils.js';
 import { mountQuestionEmbeds } from './question-embed.js';
 import { NO_CONTENT_FOR_TODAY } from './constants.js';

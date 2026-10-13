@@ -5,7 +5,6 @@ import {
   getPracticeSetFromDB,
   getAllPracticeSets,
   savePracticeSet,
-  getAllPracticeSetSlugs,
   assignPracticeSetSlug,
   removePracticeSetSlug,
   renamePracticeSetSlug,

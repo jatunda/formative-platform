@@ -150,7 +150,7 @@ describe('renderQuestionWidget', () => {
 
     it('does not allow a 3rd attempt', () => {
       const outcomes = [];
-      const widget = renderQuestionWidget(container, QUESTION, { onOutcome: (o) => outcomes.push(o) });
+      renderQuestionWidget(container, QUESTION, { onOutcome: (o) => outcomes.push(o) });
 
       radios(container)[1].click();
       submitBtn(container).click();

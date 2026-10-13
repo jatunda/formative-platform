@@ -150,7 +150,6 @@ function getBusinessDaysBetween(startDate, endDate) {
  */
 export async function getTodayDayIndex(classId, classStartDate = DEFAULT_CLASS_START_DATE) {
   const today = new Date();
-  const startDate = createLocalDate(classStartDate);
   
   // Calculate business days difference from start date to today
   const businessDaysDiff = getBusinessDaysBetween(classStartDate, today);

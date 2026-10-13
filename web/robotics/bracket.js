@@ -1,3 +1,8 @@
+// @ts-check
+/**
+ * @typedef {{bracketSize: number, paddedSize: number, seeds: string[], includeThirdPlace: boolean, matches: object[]}} Bracket
+ */
+
 /** Smallest power of two that is >= n. */
 export function nextPowerOfTwo(n) {
   let p = 1;
@@ -31,7 +36,7 @@ export function seedOrder(n) {
  * Byes for the top Seeds. Byes still appear in `matches` (flagged `isBye`)
  * so the bracket can render a "BYE" slot, even though no match is played.
  * @param {{bracketSize: number, seeds: string[], includeThirdPlace: boolean}} config
- * @returns {{bracketSize: number, paddedSize: number, seeds: string[], includeThirdPlace: boolean, matches: object[]}}
+ * @returns {Bracket}
  */
 export function buildBracket({ bracketSize, seeds, includeThirdPlace }) {
   const paddedSize = nextPowerOfTwo(bracketSize);
@@ -98,7 +103,7 @@ export function buildBracket({ bracketSize, seeds, includeThirdPlace }) {
 
   if (includeThirdPlace && semifinalRound && semifinalRound.length === 2) {
     matches.push({
-      id: `m${++matchIdCounter}`,
+      id: `m${matchIdCounter + 1}`,
       round: 'third-place',
       slot: 0,
       seedA: null,
@@ -124,7 +129,7 @@ function findMatch(bracket, matchId) {
  * Resolve the two Playoff Alliances occupying a match's sides. A side is
  * `null` until it can be determined (round 1 always resolves immediately;
  * later rounds resolve once their feeder matches are decided or are Byes).
- * @param {object} bracket
+ * @param {Bracket} bracket
  * @param {string} matchId
  * @returns {{allianceA: string|null, allianceB: string|null}}
  */
@@ -205,7 +210,7 @@ export function getMatchesInBracketOrder(bracket) {
  * Where a match's side comes from, while it isn't decided yet: "Winner of
  * Round 2 · Match 1" (or "Runner-up of …" for the Third-Place Match). Null for a
  * Round 1 side, which is a Seed rather than a feeder match.
- * @param {object} bracket
+ * @param {Bracket} bracket
  * @param {string} matchId
  * @param {'A'|'B'} side
  * @returns {string|null}
@@ -244,5 +249,5 @@ export function getPlacements(bracket) {
     { place: 2, allianceId: getMatchLoser(bracket, finalMatch.id) },
     { place: 3, allianceId: thirdPlaceMatch ? getMatchWinner(bracket, thirdPlaceMatch.id) : null },
   ];
-  return candidates.filter((p) => p.allianceId);
+  return /** @type {{place: number, allianceId: string}[]} */ (candidates.filter((p) => p.allianceId));
 }

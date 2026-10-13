@@ -1,3 +1,4 @@
+// @ts-check
 import { getAllMatchesInScheduleOrder, allianceTeamNames, playoffAllianceTeamIds, playoffAllianceLabel } from './state.js';
 import { computeMatchTime } from './match-timeline.js';
 import { getInferredCurrentMatchIndex, getUpNextMatchIndex, getEliminationCurrentMatchId, getEliminationUpNextMatchId } from './current-match.js';

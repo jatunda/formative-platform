@@ -115,7 +115,7 @@ describe('drag-drop-utils', () => {
         value: { dropEffect: '' },
       });
       
-      const prevented = element.dispatchEvent(event);
+      element.dispatchEvent(event);
       
       expect(event.defaultPrevented).toBe(true);
       expect(event.dataTransfer.dropEffect).toBe('move');

@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   initializeDatabase,
   getScheduleForDay,
-  updateScheduleForDay,
 } from '../../database-utils.js';
 import {
   initializeDateUtils,
@@ -109,7 +108,7 @@ describe('Database and Date Integration', () => {
   it('should handle date offset affecting schedule access', async () => {
     // With offset of 2, day index calculations are adjusted
     const dayIndex = 0;
-    const dateStr = await getDateForDayIndex(dayIndex, 'class1', '2024-01-01');
+    await getDateForDayIndex(dayIndex, 'class1', '2024-01-01');
     
     // Should still be able to access schedule
     const schedule = await getScheduleForDay('class1', dayIndex);

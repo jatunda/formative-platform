@@ -4,16 +4,20 @@ Single-teacher tool for planning/delivering class content. See `CONTEXT.md` for 
 
 ## Before considering any `web/` change complete
 
-Run coverage, not just the test suite:
+Run lint, the type checker, and coverage (not just the test suite):
 
 ```
 cd web
+npm run lint
+npm run typecheck
 npm run test:coverage
 ```
 
-`npx vitest run` alone can pass while coverage silently regresses — `vitest.config.js`'s `coverage.thresholds` is a hard gate (currently lines 86% / functions 84% / branches 89% / statements 86%) and only `test:coverage` evaluates it. A change is not done until this command exits clean.
+A change is not done until all three exit clean. Fix lint and type errors rather than disabling the rule or adding `// @ts-ignore`. The type checker only checks files whose first line is `// @ts-check` (see `jsconfig.json`). Keep that line in files that have it, and add it to new pure modules (no DOM rendering).
 
-If it fails:
+`npx vitest run` alone can pass while coverage silently regresses — `vitest.config.js`'s `coverage.thresholds` is a hard gate (currently lines 86% / functions 84% / branches 89% / statements 86%) and only `test:coverage` evaluates it.
+
+If coverage fails:
 
 - **Your diff introduced the gap** (new `if`/`&&`/`||`/ternary with a path never exercised) — add a test for the missing branch. Don't rationalize it away as "trivial" or "obviously correct"; untested branches are exactly where regressions hide.
 - **The gap predates your diff** (pre-existing file was already short) — still fix it rather than lowering the threshold. The comment above `thresholds` in `vitest.config.js` calls it "a ratcheting floor, not an aspirational target": numbers only move up as real coverage work lands, never down to accommodate a shortfall. Finding uncovered branches: `npx vitest run --coverage` prints uncovered line numbers per file in the text summary; `coverage/coverage-final.json`'s `branchMap`/`b` fields give exact branch-level locations if the line numbers aren't precise enough (a branch's "not taken" location is often attributed to the line *after* a one-line `if` with no `else`).

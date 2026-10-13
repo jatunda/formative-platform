@@ -370,7 +370,6 @@ describe('teacher', () => {
 
     it('shows the schedule error state if loading fails', async () => {
       scheduleFixture();
-      const { get } = await import('https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js');
       const { getClassDateOffset } = await import('../../date-utils.js');
       const { showErrorState } = await import('../../error-ui-utils.js');
       getClassDateOffset.mockRejectedValueOnce(new Error('network down'));

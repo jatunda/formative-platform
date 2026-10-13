@@ -1,14 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import { describe, it, expect } from 'vitest';
 
 // Since parseMarkdown.js uses CommonJS require, we need to handle it differently
 // We'll test the logic by importing the web version which has the same parsing logic
 import { parseDSL } from '../../dsl.js';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 describe('parseMarkdown (Node.js script)', () => {
   // Note: The actual parseMarkdown.js uses fs.readFileSync which is Node.js specific

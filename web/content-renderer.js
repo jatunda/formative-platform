@@ -1,3 +1,4 @@
+/* global Prism -- loaded from a CDN <script> on the pages that render code blocks */
 // Shared content rendering module
 // Used by both view.js and editor.js for consistent rendering
 import { CONTENT_NOT_FOUND } from './constants.js';
@@ -325,7 +326,7 @@ function renderContentItems(contentItems, containerEl, headingIds = new Map(), h
 				} else {
 					const ulMatch = line.match(/^(\s*)([*-])\s+(.+)$/);
 					if (ulMatch) {
-						const [, indent, marker, content] = ulMatch;
+						const [, indent, , content] = ulMatch;
 						const depth = calculateDepth(indent);
 						const ul = getListAtDepth(depth, 'ul');
 						
@@ -340,7 +341,7 @@ function renderContentItems(contentItems, containerEl, headingIds = new Map(), h
 					} else {
 						const olMatch = line.match(/^(\s*)(\d+)\.\s+(.+)$/);
 						if (olMatch) {
-							const [, indent, number, content] = olMatch;
+							const [, indent, , content] = olMatch;
 							const depth = calculateDepth(indent);
 							const ol = getListAtDepth(depth, 'ol');
 							

@@ -491,7 +491,6 @@ describe('editor', () => {
   describe('handleNewLessonContext', () => {
     it('seeds a blank Lesson and a fresh id when ?new=1', async () => {
       const contentIdEl = document.createElement('div');
-      const dslInput = document.createElement('textarea');
       const preview = document.createElement('div');
       document.body.innerHTML = '<textarea id="dslInput"></textarea><button id="saveBtn"></button><button id="duplicateBtn"></button><button id="deleteBtn"></button>';
 

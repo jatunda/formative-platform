@@ -1,3 +1,4 @@
+// @ts-check
 import { generateQualificationMatches } from './pairing-draw.js';
 import { buildBracket, isBracketComplete, getPlacements, getMatchesInBracketOrder } from './bracket.js';
 import { getAllianceSelectionBlockReason, getDeclinedTeamIds, getEffectiveBracketSize, isBracketSizeSaved } from './alliance-selection.js';
@@ -46,7 +47,6 @@ function updateEliminationBracket(state, matchId, makePatch) {
  * The blank Tournament state: no Teams, default Qualification/Timeline
  * config, no Elimination Bracket. See web/robotics/CONTEXT.md for the
  * vocabulary behind every field here.
- * @returns {object}
  */
 export function createInitialState() {
   return {
@@ -150,6 +150,10 @@ export function suggestEvenMatchesPerTeam(teamCount, matchesPerTeam, limit = 2) 
   return suggestions.sort((a, b) => a - b);
 }
 
+/**
+ * @param {*} state - the Tournament
+ * @param {{random?: () => number}} [options] - random source for the Pairing Draw (tests pass a seeded one)
+ */
 export function regenerateMatchups(state, { random } = {}) {
   if (!canRegenerateMatchups(state)) {
     throw new Error('Cannot regenerate matchups once a Qualification Match is complete. Reset results first.');

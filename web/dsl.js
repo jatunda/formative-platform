@@ -34,7 +34,6 @@ export function parseDSL(dslText) {
   let inQuestion = false;
   let hasEncounteredSeparator = false;
   let collapsibleStack = []; // Track open collapsible sections: [{ section: object, depth: number }]
-  let lastContentAddedToCollapsible = false; // Track if last content was added to a collapsible
   
   for (let raw of lines) {
     const line = raw.trim();
@@ -61,7 +60,6 @@ export function parseDSL(dslText) {
         );
       }
       
-      lastContentAddedToCollapsible = false;
       hasEncounteredSeparator = true;
       if (inQuestion && currentBlock) {
         // End current question and push it
@@ -90,10 +88,8 @@ export function parseDSL(dslText) {
           // If we're inside a collapsible section, add to the top of the stack
           if (collapsibleStack.length > 0) {
             collapsibleStack[collapsibleStack.length - 1].section.content.push(codeBlock);
-            lastContentAddedToCollapsible = true;
           } else {
             currentBlock.content.push(codeBlock);
-            lastContentAddedToCollapsible = false;
           }
         }
         inCode = false;
@@ -126,7 +122,6 @@ export function parseDSL(dslText) {
       // Close the current collapsible section if one is open
       if (collapsibleStack.length > 0) {
         collapsibleStack.pop();
-        lastContentAddedToCollapsible = false;
       }
       // Skip processing this line further (don't treat as regular text)
       continue;
@@ -146,7 +141,7 @@ export function parseDSL(dslText) {
         const isExpanded = line.startsWith(">>>!");
         
         // Extract title (everything after >>> or >>>! and optional space)
-        let title = "";
+        let title;
         if (isExpanded) {
           title = line.substring(4).trim(); // Skip ">>>!"
         } else {
@@ -226,8 +221,6 @@ export function parseDSL(dslText) {
         const newDepth = collapsibleStack.length;
         collapsibleStack.push({ section: newCollapsible, depth: newDepth });
         
-        // Reset the flag - we just created a new collapsible, so next content will go into it
-        lastContentAddedToCollapsible = false;
       }
     }
     
@@ -245,10 +238,8 @@ export function parseDSL(dslText) {
         // If we're inside a collapsible section, add to the top of the stack
         if (collapsibleStack.length > 0) {
           collapsibleStack[collapsibleStack.length - 1].section.content.push({ type: "text", value: raw });
-          lastContentAddedToCollapsible = true;
         } else {
           currentBlock.content.push({ type: "text", value: raw });
-          lastContentAddedToCollapsible = false;
         }
       }
     }
@@ -269,8 +260,6 @@ export function parseDSL(dslText) {
       `Please add <<< to close each opened collapsible section.`
     );
   }
-  
-  lastContentAddedToCollapsible = false;
   
   // Close any remaining question block that has content
   if (inQuestion && currentBlock && currentBlock.content.length > 0) {

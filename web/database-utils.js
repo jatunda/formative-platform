@@ -2,8 +2,7 @@
 import {
   ref,
   get,
-  set,
-  update
+  set
 } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js";
 import { DEFAULT_LESSON_TITLE, UNTITLED_LESSON } from "./constants.js";
 
@@ -37,7 +36,7 @@ export async function getScheduleForDay(classId, dayIndex) {
     return snap.val() || [];
   } catch (error) {
     console.error(`Failed to get schedule for class ${classId}, day ${dayIndex}:`, error);
-    throw new Error(`Unable to load schedule. Please try again.`);
+    throw new Error(`Unable to load schedule. Please try again.`, { cause: error });
   }
 }
 
@@ -58,7 +57,7 @@ export async function updateScheduleForDay(classId, dayIndex, lessons) {
     await set(dayRef, lessons);
   } catch (error) {
     console.error(`Failed to update schedule for class ${classId}, day ${dayIndex}:`, error);
-    throw new Error(`Unable to save schedule. Please try again.`);
+    throw new Error(`Unable to save schedule. Please try again.`, { cause: error });
   }
 }
 
@@ -77,9 +76,8 @@ export async function getFullSchedule(classId) {
     return snap.exists() ? snap.val() : {};
   } catch (error) {
     console.error(`Failed to get full schedule for class ${classId}:`, error);
-    throw new Error(`Unable to load full schedule. Please try again.`);
+    throw new Error(`Unable to load full schedule. Please try again.`, { cause: error });
   }
-  return snap.val() || {};
 }
 
 /**
@@ -239,7 +237,7 @@ export async function getClassDateOffset(classId) {
     return snap.exists() ? snap.val() : 0; // Default offset is 0
   } catch (error) {
     console.error(`Failed to get date offset for class ${classId}:`, error);
-    throw new Error(`Unable to load date offset. Please try again.`);
+    throw new Error(`Unable to load date offset. Please try again.`, { cause: error });
   }
 }
 
@@ -260,7 +258,7 @@ export async function setClassDateOffset(classId, offset) {
     await set(ref(db, `classes/${classId}/dateOffset`), Number(offset));
   } catch (error) {
     console.error(`Failed to set date offset for class ${classId}:`, error);
-    throw new Error(`Unable to save date offset. Please try again.`);
+    throw new Error(`Unable to save date offset. Please try again.`, { cause: error });
   }
 }
 
@@ -333,6 +331,6 @@ export async function deleteDayAt(classId, index) {
     await Promise.all(writeOperations);
   } catch (error) {
     console.error(`Failed to delete day ${index} for class ${classId}:`, error);
-    throw new Error(`Unable to delete day. Please try again.`);
+    throw new Error(`Unable to delete day. Please try again.`, { cause: error });
   }
 }
