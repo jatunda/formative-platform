@@ -17,6 +17,7 @@ import {
   recordEliminationResult,
   revealNextPlacement,
   getRevealedCount,
+  resetResults,
 } from '../../robotics/state.js';
 
 function setClipboardMock() {
@@ -546,6 +547,48 @@ describe('initRoboticsApp', () => {
       const toast = document.querySelector('.robotics-toast-visible');
       expect(toast?.textContent).toContain('Reset Results');
       expect(toast?.className).toContain('robotics-toast-error');
+    });
+
+    it('locks Add Team and every Remove once Generate Matchups has run, keeping rename and Members editable', async () => {
+      const app = initRoboticsApp();
+      setupFourTeams(app);
+      app.dispatch((s) => setMatchesPerTeam(s, 2));
+      await flushRender();
+      clickButtonWithText(document.getElementById('roboticsApp'), 'Generate Matchups');
+      await flushRender();
+      const root = document.getElementById('roboticsApp');
+
+      const addBtn = [...root.querySelectorAll('button')].find((b) => b.textContent === 'Add Team');
+      const removeBtns = [...root.querySelectorAll('.robotics-team-row button')].filter((b) => b.textContent === 'Remove');
+      expect(removeBtns).toHaveLength(4);
+      for (const btn of [addBtn, ...removeBtns]) {
+        expect(btn.getAttribute('aria-disabled')).toBe('true');
+        expect(btn.title).toBe(addBtn.title);
+      }
+      expect(addBtn.title).toContain('Reset Results');
+
+      removeBtns[0].click();
+      expect(app.getState().teams).toHaveLength(4);
+      const toast = document.querySelector('.robotics-toast-visible');
+      expect(toast?.textContent).toBe(addBtn.title);
+      expect(toast?.className).toContain('robotics-toast-error');
+
+      expect(root.querySelector('.robotics-team-name-input').readOnly).toBe(false);
+      expect(root.querySelector('.robotics-member-add-input').readOnly).toBe(false);
+    });
+
+    it('unlocks Remove again after Reset Results', async () => {
+      const app = initRoboticsApp();
+      setupFourTeams(app);
+      app.dispatch((s) => setMatchesPerTeam(s, 2));
+      app.dispatch((s) => regenerateMatchups(s));
+      app.dispatch((s) => resetResults(s));
+      await flushRender();
+      const root = document.getElementById('roboticsApp');
+      const removeBtn = [...root.querySelectorAll('.robotics-team-row button')].find((b) => b.textContent === 'Remove');
+      expect(removeBtn.getAttribute('aria-disabled')).toBeNull();
+      removeBtn.click();
+      expect(app.getState().teams).toHaveLength(3);
     });
 
     it('keeps the Add a Team form enabled when unlocked', () => {

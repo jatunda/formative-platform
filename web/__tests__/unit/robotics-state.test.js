@@ -4,6 +4,7 @@ import {
   addTeam,
   updateTeam,
   removeTeam,
+  getRosterBlockReason,
   setMatchesPerTeam,
   canRegenerateMatchups,
   regenerateMatchups,
@@ -73,6 +74,39 @@ describe('team CRUD', () => {
     const original = createInitialState();
     addTeam(original, { name: 'Alpha', members: [] });
     expect(original.teams).toHaveLength(0);
+  });
+});
+
+describe('roster lock', () => {
+  function withDrawnMatches() {
+    return regenerateMatchups(setMatchesPerTeam(withFourTeams(createInitialState()), 2));
+  }
+
+  it('is unlocked before the Pairing Draw', () => {
+    expect(getRosterBlockReason(withFourTeams(createInitialState()))).toBeNull();
+  });
+
+  it('locks once the Pairing Draw has produced Qualification Matches, pointing at Reset Results', () => {
+    expect(getRosterBlockReason(withDrawnMatches())).toContain('Reset Results');
+  });
+
+  it('addTeam and removeTeam no-op while locked', () => {
+    const state = withDrawnMatches();
+    expect(addTeam(state, { name: 'Echo' })).toBe(state);
+    expect(removeTeam(state, state.teams[0].id)).toBe(state);
+  });
+
+  it('still allows renaming a Team and editing its Members while locked', () => {
+    let state = withDrawnMatches();
+    const id = state.teams[0].id;
+    state = updateTeam(state, id, { name: 'Alpha Prime', members: ['Ann'] });
+    expect(state.teams[0]).toMatchObject({ name: 'Alpha Prime', members: ['Ann'] });
+  });
+
+  it('Reset Results and New Tournament unlock it', () => {
+    const state = withDrawnMatches();
+    expect(getRosterBlockReason(resetResults(state))).toBeNull();
+    expect(getRosterBlockReason(newTournament(state))).toBeNull();
   });
 });
 

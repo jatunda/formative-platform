@@ -10,7 +10,7 @@ See `CONTEXT-MAP.md` at the repo root for how this context relates to the unrela
 The single current competition: a Team roster, a Qualification Round, and an optional Elimination Bracket. Only one Tournament exists at a time — starting a new one (see New Tournament) discards the previous one entirely rather than archiving it.
 
 **Team**:
-A competing entry with a name and an ordered list of Member names. Members are display-only (shown on roster lists and match cards so students can tell who's on which Team) — no stats are tracked per Member, only per Team.
+A competing entry with a name and an ordered list of Member names. Members are display-only (shown on roster lists and match cards so students can tell who's on which Team) — no stats are tracked per Member, only per Team. The Team roster is locked once the Pairing Draw has produced Qualification Matches: no Team can be added or removed until Reset Results or New Tournament. Renaming a Team and editing its Members stay allowed.
 
 **Member**:
 A student name within a Team's roster. Free-form, addable/removable at any time. Not a tracked entity on its own — Members exist only as part of a Team's roster.

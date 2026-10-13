@@ -4,6 +4,7 @@ import {
   addTeam,
   updateTeam,
   removeTeam,
+  getRosterBlockReason,
   setMatchesPerTeam,
   canRegenerateMatchups,
   regenerateMatchups,
@@ -225,14 +226,13 @@ function renderRegenerateMatchupsButton(state, dispatch) {
 export function renderTeamsTab(state, dispatch) {
   const section = el('div', { className: 'robotics-teams-layout' });
 
-  const locked = !canRegenerateMatchups(state);
-  const lockHint = 'Locked — a Qualification Match is already complete. Use Reset Results or Reset Everything / New Tournament first.';
+  const rosterBlockReason = getRosterBlockReason(state);
 
   const nameInput = el('input', { placeholder: 'Team name' });
   const membersInput = el('input', { placeholder: 'Members (comma-separated)' });
   const addTeamFromForm = () => {
-    if (locked) {
-      showToast(lockHint, { isError: true });
+    if (rosterBlockReason) {
+      showToast(rosterBlockReason, { isError: true });
       return;
     }
     if (!nameInput.value.trim()) {
@@ -263,9 +263,9 @@ export function renderTeamsTab(state, dispatch) {
       focusAfterRender('input[placeholder="Team name"]');
     }
   });
-  if (locked) {
-    [nameInput, membersInput].forEach((input) => lockField(input, lockHint));
-    markLocked(addBtn, lockHint);
+  if (rosterBlockReason) {
+    [nameInput, membersInput].forEach((input) => lockField(input, rosterBlockReason));
+    markLocked(addBtn, rosterBlockReason);
   }
   section.appendChild(el('div', { className: 'robotics-card robotics-teams-add' }, [
     el('h3', { className: 'robotics-card-title' }, ['Add a Team']),
@@ -325,11 +325,23 @@ export function renderTeamsTab(state, dispatch) {
       onClick: addMember,
     }, ['Add member']);
 
+    const removeBtn = el('button', {
+      className: 'robotics-btn robotics-btn-danger robotics-btn-sm',
+      onClick: () => {
+        if (rosterBlockReason) {
+          showToast(rosterBlockReason, { isError: true });
+          return;
+        }
+        dispatch((s) => removeTeam(s, team.id));
+      },
+    }, ['Remove']);
+    if (rosterBlockReason) markLocked(removeBtn, rosterBlockReason);
+
     const row = el('div', { className: 'robotics-match-row robotics-team-row' }, [
       nameInput,
       membersEdit,
       el('div', { className: 'robotics-member-add-row' }, [addMemberInput, addMemberBtn]),
-      el('button', { className: 'robotics-btn robotics-btn-danger robotics-btn-sm', onClick: () => dispatch((s) => removeTeam(s, team.id)) }, ['Remove']),
+      removeBtn,
     ]);
     list.appendChild(row);
   });

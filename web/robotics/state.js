@@ -98,7 +98,21 @@ function savableBracketSize(state) {
 
 // ---- Teams ----
 
+/**
+ * Why Teams can't be added or removed right now, as the toast to show, or null when they can.
+ * The roster locks once the Pairing Draw has produced Qualification Matches, since those (and
+ * any Playoff Alliance) hold Team ids. Renaming a Team and editing its Members stay allowed.
+ * @param {*} state - the Tournament
+ * @returns {string|null}
+ */
+export function getRosterBlockReason(state) {
+  if (state.qualification.matches.length === 0) return null;
+  return 'Locked — the Qualification Matches are drawn. Use Reset Results or Reset Everything / New Tournament to change Teams.';
+}
+
+/** No-ops while the roster is locked (see getRosterBlockReason). */
 export function addTeam(state, { name, members = [] }) {
+  if (getRosterBlockReason(state)) return state;
   const team = { id: generateId('team'), name, members: [...members] };
   return { ...state, teams: [...state.teams, team] };
 }
@@ -110,7 +124,9 @@ export function updateTeam(state, teamId, patch) {
   };
 }
 
+/** No-ops while the roster is locked (see getRosterBlockReason). */
 export function removeTeam(state, teamId) {
+  if (getRosterBlockReason(state)) return state;
   return { ...state, teams: state.teams.filter((t) => t.id !== teamId) };
 }
 
