@@ -164,7 +164,7 @@ describe('TeacherAuth', () => {
       expect(auth.isSessionValid()).toBe(true);
     });
 
-    it('resolves false and alerts when the wrong password is entered', async () => {
+    it('resolves false without alerting when the wrong password is entered', async () => {
       auth.passwordHash = await sha256Hex('correct-horse');
       const promise = auth.authenticate();
 
@@ -173,7 +173,7 @@ describe('TeacherAuth', () => {
       document.getElementById('loginBtn').click();
 
       expect(await promise).toBe(false);
-      expect(alert).toHaveBeenCalledWith('Incorrect password. Access denied.');
+      expect(alert).not.toHaveBeenCalled();
       expect(auth.isSessionValid()).toBe(false);
     });
 
@@ -221,6 +221,18 @@ describe('TeacherAuth', () => {
 
       expect(await promise).toBe(false);
       expect(alert).toHaveBeenCalledWith('Access denied. Redirecting to student portal.');
+      expect(window.location.href).toBe('index.html');
+    });
+
+    it('shows only one dialog when the wrong password is entered', async () => {
+      auth.passwordHash = await sha256Hex('correct-horse');
+      const promise = auth.requireAuth();
+      await vi.waitFor(() => expect(document.getElementById('teacherPasswordInput')).toBeTruthy());
+      document.getElementById('teacherPasswordInput').value = 'wrong-password';
+      document.getElementById('loginBtn').click();
+
+      expect(await promise).toBe(false);
+      expect(alert).toHaveBeenCalledTimes(1);
       expect(window.location.href).toBe('index.html');
     });
 
@@ -345,6 +357,16 @@ describe('TeacherAuth', () => {
 
       expect(alert).toHaveBeenCalledWith('Session expired. Please log in again.');
       expect(window.location.href).toBe('index.html');
+    });
+
+    it('shows the session-expired dialog only once, even if more checks fire before the redirect lands', () => {
+      auth.setSession();
+      auth.setupActivityListeners();
+      localStorage.setItem(auth.timeoutKey, (Date.now() - 1000).toString());
+
+      vi.advanceTimersByTime(60000 * 3);
+
+      expect(alert).toHaveBeenCalledTimes(1);
     });
 
     it('does not redirect while the dev bypass is active, even with an expired session', () => {

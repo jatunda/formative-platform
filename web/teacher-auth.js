@@ -251,7 +251,9 @@ export class TeacherAuth {
     });
   }
 
-  // Prompt for password and authenticate
+  // Prompt for password and authenticate. Never alerts on failure itself -
+  // requireAuth owns the single "access denied" dialog, so a wrong password
+  // doesn't stack two alerts back to back.
   async authenticate() {
     if (this.isDevBypassActive()) {
       this.showDevBypassBanner();
@@ -274,13 +276,10 @@ export class TeacherAuth {
       if (inputHash === this.passwordHash) {
         this.setSession();
         return true;
-      } else {
-        alert('Incorrect password. Access denied.');
-        return false;
       }
+      return false;
     } catch (error) {
       console.error('Authentication error:', error);
-      alert('Authentication error. Please try again.');
       return false;
     }
   }
@@ -316,10 +315,13 @@ export class TeacherAuth {
       document.addEventListener(event, extendSession, true);
     });
 
-    // Check session validity every minute
-    setInterval(() => {
+    // Check session validity every minute. Stops itself on expiry: the
+    // redirect isn't instant, and an overdue tick (e.g. after the tab was
+    // backgrounded) would otherwise alert a second time before it lands.
+    const sessionCheck = setInterval(() => {
       if (this.isDevBypassActive()) return;
       if (!this.isSessionValid() && document.body?.dataset.teacherPage === 'true') {
+        clearInterval(sessionCheck);
         alert('Session expired. Please log in again.');
         window.location.href = 'index.html';
       }
