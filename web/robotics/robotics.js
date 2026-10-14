@@ -50,6 +50,7 @@ import {
   timeOfDayToEpochMs,
 } from './match-timeline.js';
 import { computeStandings, formatRecord } from './standings.js';
+import { winningSide } from './match-result.js';
 import { resolveMatchSides, getMatchWinner, isBracketComplete, countUndecidedMatches, getPlacements, getPlayedEliminationMatches, eliminationMatchLabel } from './bracket.js';
 import {
   getAllianceCaptain,
@@ -477,15 +478,13 @@ function renderMatchRow(state, dispatch, entry, liveMatch) {
 
   const scores = renderScoreInputs(dispatch, match, qualIndex, QUALIFICATION_MATCH_ACTIONS.setDraftScore);
   const { scoreA, scoreB } = scores;
-  const winningSide = match.completed && match.scoreA !== match.scoreB
-    ? (match.scoreA > match.scoreB ? 'A' : 'B')
-    : null;
+  const winner = winningSide(match);
   const toggleQualificationNoShow = (teamId, next) => dispatch((s) => QUALIFICATION_MATCH_ACTIONS.setNoShow(s, qualIndex, teamId, next));
   // Each side and each score is its own grid cell so columns line up down the list.
-  row.appendChild(renderAllianceSide(state, match.allianceA, match.noShow, toggleQualificationNoShow, winningSide === 'A', 'red'));
+  row.appendChild(renderAllianceSide(state, match.allianceA, match.noShow, toggleQualificationNoShow, winner === 'A', 'red'));
   row.appendChild(scoreA);
   row.appendChild(scoreB);
-  row.appendChild(renderAllianceSide(state, match.allianceB, match.noShow, toggleQualificationNoShow, winningSide === 'B', 'blue'));
+  row.appendChild(renderAllianceSide(state, match.allianceB, match.noShow, toggleQualificationNoShow, winner === 'B', 'blue'));
 
   const actions = el('div', { className: 'robotics-match-actions' });
   actions.appendChild(renderMarkMatchCompleteButton(dispatch, match, qualIndex, scores, 'robotics-btn robotics-btn-secondary robotics-btn-sm', QUALIFICATION_MATCH_ACTIONS.recordResult));

@@ -1,3 +1,5 @@
+import { qualificationTeamResult } from './match-result.js';
+
 /**
  * Compute Standings: every Team ranked by record accumulated from completed
  * Qualification Matches. Ranking adapts to whether every Team that has played
@@ -9,8 +11,8 @@
  * - Unequal match counts ("rate" mode): ranked by win percentage desc, where a
  *   Tie counts as half a win, tiebreak: average Score per match desc,
  *   since raw totals would otherwise favor whichever Team played more.
- * A completed match with equal Scores is a Tie for every Team on both sides,
- * except a No-Show Team, which still records a loss.
+ * Each Team's win, loss or Tie comes from the shared "who won" rule
+ * (`qualificationTeamResult`), so a No-Show Team still records a loss.
  * @param {{id: string}[]} teams
  * @param {{allianceA: string[], allianceB: string[], scoreA: number, scoreB: number, completed: boolean, noShow: Record<string, boolean>}[]} matches
  * @returns {{teamId: string, wins: number, losses: number, ties: number, winPoints: number, points: number, matchesPlayed: number, winRate: number, avgPoints: number, rankingMode: 'raw'|'rate'}[]}
@@ -19,30 +21,21 @@ export function computeStandings(teams, matches) {
   const record = new Map(teams.map((t) => [t.id, { teamId: t.id, wins: 0, losses: 0, ties: 0, points: 0, matchesPlayed: 0 }]));
 
   for (const match of matches) {
-    if (!match.completed) continue;
-    const noShow = match.noShow || {};
     const sides = [
-      { teamIds: match.allianceA, score: match.scoreA, opponentScore: match.scoreB },
-      { teamIds: match.allianceB, score: match.scoreB, opponentScore: match.scoreA },
+      { side: 'A', teamIds: match.allianceA, score: match.scoreA },
+      { side: 'B', teamIds: match.allianceB, score: match.scoreB },
     ];
 
-    for (const side of sides) {
-      const won = side.score > side.opponentScore;
-      const lost = side.score < side.opponentScore;
-      for (const teamId of side.teamIds) {
+    for (const { side, teamIds, score } of sides) {
+      for (const teamId of teamIds) {
         const entry = record.get(teamId);
-        if (!entry) continue;
-        entry.points += side.score;
+        const result = qualificationTeamResult(match, side, teamId);
+        if (!entry || result === null) continue;
+        entry.points += score;
         entry.matchesPlayed += 1;
-        if (noShow[teamId]) {
-          entry.losses += 1;
-        } else if (won) {
-          entry.wins += 1;
-        } else if (lost) {
-          entry.losses += 1;
-        } else {
-          entry.ties += 1;
-        }
+        if (result === 'win') entry.wins += 1;
+        else if (result === 'loss') entry.losses += 1;
+        else entry.ties += 1;
       }
     }
   }

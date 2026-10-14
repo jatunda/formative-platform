@@ -221,4 +221,13 @@ describe('computeStandings', () => {
     expect(t1Index).toBeLessThan(t3Index);
     expect(t3Index).toBeLessThan(t2Index);
   });
+
+  it('skips a Team id no longer on the roster, crediting only the Teams that are', () => {
+    const matches = [
+      match({ allianceA: ['t1', 'gone'], allianceB: ['t3', 't4'], scoreA: 50, scoreB: 20 }),
+    ];
+    const standings = computeStandings(teams, matches);
+    expect(standings.map((s) => s.teamId)).not.toContain('gone');
+    expect(standings.find((s) => s.teamId === 't1').wins).toBe(1);
+  });
 });

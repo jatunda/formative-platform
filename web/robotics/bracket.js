@@ -1,4 +1,6 @@
 // @ts-check
+import { winningSide } from './match-result.js';
+
 /**
  * @typedef {{bracketSize: number, paddedSize: number, seeds: string[], includeThirdPlace: boolean, matches: object[]}} Bracket
  */
@@ -153,9 +155,9 @@ export function getMatchWinner(bracket, matchId) {
   const match = findMatch(bracket, matchId);
   const { allianceA, allianceB } = resolveMatchSides(bracket, matchId);
   if (match.isBye) return allianceA ?? allianceB;
-  if (!match.completed) return null;
-  if (match.scoreA === match.scoreB) return null;
-  return match.scoreA > match.scoreB ? allianceA : allianceB;
+  const side = winningSide(match);
+  if (side === null) return null;
+  return side === 'A' ? allianceA : allianceB;
 }
 
 /** The alliance that lost a match, or null if not yet decided (or there is no loser, as with a Bye). */
@@ -163,8 +165,9 @@ export function getMatchLoser(bracket, matchId) {
   const match = findMatch(bracket, matchId);
   if (match.isBye) return null;
   const { allianceA, allianceB } = resolveMatchSides(bracket, matchId);
-  if (!match.completed || match.scoreA === match.scoreB) return null;
-  return match.scoreA > match.scoreB ? allianceB : allianceA;
+  const side = winningSide(match);
+  if (side === null) return null;
+  return side === 'A' ? allianceB : allianceA;
 }
 
 /** The Tournament champion once the final is complete, else null. */
