@@ -188,19 +188,37 @@ function lockField(input, reason) {
   });
 }
 
+/**
+ * A button whose action may be blocked. With a block reason (null when allowed) it still shows
+ * and still clicks, styled inactive (see markLocked), and a click explains the reason in an
+ * error toast instead of calling onAllowed - the same rule the matching state action's no-op follows.
+ */
+function renderBlockableButton(reason, { className, label, ariaLabel, onAllowed }) {
+  const btn = el('button', {
+    className,
+    ...(ariaLabel ? { 'aria-label': ariaLabel } : {}),
+    onClick: () => {
+      if (reason) {
+        showToast(reason, { isError: true });
+        return;
+      }
+      onAllowed();
+    },
+  }, [label]);
+  if (reason) markLocked(btn, reason);
+  return btn;
+}
+
 // ---- Tab: Teams ----
 
 function renderRegenerateMatchupsButton(state, dispatch) {
-  const locked = !canRegenerateMatchups(state);
-  const lockHint = 'Locked — a Qualification Match is already complete. Use Reset Results or Reset Everything / New Tournament first.';
-  const regenerateLabel = state.qualification.matches.length === 0 ? 'Generate Matchups' : 'Regenerate Matchups';
-  const regenerateBtn = el('button', {
+  const reason = canRegenerateMatchups(state)
+    ? null
+    : 'Locked — a Qualification Match is already complete. Use Reset Results or Reset Everything / New Tournament first.';
+  return renderBlockableButton(reason, {
     className: 'robotics-btn robotics-btn-secondary',
-    onClick: () => {
-      if (locked) {
-        showToast(lockHint, { isError: true });
-        return;
-      }
+    label: state.qualification.matches.length === 0 ? 'Generate Matchups' : 'Regenerate Matchups',
+    onAllowed: () => {
       if (hasEvenMatchCounts(state.teams.length, state.qualification.matchesPerTeam)) {
         dispatch((s) => regenerateMatchups(s));
         return;
@@ -217,9 +235,7 @@ function renderRegenerateMatchupsButton(state, dispatch) {
         if (confirmed) dispatch((s) => regenerateMatchups(s));
       });
     },
-  }, [regenerateLabel]);
-  if (locked) markLocked(regenerateBtn, lockHint);
-  return regenerateBtn;
+  });
 }
 
 /** Roster in a wide column; Add a Team and Tournament Settings beside it on wide screens, stacked around it on narrow ones. */
@@ -230,43 +246,32 @@ export function renderTeamsTab(state, dispatch) {
 
   const nameInput = el('input', { placeholder: 'Team name' });
   const membersInput = el('input', { placeholder: 'Members (comma-separated)' });
-  const addTeamFromForm = () => {
-    if (rosterBlockReason) {
-      showToast(rosterBlockReason, { isError: true });
-      return;
-    }
-    if (!nameInput.value.trim()) {
-      showToast('Team name is required.', { isError: true });
-      return;
-    }
-    const members = membersInput.value.split(',').map((m) => m.trim()).filter(Boolean);
-    dispatch((s) => addTeam(s, { name: nameInput.value.trim(), members }));
-  };
-  const addBtn = el('button', {
+  const addBtn = renderBlockableButton(rosterBlockReason, {
     className: 'robotics-btn robotics-btn-primary',
-    onClick: addTeamFromForm,
-  }, ['Add Team']);
+    label: 'Add Team',
+    onAllowed: () => {
+      if (!nameInput.value.trim()) {
+        showToast('Team name is required.', { isError: true });
+        return;
+      }
+      const members = membersInput.value.split(',').map((m) => m.trim()).filter(Boolean);
+      dispatch((s) => addTeam(s, { name: nameInput.value.trim(), members }));
+    },
+  });
   // dispatch() re-renders and replaces the whole subtree on success, so a closed-over
   // element reference may already be detached afterward — look up the live one by selector.
   const focusAfterRender = (selector) => document.querySelector(selector)?.focus();
-  nameInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      addTeamFromForm();
-      focusAfterRender('input[placeholder="Team name"]');
-    }
+  // Enter in either field acts as clicking Add Team, so the roster lock is checked in one place.
+  [nameInput, membersInput].forEach((input) => {
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        addBtn.click();
+        focusAfterRender('input[placeholder="Team name"]');
+      }
+    });
+    if (rosterBlockReason) lockField(input, rosterBlockReason);
   });
-  membersInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      addTeamFromForm();
-      focusAfterRender('input[placeholder="Team name"]');
-    }
-  });
-  if (rosterBlockReason) {
-    [nameInput, membersInput].forEach((input) => lockField(input, rosterBlockReason));
-    markLocked(addBtn, rosterBlockReason);
-  }
   section.appendChild(el('div', { className: 'robotics-card robotics-teams-add' }, [
     el('h3', { className: 'robotics-card-title' }, ['Add a Team']),
     el('div', { className: 'robotics-form-row' }, [nameInput, membersInput, addBtn]),
@@ -325,17 +330,11 @@ export function renderTeamsTab(state, dispatch) {
       onClick: addMember,
     }, ['Add member']);
 
-    const removeBtn = el('button', {
+    const removeBtn = renderBlockableButton(rosterBlockReason, {
       className: 'robotics-btn robotics-btn-danger robotics-btn-sm',
-      onClick: () => {
-        if (rosterBlockReason) {
-          showToast(rosterBlockReason, { isError: true });
-          return;
-        }
-        dispatch((s) => removeTeam(s, team.id));
-      },
-    }, ['Remove']);
-    if (rosterBlockReason) markLocked(removeBtn, rosterBlockReason);
+      label: 'Remove',
+      onAllowed: () => dispatch((s) => removeTeam(s, team.id)),
+    });
 
     const row = el('div', { className: 'robotics-match-row robotics-team-row' }, [
       nameInput,
@@ -860,26 +859,9 @@ export function renderScheduleAndStandingsTab(state, dispatch, { ui, setActiveTa
 
 // ---- Tab: Alliance Selection ----
 
-/**
- * A button for an Alliance Selection action. When getAllianceSelectionBlockReason blocks the
- * action, the button still shows and still clicks, styled inactive, and a click explains why
- * in an error toast instead of acting - the same rule the state action's no-op follows.
- */
-function renderSelectionActionButton(state, action, { className, label, ariaLabel, onAllowed }) {
-  const reason = getAllianceSelectionBlockReason(state, action);
-  const btn = el('button', {
-    className,
-    ...(ariaLabel ? { 'aria-label': ariaLabel } : {}),
-    onClick: () => {
-      if (reason) {
-        showToast(reason, { isError: true });
-        return;
-      }
-      onAllowed();
-    },
-  }, [label]);
-  if (reason) markLocked(btn, reason);
-  return btn;
+/** A button for an Alliance Selection action, blocked by getAllianceSelectionBlockReason. */
+function renderSelectionActionButton(state, action, options) {
+  return renderBlockableButton(getAllianceSelectionBlockReason(state, action), options);
 }
 
 /**

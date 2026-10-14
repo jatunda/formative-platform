@@ -577,6 +577,20 @@ describe('initRoboticsApp', () => {
       expect(root.querySelector('.robotics-member-add-input').readOnly).toBe(false);
     });
 
+    it('Enter in the Add a Team form explains the roster lock instead of adding', async () => {
+      const app = initRoboticsApp();
+      setupFourTeams(app);
+      app.dispatch((s) => setMatchesPerTeam(s, 2));
+      app.dispatch((s) => regenerateMatchups(s));
+      await flushRender();
+      const root = document.getElementById('roboticsApp');
+      const nameInput = [...root.querySelectorAll('input')].find((i) => i.placeholder === 'Team name');
+      nameInput.value = 'Echo';
+      nameInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', cancelable: true }));
+      expect(app.getState().teams).toHaveLength(4);
+      expect(document.querySelector('.robotics-toast-visible')?.textContent).toContain('Reset Results');
+    });
+
     it('unlocks Remove again after Reset Results', async () => {
       const app = initRoboticsApp();
       setupFourTeams(app);
