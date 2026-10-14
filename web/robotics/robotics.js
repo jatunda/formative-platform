@@ -16,6 +16,7 @@ import {
   canMoveQualificationMatch,
   reorderQualificationMatch,
   setTimelineConfig,
+  applyMatchTimeline,
   upgradeSavedTournament,
   formPlayoffAlliance,
   removePlayoffAlliance,
@@ -42,10 +43,7 @@ import {
 } from './state.js';
 import {
   computeMatchTime,
-  computeTotalDurationMinutes,
-  computeStartTimeFromEndTime,
   matchField,
-  getScheduledMatchCount,
   timeOfDayInputValue,
   timeOfDayToEpochMs,
 } from './match-timeline.js';
@@ -533,17 +531,8 @@ function renderTimelineControls(state, dispatch) {
   const applyBtn = el('button', {
     className: 'robotics-btn robotics-btn-primary',
     onClick: () => {
-      if (isForward) {
-        const startTime = timeOfDayToEpochMs(timeInput.value);
-        dispatch((s) => setTimelineConfig(s, { startTime }));
-        return;
-      }
-      const endTime = timeOfDayToEpochMs(timeInput.value);
-      const totalMinutes = computeTotalDurationMinutes(state.timeline, getScheduledMatchCount(
-        state.qualification.matches.length, state.elimination.bracket, state.timeline.estimatedBracketSize, state.timeline.estimatedThirdPlace,
-      ));
-      const startTime = computeStartTimeFromEndTime({ endTime }, totalMinutes);
-      dispatch((s) => setTimelineConfig(s, { endTime, startTime }));
+      const time = timeOfDayToEpochMs(timeInput.value);
+      dispatch((s) => applyMatchTimeline(s, { mode: state.timeline.mode, time }));
     },
   }, ['Apply']);
   panel.appendChild(el('div', { className: 'robotics-timeline-time' }, [

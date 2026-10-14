@@ -16,6 +16,7 @@ import {
   canMoveQualificationMatch,
   reorderQualificationMatch,
   setTimelineConfig,
+  applyMatchTimeline,
   formPlayoffAlliance,
   removePlayoffAlliance,
   setBracketConfig,
@@ -165,6 +166,10 @@ describe('suggestEvenMatchesPerTeam', () => {
   it('respects the limit parameter', () => {
     expect(suggestEvenMatchesPerTeam(5, 3, 1)).toEqual([4]);
   });
+
+  it('stops at the lower value when it alone fills the limit', () => {
+    expect(suggestEvenMatchesPerTeam(4, 3, 1)).toEqual([2]);
+  });
 });
 
 describe('qualification match reordering', () => {
@@ -298,6 +303,79 @@ describe('timeline config', () => {
 
   it('defaults estimatedThirdPlace to false', () => {
     expect(createInitialState().timeline.estimatedThirdPlace).toBe(false);
+  });
+});
+
+describe('applyMatchTimeline', () => {
+  const MIN = 60 * 1000;
+  const NOON = new Date(2026, 9, 14, 12, 0).getTime();
+
+  // Default pacing: 4-minute matches, 1-minute gaps, one Field.
+  function backwardState(timeline = {}) {
+    return setTimelineConfig(createInitialState(), { mode: 'backward', ...timeline });
+  }
+
+  it('Forward: sets the entered Start Time and leaves the End Time alone', () => {
+    const state = setTimelineConfig(createInitialState(), { endTime: NOON });
+    const next = applyMatchTimeline(state, { mode: 'forward', time: NOON - 30 * MIN });
+    expect(next.timeline.startTime).toBe(NOON - 30 * MIN);
+    expect(next.timeline.endTime).toBe(NOON);
+  });
+
+  it('Backward: back-calculates the Start Time from the End Time over the estimated Elimination Matches', () => {
+    // Estimated Bracket Size 8, no Third-Place Match: 7 matches -> 7*4 + 6*1 = 34 minutes.
+    const next = applyMatchTimeline(backwardState({ estimatedBracketSize: 8 }), { mode: 'backward', time: NOON });
+    expect(next.timeline.endTime).toBe(NOON);
+    expect(next.timeline.startTime).toBe(NOON - 34 * MIN);
+  });
+
+  it('Backward: counts the Third-Place Match when one is estimated', () => {
+    // 8 matches -> 8*4 + 7*1 = 39 minutes.
+    const state = backwardState({ estimatedBracketSize: 8, estimatedThirdPlace: true });
+    expect(applyMatchTimeline(state, { mode: 'backward', time: NOON }).timeline.startTime).toBe(NOON - 39 * MIN);
+  });
+
+  it('Backward: a non-power-of-two Estimated Bracket Size counts Bracket Size - 1 matches (Byes play none)', () => {
+    // Bracket Size 6 -> 5 matches -> 5*4 + 4*1 = 24 minutes.
+    const state = backwardState({ estimatedBracketSize: 6 });
+    expect(applyMatchTimeline(state, { mode: 'backward', time: NOON }).timeline.startTime).toBe(NOON - 24 * MIN);
+  });
+
+  it('Backward: includes Qualification Matches and the Field Count in the duration', () => {
+    let state = regenerateMatchups(setMatchesPerTeam(withFourTeams(createInitialState()), 2));
+    state = setTimelineConfig(state, { mode: 'backward', estimatedBracketSize: 2, fieldCount: 2 });
+    const totalMatches = state.qualification.matches.length + 1;
+    const slots = Math.ceil(totalMatches / 2);
+    const next = applyMatchTimeline(state, { mode: 'backward', time: NOON });
+    expect(next.timeline.startTime).toBe(NOON - (slots * 4 + (slots - 1) * 1) * MIN);
+  });
+
+  it('Backward: clearing the End Time clears the Start Time too', () => {
+    const applied = applyMatchTimeline(backwardState(), { mode: 'backward', time: NOON });
+    const cleared = applyMatchTimeline(applied, { mode: 'backward', time: null });
+    expect(cleared.timeline.endTime).toBeNull();
+    expect(cleared.timeline.startTime).toBeNull();
+  });
+
+  it('a later Bracket Size change does not re-target the applied End Time', () => {
+    const applied = applyMatchTimeline(backwardState({ estimatedBracketSize: 8 }), { mode: 'backward', time: NOON });
+    const changed = setTimelineConfig(applied, { estimatedBracketSize: 4 });
+    expect(changed.timeline.startTime).toBe(NOON - 34 * MIN);
+    expect(changed.timeline.endTime).toBe(NOON);
+  });
+
+  it('building the actual Bracket does not re-target the applied End Time; Applying again uses the actual Bracket', () => {
+    // Four single-Team Playoff Alliances, so the actual Bracket Size (4) differs from the estimate (8).
+    let state = createInitialState();
+    for (const name of ['Alpha', 'Bravo', 'Charlie', 'Delta']) state = addTeam(state, { name, members: [] });
+    state.teams.forEach((t) => { state = formPlayoffAlliance(state, t.id, t.id); });
+    state = setTimelineConfig(state, { mode: 'backward', estimatedBracketSize: 8 });
+    const applied = applyMatchTimeline(state, { mode: 'backward', time: NOON });
+    const started = startFinals(setBracketConfig(applied, { bracketSize: 4, includeThirdPlace: false }));
+    expect(started.elimination.bracket).not.toBeNull();
+    expect(started.timeline.startTime).toBe(NOON - 34 * MIN);
+    // 3 actual matches -> 3*4 + 2*1 = 14 minutes.
+    expect(applyMatchTimeline(started, { mode: 'backward', time: NOON }).timeline.startTime).toBe(NOON - 14 * MIN);
   });
 });
 

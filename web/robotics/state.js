@@ -1,6 +1,7 @@
 // @ts-check
 import { generateQualificationMatches } from './pairing-draw.js';
 import { buildBracket, isBracketComplete, getPlacements, getMatchesInBracketOrder } from './bracket.js';
+import { computeTotalDurationMinutes, computeStartTimeFromEndTime, getScheduledMatchCount } from './match-timeline.js';
 import { getAllianceSelectionBlockReason, getDeclinedTeamIds, getEffectiveBracketSize, isBracketSizeSaved } from './alliance-selection.js';
 
 let idCounter = 0;
@@ -231,6 +232,27 @@ export function reorderQualificationMatch(state, qualIndex, direction) {
 
 export function setTimelineConfig(state, patch) {
   return { ...state, timeline: { ...state.timeline, ...patch } };
+}
+
+/**
+ * Apply the Match Timeline's entered time. Forward: it is the Start Time.
+ * Backward: it is the target End Time, and the Start Time is back-calculated
+ * from the total duration of every scheduled match (Qualification Matches plus
+ * the actual Elimination Bracket, or the Estimated Bracket Size and Third-Place
+ * Match before one exists). The Start Time is stored, so a later Bracket Size
+ * change doesn't re-target this End Time. Clearing the time clears both.
+ * @param {ReturnType<typeof createInitialState>} state
+ * @param {{mode: 'forward'|'backward', time: number|null}} entry - time in epoch ms, or null for unset
+ */
+export function applyMatchTimeline(state, { mode, time }) {
+  if (mode === 'forward') return setTimelineConfig(state, { startTime: time });
+  if (time === null) return setTimelineConfig(state, { endTime: null, startTime: null });
+  const { timeline } = state;
+  const matchCount = getScheduledMatchCount(
+    state.qualification.matches.length, state.elimination.bracket, timeline.estimatedBracketSize, timeline.estimatedThirdPlace,
+  );
+  const startTime = computeStartTimeFromEndTime({ endTime: time }, computeTotalDurationMinutes(timeline, matchCount));
+  return setTimelineConfig(state, { endTime: time, startTime });
 }
 
 // ---- Elimination ----
