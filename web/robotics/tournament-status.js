@@ -1,5 +1,6 @@
 import { MINUTE_MS } from './match-timeline.js';
 import { isBracketComplete } from './bracket.js';
+import { isQualificationIncomplete } from './alliance-selection.js';
 
 export const PHASE_LABELS = {
   setup: 'Setup',
@@ -12,8 +13,8 @@ export const PHASE_LABELS = {
 /**
  * The Tournament's phase, derived purely from state: Setup (no matches) ->
  * Qualification -> Alliance Selection (every Qualification Match complete,
- * no bracket yet) -> Elimination -> Complete (every played Elimination
- * Match has a winner).
+ * no bracket yet; Playoff Alliances formed earlier don't change the phase)
+ * -> Elimination -> Complete (every played Elimination Match has a winner).
  * @returns {'setup'|'qualification'|'alliance-selection'|'elimination'|'complete'}
  */
 export function getTournamentPhase(state) {
@@ -21,9 +22,8 @@ export function getTournamentPhase(state) {
   if (bracket) {
     return isBracketComplete(bracket) ? 'complete' : 'elimination';
   }
-  const matches = state.qualification.matches;
-  if (matches.length === 0) return 'setup';
-  return matches.every((m) => m.completed) ? 'alliance-selection' : 'qualification';
+  if (state.qualification.matches.length === 0) return 'setup';
+  return isQualificationIncomplete(state) ? 'qualification' : 'alliance-selection';
 }
 
 /**

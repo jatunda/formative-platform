@@ -48,9 +48,23 @@ export function isBracketSizeSaved(bracketSize) {
   return bracketSize >= 2;
 }
 
+/** How many Playoff Alliances short of the effective Bracket Size Alliance Selection is (0 once complete). */
+export function getAllianceShortfall(state) {
+  return Math.max(0, getEffectiveBracketSize(state) - state.elimination.alliances.length);
+}
+
 /** Whether Alliance Selection is over: as many alliances have formed as the effective Bracket Size. */
 export function isSelectionComplete(state) {
-  return state.elimination.alliances.length >= getEffectiveBracketSize(state);
+  return getAllianceShortfall(state) === 0;
+}
+
+/**
+ * Whether any Qualification Match is still incomplete, so Standings (and with them the
+ * Alliance Captain) may still change. Alliance Selection may start anyway; the Tournament
+ * phase stays Qualification until this is false.
+ */
+export function isQualificationIncomplete(state) {
+  return state.qualification.matches.some((m) => !m.completed);
 }
 
 /**

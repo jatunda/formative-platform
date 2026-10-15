@@ -51,6 +51,12 @@ describe('getTournamentPhase', () => {
     expect(getTournamentPhase(makeState({ qual: [true, false] }))).toBe('qualification');
   });
 
+  it('stays qualification while any Qualification Match is incomplete, even once Playoff Alliances have formed', () => {
+    const state = makeState({ qual: [true, false] });
+    state.elimination.alliances = [{ id: 'a1', teamIds: ['t1', 't2'] }];
+    expect(getTournamentPhase(state)).toBe('qualification');
+  });
+
   it('is alliance-selection once every Qualification Match is complete and there is no bracket', () => {
     expect(getTournamentPhase(makeState({ qual: [true, true] }))).toBe('alliance-selection');
   });

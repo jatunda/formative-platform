@@ -1108,6 +1108,18 @@ describe('initRoboticsApp', () => {
       return root;
     }
 
+    it('saves Matches per team from the Tournament Settings input, falling back to 1 when blank', () => {
+      const app = initRoboticsApp();
+      const input = () => [...document.querySelectorAll('.robotics-teams-settings label')]
+        .find((l) => l.textContent.includes('Matches per team')).querySelector('input');
+      input().value = '4';
+      input().dispatchEvent(new Event('change'));
+      expect(app.getState().qualification.matchesPerTeam).toBe(4);
+      input().value = '';
+      input().dispatchEvent(new Event('change'));
+      expect(app.getState().qualification.matchesPerTeam).toBe(1);
+    });
+
     it('generates matchups immediately with no dialog when matchesPerTeam divides evenly', () => {
       const app = initRoboticsApp();
       const root = setupFourTeams(app); // 4 teams * default 3 matchesPerTeam = 12, divisible by 4
@@ -1942,7 +1954,9 @@ describe('initRoboticsApp', () => {
       const startBtn = [...root().querySelectorAll('button')].find((b) => b.textContent === 'Start Finals →');
       expect(startBtn.classList.contains('is-locked')).toBe(false);
       startBtn.click();
+      await flushRender();
       await clickDialogButton(root(), 'Start Finals');
+      await flushRender();
       const { elimination, podium } = app.getState();
       expect(elimination.bracket.seeds).toEqual(elimination.alliances.map((a) => a.id));
       expect(allianceNames(app)).toEqual(['Charlie & Delta', 'Alpha & Bravo']);
@@ -2105,17 +2119,34 @@ describe('initRoboticsApp', () => {
 
         const before = app.getState();
         clickButtonWithText(root(), 'Start Finals →');
+        await flushRender();
         expect(root().querySelector('.robotics-confirm-dialog').textContent)
           .toContain('Only 3 of 4 alliances formed — start Finals with 3?');
         await clickDialogButton(root(), 'Cancel');
+        await flushRender();
         expect(app.getState()).toBe(before);
         expect(document.querySelector('.robotics-tab-btn.active').dataset.tabKey).toBe('alliance-selection');
 
         clickButtonWithText(root(), 'Start Finals →');
+        await flushRender();
         await clickDialogButton(root(), 'Start Finals');
+        await flushRender();
         expect(app.getState().elimination.bracketSize).toBe(3);
         expect(app.getState().elimination.bracket.bracketSize).toBe(3);
         expect(document.querySelector('.robotics-tab-btn.active').dataset.tabKey).toBe('finals');
+      });
+
+      it('a Start Finals that builds nothing leaves the teacher on Alliance Selection', async () => {
+        const app = await selectionComplete();
+        // An alliance is removed after the Start Finals button rendered, so the click lands on
+        // a stale, still-enabled button and startFinals itself refuses (fewer than 2 alliances).
+        const [first] = app.getState().elimination.alliances;
+        app.dispatch((s) => ({ ...s, elimination: { ...s.elimination, alliances: [first] } }));
+        clickButtonWithText(root(), 'Start Finals →');
+        await flushRender();
+        expect(app.getState().elimination.bracket).toBeNull();
+        expect(root().querySelector('.robotics-confirm-dialog')).toBeFalsy();
+        expect(document.querySelector('.robotics-tab-btn.active').dataset.tabKey).toBe('alliance-selection');
       });
     });
 
@@ -2284,7 +2315,7 @@ describe('initRoboticsApp', () => {
         const ids = next.teams.map((t) => t.id);
         const step = singles ? 1 : 2;
         for (let i = 0; i < ids.length; i += step) next = formPlayoffAlliance(next, ids[i], ids[i + step - 1]);
-        return startFinals(setBracketConfig(next, { includeThirdPlace }));
+        return startFinals(setBracketConfig(next, { includeThirdPlace }), { confirmedShort: true }).state;
       });
       app.setActiveTab('finals');
       await flushRender();
@@ -2348,7 +2379,7 @@ describe('initRoboticsApp', () => {
         let next = s;
         next.qualification.matches.forEach((_m, i) => { next = recordQualificationResult(next, i, { scoreA: 1, scoreB: 0 }); });
         next.teams.forEach((t) => { next = formPlayoffAlliance(next, t.id, t.id); });
-        return startFinals(next);
+        return startFinals(next, { confirmedShort: true }).state;
       });
       await flushRender();
       const scrollIntoView = vi.fn();
@@ -2612,7 +2643,7 @@ describe('initRoboticsApp', () => {
       let s = createInitialState();
       teams.forEach(([name, members]) => { s = addTeam(s, { name, members }); });
       s.teams.forEach((t) => { s = formPlayoffAlliance(s, t.id, t.id); });
-      s = startFinals(setBracketConfig(s, { includeThirdPlace }));
+      s = startFinals(setBracketConfig(s, { includeThirdPlace }), { confirmedShort: true }).state;
       const played = s.elimination.bracket.matches.filter((m) => !m.isBye);
       winners.forEach((aWins, i) => {
         if (aWins === undefined) return;
@@ -2996,7 +3027,7 @@ describe('live status header', () => {
       let next = s;
       ['Alpha', 'Bravo', 'Charlie', 'Delta'].forEach((name) => { next = addTeam(next, { name, members: [] }); });
       next.teams.forEach((t) => { next = formPlayoffAlliance(next, t.id, t.id); });
-      next = startFinals(setBracketConfig(next, { includeThirdPlace: false }));
+      next = startFinals(setBracketConfig(next, { includeThirdPlace: false }), { confirmedShort: true }).state;
       return setTimelineConfig(next, { startTime: START, matchDurationMin: 5, gapMin: 0, fieldCount: 1 });
     });
     app.dispatch((s) => recordEliminationResult(s, 'm1', { scoreA: 1, scoreB: 0 }));

@@ -2,7 +2,7 @@
 import { generateQualificationMatches } from './pairing-draw.js';
 import { buildBracket, isBracketComplete, getPlacements, getMatchesInBracketOrder } from './bracket.js';
 import { computeTotalDurationMinutes, computeStartTimeFromEndTime, getScheduledMatchCount } from './match-timeline.js';
-import { getAllianceSelectionBlockReason, getDeclinedTeamIds, getEffectiveBracketSize, isBracketSizeSaved } from './alliance-selection.js';
+import { getAllianceSelectionBlockReason, getAllianceShortfall, getDeclinedTeamIds, getEffectiveBracketSize, isBracketSizeSaved } from './alliance-selection.js';
 
 let idCounter = 0;
 function generateId(prefix) {
@@ -350,19 +350,31 @@ export function setBracketConfig(state, patch) {
 /**
  * Start Finals: builds the Elimination Bracket from the first Bracket Size Playoff
  * Alliances in list order (alliance N is Seed N), using the effective Bracket Size (the
- * Estimated Bracket Size until one is saved). With fewer alliances formed than that, Bracket
- * Size becomes the number formed. A no-op while getAllianceSelectionBlockReason blocks
- * 'start-finals' (fewer than 2 alliances, or a Bracket already exists). Tournaments saved before Seeds became list
- * order still carry a per-number `seeds` map; it's ignored here.
+ * Estimated Bracket Size until one is saved). With fewer alliances formed than that, it
+ * starts only once the teacher has confirmed (`confirmedShort`), and Bracket Size becomes
+ * the number formed. A no-op while getAllianceSelectionBlockReason blocks 'start-finals'
+ * (fewer than 2 alliances, or a Bracket already exists). Tournaments saved before Seeds
+ * became list order still carry a per-number `seeds` map; it's ignored here.
+ * Reports what it did: whether it built the Bracket, and how many alliances short of
+ * Bracket Size selection was (always 0 when blocked, since nothing was attempted).
+ * @param {*} state - the Tournament
+ * @param {{confirmedShort?: boolean}} [options]
+ * @returns {{state: *, started: boolean, shortBy: number}}
  */
-export function startFinals(state) {
-  if (getAllianceSelectionBlockReason(state, 'start-finals')) return state;
+export function startFinals(state, { confirmedShort = false } = {}) {
+  if (getAllianceSelectionBlockReason(state, 'start-finals')) return { state, started: false, shortBy: 0 };
+  const shortBy = getAllianceShortfall(state);
+  if (shortBy > 0 && !confirmedShort) return { state, started: false, shortBy };
   const { alliances, includeThirdPlace } = state.elimination;
   const bracketSize = Math.min(getEffectiveBracketSize(state), alliances.length);
   const seeds = alliances.slice(0, bracketSize).map((a) => a.id);
   const bracket = buildBracket({ bracketSize, seeds, includeThirdPlace });
   // A new bracket has new Placements, so any earlier Podium reveal no longer applies.
-  return { ...state, elimination: { ...state.elimination, bracketSize, bracket }, podium: createInitialState().podium };
+  return {
+    state: { ...state, elimination: { ...state.elimination, bracketSize, bracket }, podium: createInitialState().podium },
+    started: true,
+    shortBy,
+  };
 }
 
 /**

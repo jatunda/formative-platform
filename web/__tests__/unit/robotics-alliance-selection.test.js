@@ -6,6 +6,8 @@ import {
   getPickableTeams,
   getEffectiveBracketSize,
   isSelectionComplete,
+  getAllianceShortfall,
+  isQualificationIncomplete,
 } from '../../robotics/alliance-selection.js';
 import {
   createInitialState,
@@ -269,7 +271,7 @@ describe('Alliance Selection locked while a Bracket exists', () => {
   const ACTIONS = ['pick', 'decline', 'undo-decline', 'move', 'remove', 'start-finals', 'set-bracket-size', 'set-third-place'];
 
   it('blocks every Alliance Selection action with the lock message', () => {
-    const s = startFinals(withTwoAlliancesOfTwo());
+    const s = startFinals(withTwoAlliancesOfTwo(), { confirmedShort: true }).state;
     for (const action of ACTIONS) {
       expect(getAllianceSelectionBlockReason(s, action)).toBe(LOCKED_MESSAGE);
     }
@@ -277,7 +279,7 @@ describe('Alliance Selection locked while a Bracket exists', () => {
   });
 
   it('unblocks them once the Bracket is discarded', () => {
-    const s = discardBracket(startFinals(withTwoAlliancesOfTwo()));
+    const s = discardBracket(startFinals(withTwoAlliancesOfTwo(), { confirmedShort: true }).state);
     for (const action of ['undo-decline', 'move', 'remove', 'start-finals', 'set-third-place']) {
       expect(getAllianceSelectionBlockReason(s, action)).toBeNull();
     }
@@ -322,7 +324,7 @@ describe('Bracket Size saved once Alliance Selection starts', () => {
     expect(getEffectiveBracketSize(s)).toBe(8);
     expect(isSelectionComplete(s)).toBe(false);
     expect(getAllianceCaptain(s)).toBe(idOf(s, 'Delta'));
-    expect(startFinals(s).elimination.bracket.seeds).toHaveLength(3);
+    expect(startFinals(s, { confirmedShort: true }).state.elimination.bracket.seeds).toHaveLength(3);
   });
 
   it('keeps the saved Bracket Size when every alliance is removed', () => {
@@ -342,7 +344,7 @@ describe('Bracket Size saved once Alliance Selection starts', () => {
   });
 
   it('keeps the saved Bracket Size through Discard Bracket', () => {
-    const s = setTimelineConfig(discardBracket(startFinals(withTwoAlliancesOfTwo())), { estimatedBracketSize: 6 });
+    const s = setTimelineConfig(discardBracket(startFinals(withTwoAlliancesOfTwo(), { confirmedShort: true }).state), { estimatedBracketSize: 6 });
     expect(getEffectiveBracketSize(s)).toBe(2);
   });
 
@@ -390,5 +392,26 @@ describe('selection complete at Bracket Size', () => {
     expect(isSelectionComplete(s)).toBe(false);
     expect(getAllianceCaptain(s)).toBe(idOf(s, 'Echo'));
     expect(getAllianceSelectionBlockReason(s, 'pick')).toBeNull();
+  });
+});
+
+describe('getAllianceShortfall', () => {
+  it('is how many alliances short of the effective Bracket Size, never below 0', () => {
+    let s = setBracketConfig(withTeams(['Alpha', 'Bravo', 'Charlie', 'Delta']), { bracketSize: 3 });
+    expect(getAllianceShortfall(s)).toBe(3);
+    s = formPlayoffAlliance(s, idOf(s, 'Alpha'), idOf(s, 'Bravo'));
+    expect(getAllianceShortfall(s)).toBe(2);
+    s = formPlayoffAlliance(s, idOf(s, 'Charlie'), idOf(s, 'Charlie'));
+    s = formPlayoffAlliance(s, idOf(s, 'Delta'), idOf(s, 'Delta'));
+    expect(getAllianceShortfall(s)).toBe(0);
+  });
+});
+
+describe('isQualificationIncomplete', () => {
+  it('is true while any Qualification Match is incomplete, false once all are or none exist', () => {
+    const teams = withTeams(['Alpha', 'Bravo', 'Charlie', 'Delta']);
+    expect(isQualificationIncomplete(teams)).toBe(false);
+    expect(isQualificationIncomplete(regenerateMatchups(setMatchesPerTeam(teams, 2), { random: () => 0.5 }))).toBe(true);
+    expect(isQualificationIncomplete(withPlayedQualification())).toBe(false);
   });
 });

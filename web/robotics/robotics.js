@@ -57,6 +57,8 @@ import {
   getPickableTeams,
   getEffectiveBracketSize,
   isSelectionComplete,
+  isBracketSizeSaved,
+  isQualificationIncomplete,
 } from './alliance-selection.js';
 import { bracketColumnSpacerGrowRatios } from './bracket-layout.js';
 import { launchConfetti } from './confetti.js';
@@ -919,7 +921,7 @@ function renderSelectionSettings(state, dispatch) {
   const sizeInput = el('input', { type: 'number', min: '2', value: savedSize });
   sizeInput.addEventListener('change', () => {
     const size = parseInt(sizeInput.value, 10);
-    const bracketSize = size >= 2 ? size : null;
+    const bracketSize = isBracketSizeSaved(size) ? size : null;
     const reason = getAllianceSelectionBlockReason(state, 'set-bracket-size', { bracketSize });
     if (reason) {
       showToast(reason, { isError: true });
@@ -1077,26 +1079,29 @@ function renderSelectionBanner(state, captainId, actions, ui) {
 }
 
 /**
- * Start Finals, asking first when fewer alliances have formed than Bracket Size; startFinals
- * then shrinks Bracket Size to the number formed.
+ * Start Finals, then react to what it reports once that has rendered. Short of Bracket Size
+ * it builds nothing, so ask first and retry as confirmed (startFinals then shrinks Bracket
+ * Size to the number formed). Only a Bracket actually built opens the Finals tab.
  */
-function startFinalsAfterConfirmIfShort(state, dispatch, setActiveTab) {
-  const start = () => {
-    dispatch((s) => startFinals(s));
-    setActiveTab('finals');
-  };
-  if (isSelectionComplete(state)) {
-    start();
-    return;
-  }
-  const formed = state.elimination.alliances.length;
-  const size = getEffectiveBracketSize(state);
-  showConfirm({
-    title: 'Start Finals Early?',
-    message: `Only ${formed} of ${size} alliances formed — start Finals with ${formed}?`,
-    confirmLabel: 'Start Finals',
-  }).then((confirmed) => {
-    if (confirmed) start();
+function startFinalsAfterConfirmIfShort(dispatch, setActiveTab, confirmedShort = false) {
+  let result;
+  dispatch((s) => {
+    result = startFinals(s, { confirmedShort });
+    return result.state;
+  }, () => {
+    if (result.started) {
+      setActiveTab('finals');
+      return;
+    }
+    if (result.shortBy === 0) return;
+    const formed = result.state.elimination.alliances.length;
+    showConfirm({
+      title: 'Start Finals Early?',
+      message: `Only ${formed} of ${formed + result.shortBy} alliances formed — start Finals with ${formed}?`,
+      confirmLabel: 'Start Finals',
+    }).then((confirmed) => {
+      if (confirmed) startFinalsAfterConfirmIfShort(dispatch, setActiveTab, true);
+    });
   });
 }
 
@@ -1151,7 +1156,7 @@ export function renderAllianceSelectionTab(state, dispatch, { setActiveTab, ui }
   const actions = selectionPickActions(state, dispatch, captainId, ui);
 
   const main = el('div', { className: 'robotics-selection-main' });
-  if (state.qualification.matches.some((m) => !m.completed)) {
+  if (isQualificationIncomplete(state)) {
     main.appendChild(el('p', { className: 'robotics-selection-notice', role: 'status' }, [
       'The Qualification Round isn’t finished — Standings and the Alliance Captain may still change.',
     ]));
@@ -1168,7 +1173,7 @@ export function renderAllianceSelectionTab(state, dispatch, { setActiveTab, ui }
       : renderSelectionActionButton(state, 'start-finals', {
         className: 'robotics-btn robotics-btn-primary robotics-start-finals-btn',
         label: 'Start Finals →',
-        onAllowed: () => startFinalsAfterConfirmIfShort(state, dispatch, setActiveTab),
+        onAllowed: () => startFinalsAfterConfirmIfShort(dispatch, setActiveTab),
       }),
   ]);
   return el('div', { className: 'robotics-selection-layout' }, [main, side]);
