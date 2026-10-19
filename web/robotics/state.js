@@ -296,7 +296,7 @@ export function formPlayoffAlliance(state, teamIdA, teamIdB) {
 
 /** A no-op while a Bracket exists. */
 export function removePlayoffAlliance(state, allianceId) {
-  if (getAllianceSelectionBlockReason(state, 'remove')) return state;
+  if (getAllianceSelectionBlockReason(state, 'remove-alliance')) return state;
   return {
     ...state,
     elimination: { ...state.elimination, alliances: state.elimination.alliances.filter((a) => a.id !== allianceId) },
@@ -326,7 +326,7 @@ export function undoDecline(state, teamId) {
  * while a Bracket exists.
  */
 export function movePlayoffAlliance(state, allianceId, direction) {
-  if (getAllianceSelectionBlockReason(state, 'move')) return state;
+  if (getAllianceSelectionBlockReason(state, 'move-alliance')) return state;
   const alliances = state.elimination.alliances;
   const index = alliances.findIndex((a) => a.id === allianceId);
   const other = index + direction;

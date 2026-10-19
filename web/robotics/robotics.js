@@ -1,13 +1,6 @@
 import { createLocalStorageAdapter } from './storage.js';
 import {
   createInitialState,
-  addTeam,
-  updateTeam,
-  removeTeam,
-  getRosterBlockReason,
-  setMatchesPerTeam,
-  canRegenerateMatchups,
-  regenerateMatchups,
   hasEvenMatchCounts,
   suggestEvenMatchesPerTeam,
   recordQualificationResult,
@@ -18,14 +11,6 @@ import {
   setTimelineConfig,
   applyMatchTimeline,
   upgradeSavedTournament,
-  formPlayoffAlliance,
-  removePlayoffAlliance,
-  declineTeam,
-  undoDecline,
-  movePlayoffAlliance,
-  setBracketConfig,
-  startFinals,
-  discardBracket,
   recordEliminationResult,
   setEliminationNoShow,
   setEliminationDraftScore,
@@ -53,7 +38,6 @@ import { resolveMatchSides, getMatchWinner, isBracketComplete, countUndecidedMat
 import {
   getAllianceCaptain,
   getSelectionRowStatus,
-  getAllianceSelectionBlockReason,
   getPickableTeams,
   getEffectiveBracketSize,
   isSelectionComplete,
@@ -67,6 +51,7 @@ import { exportStandingsMarkdown, exportMatchesMarkdown, exportRosterMarkdown, e
 import { createToastContainer, showToast } from './toast.js';
 import { createConfirmDialogContainer, showConfirm } from './confirm-dialog.js';
 import { createRenderLoop } from './render-loop.js';
+import { applyTournamentAction, getActionBlockReason } from './actions.js';
 import { getTournamentPhase, PHASE_LABELS, getMatchProgress, getScheduleDrift, formatScheduleDrift } from './tournament-status.js';
 import { getLiveMatch, getQualificationLiveMatch, getEliminationLiveMatch } from './live-match.js';
 
@@ -213,15 +198,12 @@ function renderBlockableButton(reason, { className, label, ariaLabel, onAllowed 
 // ---- Tab: Teams ----
 
 function renderRegenerateMatchupsButton(state, dispatch) {
-  const reason = canRegenerateMatchups(state)
-    ? null
-    : 'Locked — a Qualification Match is already complete. Use Reset Results or Reset Everything / New Tournament first.';
-  return renderBlockableButton(reason, {
+  return renderBlockableButton(getActionBlockReason(state, { type: 'regenerate-matchups' }), {
     className: 'robotics-btn robotics-btn-secondary',
     label: state.qualification.matches.length === 0 ? 'Generate Matchups' : 'Regenerate Matchups',
     onAllowed: () => {
       if (hasEvenMatchCounts(state.teams.length, state.qualification.matchesPerTeam)) {
-        dispatch((s) => regenerateMatchups(s));
+        dispatch({ type: 'regenerate-matchups' });
         return;
       }
       const suggestions = suggestEvenMatchesPerTeam(state.teams.length, state.qualification.matchesPerTeam);
@@ -233,7 +215,7 @@ function renderRegenerateMatchupsButton(state, dispatch) {
         message: `With ${state.teams.length} Teams and ${state.qualification.matchesPerTeam} matches per team, some Teams will play one more Qualification Match than others.${suggestionText} Proceed anyway?`,
         confirmLabel: 'Generate Anyway',
       }).then((confirmed) => {
-        if (confirmed) dispatch((s) => regenerateMatchups(s));
+        if (confirmed) dispatch({ type: 'regenerate-matchups' });
       });
     },
   });
@@ -243,11 +225,11 @@ function renderRegenerateMatchupsButton(state, dispatch) {
 export function renderTeamsTab(state, dispatch) {
   const section = el('div', { className: 'robotics-teams-layout' });
 
-  const rosterBlockReason = getRosterBlockReason(state);
+  const addTeamBlockReason = getActionBlockReason(state, { type: 'add-team' });
 
   const nameInput = el('input', { placeholder: 'Team name' });
   const membersInput = el('input', { placeholder: 'Members (comma-separated)' });
-  const addBtn = renderBlockableButton(rosterBlockReason, {
+  const addBtn = renderBlockableButton(addTeamBlockReason, {
     className: 'robotics-btn robotics-btn-primary',
     label: 'Add Team',
     onAllowed: () => {
@@ -256,7 +238,7 @@ export function renderTeamsTab(state, dispatch) {
         return;
       }
       const members = membersInput.value.split(',').map((m) => m.trim()).filter(Boolean);
-      dispatch((s) => addTeam(s, { name: nameInput.value.trim(), members }));
+      dispatch({ type: 'add-team', name: nameInput.value.trim(), members });
     },
   });
   // dispatch() re-renders and replaces the whole subtree on success, so a closed-over
@@ -271,7 +253,7 @@ export function renderTeamsTab(state, dispatch) {
         focusAfterRender('input[placeholder="Team name"]');
       }
     });
-    if (rosterBlockReason) lockField(input, rosterBlockReason);
+    if (addTeamBlockReason) lockField(input, addTeamBlockReason);
   });
   section.appendChild(el('div', { className: 'robotics-card robotics-teams-add' }, [
     el('h3', { className: 'robotics-card-title' }, ['Add a Team']),
@@ -291,7 +273,7 @@ export function renderTeamsTab(state, dispatch) {
         nameInput.value = team.name;
         return;
       }
-      dispatch((s) => updateTeam(s, team.id, { name: trimmed }));
+      dispatch({ type: 'rename-team', teamId: team.id, name: trimmed });
     });
 
     const membersEdit = el('div', { className: 'robotics-team-members-edit' });
@@ -302,7 +284,7 @@ export function renderTeamsTab(state, dispatch) {
           type: 'button',
           className: 'robotics-member-remove',
           'aria-label': `Remove ${member}`,
-          onClick: () => dispatch((s) => updateTeam(s, team.id, { members: team.members.filter((_, idx) => idx !== i) })),
+          onClick: () => dispatch({ type: 'remove-member', teamId: team.id, index: i }),
         }, ['×']),
       ]));
     });
@@ -316,7 +298,7 @@ export function renderTeamsTab(state, dispatch) {
     const addMember = () => {
       const value = addMemberInput.value.trim();
       if (!value) return;
-      dispatch((s) => updateTeam(s, team.id, { members: [...team.members, value] }));
+      dispatch({ type: 'add-member', teamId: team.id, member: value });
     };
     addMemberInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
@@ -331,10 +313,10 @@ export function renderTeamsTab(state, dispatch) {
       onClick: addMember,
     }, ['Add member']);
 
-    const removeBtn = renderBlockableButton(rosterBlockReason, {
+    const removeBtn = renderBlockableButton(getActionBlockReason(state, { type: 'remove-team', teamId: team.id }), {
       className: 'robotics-btn robotics-btn-danger robotics-btn-sm',
       label: 'Remove',
-      onAllowed: () => dispatch((s) => removeTeam(s, team.id)),
+      onAllowed: () => dispatch({ type: 'remove-team', teamId: team.id }),
     });
 
     const row = el('div', { className: 'robotics-match-row robotics-team-row' }, [
@@ -351,20 +333,20 @@ export function renderTeamsTab(state, dispatch) {
   config.appendChild(el('h3', { className: 'robotics-card-title' }, ['Tournament Settings']));
   const matchesPerTeamInput = el('input', { type: 'number', value: state.qualification.matchesPerTeam });
   matchesPerTeamInput.addEventListener('change', () => {
-    dispatch((s) => setMatchesPerTeam(s, parseInt(matchesPerTeamInput.value, 10) || 1));
+    dispatch({ type: 'set-matches-per-team', matchesPerTeam: parseInt(matchesPerTeamInput.value, 10) || 1 });
   });
   config.appendChild(el('label', { className: 'robotics-field' }, ['Matches per team: ', matchesPerTeamInput]));
 
   const estBracketInput = el('input', { type: 'number', value: state.timeline.estimatedBracketSize });
   estBracketInput.addEventListener('change', () => {
-    dispatch((s) => setTimelineConfig(s, { estimatedBracketSize: parseInt(estBracketInput.value, 10) || 2 }));
+    dispatch({ type: 'set-timeline-config', patch: { estimatedBracketSize: parseInt(estBracketInput.value, 10) || 2 } });
   });
   config.appendChild(el('label', { className: 'robotics-field' }, ['Estimated bracket size: ', estBracketInput]));
 
   const estThirdInput = el('input', { type: 'checkbox' });
   estThirdInput.checked = state.timeline.estimatedThirdPlace;
   estThirdInput.addEventListener('change', () => {
-    dispatch((s) => setTimelineConfig(s, { estimatedThirdPlace: estThirdInput.checked }));
+    dispatch({ type: 'set-timeline-config', patch: { estimatedThirdPlace: estThirdInput.checked } });
   });
   config.appendChild(el('label', { className: 'robotics-field robotics-checkbox-field' }, [estThirdInput, 'Estimated third-place match']));
 
@@ -849,9 +831,9 @@ export function renderScheduleAndStandingsTab(state, dispatch, { ui, setActiveTa
 
 // ---- Tab: Alliance Selection ----
 
-/** A button for an Alliance Selection action, blocked by getAllianceSelectionBlockReason. */
+/** A button for a named Alliance Selection action (see actions.js), blocked by that action's block reason. */
 function renderSelectionActionButton(state, action, options) {
-  return renderBlockableButton(getAllianceSelectionBlockReason(state, action), options);
+  return renderBlockableButton(getActionBlockReason(state, { type: action }), options);
 }
 
 /**
@@ -892,13 +874,13 @@ function renderSelectionStandings(state, dispatch, captainId, { pick, pickDeclin
         ...tags,
         el('span', { className: 'robotics-selection-tag is-declined' }, ['Declined']),
         actionButton('pick', 'Pick', 'robotics-btn-secondary', () => pickDeclined(teamId)),
-        actionButton('undo-decline', 'Undo', 'robotics-btn-ghost', () => dispatch((s) => undoDecline(s, teamId))),
+        actionButton('undo-decline', 'Undo', 'robotics-btn-ghost', () => dispatch({ type: 'undo-decline', teamId })),
       ]);
     }
     return el('span', { className: 'robotics-selection-actions' }, [
       ...tags,
       actionButton('pick', 'Pick', 'robotics-btn-primary', () => pick(teamId)),
-      actionButton('decline', 'Declined', 'robotics-btn-ghost', () => dispatch((s) => declineTeam(s, teamId))),
+      actionButton('decline', 'Declined', 'robotics-btn-ghost', () => dispatch({ type: 'decline', teamId })),
     ]);
   };
   renderStandingsTable(state, standings, {
@@ -921,27 +903,17 @@ function renderSelectionSettings(state, dispatch) {
   const sizeInput = el('input', { type: 'number', min: '2', value: savedSize });
   sizeInput.addEventListener('change', () => {
     const size = parseInt(sizeInput.value, 10);
-    const bracketSize = isBracketSizeSaved(size) ? size : null;
-    const reason = getAllianceSelectionBlockReason(state, 'set-bracket-size', { bracketSize });
-    if (reason) {
-      showToast(reason, { isError: true });
-      sizeInput.value = savedSize;
-      return;
-    }
-    dispatch((s) => setBracketConfig(s, { bracketSize }));
+    const { blockReason } = dispatch({ type: 'set-bracket-size', bracketSize: isBracketSizeSaved(size) ? size : null });
+    if (blockReason) sizeInput.value = savedSize;
   });
   const thirdPlaceInput = el('input', { type: 'checkbox' });
   thirdPlaceInput.checked = state.elimination.includeThirdPlace;
-  const thirdPlaceReason = getAllianceSelectionBlockReason(state, 'set-third-place');
   thirdPlaceInput.addEventListener('change', () => {
-    if (thirdPlaceReason) {
-      showToast(thirdPlaceReason, { isError: true });
-      thirdPlaceInput.checked = state.elimination.includeThirdPlace;
-      return;
-    }
-    dispatch((s) => setBracketConfig(s, { includeThirdPlace: thirdPlaceInput.checked }));
+    const { blockReason } = dispatch({ type: 'set-third-place', includeThirdPlace: thirdPlaceInput.checked });
+    if (blockReason) thirdPlaceInput.checked = state.elimination.includeThirdPlace;
   });
-  const sizeReason = getAllianceSelectionBlockReason(state, 'set-bracket-size', { bracketSize: savedSize });
+  const thirdPlaceReason = getActionBlockReason(state, { type: 'set-third-place' });
+  const sizeReason = getActionBlockReason(state, { type: 'set-bracket-size', bracketSize: savedSize });
   if (sizeReason) lockField(sizeInput, sizeReason);
   if (thirdPlaceReason) lockField(thirdPlaceInput, thirdPlaceReason);
   card.appendChild(el('label', { className: 'robotics-field' }, ['Bracket size', sizeInput]));
@@ -961,11 +933,11 @@ function renderSelectionAllianceList(state, dispatch) {
   const list = el('ol', { className: 'robotics-selection-alliances' });
   alliances.forEach((alliance, i) => {
     const moveBtn = (direction, label, ariaLabel) => {
-      const btn = renderSelectionActionButton(state, 'move', {
+      const btn = renderSelectionActionButton(state, 'move-alliance', {
         className: 'robotics-btn robotics-btn-ghost robotics-btn-sm',
         label,
         ariaLabel,
-        onAllowed: () => dispatch((s) => movePlayoffAlliance(s, alliance.id, direction)),
+        onAllowed: () => dispatch({ type: 'move-alliance', allianceId: alliance.id, direction }),
       });
       // Past either end there's nowhere to move, but a locked button still explains the lock.
       const target = i + direction;
@@ -978,10 +950,10 @@ function renderSelectionAllianceList(state, dispatch) {
       el('span', { className: 'robotics-selection-alliance-actions' }, [
         moveBtn(-1, '↑', 'Move alliance up'),
         moveBtn(1, '↓', 'Move alliance down'),
-        renderSelectionActionButton(state, 'remove', {
+        renderSelectionActionButton(state, 'remove-alliance', {
           className: 'robotics-btn robotics-btn-danger robotics-btn-sm',
           label: 'Remove',
-          onAllowed: () => dispatch((s) => removePlayoffAlliance(s, alliance.id)),
+          onAllowed: () => dispatch({ type: 'remove-alliance', allianceId: alliance.id }),
         }),
       ]),
     ]));
@@ -992,15 +964,13 @@ function renderSelectionAllianceList(state, dispatch) {
 
 /**
  * The pick actions for this turn's Captain. Picking a Declined partner, or forming a
- * single-Team alliance by choice, asks first. Forming an alliance ends the turn, and with it
- * any Captain override. The new alliance is always last in the list, so it's marked once
- * the rebuilt list exists.
+ * single-Team alliance by choice, asks first. The new alliance is always last in the list,
+ * so it's marked once the rebuilt list exists.
  */
-function selectionPickActions(state, dispatch, captainId, ui) {
+function selectionPickActions(state, dispatch, captainId) {
   const pick = (partnerId) => {
-    ui.captainOverride = null;
     dispatch(
-      (s) => formPlayoffAlliance(s, captainId, partnerId),
+      { type: 'pick', captainId, partnerId },
       () => document.querySelector('.robotics-selection-alliance:last-child')?.classList.add('is-new'),
     );
   };
@@ -1031,7 +1001,7 @@ function selectionPickActions(state, dispatch, captainId, ui) {
  * confirm when the Captain has no one left to pick, or with one while partners remain
  * (prominently once everyone left has Declined).
  */
-function renderSelectionBanner(state, captainId, actions, ui) {
+function renderSelectionBanner(state, dispatch, captainId, actions) {
   const text = el('div', { className: 'robotics-selection-banner-text' });
   const banner = el('div', { className: 'robotics-selection-banner' }, [text]);
   if (isSelectionComplete(state)) {
@@ -1061,7 +1031,7 @@ function renderSelectionBanner(state, captainId, actions, ui) {
     el('option', { value: '' }, ['change ▾']),
     ...pickable.map(({ teamId }) => el('option', { value: teamId }, [teamName(state, teamId)])),
   ]);
-  captainSelect.addEventListener('change', () => ui.setCaptainOverride(captainSelect.value));
+  captainSelect.addEventListener('change', () => dispatch({ type: 'set-captain-override', teamId: captainSelect.value }));
   const allDeclined = pickable.every((team) => team.declined);
   if (allDeclined) {
     text.textContent = `${captain} is picking — every remaining Team has Declined`;
@@ -1083,24 +1053,19 @@ function renderSelectionBanner(state, captainId, actions, ui) {
  * it builds nothing, so ask first and retry as confirmed (startFinals then shrinks Bracket
  * Size to the number formed). Only a Bracket actually built opens the Finals tab.
  */
-function startFinalsAfterConfirmIfShort(dispatch, setActiveTab, confirmedShort = false) {
-  let result;
-  dispatch((s) => {
-    result = startFinals(s, { confirmedShort });
-    return result.state;
-  }, () => {
-    if (result.started) {
+function startFinalsAfterConfirmIfShort(state, dispatch, setActiveTab, confirmedShort = false) {
+  const { outcome } = dispatch({ type: 'start-finals', confirmedShort }, () => {
+    if (outcome.started) {
       setActiveTab('finals');
       return;
     }
-    if (result.shortBy === 0) return;
-    const formed = result.state.elimination.alliances.length;
+    const formed = state.elimination.alliances.length;
     showConfirm({
       title: 'Start Finals Early?',
-      message: `Only ${formed} of ${formed + result.shortBy} alliances formed — start Finals with ${formed}?`,
+      message: `Only ${formed} of ${formed + outcome.shortBy} alliances formed — start Finals with ${formed}?`,
       confirmLabel: 'Start Finals',
     }).then((confirmed) => {
-      if (confirmed) startFinalsAfterConfirmIfShort(dispatch, setActiveTab, true);
+      if (confirmed) startFinalsAfterConfirmIfShort(state, dispatch, setActiveTab, true);
     });
   });
 }
@@ -1125,7 +1090,7 @@ function discardBracketAfterConfirm(state, dispatch) {
     message: `${lost} Alliances, Declines, and Bracket settings are kept, so Start Finals can build a new Bracket.`,
     confirmLabel: 'Discard Bracket',
   }).then((confirmed) => {
-    if (confirmed) dispatch((s) => discardBracket(s));
+    if (confirmed) dispatch({ type: 'discard-bracket' });
   });
 }
 
@@ -1153,7 +1118,7 @@ function renderFinalsInProgressCard(state, dispatch, setActiveTab) {
  */
 export function renderAllianceSelectionTab(state, dispatch, { setActiveTab, ui }) {
   const captainId = getAllianceCaptain(state, ui.captainOverride);
-  const actions = selectionPickActions(state, dispatch, captainId, ui);
+  const actions = selectionPickActions(state, dispatch, captainId);
 
   const main = el('div', { className: 'robotics-selection-main' });
   if (isQualificationIncomplete(state)) {
@@ -1162,7 +1127,7 @@ export function renderAllianceSelectionTab(state, dispatch, { setActiveTab, ui }
     ]));
   }
   const finalsStarted = Boolean(state.elimination.bracket);
-  if (!finalsStarted) main.appendChild(renderSelectionBanner(state, captainId, actions, ui));
+  if (!finalsStarted) main.appendChild(renderSelectionBanner(state, dispatch, captainId, actions));
   main.appendChild(renderSelectionStandings(state, dispatch, captainId, actions));
 
   const side = el('div', { className: 'robotics-selection-side' }, [
@@ -1173,7 +1138,7 @@ export function renderAllianceSelectionTab(state, dispatch, { setActiveTab, ui }
       : renderSelectionActionButton(state, 'start-finals', {
         className: 'robotics-btn robotics-btn-primary robotics-start-finals-btn',
         label: 'Start Finals →',
-        onAllowed: () => startFinalsAfterConfirmIfShort(dispatch, setActiveTab),
+        onAllowed: () => startFinalsAfterConfirmIfShort(state, dispatch, setActiveTab),
       }),
   ]);
   return el('div', { className: 'robotics-selection-layout' }, [main, side]);
@@ -1496,18 +1461,17 @@ export function initRoboticsApp({ mountId = 'roboticsApp', storageKey = 'robotic
   // UI preferences (e.g. whether the Match Timeline is open) persist under their own key,
   // so Reset Results / New Tournament never touch them.
   const uiStorage = createLocalStorageAdapter(uiPrefsKey);
+  // Screen state (the Alliance Captain override) is changed only by named actions (see
+  // actions.js); renderers read it through `ui`.
+  let screen = { captainOverride: null };
   const ui = {
     prefs: uiStorage.load() ?? {},
     setPref(key, value) {
       ui.prefs = { ...ui.prefs, [key]: value };
       uiStorage.save(ui.prefs);
     },
-    // The teacher's one-turn Alliance Captain override: screen state only, never saved.
-    // It clears when an alliance forms (see selectionPickActions) or the tab changes.
-    captainOverride: null,
-    setCaptainOverride(teamId) {
-      ui.captainOverride = teamId;
-      loop.renderNow();
+    get captainOverride() {
+      return screen.captainOverride;
     },
   };
 
@@ -1529,15 +1493,37 @@ export function initRoboticsApp({ mountId = 'roboticsApp', storageKey = 'robotic
     lastCurrentMatchRefByTab[activeTab] = currentRef;
   }
 
-  function dispatch(updater, afterRender) {
-    state = updater(state);
-    storage.save(state);
+  /**
+   * Applies a named tournament action ({ type, ...payload }, see actions.js) and re-renders,
+   * or explains a blocked one in an error toast and changes nothing. Returns what the action
+   * entry point reported. Still also takes a raw (state) => state function for the handlers
+   * not yet moved onto named actions; that path returns null.
+   */
+  function dispatch(actionOrUpdater, afterRender) {
+    if (typeof actionOrUpdater === 'function') {
+      state = actionOrUpdater(state);
+      storage.save(state);
+      loop.requestRender(afterRender);
+      return null;
+    }
+    const result = applyTournamentAction(state, screen, actionOrUpdater);
+    if (result.blockReason) {
+      showToast(result.blockReason, { isError: true });
+      return result;
+    }
+    if (result.state !== state) {
+      state = result.state;
+      storage.save(state);
+    }
+    screen = result.screen;
     loop.requestRender(afterRender);
+    return result;
   }
 
   function setActiveTab(tab) {
     activeTab = tab;
-    ui.captainOverride = null;
+    // A Captain override lasts one turn, on one visit to the tab.
+    screen = applyTournamentAction(state, screen, { type: 'set-captain-override', teamId: null }).screen;
     loop.renderNow();
   }
 

@@ -114,11 +114,11 @@ export function getSelectionRowStatus(state, teamId, captainId = getAllianceCapt
 
 /**
  * Why an Alliance Selection action can't happen right now, as the toast to show, or null
- * when it's allowed. Actions: 'pick', 'decline', 'undo-decline', 'move', 'remove',
- * 'start-finals', 'set-third-place', and 'set-bracket-size', which also takes the
- * `bracketSize` being set (null clears it back to the Estimated Bracket Size, allowed only
- * until Bracket Size is saved). Every action is locked while an Elimination Bracket exists,
- * until Discard Bracket.
+ * when it's allowed. Actions: 'pick', 'decline', 'undo-decline', 'move-alliance',
+ * 'remove-alliance', 'start-finals', 'set-third-place', and 'set-bracket-size', which also
+ * takes the `bracketSize` being set (null clears it back to the Estimated Bracket Size,
+ * allowed only until Bracket Size is saved). Every action is locked while an Elimination
+ * Bracket exists, until Discard Bracket.
  * @param {object} state
  * @param {string} action
  * @param {{bracketSize?: number|null}} [args]

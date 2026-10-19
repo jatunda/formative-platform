@@ -233,7 +233,7 @@ describe('getAllianceSelectionBlockReason', () => {
 
   it('allows every other action while selection is open', () => {
     const s = createInitialState();
-    for (const action of ['pick', 'move', 'remove', 'decline', 'undo-decline', 'set-bracket-size']) {
+    for (const action of ['pick', 'move-alliance', 'remove-alliance', 'decline', 'undo-decline', 'set-bracket-size']) {
       expect(getAllianceSelectionBlockReason(s, action)).toBeNull();
     }
   });
@@ -242,7 +242,7 @@ describe('getAllianceSelectionBlockReason', () => {
     const s = withTwoAlliancesOfTwo();
     expect(getAllianceSelectionBlockReason(s, 'pick')).toBe('All 2 alliances are formed. Raise Bracket Size to keep picking.');
     expect(getAllianceSelectionBlockReason(s, 'decline')).toBe('All 2 alliances are formed. Raise Bracket Size to keep picking.');
-    for (const action of ['undo-decline', 'move', 'remove', 'start-finals']) {
+    for (const action of ['undo-decline', 'move-alliance', 'remove-alliance', 'start-finals']) {
       expect(getAllianceSelectionBlockReason(s, action)).toBeNull();
     }
   });
@@ -268,7 +268,7 @@ describe('getAllianceSelectionBlockReason', () => {
 
 describe('Alliance Selection locked while a Bracket exists', () => {
   const LOCKED_MESSAGE = 'Locked — the Finals have started. Discard Bracket to change alliances.';
-  const ACTIONS = ['pick', 'decline', 'undo-decline', 'move', 'remove', 'start-finals', 'set-bracket-size', 'set-third-place'];
+  const ACTIONS = ['pick', 'decline', 'undo-decline', 'move-alliance', 'remove-alliance', 'start-finals', 'set-bracket-size', 'set-third-place'];
 
   it('blocks every Alliance Selection action with the lock message', () => {
     const s = startFinals(withTwoAlliancesOfTwo(), { confirmedShort: true }).state;
@@ -280,7 +280,7 @@ describe('Alliance Selection locked while a Bracket exists', () => {
 
   it('unblocks them once the Bracket is discarded', () => {
     const s = discardBracket(startFinals(withTwoAlliancesOfTwo(), { confirmedShort: true }).state);
-    for (const action of ['undo-decline', 'move', 'remove', 'start-finals', 'set-third-place']) {
+    for (const action of ['undo-decline', 'move-alliance', 'remove-alliance', 'start-finals', 'set-third-place']) {
       expect(getAllianceSelectionBlockReason(s, action)).toBeNull();
     }
   });
