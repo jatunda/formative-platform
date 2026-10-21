@@ -20,6 +20,7 @@ import {
   formPlayoffAlliance,
   removePlayoffAlliance,
   setBracketConfig,
+  setThirdPlace,
   movePlayoffAlliance,
   declineTeam,
   undoDecline,
@@ -583,7 +584,6 @@ describe('Alliance Selection locked while a Bracket exists', () => {
     expect(movePlayoffAlliance(s, allianceB, -1)).toBe(s);
     expect(undoDecline(s, delta)).toBe(s);
     expect(setBracketConfig(s, { bracketSize: 4 })).toBe(s);
-    expect(setBracketConfig(s, { includeThirdPlace: true })).toBe(s);
     expect(startFinals(s, { confirmedShort: true }).state).toBe(s);
   });
 
@@ -805,6 +805,11 @@ describe('Podium reveal', () => {
     for (const m of s.elimination.bracket.matches) s = recordEliminationResult(s, m.id, { scoreA: 9, scoreB: 1 });
     return s;
   }
+
+  it('setThirdPlace is a no-op once the Third-Place Match is complete', () => {
+    const s = completeAll(withBracket({ size: 4, includeThirdPlace: true }));
+    expect(setThirdPlace(s, false, { now: 0 })).toBe(s);
+  });
 
   it('starts with nothing revealed, including for a state saved before reveal progress existed', () => {
     expect(getRevealedCount(createInitialState())).toBe(0);

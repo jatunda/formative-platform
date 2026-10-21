@@ -2223,7 +2223,7 @@ describe('initRoboticsApp', () => {
         }
       });
 
-      it('Bracket Size and Third-Place only explain the lock', async () => {
+      it('Bracket Size only explains the lock; the Third-Place Match stays switchable', async () => {
         const app = await lockedSelection();
         const before = app.getState();
 
@@ -2235,15 +2235,11 @@ describe('initRoboticsApp', () => {
         expect(app.getState()).toBe(before);
         expect(sizeInput().value).toBe('2');
 
-        document.querySelector('.robotics-toast-visible').classList.remove('robotics-toast-visible');
+        expect(thirdPlace().classList.contains('robotics-locked-field')).toBe(false);
         const wasChecked = thirdPlace().checked;
         thirdPlace().click();
-        expect(thirdPlace().checked).toBe(wasChecked);
-        expect(toastText()).toBe(LOCKED);
-        thirdPlace().checked = !wasChecked;
-        thirdPlace().dispatchEvent(new Event('change'));
-        expect(app.getState()).toBe(before);
-        expect(thirdPlace().checked).toBe(wasChecked);
+        await flushRender();
+        expect(app.getState().elimination.includeThirdPlace).toBe(!wasChecked);
       });
 
       it('On to Finals → switches to the Finals tab', async () => {
@@ -2583,6 +2579,66 @@ describe('initRoboticsApp', () => {
         await flushRender();
         expect(root().querySelector('.robotics-now-playing-meta').textContent).toContain('Field 1');
         expect(root().querySelector('.robotics-up-next-meta').textContent).toContain('Field 2');
+      });
+    });
+
+    describe('Third-Place Match toggle', () => {
+      const toggle = () => root().querySelector('.robotics-finals-settings input[type="checkbox"]');
+      const headings = () => [...root().querySelectorAll('.robotics-bracket-round')].map((col) => col.querySelector('h4').textContent);
+      const nowPlayingNames = () => [...root().querySelectorAll('.robotics-now-playing-side .robotics-now-playing-team-name')].map((n) => n.textContent);
+      async function decide(app, matchRefs) {
+        dispatchAll(app, matchRefs.map((matchRef) => ({ type: 'record-result', phase: 'elimination', matchRef, scoreA: 80, scoreB: 20 })));
+        await flushRender();
+      }
+
+      it('switching it on after the Final is complete adds the Third-Place Match as the Current Match', async () => {
+        const app = await openFinals({ teamCount: 8 });
+        await decide(app, ['m1', 'm2', 'm3']);
+        expect(root().textContent).toContain('Playoffs complete');
+        expect(toggle().checked).toBe(false);
+
+        toggle().click();
+        await flushRender();
+        expect(app.getState().elimination.includeThirdPlace).toBe(true);
+        expect(headings()).toEqual(['Round 1', 'Third Place', 'Final']);
+        expect(root().textContent).not.toContain('Playoffs complete');
+        // Golf & Hotel and Echo & Foxtrot lost their semis.
+        expect(nowPlayingNames()).toEqual(['Golf', 'Hotel', 'Echo', 'Foxtrot']);
+        expect(app.getState().elimination.bracket.matches.find((m) => m.round === 'final').completed).toBe(true);
+      });
+
+      it('switching it off removes the Third-Place Match, so the Final is Up Next', async () => {
+        const app = await openFinals({ teamCount: 8, includeThirdPlace: true });
+        await decide(app, ['m1']);
+        expect([...root().querySelectorAll('.robotics-up-next-teams')].map((n) => n.textContent))
+          .toEqual(['Golf & Hotel', 'Runner-up of Round 1 · Match 2']);
+
+        toggle().click();
+        await flushRender();
+        expect(headings()).toEqual(['Round 1', 'Final']);
+        expect([...root().querySelectorAll('.robotics-up-next-teams')].map((n) => n.textContent))
+          .toEqual(['Alpha & Bravo', 'Winner of Round 1 · Match 2']);
+      });
+
+      it('locks once the Third-Place Match is complete, explaining why', async () => {
+        const app = await openFinals({ teamCount: 8, includeThirdPlace: true });
+        await decide(app, ['m1', 'm2', 'm4']);
+        const before = app.getState();
+        toggle().click();
+        expect(toggle().checked).toBe(true);
+        expect(document.querySelector('.robotics-toast-visible').textContent).toBe('Locked — the Third-Place Match is complete.');
+        expect(app.getState()).toBe(before);
+      });
+
+      it('is not offered for a lone Final, which has no Semifinal round', async () => {
+        await openFinals({ teamCount: 4 });
+        expect(toggle()).toBeNull();
+      });
+
+      it('is not offered with a Bye in the Semifinals, which leaves only one runner-up', async () => {
+        await openFinals({ teamCount: 3, singles: true, includeThirdPlace: true });
+        expect(toggle()).toBeNull();
+        expect(headings()).toEqual(['Round 1', 'Final']);
       });
     });
 

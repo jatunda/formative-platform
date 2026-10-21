@@ -21,7 +21,7 @@ import {
 } from './match-timeline.js';
 import { computeStandings, formatRecord } from './standings.js';
 import { winningSide } from './match-result.js';
-import { resolveMatchSides, getMatchWinner, isBracketComplete, countUndecidedMatches, getPlacements, getPlayedEliminationMatches, eliminationMatchLabel } from './bracket.js';
+import { resolveMatchSides, getMatchWinner, isBracketComplete, countUndecidedMatches, getPlacements, getPlayedEliminationMatches, eliminationMatchLabel, canHaveThirdPlaceMatch } from './bracket.js';
 import {
   getAllianceCaptain,
   getSelectionRowStatus,
@@ -876,10 +876,28 @@ function renderSelectionStandings(state, dispatch, captainId, { pick, pickDeclin
 }
 
 /**
+ * The Third-Place Match toggle, saved as soon as it changes. It stays switchable on a live
+ * Bracket (adding or removing the match, from now), and locks once the Third-Place Match is
+ * complete.
+ */
+function renderThirdPlaceToggle(state, dispatch) {
+  const input = el('input', { type: 'checkbox' });
+  input.checked = state.elimination.includeThirdPlace;
+  input.addEventListener('change', () => {
+    const { blockReason } = dispatch({ type: 'set-third-place', includeThirdPlace: input.checked, now: Date.now() });
+    if (blockReason) input.checked = state.elimination.includeThirdPlace;
+  });
+  const reason = getActionBlockReason(state, { type: 'set-third-place' });
+  if (reason) lockField(input, reason);
+  return el('label', { className: 'robotics-field robotics-checkbox-field' }, [input, 'Include third-place match']);
+}
+
+/**
  * Bracket Size and the Third-Place Match toggle, each saved as soon as it changes. Bracket
  * Size shows the Estimated Bracket Size until it's saved (the teacher sets it, or the first
  * alliance forms). Lowering it below the number of alliances formed, or clearing it once
- * saved, is refused with a toast, and the input reverts. Both are locked while a Bracket exists.
+ * saved, is refused with a toast, and the input reverts. Bracket Size is locked while a
+ * Bracket exists.
  */
 function renderSelectionSettings(state, dispatch) {
   const card = el('div', { className: 'robotics-card robotics-selection-settings' });
@@ -891,18 +909,10 @@ function renderSelectionSettings(state, dispatch) {
     const { blockReason } = dispatch({ type: 'set-bracket-size', bracketSize: isBracketSizeSaved(size) ? size : null });
     if (blockReason) sizeInput.value = savedSize;
   });
-  const thirdPlaceInput = el('input', { type: 'checkbox' });
-  thirdPlaceInput.checked = state.elimination.includeThirdPlace;
-  thirdPlaceInput.addEventListener('change', () => {
-    const { blockReason } = dispatch({ type: 'set-third-place', includeThirdPlace: thirdPlaceInput.checked });
-    if (blockReason) thirdPlaceInput.checked = state.elimination.includeThirdPlace;
-  });
-  const thirdPlaceReason = getActionBlockReason(state, { type: 'set-third-place' });
   const sizeReason = getActionBlockReason(state, { type: 'set-bracket-size', bracketSize: savedSize });
   if (sizeReason) lockField(sizeInput, sizeReason);
-  if (thirdPlaceReason) lockField(thirdPlaceInput, thirdPlaceReason);
   card.appendChild(el('label', { className: 'robotics-field' }, ['Bracket size', sizeInput]));
-  card.appendChild(el('label', { className: 'robotics-field robotics-checkbox-field' }, [thirdPlaceInput, 'Include third-place match']));
+  card.appendChild(renderThirdPlaceToggle(state, dispatch));
   return card;
 }
 
@@ -1238,6 +1248,10 @@ export function renderFinalsTab(state, dispatch, { setActiveTab }) {
 
   section.appendChild(renderFinalsNowPlaying(state, dispatch, setActiveTab));
   section.appendChild(renderBracket(state, dispatch));
+  // Without two Semifinal-round losers there's no Third-Place Match to toggle.
+  if (canHaveThirdPlaceMatch(state.elimination.bracket)) {
+    section.appendChild(el('div', { className: 'robotics-card robotics-finals-settings' }, [renderThirdPlaceToggle(state, dispatch)]));
+  }
   return section;
 }
 

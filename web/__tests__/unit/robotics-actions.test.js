@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { applyTournamentAction, getActionBlockReason } from '../../robotics/actions.js';
 import { createInitialState, recordQualificationResult, getRevealedCount } from '../../robotics/state.js';
+import { isBracketComplete } from '../../robotics/bracket.js';
+import { getEliminationCurrentMatchId } from '../../robotics/current-match.js';
 
 const NO_SCREEN = { captainOverride: null };
 
@@ -196,7 +198,6 @@ describe('Alliance Selection through named actions', () => {
       { type: 'move-alliance', allianceId, direction: 1 },
       { type: 'remove-alliance', allianceId },
       { type: 'set-bracket-size', bracketSize: 4 },
-      { type: 'set-third-place', includeThirdPlace: true },
       { type: 'start-finals', confirmedShort: true },
     ]) {
       expect(applyTournamentAction(started.state, started.screen, action).blockReason).toBe(locked);
@@ -313,5 +314,107 @@ describe('unknown actions', () => {
   it('throws rather than silently doing nothing', () => {
     expect(() => applyTournamentAction(createInitialState(), NO_SCREEN, { type: 'no-such-action' })).toThrow('Unknown tournament action: no-such-action');
     expect(() => applyTournamentAction(createInitialState(), NO_SCREEN, { type: 'record-result', phase: 'practice', matchRef: 0 })).toThrow('Unknown match phase: practice');
+  });
+});
+
+describe('Third-Place Match toggle on a live Bracket', () => {
+  /** Four single-Team alliances, Finals started, with or without a Third-Place Match. */
+  function fourAllianceFinals({ includeThirdPlace = true } = {}) {
+    const teams = run(addTeams(['Alpha', 'Bravo', 'Charlie', 'Delta']));
+    const id = (name) => idOf(teams.state, name);
+    return run([
+      { type: 'set-bracket-size', bracketSize: 4 },
+      { type: 'set-third-place', includeThirdPlace },
+      ...['Alpha', 'Bravo', 'Charlie', 'Delta'].map((name) => ({ type: 'pick', captainId: id(name), partnerId: id(name) })),
+      { type: 'start-finals', confirmedShort: false },
+    ], teams);
+  }
+  const rounds = (state) => state.elimination.bracket.matches.map((m) => m.round);
+
+  it('switching it off removes the Third-Place Match and keeps every other result', () => {
+    const start = fourAllianceFinals();
+    const played = run([{ type: 'record-result', phase: 'elimination', matchRef: 'm1', scoreA: 5, scoreB: 1 }], start);
+    const { state } = run([{ type: 'set-third-place', includeThirdPlace: false, now: 0 }], played);
+    expect(rounds(state)).toEqual([1, 1, 'final']);
+    expect(state.elimination.includeThirdPlace).toBe(false);
+    expect(state.elimination.bracket.matches[0]).toEqual(played.state.elimination.bracket.matches[0]);
+  });
+
+  it('switching it on adds a Third-Place Match fed by the Semifinal-round losers', () => {
+    const start = fourAllianceFinals({ includeThirdPlace: false });
+    const { state } = run([{ type: 'set-third-place', includeThirdPlace: true, now: 0 }], start);
+    expect(state.elimination.includeThirdPlace).toBe(true);
+    expect(state.elimination.bracket.matches.slice(0, 3)).toEqual(start.state.elimination.bracket.matches);
+    expect(state.elimination.bracket.matches[3]).toMatchObject({
+      id: 'm4', round: 'third-place', fromMatch: ['m1', 'm2'], resolveAs: 'loser', completed: false, scoreA: null, scoreB: null,
+    });
+  });
+
+  it('locks once the Third-Place Match is marked complete', () => {
+    const start = fourAllianceFinals();
+    const thirdPlaceId = start.state.elimination.bracket.matches.find((m) => m.round === 'third-place').id;
+    const completed = run([{ type: 'record-result', phase: 'elimination', matchRef: thirdPlaceId, scoreA: 3, scoreB: 3 }], start);
+    const result = applyTournamentAction(completed.state, completed.screen, { type: 'set-third-place', includeThirdPlace: false, now: 0 });
+    expect(result.blockReason).toBe('Locked — the Third-Place Match is complete.');
+    expect(result.state).toBe(completed.state);
+  });
+
+  it('switching it off with a score entered but not marked complete removes the match, score and all', () => {
+    const start = fourAllianceFinals();
+    const drafted = run([{ type: 'set-draft-score', phase: 'elimination', matchRef: 'm4', field: 'scoreA', value: 7 }], start);
+    const off = run([{ type: 'set-third-place', includeThirdPlace: false, now: 0 }], drafted);
+    expect(rounds(off.state)).toEqual([1, 1, 'final']);
+    const back = run([{ type: 'set-third-place', includeThirdPlace: true, now: 0 }], off);
+    expect(back.state.elimination.bracket.matches[3]).toMatchObject({ round: 'third-place', scoreA: null });
+  });
+
+  it('recalculates Match Times forward from now: the Current Match is scheduled at now', () => {
+    const MIN = 60 * 1000;
+    const start = fourAllianceFinals({ includeThirdPlace: false });
+    const played = run([
+      { type: 'set-timeline-config', patch: { matchDurationMin: 4, gapMin: 1, fieldCount: 1 } },
+      { type: 'apply-match-timeline', mode: 'forward', time: 0 },
+      { type: 'record-result', phase: 'elimination', matchRef: 'm1', scoreA: 5, scoreB: 1 },
+      { type: 'record-result', phase: 'elimination', matchRef: 'm2', scoreA: 5, scoreB: 1 },
+    ], start);
+    // Third-Place Match is the Current Match, third in the schedule: two 5-minute slots in.
+    const now = 100 * MIN;
+    const { state } = run([{ type: 'set-third-place', includeThirdPlace: true, now }], played);
+    expect(state.timeline.startTime).toBe(now - 10 * MIN);
+  });
+
+  it('leaves Match Times alone when no Start Time is set yet', () => {
+    const { state } = run([{ type: 'set-third-place', includeThirdPlace: false, now: 12345 }], fourAllianceFinals());
+    expect(state.timeline.startTime).toBeNull();
+  });
+
+  it('covers the Podium again, since the Placements change', () => {
+    const start = fourAllianceFinals({ includeThirdPlace: false });
+    const revealed = run([
+      { type: 'record-result', phase: 'elimination', matchRef: 'm1', scoreA: 5, scoreB: 1 },
+      { type: 'record-result', phase: 'elimination', matchRef: 'm2', scoreA: 5, scoreB: 1 },
+      { type: 'record-result', phase: 'elimination', matchRef: 'm3', scoreA: 5, scoreB: 1 },
+      { type: 'reveal-next-placement' },
+    ], start);
+    expect(getRevealedCount(revealed.state)).toBe(1);
+    const on = run([{ type: 'set-third-place', includeThirdPlace: true, now: 0 }], revealed);
+    expect(on.state.podium).toEqual(createInitialState().podium);
+    // With the Final already complete, the new Third-Place Match is all that's left to play.
+    expect(isBracketComplete(on.state.elimination.bracket)).toBe(false);
+    expect(getEliminationCurrentMatchId(on.state.elimination.bracket)).toBe('m4');
+  });
+
+  it('with a lone Final (no Semifinal round) only the setting changes', () => {
+    const teams = run(addTeams(['Alpha', 'Bravo']));
+    const id = (name) => idOf(teams.state, name);
+    const start = run([
+      { type: 'pick', captainId: id('Alpha'), partnerId: id('Alpha') },
+      { type: 'pick', captainId: id('Bravo'), partnerId: id('Bravo') },
+      { type: 'start-finals', confirmedShort: true },
+      { type: 'set-third-place', includeThirdPlace: false, now: 0 },
+    ], teams);
+    const { state } = run([{ type: 'set-third-place', includeThirdPlace: true, now: 0 }], start);
+    expect(state.elimination.includeThirdPlace).toBe(true);
+    expect(state.elimination.bracket).toBe(start.state.elimination.bracket);
   });
 });

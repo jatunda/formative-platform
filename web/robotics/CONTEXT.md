@@ -63,7 +63,7 @@ The tournament-wide timing configuration used to compute every Match's Match Tim
 - *Forward*: a Start Time plus a Match Duration and Gap, computed forward through the Qualification Round and then the Elimination Bracket.
 - *Backward*: a target End Time, from which a Start Time is back-calculated using an Estimated Bracket Size and whether a Third-Place Match is included (both configured once, up front, on the Teams tab's Tournament Settings — not re-asked per Match Timeline mode switch), to determine the total match count. Changing the actual Bracket Size later does not re-target the original End Time — it only recalculates forward from the current time.
 Start Time and End Time are entered as a time-of-day only (the Tournament runs in one sitting) and only take effect once the teacher clicks Apply.
-Recalculating the Match Timeline ("Recalculate Match Times") never alters recorded results and is always available, distinct from the (destructive) Pairing Draw.
+Recalculating the Match Timeline ("Recalculate Match Times") never alters recorded results and is always available, distinct from the (destructive) Pairing Draw. Toggling the Third-Place Match on a live Elimination Bracket is the one case Match Times change without it: they are recalculated forward from now automatically (see Third-Place Match).
 
 **Match Time**:
 The computed scheduled time for one Qualification Match or Elimination Match, derived from the Match Timeline.
@@ -94,7 +94,7 @@ An invited Team refusing to join an Alliance Captain's Playoff Alliance. A Team 
 A pairing of two Teams formed once via Alliance Selection, fixed for the remainder of the Tournament. Distinct from Match Alliance (above) — a Playoff Alliance persists across every Elimination Match it plays. Normally two distinct Teams, but the teacher can confirm forming a single-Team Playoff Alliance (e.g. when a Team has no partner left) — it plays alone, with no partner Team sharing its Score.
 
 **Elimination Bracket**:
-The single-elimination bracket of Playoff Alliances played after Alliance Selection. Fixed once generated — Bracket Slots are not reseeded between rounds. While a Bracket exists, Alliance Selection is locked: no picks, Declines, removals, or Seed changes until the Bracket is discarded.
+The single-elimination bracket of Playoff Alliances played after Alliance Selection. Fixed once generated — Bracket Slots are not reseeded between rounds, and the only match that can be added or removed afterwards is the Third-Place Match (see Third-Place Match). While a Bracket exists, Alliance Selection is locked: no picks, Declines, removals, or Seed changes until the Bracket is discarded.
 
 **Discard Bracket**:
 The action that deletes the Elimination Bracket and its results, unlocking Alliance Selection. Playoff Alliances, Declines, and Seeds are kept. Requires confirming a dialog that names any recorded Elimination Match results that will be lost.
@@ -106,7 +106,7 @@ The number of Playoff Alliances the teacher chooses to enter into the Eliminatio
 One seeded position within the Elimination Bracket. If Bracket Size isn't a power of two, the bracket pads to the next power of two, with the extra Bracket Slots resolved as Byes for the top Seeds.
 
 **Seed**:
-The rank-order position assigned to a Playoff Alliance within the Elimination Bracket. By default, Seeds follow the order the Playoff Alliances were formed in during Alliance Selection (the first one formed is Seed 1), but every Bracket Slot's Seed is manually overridable.
+The rank-order position assigned to a Playoff Alliance within the Elimination Bracket. Seed N is the Nth Playoff Alliance in list order, which starts as the order they formed in during Alliance Selection (the first one formed is Seed 1). The teacher changes Seeds by reordering the Playoff Alliances before Start Finals; there is no separate per-Bracket-Slot Seed override.
 
 **Bye**:
 An automatic advancement past Round 1 of the Elimination Bracket, given to a top Seed when Bracket Size is padded to the next power of two.
@@ -115,7 +115,7 @@ An automatic advancement past Round 1 of the Elimination Bracket, given to a top
 A match between two Playoff Alliances within the Elimination Bracket. A Score is recorded for the record, and only win/loss by Score determines advancement — a No-Show here (as everywhere) only affects that Team's own record, never which Playoff Alliance advances.
 
 **Third-Place Match**:
-An optional Elimination Match between the two Semifinal-round losers. Can be toggled on or off at any time until the Third-Place Match itself is marked complete.
+An optional Elimination Match between the two Semifinal-round losers. Can be toggled on or off at any time until the Third-Place Match itself is marked complete, including on a live Elimination Bracket (from Alliance Selection's Bracket settings or the Finals tab). Toggling it on a live Bracket adds or removes just that match: every other recorded result is kept, and a score entered on a Third-Place Match being removed (but not marked complete) goes with it. Because the Placements change (3rd exists or not), the Podium is re-covered, to be revealed again from the start, and Match Times are recalculated forward from now: the Elimination Current Match is rescheduled to the current time and every later Match follows it. A Bracket without two Semifinal-round losers (a lone Final, or Bracket Size 3, where one Semifinal is a Bye) never has a Third-Place Match; the setting is kept for a later Bracket but changes nothing on this one.
 
 **Placement**:
 A decided 1st / 2nd / 3rd finishing position in the Elimination Bracket, held by one Playoff Alliance. 1st and 2nd come from the Final; 3rd exists only when a Third-Place Match is included and complete.

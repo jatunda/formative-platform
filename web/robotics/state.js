@@ -1,7 +1,8 @@
 // @ts-check
 import { generateQualificationMatches } from './pairing-draw.js';
-import { buildBracket, isBracketComplete, getPlacements, getMatchesInBracketOrder } from './bracket.js';
-import { computeTotalDurationMinutes, computeStartTimeFromEndTime, getScheduledMatchCount } from './match-timeline.js';
+import { buildBracket, withThirdPlaceMatch, isBracketComplete, getPlacements, getMatchesInBracketOrder } from './bracket.js';
+import { computeMatchTime, computeTotalDurationMinutes, computeStartTimeFromEndTime, getScheduledMatchCount } from './match-timeline.js';
+import { getEliminationCurrentMatchId } from './current-match.js';
 import { getAllianceSelectionBlockReason, getAllianceShortfall, getDeclinedTeamIds, getEffectiveBracketSize, isBracketSizeSaved } from './alliance-selection.js';
 
 let idCounter = 0;
@@ -359,12 +360,62 @@ export function movePlayoffAlliance(state, allianceId, direction) {
 /**
  * Sets Bracket Size and/or the Third-Place Match toggle; fields left out of the patch are kept.
  * A no-op when the patch would lower Bracket Size below the number of alliances formed, or
- * while a Bracket exists.
+ * sets Bracket Size while a Bracket exists. The toggle is applied as setThirdPlace does.
+ * @param {*} state - the Tournament
+ * @param {{bracketSize?: number|null, includeThirdPlace?: boolean}} patch
  */
 export function setBracketConfig(state, patch) {
-  if ('bracketSize' in patch && getAllianceSelectionBlockReason(state, 'set-bracket-size', patch)) return state;
-  if ('includeThirdPlace' in patch && getAllianceSelectionBlockReason(state, 'set-third-place')) return state;
-  return { ...state, elimination: { ...state.elimination, ...patch } };
+  let next = state;
+  if ('bracketSize' in patch) {
+    if (getAllianceSelectionBlockReason(state, 'set-bracket-size', patch)) return state;
+    next = { ...next, elimination: { ...next.elimination, bracketSize: patch.bracketSize } };
+  }
+  return 'includeThirdPlace' in patch ? setThirdPlace(next, Boolean(patch.includeThirdPlace)) : next;
+}
+
+/**
+ * Why the Third-Place Match can't be switched on or off right now, as the toast to show, or
+ * null when it can. It stays switchable on a live Bracket, until the Third-Place Match itself
+ * is marked complete.
+ * @param {*} state - the Tournament
+ * @returns {string|null}
+ */
+export function getThirdPlaceBlockReason(state) {
+  const thirdPlace = state.elimination.bracket?.matches.find((m) => m.round === 'third-place');
+  return thirdPlace?.completed ? 'Locked — the Third-Place Match is complete.' : null;
+}
+
+/**
+ * Switches the Third-Place Match on or off. With a live Bracket it also adds the match (fed by
+ * the Semifinal-round losers) or removes it, leaving every other result as it was. When that
+ * changes the Bracket's matches, the Placements change too, so the Podium is covered again,
+ * and Match Times are recalculated forward from `now`: the Elimination Current Match is
+ * scheduled at `now` and the rest follow it. A no-op while getThirdPlaceBlockReason blocks it.
+ * @param {*} state - the Tournament
+ * @param {boolean} includeThirdPlace
+ * @param {{now?: number}} [options] - the current time in epoch ms
+ */
+export function setThirdPlace(state, includeThirdPlace, { now = Date.now() } = {}) {
+  if (getThirdPlaceBlockReason(state)) return state;
+  const elimination = { ...state.elimination, includeThirdPlace };
+  const { bracket } = state.elimination;
+  const nextBracket = bracket && withThirdPlaceMatch(bracket, includeThirdPlace);
+  if (nextBracket === bracket) return { ...state, elimination };
+  const next = { ...state, elimination: { ...elimination, bracket: nextBracket }, podium: createInitialState().podium };
+  return recalculateMatchTimesFromNow(next, now);
+}
+
+/**
+ * Moves the Start Time so the Elimination Current Match's Match Time is `now`. Unchanged
+ * when no Start Time is set yet, or when every Elimination Match already has a winner.
+ */
+function recalculateMatchTimesFromNow(state, now) {
+  const currentId = getEliminationCurrentMatchId(state.elimination.bracket);
+  if (state.timeline.startTime == null || currentId === null) return state;
+  const current = getAllMatchesInScheduleOrder(state).find((e) => e.kind === 'elimination' && e.match.id === currentId);
+  // The Current Match's Match Time measured from the Start Time (never null, with a Start Time of 0).
+  const offset = /** @type {number} */ (computeMatchTime({ ...state.timeline, startTime: 0 }, current.globalIndex));
+  return setTimelineConfig(state, { startTime: now - offset });
 }
 
 /**

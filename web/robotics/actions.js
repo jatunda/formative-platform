@@ -14,6 +14,8 @@ import {
   movePlayoffAlliance,
   removePlayoffAlliance,
   setBracketConfig,
+  getThirdPlaceBlockReason,
+  setThirdPlace,
   startFinals,
   discardBracket,
   setQualificationDraftScore,
@@ -131,9 +133,11 @@ const HANDLERS = {
     blockReason: selectionBlockReason,
     apply: (state, { bracketSize }) => setBracketConfig(state, { bracketSize }),
   },
+  // Allowed on a live Bracket too: `now` (epoch ms, defaulting to the clock) is where the
+  // recalculated Match Times start from when the Third-Place Match is added or removed.
   'set-third-place': {
-    blockReason: selectionBlockReason,
-    apply: (state, { includeThirdPlace }) => setBracketConfig(state, { includeThirdPlace }),
+    blockReason: getThirdPlaceBlockReason,
+    apply: (state, { includeThirdPlace, now }) => setThirdPlace(state, includeThirdPlace, { now }),
   },
   // Short of Bracket Size it builds nothing until confirmedShort; the outcome says which happened.
   'start-finals': {
