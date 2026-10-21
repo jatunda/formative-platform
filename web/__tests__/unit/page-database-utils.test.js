@@ -277,6 +277,43 @@ describe('page-database-utils', () => {
       expect(getAtPath('backlinks/target2/abc')).toBeUndefined();
       expect(getAtPath('backlinks/target1/unrelated')).toBe(true);
     });
+
+    it('removes this page from the Question Backlinks of every Question it linked to', async () => {
+      setAtPath('pages/abc', { title: 'To Delete', questionLinksTo: ['q1', 'q2'] });
+      setAtPath('questionBacklinks/q1', { abc: true, other: true });
+      setAtPath('questionBacklinks/q2', { abc: true });
+      setAtPath('questionBacklinks/q3', { other: true });
+
+      await deletePageAndSlugs('abc');
+
+      expect(getAtPath('questionBacklinks/q1/abc')).toBeUndefined();
+      expect(getAtPath('questionBacklinks/q1/other')).toBe(true);
+      expect(getAtPath('questionBacklinks/q2/abc')).toBeUndefined();
+      expect(getAtPath('questionBacklinks/q3/other')).toBe(true);
+    });
+
+    it('removes a Question Backlink entry even when the page\'s questionLinksTo no longer lists it', async () => {
+      // savePage overwrites the whole page record, so questionLinksTo only
+      // reflects the latest save - an older entry can outlive it.
+      setAtPath('pages/abc', { title: 'To Delete' });
+      setAtPath('questionBacklinks/q1', { abc: true });
+
+      await deletePageAndSlugs('abc');
+
+      expect(getAtPath('questionBacklinks/q1/abc')).toBeUndefined();
+    });
+
+    it('deletes everything in one atomic update', async () => {
+      setAtPath('pages/abc', { title: 'To Delete', questionLinksTo: ['q1'] });
+      setAtPath('questionBacklinks/q1', { abc: true });
+      setAtPath('slugIndex', { syllabus: 'abc' });
+
+      await deletePageAndSlugs('abc');
+
+      expect(mockUpdate).toHaveBeenCalledTimes(1);
+      expect(mockSet).not.toHaveBeenCalled();
+      expect(mockRemove).not.toHaveBeenCalled();
+    });
   });
 
   describe('getBacklinks', () => {

@@ -13,6 +13,7 @@ import {
 import { DEFAULT_PAGE_TITLE } from "./constants.js";
 import { generateUniqueHash } from "./database-utils.js";
 import { extractPageLinkSlugs, rewriteSlugInContent } from "./page-links.js";
+import { questionBacklinkRemovals } from "./question-backlinks.js";
 
 let db;
 
@@ -235,21 +236,31 @@ export async function resolveSlugToPageId(slug) {
 
 /**
  * Delete a Page and every Slug that points to it, atomically. Also cleans up
- * this Page's own outgoing Backlink entries (it no longer links to anything)
- * and its incoming ones (nothing should claim a Backlink to a deleted Page).
+ * this Page's own outgoing Backlink entries (it no longer links to anything),
+ * its incoming ones (nothing should claim a Backlink to a deleted Page), and
+ * its entries in every Question's Question Backlinks (so the Question
+ * editor's delete/remove confirms stop counting it).
  * Does not touch other Pages' stored Page Link text - those become dangling
  * (see CONTEXT.md's Slug entry) rather than being rewritten.
  * @param {string} pageId
  * @returns {Promise<void>}
  */
 export async function deletePageAndSlugs(pageId) {
-  const [allSlugs, linksToSnap] = await Promise.all([
+  const [allSlugs, linksToSnap, questionBacklinksSnap] = await Promise.all([
     getAllSlugs(),
     get(ref(db, `pages/${pageId}/linksTo`)),
+    get(ref(db, "questionBacklinks")),
   ]);
   const updates = {
     [`pages/${pageId}`]: null,
     [`backlinks/${pageId}`]: null,
+    // Scans the whole Question Backlink index rather than trusting this
+    // Page's `questionLinksTo`, which only reflects its latest save (savePage
+    // overwrites the record), so an older entry could otherwise outlive it.
+    ...questionBacklinkRemovals(
+      questionBacklinksSnap.exists() ? questionBacklinksSnap.val() : null,
+      (sourcePageId) => sourcePageId === pageId
+    ),
   };
   for (const [slug, ownerId] of Object.entries(allSlugs)) {
     if (ownerId === pageId) {
