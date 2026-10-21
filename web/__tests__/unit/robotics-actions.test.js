@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { applyTournamentAction, getActionBlockReason } from '../../robotics/actions.js';
-import { createInitialState, recordQualificationResult } from '../../robotics/state.js';
+import { createInitialState, recordQualificationResult, getRevealedCount } from '../../robotics/state.js';
 
 const NO_SCREEN = { captainOverride: null };
 
@@ -207,6 +207,99 @@ describe('Alliance Selection through named actions', () => {
   });
 });
 
+describe('Qualification Matches through named actions', () => {
+  /** Four Teams, two Qualification Matches each (two matches). */
+  function drawn() {
+    return run([...addTeams(['Alpha', 'Bravo', 'Charlie', 'Delta']), { type: 'set-matches-per-team', matchesPerTeam: 2 }, { type: 'regenerate-matchups' }]);
+  }
+
+  it('saves draft scores and No-Shows, then records the result', () => {
+    const start = drawn();
+    const [teamId] = start.state.qualification.matches[0].allianceA;
+    const { state } = run([
+      { type: 'set-draft-score', phase: 'qualification', matchRef: 0, field: 'scoreA', value: 4 },
+      { type: 'set-no-show', phase: 'qualification', matchRef: 0, teamId, noShow: true },
+    ], start);
+    expect(state.qualification.matches[0]).toMatchObject({ scoreA: 4, completed: false, noShow: { [teamId]: true } });
+
+    const recorded = run([{ type: 'record-result', phase: 'qualification', matchRef: 0, scoreA: 4, scoreB: 2 }], { state, screen: NO_SCREEN });
+    expect(recorded.state.qualification.matches[0]).toMatchObject({ scoreA: 4, scoreB: 2, completed: true });
+  });
+
+  it('moves a Qualification Match down the schedule', () => {
+    const start = drawn();
+    const [first, second] = start.state.qualification.matches;
+    const { state } = run([{ type: 'reorder-qualification-match', qualIndex: 0, direction: 1 }], start);
+    expect(state.qualification.matches).toEqual([second, first]);
+  });
+
+  it('applies a Backward Match Timeline from its End Time', () => {
+    const end = new Date(2026, 9, 20, 12, 0).getTime();
+    const { state } = run([
+      { type: 'set-timeline-config', patch: { mode: 'backward', matchDurationMin: 5, gapMin: 0, fieldCount: 1, estimatedBracketSize: 2, estimatedThirdPlace: false } },
+      { type: 'apply-match-timeline', mode: 'backward', time: end },
+    ], drawn());
+    // Two Qualification Matches plus the estimated one-match Bracket: 15 minutes before End Time.
+    expect(state.timeline).toMatchObject({ endTime: end, startTime: end - 15 * 60 * 1000 });
+  });
+});
+
+describe('Finals and the Podium through named actions', () => {
+  /** Two single-Team alliances, so the Bracket is one Final, already started. */
+  function finalsStarted() {
+    const teams = run(addTeams(['Alpha', 'Bravo']));
+    const id = (name) => idOf(teams.state, name);
+    return run([
+      { type: 'pick', captainId: id('Alpha'), partnerId: id('Alpha') },
+      { type: 'pick', captainId: id('Bravo'), partnerId: id('Bravo') },
+      { type: 'start-finals', confirmedShort: true },
+    ], teams);
+  }
+  const finalOf = (state) => state.elimination.bracket.matches.find((m) => !m.isBye);
+
+  it('saves an Elimination draft score and No-Show, then records the result', () => {
+    const start = finalsStarted();
+    const matchRef = finalOf(start.state).id;
+    const teamId = idOf(start.state, 'Alpha');
+    const drafted = run([
+      { type: 'set-draft-score', phase: 'elimination', matchRef, field: 'scoreB', value: 3 },
+      { type: 'set-no-show', phase: 'elimination', matchRef, teamId, noShow: true },
+    ], start);
+    expect(finalOf(drafted.state)).toMatchObject({ scoreB: 3, completed: false, noShow: { [teamId]: true } });
+
+    const { state } = run([{ type: 'record-result', phase: 'elimination', matchRef, scoreA: 5, scoreB: 3 }], drafted);
+    expect(finalOf(state)).toMatchObject({ scoreA: 5, scoreB: 3, completed: true });
+  });
+
+  it('reveals the Podium 2nd then 1st, reporting each place revealed, and Replay covers it again', () => {
+    const start = finalsStarted();
+    const decided = run([{ type: 'record-result', phase: 'elimination', matchRef: finalOf(start.state).id, scoreA: 5, scoreB: 1 }], start);
+
+    const second = applyTournamentAction(decided.state, decided.screen, { type: 'reveal-next-placement' });
+    expect(second.outcome).toEqual({ revealedPlace: 2 });
+    const first = applyTournamentAction(second.state, second.screen, { type: 'reveal-next-placement' });
+    expect(first.outcome).toEqual({ revealedPlace: 1 });
+    expect(getRevealedCount(first.state)).toBe(2);
+
+    const nothingLeft = applyTournamentAction(first.state, first.screen, { type: 'reveal-next-placement' });
+    expect(nothingLeft.outcome).toEqual({ revealedPlace: null });
+    expect(nothingLeft.state).toBe(first.state);
+
+    const replayed = run([{ type: 'replay-reveal' }], first);
+    expect(getRevealedCount(replayed.state)).toBe(0);
+  });
+});
+
+describe('Resets through named actions', () => {
+  it('Reset Results keeps the roster; New Tournament clears it too', () => {
+    const played = run([...addTeams(['Alpha', 'Bravo', 'Charlie', 'Delta']), { type: 'regenerate-matchups' }]);
+    const reset = run([{ type: 'reset-results' }], played);
+    expect(reset.state).toEqual({ ...createInitialState(), teams: played.state.teams });
+    const fresh = run([{ type: 'new-tournament' }], played);
+    expect(fresh.state).toEqual(createInitialState());
+  });
+});
+
 describe('getActionBlockReason', () => {
   it('asks the same rule the entry point checks, and allows actions with no rule', () => {
     const drawn = run([...addTeams(['Alpha', 'Bravo', 'Charlie', 'Delta']), { type: 'regenerate-matchups' }]).state;
@@ -219,5 +312,6 @@ describe('getActionBlockReason', () => {
 describe('unknown actions', () => {
   it('throws rather than silently doing nothing', () => {
     expect(() => applyTournamentAction(createInitialState(), NO_SCREEN, { type: 'no-such-action' })).toThrow('Unknown tournament action: no-such-action');
+    expect(() => applyTournamentAction(createInitialState(), NO_SCREEN, { type: 'record-result', phase: 'practice', matchRef: 0 })).toThrow('Unknown match phase: practice');
   });
 });

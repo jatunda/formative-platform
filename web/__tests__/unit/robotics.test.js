@@ -7,17 +7,12 @@ import {
   teamName,
   createInitialState,
   addTeam,
-  setMatchesPerTeam,
-  regenerateMatchups,
-  recordQualificationResult,
-  setTimelineConfig,
   formPlayoffAlliance,
   setBracketConfig,
   startFinals,
   recordEliminationResult,
   revealNextPlacement,
   getRevealedCount,
-  resetResults,
 } from '../../robotics/state.js';
 
 function setClipboardMock() {
@@ -37,6 +32,14 @@ function clickButtonWithText(root, text) {
 // Tests that inspect the DOM after a dispatch-triggering interaction must await this first.
 function flushRender() {
   return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+/** Dispatches each named action in turn, failing loudly on a blocked one. */
+function dispatchAll(app, actions) {
+  actions.forEach((action) => {
+    const { blockReason } = app.dispatch(action);
+    if (blockReason) throw new Error(`${action.type} blocked: ${blockReason}`);
+  });
 }
 
 async function clickDialogButton(root, text) {
@@ -209,8 +212,8 @@ describe('initRoboticsApp', () => {
       const app = initRoboticsApp();
       const root = document.getElementById('roboticsApp');
       ['Alpha', 'Bravo', 'Charlie', 'Delta'].forEach((name) => addTeamViaForm(root, name));
-      app.dispatch((s) => setMatchesPerTeam(s, 2));
-      app.dispatch((s) => regenerateMatchups(s));
+      app.dispatch({ type: 'set-matches-per-team', matchesPerTeam: 2 });
+      app.dispatch({ type: 'regenerate-matchups' });
       const teamId = app.getState().teams[0].id;
       const matchCountBefore = app.getState().qualification.matches.length;
 
@@ -406,8 +409,8 @@ describe('initRoboticsApp', () => {
       const app = initRoboticsApp();
       const root = document.getElementById('roboticsApp');
       ['Alpha', 'Bravo', 'Charlie', 'Delta'].forEach((name) => addTeamViaForm(root, name));
-      app.dispatch((s) => setMatchesPerTeam(s, 2));
-      app.dispatch((s) => regenerateMatchups(s));
+      app.dispatch({ type: 'set-matches-per-team', matchesPerTeam: 2 });
+      app.dispatch({ type: 'regenerate-matchups' });
       app.setActiveTab('schedule');
 
       const scoreInputs = root.querySelectorAll('.robotics-score-input');
@@ -449,8 +452,8 @@ describe('initRoboticsApp', () => {
       const app = initRoboticsApp();
       setupFourTeams(app);
       // directly dispatch config + regenerate to keep this test focused on the lock behavior
-      app.dispatch((s) => setMatchesPerTeam(s, 2));
-      app.dispatch((s) => regenerateMatchups(s));
+      app.dispatch({ type: 'set-matches-per-team', matchesPerTeam: 2 });
+      app.dispatch({ type: 'regenerate-matchups' });
       await flushRender();
       let root = document.getElementById('roboticsApp');
       expect([...root.querySelectorAll('button')].find((b) => b.textContent === 'Regenerate Matchups').getAttribute('aria-disabled')).toBeNull();
@@ -483,8 +486,8 @@ describe('initRoboticsApp', () => {
       expect([...root.querySelectorAll('button')].some((b) => b.textContent === 'Generate Matchups')).toBe(true);
       expect([...root.querySelectorAll('button')].some((b) => b.textContent === 'Regenerate Matchups')).toBe(false);
 
-      app.dispatch((s) => setMatchesPerTeam(s, 2));
-      app.dispatch((s) => regenerateMatchups(s));
+      app.dispatch({ type: 'set-matches-per-team', matchesPerTeam: 2 });
+      app.dispatch({ type: 'regenerate-matchups' });
       await flushRender();
       root = document.getElementById('roboticsApp');
       expect([...root.querySelectorAll('button')].some((b) => b.textContent === 'Generate Matchups')).toBe(false);
@@ -494,8 +497,8 @@ describe('initRoboticsApp', () => {
     it('shows an error toast with the reset hint when clicking the locked Regenerate Matchups button', () => {
       const app = initRoboticsApp();
       setupFourTeams(app);
-      app.dispatch((s) => setMatchesPerTeam(s, 2));
-      app.dispatch((s) => regenerateMatchups(s));
+      app.dispatch({ type: 'set-matches-per-team', matchesPerTeam: 2 });
+      app.dispatch({ type: 'regenerate-matchups' });
       app.setActiveTab('schedule');
       let root = document.getElementById('roboticsApp');
       const scoreInputs = root.querySelectorAll('.robotics-score-input');
@@ -516,8 +519,8 @@ describe('initRoboticsApp', () => {
     it('locks the Add a Team form once a Qualification Match is complete, with a hint on hover and click', () => {
       const app = initRoboticsApp();
       setupFourTeams(app);
-      app.dispatch((s) => setMatchesPerTeam(s, 2));
-      app.dispatch((s) => regenerateMatchups(s));
+      app.dispatch({ type: 'set-matches-per-team', matchesPerTeam: 2 });
+      app.dispatch({ type: 'regenerate-matchups' });
       app.setActiveTab('schedule');
       let root = document.getElementById('roboticsApp');
       const scoreInputs = root.querySelectorAll('.robotics-score-input');
@@ -552,7 +555,7 @@ describe('initRoboticsApp', () => {
     it('locks Add Team and every Remove once Generate Matchups has run, keeping rename and Members editable', async () => {
       const app = initRoboticsApp();
       setupFourTeams(app);
-      app.dispatch((s) => setMatchesPerTeam(s, 2));
+      app.dispatch({ type: 'set-matches-per-team', matchesPerTeam: 2 });
       await flushRender();
       clickButtonWithText(document.getElementById('roboticsApp'), 'Generate Matchups');
       await flushRender();
@@ -580,8 +583,8 @@ describe('initRoboticsApp', () => {
     it('Enter in the Add a Team form explains the roster lock instead of adding', async () => {
       const app = initRoboticsApp();
       setupFourTeams(app);
-      app.dispatch((s) => setMatchesPerTeam(s, 2));
-      app.dispatch((s) => regenerateMatchups(s));
+      app.dispatch({ type: 'set-matches-per-team', matchesPerTeam: 2 });
+      app.dispatch({ type: 'regenerate-matchups' });
       await flushRender();
       const root = document.getElementById('roboticsApp');
       const nameInput = [...root.querySelectorAll('input')].find((i) => i.placeholder === 'Team name');
@@ -594,9 +597,9 @@ describe('initRoboticsApp', () => {
     it('unlocks Remove again after Reset Results', async () => {
       const app = initRoboticsApp();
       setupFourTeams(app);
-      app.dispatch((s) => setMatchesPerTeam(s, 2));
-      app.dispatch((s) => regenerateMatchups(s));
-      app.dispatch((s) => resetResults(s));
+      app.dispatch({ type: 'set-matches-per-team', matchesPerTeam: 2 });
+      app.dispatch({ type: 'regenerate-matchups' });
+      app.dispatch({ type: 'reset-results' });
       await flushRender();
       const root = document.getElementById('roboticsApp');
       const removeBtn = [...root.querySelectorAll('.robotics-team-row button')].find((b) => b.textContent === 'Remove');
@@ -657,8 +660,8 @@ describe('initRoboticsApp', () => {
     it('marks a match complete and shows the completed badge', async () => {
       const app = initRoboticsApp();
       setupFourTeams(app);
-      app.dispatch((s) => setMatchesPerTeam(s, 2));
-      app.dispatch((s) => regenerateMatchups(s));
+      app.dispatch({ type: 'set-matches-per-team', matchesPerTeam: 2 });
+      app.dispatch({ type: 'regenerate-matchups' });
       app.setActiveTab('schedule');
       let root = document.getElementById('roboticsApp');
       const scoreInputs = root.querySelectorAll('.robotics-score-input');
@@ -674,8 +677,8 @@ describe('initRoboticsApp', () => {
     it('marks the winning side with is-winner once a match completes with a decisive score', async () => {
       const app = initRoboticsApp();
       setupFourTeams(app);
-      app.dispatch((s) => setMatchesPerTeam(s, 2));
-      app.dispatch((s) => regenerateMatchups(s));
+      app.dispatch({ type: 'set-matches-per-team', matchesPerTeam: 2 });
+      app.dispatch({ type: 'regenerate-matchups' });
       app.setActiveTab('schedule');
       let root = document.getElementById('roboticsApp');
       const scoreInputs = root.querySelectorAll('.robotics-score-input');
@@ -693,8 +696,8 @@ describe('initRoboticsApp', () => {
     it('does not mark either side as winner on a tied completed match', () => {
       const app = initRoboticsApp();
       setupFourTeams(app);
-      app.dispatch((s) => setMatchesPerTeam(s, 2));
-      app.dispatch((s) => regenerateMatchups(s));
+      app.dispatch({ type: 'set-matches-per-team', matchesPerTeam: 2 });
+      app.dispatch({ type: 'regenerate-matchups' });
       app.setActiveTab('schedule');
       let root = document.getElementById('roboticsApp');
       const scoreInputs = root.querySelectorAll('.robotics-score-input');
@@ -711,8 +714,8 @@ describe('initRoboticsApp', () => {
     it('toggles no-show by clicking a team name', () => {
       const app = initRoboticsApp();
       setupFourTeams(app);
-      app.dispatch((s) => setMatchesPerTeam(s, 2));
-      app.dispatch((s) => regenerateMatchups(s));
+      app.dispatch({ type: 'set-matches-per-team', matchesPerTeam: 2 });
+      app.dispatch({ type: 'regenerate-matchups' });
       app.setActiveTab('schedule');
       const root = document.getElementById('roboticsApp');
       const toggle = root.querySelector('.robotics-match-row .robotics-team-toggle');
@@ -727,8 +730,8 @@ describe('initRoboticsApp', () => {
       const root = document.getElementById('roboticsApp');
       addTeamViaForm(root, 'Robo Raiders Supreme');
       ['Bravo', 'Charlie', 'Delta'].forEach((name) => addTeamViaForm(root, name));
-      app.dispatch((s) => setMatchesPerTeam(s, 2));
-      app.dispatch((s) => regenerateMatchups(s));
+      app.dispatch({ type: 'set-matches-per-team', matchesPerTeam: 2 });
+      app.dispatch({ type: 'regenerate-matchups' });
       app.setActiveTab('schedule');
       const freshRoot = document.getElementById('roboticsApp');
       const toggles = [...freshRoot.querySelectorAll('.robotics-match-row .robotics-team-toggle')];
@@ -746,8 +749,8 @@ describe('initRoboticsApp', () => {
       const extremeName = 'A'.repeat(60);
       addTeamViaForm(root, extremeName);
       ['Bravo', 'Charlie', 'Delta'].forEach((name) => addTeamViaForm(root, name));
-      app.dispatch((s) => setMatchesPerTeam(s, 2));
-      app.dispatch((s) => regenerateMatchups(s));
+      app.dispatch({ type: 'set-matches-per-team', matchesPerTeam: 2 });
+      app.dispatch({ type: 'regenerate-matchups' });
       app.setActiveTab('schedule');
       const freshRoot = document.getElementById('roboticsApp');
       const toggle = [...freshRoot.querySelectorAll('.robotics-match-row .robotics-team-toggle')].find((t) => t.textContent === extremeName);
@@ -758,8 +761,8 @@ describe('initRoboticsApp', () => {
     it('marks a clicked no-show team with the is-no-show class, and clears it on a second click', async () => {
       const app = initRoboticsApp();
       setupFourTeams(app);
-      app.dispatch((s) => setMatchesPerTeam(s, 2));
-      app.dispatch((s) => regenerateMatchups(s));
+      app.dispatch({ type: 'set-matches-per-team', matchesPerTeam: 2 });
+      app.dispatch({ type: 'regenerate-matchups' });
       app.setActiveTab('schedule');
       let root = document.getElementById('roboticsApp');
       let toggle = root.querySelector('.robotics-match-row .robotics-team-toggle');
@@ -780,8 +783,8 @@ describe('initRoboticsApp', () => {
     it('keeps a typed-but-unsaved score after toggling No-Show, including repeated toggling on either side', () => {
       const app = initRoboticsApp();
       setupFourTeams(app);
-      app.dispatch((s) => setMatchesPerTeam(s, 2));
-      app.dispatch((s) => regenerateMatchups(s));
+      app.dispatch({ type: 'set-matches-per-team', matchesPerTeam: 2 });
+      app.dispatch({ type: 'regenerate-matchups' });
       app.setActiveTab('schedule');
       let root = document.getElementById('roboticsApp');
 
@@ -823,8 +826,8 @@ describe('initRoboticsApp', () => {
     it('marks the current match row with a compact dot indicator, not a wide text label', () => {
       const app = initRoboticsApp();
       setupFourTeams(app);
-      app.dispatch((s) => setMatchesPerTeam(s, 3));
-      app.dispatch((s) => regenerateMatchups(s));
+      app.dispatch({ type: 'set-matches-per-team', matchesPerTeam: 3 });
+      app.dispatch({ type: 'regenerate-matchups' });
       app.setActiveTab('schedule');
       const root = document.getElementById('roboticsApp');
       const currentRow = root.querySelector('.robotics-match-row.is-current');
@@ -842,8 +845,8 @@ describe('initRoboticsApp', () => {
     it('reorders not-yet-complete matches with the down button, which becomes the new current match', () => {
       const app = initRoboticsApp();
       setupFourTeams(app);
-      app.dispatch((s) => setMatchesPerTeam(s, 3));
-      app.dispatch((s) => regenerateMatchups(s));
+      app.dispatch({ type: 'set-matches-per-team', matchesPerTeam: 3 });
+      app.dispatch({ type: 'regenerate-matchups' });
       app.setActiveTab('schedule');
       const secondMatchBefore = app.getState().qualification.matches[1];
 
@@ -861,8 +864,8 @@ describe('initRoboticsApp', () => {
     it('disables the up button on the topmost match and does not render reorder buttons on a completed match', async () => {
       const app = initRoboticsApp();
       setupFourTeams(app);
-      app.dispatch((s) => setMatchesPerTeam(s, 3));
-      app.dispatch((s) => regenerateMatchups(s));
+      app.dispatch({ type: 'set-matches-per-team', matchesPerTeam: 3 });
+      app.dispatch({ type: 'regenerate-matchups' });
       app.setActiveTab('schedule');
       let root = document.getElementById('roboticsApp');
       const rows = root.querySelectorAll('.robotics-match-row');
@@ -883,9 +886,9 @@ describe('initRoboticsApp', () => {
     it('shows the field assignment per match when field count is greater than 1', () => {
       const app = initRoboticsApp();
       setupFourTeams(app);
-      app.dispatch((s) => setMatchesPerTeam(s, 3));
-      app.dispatch((s) => regenerateMatchups(s));
-      app.dispatch((s) => setTimelineConfig(s, { fieldCount: 2 }));
+      app.dispatch({ type: 'set-matches-per-team', matchesPerTeam: 3 });
+      app.dispatch({ type: 'regenerate-matchups' });
+      app.dispatch({ type: 'set-timeline-config', patch: { fieldCount: 2 } });
       app.setActiveTab('schedule');
       const root = document.getElementById('roboticsApp');
       const fieldLabels = [...root.querySelectorAll('.robotics-match-field')].map((el) => el.textContent);
@@ -897,8 +900,8 @@ describe('initRoboticsApp', () => {
     it('lays each match row out as flat grid cells: time, indicator dot, red side, red score, blue score, blue side, actions', () => {
       const app = initRoboticsApp();
       setupFourTeams(app);
-      app.dispatch((s) => setMatchesPerTeam(s, 3));
-      app.dispatch((s) => regenerateMatchups(s));
+      app.dispatch({ type: 'set-matches-per-team', matchesPerTeam: 3 });
+      app.dispatch({ type: 'regenerate-matchups' });
       app.setActiveTab('schedule');
       const row = document.querySelector('#roboticsApp .robotics-match-row');
       expect(row.classList.contains('robotics-match-grid')).toBe(true);
@@ -918,8 +921,8 @@ describe('initRoboticsApp', () => {
     it('does not show field assignments when field count is 1', () => {
       const app = initRoboticsApp();
       setupFourTeams(app);
-      app.dispatch((s) => setMatchesPerTeam(s, 3));
-      app.dispatch((s) => regenerateMatchups(s));
+      app.dispatch({ type: 'set-matches-per-team', matchesPerTeam: 3 });
+      app.dispatch({ type: 'regenerate-matchups' });
       app.setActiveTab('schedule');
       const root = document.getElementById('roboticsApp');
       expect(root.querySelectorAll('.robotics-match-field')).toHaveLength(0);
@@ -929,8 +932,8 @@ describe('initRoboticsApp', () => {
       const writeText = setClipboardMock();
       const app = initRoboticsApp();
       setupFourTeams(app);
-      app.dispatch((s) => setMatchesPerTeam(s, 2));
-      app.dispatch((s) => regenerateMatchups(s));
+      app.dispatch({ type: 'set-matches-per-team', matchesPerTeam: 2 });
+      app.dispatch({ type: 'regenerate-matchups' });
       app.setActiveTab('schedule');
       const root = document.getElementById('roboticsApp');
       clickButtonWithText(root, 'Copy Match Data to Clipboard');
@@ -942,8 +945,8 @@ describe('initRoboticsApp', () => {
     it('applies a backward-mode end time to compute a start time', () => {
       const app = initRoboticsApp();
       setupFourTeams(app);
-      app.dispatch((s) => setMatchesPerTeam(s, 2));
-      app.dispatch((s) => regenerateMatchups(s));
+      app.dispatch({ type: 'set-matches-per-team', matchesPerTeam: 2 });
+      app.dispatch({ type: 'regenerate-matchups' });
       app.setActiveTab('schedule');
       let root = document.getElementById('roboticsApp');
       const modeSelect = root.querySelector('select');
@@ -959,8 +962,8 @@ describe('initRoboticsApp', () => {
     it('does not recalculate the backward-mode schedule until Apply is clicked', () => {
       const app = initRoboticsApp();
       setupFourTeams(app);
-      app.dispatch((s) => setMatchesPerTeam(s, 2));
-      app.dispatch((s) => regenerateMatchups(s));
+      app.dispatch({ type: 'set-matches-per-team', matchesPerTeam: 2 });
+      app.dispatch({ type: 'regenerate-matchups' });
       app.setActiveTab('schedule');
       let root = document.getElementById('roboticsApp');
       const modeSelect = root.querySelector('select');
@@ -975,8 +978,8 @@ describe('initRoboticsApp', () => {
     it('keeps the entered end time visible after Apply instead of clearing the field', () => {
       const app = initRoboticsApp();
       setupFourTeams(app);
-      app.dispatch((s) => setMatchesPerTeam(s, 2));
-      app.dispatch((s) => regenerateMatchups(s));
+      app.dispatch({ type: 'set-matches-per-team', matchesPerTeam: 2 });
+      app.dispatch({ type: 'regenerate-matchups' });
       app.setActiveTab('schedule');
       let root = document.getElementById('roboticsApp');
       const modeSelect = root.querySelector('select');
@@ -993,8 +996,8 @@ describe('initRoboticsApp', () => {
     it('has an explicit Apply button in forward mode that only applies the start time on click', () => {
       const app = initRoboticsApp();
       setupFourTeams(app);
-      app.dispatch((s) => setMatchesPerTeam(s, 2));
-      app.dispatch((s) => regenerateMatchups(s));
+      app.dispatch({ type: 'set-matches-per-team', matchesPerTeam: 2 });
+      app.dispatch({ type: 'regenerate-matchups' });
       app.setActiveTab('schedule');
       const root = document.getElementById('roboticsApp');
       const startInput = root.querySelector('input[type="time"]');
@@ -1011,8 +1014,8 @@ describe('initRoboticsApp', () => {
     it('keeps the entered start time visible after Apply instead of clearing the field', () => {
       const app = initRoboticsApp();
       setupFourTeams(app);
-      app.dispatch((s) => setMatchesPerTeam(s, 2));
-      app.dispatch((s) => regenerateMatchups(s));
+      app.dispatch({ type: 'set-matches-per-team', matchesPerTeam: 2 });
+      app.dispatch({ type: 'regenerate-matchups' });
       app.setActiveTab('schedule');
       let root = document.getElementById('roboticsApp');
       const startInput = root.querySelector('input[type="time"]');
@@ -1025,11 +1028,11 @@ describe('initRoboticsApp', () => {
     it('shows the previously-saved start time on render (no longer blank)', () => {
       const app = initRoboticsApp();
       setupFourTeams(app);
-      app.dispatch((s) => setMatchesPerTeam(s, 2));
-      app.dispatch((s) => regenerateMatchups(s));
+      app.dispatch({ type: 'set-matches-per-team', matchesPerTeam: 2 });
+      app.dispatch({ type: 'regenerate-matchups' });
       const d = new Date();
       d.setHours(14, 15, 0, 0);
-      app.dispatch((s) => setTimelineConfig(s, { startTime: d.getTime() }));
+      app.dispatch({ type: 'set-timeline-config', patch: { startTime: d.getTime() } });
       app.setActiveTab('schedule');
       const root = document.getElementById('roboticsApp');
       expect(root.querySelector('input[type="time"]').value).toBe('14:15');
@@ -1038,11 +1041,11 @@ describe('initRoboticsApp', () => {
     it('shows the previously-saved end time on render in backward mode (no longer blank)', () => {
       const app = initRoboticsApp();
       setupFourTeams(app);
-      app.dispatch((s) => setMatchesPerTeam(s, 2));
-      app.dispatch((s) => regenerateMatchups(s));
+      app.dispatch({ type: 'set-matches-per-team', matchesPerTeam: 2 });
+      app.dispatch({ type: 'regenerate-matchups' });
       const d = new Date();
       d.setHours(16, 45, 0, 0);
-      app.dispatch((s) => setTimelineConfig(s, { mode: 'backward', endTime: d.getTime() }));
+      app.dispatch({ type: 'set-timeline-config', patch: { mode: 'backward', endTime: d.getTime() } });
       app.setActiveTab('schedule');
       const root = document.getElementById('roboticsApp');
       expect(root.querySelector('input[type="time"]').value).toBe('16:45');
@@ -1051,8 +1054,8 @@ describe('initRoboticsApp', () => {
     it('uses the Teams-tab estimated bracket size/third-place settings for the backward-mode calculation', () => {
       const app = initRoboticsApp();
       setupFourTeams(app);
-      app.dispatch((s) => setMatchesPerTeam(s, 2));
-      app.dispatch((s) => regenerateMatchups(s));
+      app.dispatch({ type: 'set-matches-per-team', matchesPerTeam: 2 });
+      app.dispatch({ type: 'regenerate-matchups' });
       app.setActiveTab('teams');
       let root = document.getElementById('roboticsApp');
       const estBracketInput = [...root.querySelectorAll('input[type="number"]')].find((i) =>
@@ -1068,7 +1071,7 @@ describe('initRoboticsApp', () => {
       expect(app.getState().timeline.estimatedBracketSize).toBe(4);
       expect(app.getState().timeline.estimatedThirdPlace).toBe(true);
 
-      app.dispatch((s) => setTimelineConfig(s, { mode: 'backward' }));
+      app.dispatch({ type: 'set-timeline-config', patch: { mode: 'backward' } });
       app.setActiveTab('schedule');
       root = document.getElementById('roboticsApp');
       const endInput = root.querySelector('input[type="time"]');
@@ -1084,9 +1087,9 @@ describe('initRoboticsApp', () => {
     it('no longer shows the estimate fields on the Schedule tab', () => {
       const app = initRoboticsApp();
       setupFourTeams(app);
-      app.dispatch((s) => setMatchesPerTeam(s, 2));
-      app.dispatch((s) => regenerateMatchups(s));
-      app.dispatch((s) => setTimelineConfig(s, { mode: 'backward' }));
+      app.dispatch({ type: 'set-matches-per-team', matchesPerTeam: 2 });
+      app.dispatch({ type: 'regenerate-matchups' });
+      app.dispatch({ type: 'set-timeline-config', patch: { mode: 'backward' } });
       app.setActiveTab('schedule');
       const root = document.getElementById('roboticsApp');
       const labels = [...root.querySelectorAll('label')].map((l) => l.textContent);
@@ -1179,10 +1182,10 @@ describe('initRoboticsApp', () => {
       const app = initRoboticsApp();
       const root = document.getElementById('roboticsApp');
       ['Alpha', 'Bravo', 'Charlie', 'Delta'].forEach((name) => addTeamViaForm(root, name));
-      app.dispatch((s) => setMatchesPerTeam(s, 2));
-      app.dispatch((s) => regenerateMatchups(s));
+      app.dispatch({ type: 'set-matches-per-team', matchesPerTeam: 2 });
+      app.dispatch({ type: 'regenerate-matchups' });
       app.getState().qualification.matches.forEach((_, i) => {
-        app.dispatch((s) => recordQualificationResult(s, i, { scoreA: 10, scoreB: 5 }));
+        app.dispatch({ type: 'record-result', phase: 'qualification', matchRef: i, scoreA: 10, scoreB: 5 });
       });
       app.setActiveTab('schedule');
       const freshRoot = document.getElementById('roboticsApp');
@@ -1195,10 +1198,10 @@ describe('initRoboticsApp', () => {
       const app = initRoboticsApp();
       const root = document.getElementById('roboticsApp');
       ['Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo'].forEach((name) => addTeamViaForm(root, name));
-      app.dispatch((s) => setMatchesPerTeam(s, 3));
-      app.dispatch((s) => regenerateMatchups(s)); // 5 teams * 3 = 15 slots -> one team ends up with an extra match
+      app.dispatch({ type: 'set-matches-per-team', matchesPerTeam: 3 });
+      app.dispatch({ type: 'regenerate-matchups' }); // 5 teams * 3 = 15 slots -> one team ends up with an extra match
       app.getState().qualification.matches.forEach((_, i) => {
-        app.dispatch((s) => recordQualificationResult(s, i, { scoreA: 10, scoreB: 5 }));
+        app.dispatch({ type: 'record-result', phase: 'qualification', matchRef: i, scoreA: 10, scoreB: 5 });
       });
       app.setActiveTab('schedule');
       const freshRoot = document.getElementById('roboticsApp');
@@ -1211,10 +1214,10 @@ describe('initRoboticsApp', () => {
       const app = initRoboticsApp();
       const root = document.getElementById('roboticsApp');
       ['Alpha', 'Bravo', 'Charlie', 'Delta'].forEach((name) => addTeamViaForm(root, name));
-      app.dispatch((s) => setMatchesPerTeam(s, 2));
-      app.dispatch((s) => regenerateMatchups(s));
-      app.dispatch((s) => recordQualificationResult(s, 0, { scoreA: 10, scoreB: 5 }));
-      app.dispatch((s) => recordQualificationResult(s, 1, { scoreA: 7, scoreB: 7 }));
+      app.dispatch({ type: 'set-matches-per-team', matchesPerTeam: 2 });
+      app.dispatch({ type: 'regenerate-matchups' });
+      app.dispatch({ type: 'record-result', phase: 'qualification', matchRef: 0, scoreA: 10, scoreB: 5 });
+      app.dispatch({ type: 'record-result', phase: 'qualification', matchRef: 1, scoreA: 7, scoreB: 7 });
       app.setActiveTab('schedule');
       const recordCells = [...document.querySelectorAll('#roboticsApp table tbody tr td:nth-child(3)')];
       // Every Team played both matches: the winners of match 1 go 1-0-1, the losers 0-1-1.
@@ -1227,10 +1230,10 @@ describe('initRoboticsApp', () => {
       const root = document.getElementById('roboticsApp');
       addTeamViaForm(root, 'Alpha', 'Ann, Al');
       ['Bravo', 'Charlie', 'Delta'].forEach((name) => addTeamViaForm(root, name));
-      app.dispatch((s) => setMatchesPerTeam(s, 2));
-      app.dispatch((s) => regenerateMatchups(s));
+      app.dispatch({ type: 'set-matches-per-team', matchesPerTeam: 2 });
+      app.dispatch({ type: 'regenerate-matchups' });
       app.getState().qualification.matches.forEach((_, i) => {
-        app.dispatch((s) => recordQualificationResult(s, i, { scoreA: 10, scoreB: 5 }));
+        app.dispatch({ type: 'record-result', phase: 'qualification', matchRef: i, scoreA: 10, scoreB: 5 });
       });
       app.setActiveTab('schedule');
       const freshRoot = document.getElementById('roboticsApp');
@@ -1245,10 +1248,10 @@ describe('initRoboticsApp', () => {
       const root = document.getElementById('roboticsApp');
       addTeamViaForm(root, 'Robo Raiders Supreme', 'Alexandria Montgomery-Wu');
       ['Bravo', 'Charlie', 'Delta'].forEach((name) => addTeamViaForm(root, name));
-      app.dispatch((s) => setMatchesPerTeam(s, 2));
-      app.dispatch((s) => regenerateMatchups(s));
+      app.dispatch({ type: 'set-matches-per-team', matchesPerTeam: 2 });
+      app.dispatch({ type: 'regenerate-matchups' });
       app.getState().qualification.matches.forEach((_, i) => {
-        app.dispatch((s) => recordQualificationResult(s, i, { scoreA: 10, scoreB: 5 }));
+        app.dispatch({ type: 'record-result', phase: 'qualification', matchRef: i, scoreA: 10, scoreB: 5 });
       });
       app.setActiveTab('schedule');
       const freshRoot = document.getElementById('roboticsApp');
@@ -1270,8 +1273,8 @@ describe('initRoboticsApp', () => {
       const app = initRoboticsApp();
       const root = document.getElementById('roboticsApp');
       ['Alpha', 'Bravo', 'Charlie', 'Delta'].forEach((name) => addTeamViaForm(root, name));
-      app.dispatch((s) => setMatchesPerTeam(s, 2));
-      app.dispatch((s) => regenerateMatchups(s));
+      app.dispatch({ type: 'set-matches-per-team', matchesPerTeam: 2 });
+      app.dispatch({ type: 'regenerate-matchups' });
       app.setActiveTab('schedule');
       const freshRoot = document.getElementById('roboticsApp');
 
@@ -1287,7 +1290,7 @@ describe('initRoboticsApp', () => {
       const app = initRoboticsApp();
       const root = document.getElementById('roboticsApp');
       ['Alpha', 'Bravo', 'Charlie', 'Delta'].forEach((name) => addTeamViaForm(root, name));
-      app.dispatch((s) => regenerateMatchups(s));
+      app.dispatch({ type: 'regenerate-matchups' });
       app.setActiveTab('schedule');
       const layout = document.querySelector('.robotics-schedule-layout');
       expect(layout).toBeTruthy();
@@ -1317,8 +1320,8 @@ describe('initRoboticsApp', () => {
       const root = document.getElementById('roboticsApp');
       addTeamViaForm(root, 'Alpha', 'Ana, Abe');
       ['Bravo', 'Charlie', 'Delta'].forEach((name) => addTeamViaForm(root, name));
-      app.dispatch((s) => setMatchesPerTeam(s, matchesPerTeam));
-      app.dispatch((s) => regenerateMatchups(s));
+      app.dispatch({ type: 'set-matches-per-team', matchesPerTeam: matchesPerTeam });
+      app.dispatch({ type: 'regenerate-matchups' });
       app.setActiveTab('schedule');
     }
     const card = () => document.querySelector('.robotics-now-playing');
@@ -1353,8 +1356,8 @@ describe('initRoboticsApp', () => {
       const root = document.getElementById('roboticsApp');
       addTeamViaForm(root, 'Robo Raiders Supreme', 'Alexandria Montgomery-Wu');
       ['Bravo', 'Charlie', 'Delta'].forEach((name) => addTeamViaForm(root, name));
-      app.dispatch((s) => setMatchesPerTeam(s, 3));
-      app.dispatch((s) => regenerateMatchups(s));
+      app.dispatch({ type: 'set-matches-per-team', matchesPerTeam: 3 });
+      app.dispatch({ type: 'regenerate-matchups' });
       app.setActiveTab('schedule');
       const teams = [...card().querySelectorAll('.robotics-now-playing-team')];
       const longTeam = teams.find((t) => t.querySelector('.robotics-now-playing-team-name').textContent === 'Robo Raiders Supreme');
@@ -1372,7 +1375,7 @@ describe('initRoboticsApp', () => {
       expect(card().querySelector('.robotics-now-playing-field')).toBeNull();
 
       const start = new Date(2026, 9, 3, 14, 5).getTime();
-      app.dispatch((s) => setTimelineConfig(s, { startTime: start, fieldCount: 2 }));
+      app.dispatch({ type: 'set-timeline-config', patch: { startTime: start, fieldCount: 2 } });
       await flushRender();
       expect(card().querySelector('.robotics-now-playing-time').textContent)
         .toBe(new Date(start).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }));
@@ -1454,7 +1457,7 @@ describe('initRoboticsApp', () => {
       const nextTick = () => new Promise((resolve) => setTimeout(resolve, 0));
 
       app.setActiveTab('teams');
-      app.dispatch((s) => recordQualificationResult(s, 0, { scoreA: 1, scoreB: 0 }));
+      app.dispatch({ type: 'record-result', phase: 'qualification', matchRef: 0, scoreA: 1, scoreB: 0 });
       await nextTick();
       expect(scrollIntoView).not.toHaveBeenCalled();
 
@@ -1484,7 +1487,7 @@ describe('initRoboticsApp', () => {
     it('says the Qualification Round is complete once every match is, with a button on to Alliance Selection', async () => {
       const app = initRoboticsApp();
       openSchedule(app, 1);
-      app.dispatch((s) => recordQualificationResult(s, 0, { scoreA: 1, scoreB: 0 }));
+      app.dispatch({ type: 'record-result', phase: 'qualification', matchRef: 0, scoreA: 1, scoreB: 0 });
       await flushRender();
       expect(card().classList.contains('is-finished')).toBe(true);
       expect(card().querySelector('.robotics-now-playing-message').textContent).toBe('Qualification Round complete');
@@ -1508,8 +1511,8 @@ describe('initRoboticsApp', () => {
       const app = initRoboticsApp();
       const root = document.getElementById('roboticsApp');
       ['Alpha', 'Bravo', 'Charlie', 'Delta'].forEach((name) => addTeamViaForm(root, name));
-      app.dispatch((s) => setMatchesPerTeam(s, 2));
-      app.dispatch((s) => regenerateMatchups(s));
+      app.dispatch({ type: 'set-matches-per-team', matchesPerTeam: 2 });
+      app.dispatch({ type: 'regenerate-matchups' });
       app.setActiveTab('schedule');
       return app;
     }
@@ -1561,7 +1564,7 @@ describe('initRoboticsApp', () => {
     it('stays open after a Tournament change re-renders the tab', () => {
       const app = openScheduleWithMatches();
       toggle().click();
-      app.dispatch((s) => setTimelineConfig(s, { gapMin: 2 }));
+      app.dispatch({ type: 'set-timeline-config', patch: { gapMin: 2 } });
       expect(toggle().getAttribute('aria-expanded')).toBe('true');
     });
 
@@ -1721,11 +1724,12 @@ describe('initRoboticsApp', () => {
 
     it('follows Standings for the Captain, and warns while Qualification Matches remain', async () => {
       const app = openSelection(['Alpha', 'Bravo', 'Charlie', 'Delta']);
-      app.dispatch((s) => regenerateMatchups(setMatchesPerTeam(s, 1), { random: () => 0.5 }));
+      app.dispatch({ type: 'set-matches-per-team', matchesPerTeam: 1 });
+      app.dispatch({ type: 'regenerate-matchups' });
       await flushRender();
       expect(document.querySelector('.robotics-selection-notice').textContent).toContain('may still change');
 
-      app.dispatch((s) => recordQualificationResult(s, 0, { scoreA: 2, scoreB: 9 }));
+      app.dispatch({ type: 'record-result', phase: 'qualification', matchRef: 0, scoreA: 2, scoreB: 9 });
       await flushRender();
       expect(document.querySelector('.robotics-selection-notice')).toBeNull();
       const state = app.getState();
@@ -1941,15 +1945,18 @@ describe('initRoboticsApp', () => {
     });
 
     it('Start Finals builds the Bracket in list order, resets the Podium reveal, and switches to Finals', async () => {
-      const app = openSelection(['Alpha', 'Bravo', 'Charlie', 'Delta']);
+      const picking = openSelection(['Alpha', 'Bravo', 'Charlie', 'Delta']);
       pickButton('Bravo').click();
       await flushRender();
       pickButton('Delta').click();
       await flushRender();
       document.querySelectorAll('[aria-label="Move alliance up"]')[1].click();
       await flushRender();
-      app.dispatch((s) => ({ ...s, podium: { revealedCount: 2, revealedFor: 'stale' } }));
-      await flushRender();
+      // Reload the Tournament saved with a Podium reveal left over from an earlier Bracket.
+      localStorage.setItem('robotics-tournament-state', JSON.stringify({ ...picking.getState(), podium: { revealedCount: 2, revealedFor: 'stale' } }));
+      picking.destroy();
+      const app = initRoboticsApp();
+      app.setActiveTab('alliance-selection');
 
       const startBtn = [...root().querySelectorAll('button')].find((b) => b.textContent === 'Start Finals →');
       expect(startBtn.classList.contains('is-locked')).toBe(false);
@@ -1988,7 +1995,7 @@ describe('initRoboticsApp', () => {
       it('prefills Bracket Size from the Estimated Bracket Size until the teacher sets it', async () => {
         const app = openSelection();
         expect(sizeInput().value).toBe('8');
-        app.dispatch((s) => setTimelineConfig(s, { estimatedBracketSize: 4 }));
+        app.dispatch({ type: 'set-timeline-config', patch: { estimatedBracketSize: 4 } });
         await flushRender();
         expect(sizeInput().value).toBe('4');
         setSize('3');
@@ -2139,9 +2146,9 @@ describe('initRoboticsApp', () => {
       it('a Start Finals that builds nothing leaves the teacher on Alliance Selection', async () => {
         const app = await selectionComplete();
         // An alliance is removed after the Start Finals button rendered, so the click lands on
-        // a stale, still-enabled button and startFinals itself refuses (fewer than 2 alliances).
-        const [first] = app.getState().elimination.alliances;
-        app.dispatch((s) => ({ ...s, elimination: { ...s.elimination, alliances: [first] } }));
+        // a stale, still-enabled button and Start Finals is refused (fewer than 2 alliances).
+        const [, second] = app.getState().elimination.alliances;
+        app.dispatch({ type: 'remove-alliance', allianceId: second.id });
         clickButtonWithText(root(), 'Start Finals →');
         await flushRender();
         expect(app.getState().elimination.bracket).toBeNull();
@@ -2248,7 +2255,7 @@ describe('initRoboticsApp', () => {
       it('Discard Bracket names the results it will lose, and Cancel changes nothing', async () => {
         const app = await lockedSelection();
         const final = app.getState().elimination.bracket.matches.find((m) => m.round === 'final');
-        app.dispatch((s) => recordEliminationResult(s, final.id, { scoreA: 5, scoreB: 1 }));
+        app.dispatch({ type: 'record-result', phase: 'elimination', matchRef: final.id, scoreA: 5, scoreB: 1 });
         await flushRender();
         const before = app.getState();
 
@@ -2309,14 +2316,11 @@ describe('initRoboticsApp', () => {
      */
     async function openFinals({ teamCount = 4, singles = false, includeThirdPlace = false } = {}) {
       const app = initRoboticsApp();
-      app.dispatch((s) => {
-        let next = s;
-        NAMES.slice(0, teamCount).forEach((name) => { next = addTeam(next, { name, members: [] }); });
-        const ids = next.teams.map((t) => t.id);
-        const step = singles ? 1 : 2;
-        for (let i = 0; i < ids.length; i += step) next = formPlayoffAlliance(next, ids[i], ids[i + step - 1]);
-        return startFinals(setBracketConfig(next, { includeThirdPlace }), { confirmedShort: true }).state;
-      });
+      dispatchAll(app, NAMES.slice(0, teamCount).map((name) => ({ type: 'add-team', name, members: [] })));
+      const ids = app.getState().teams.map((t) => t.id);
+      const step = singles ? 1 : 2;
+      for (let i = 0; i < ids.length; i += step) dispatchAll(app, [{ type: 'pick', captainId: ids[i], partnerId: ids[i + step - 1] }]);
+      dispatchAll(app, [{ type: 'set-third-place', includeThirdPlace }, { type: 'start-finals', confirmedShort: true }]);
       app.setActiveTab('finals');
       await flushRender();
       return app;
@@ -2366,21 +2370,21 @@ describe('initRoboticsApp', () => {
 
     it('does not auto-scroll on first arriving at the Finals tab after watching Qualification on the Schedule tab', async () => {
       const app = initRoboticsApp();
-      app.dispatch((s) => {
-        let next = s;
-        NAMES.slice(0, 4).forEach((name) => { next = addTeam(next, { name, members: [] }); });
-        return regenerateMatchups(setMatchesPerTeam(next, 1));
-      });
+      dispatchAll(app, [
+        ...NAMES.slice(0, 4).map((name) => ({ type: 'add-team', name, members: [] })),
+        { type: 'set-matches-per-team', matchesPerTeam: 1 },
+        { type: 'regenerate-matchups' },
+      ]);
       app.setActiveTab('schedule');
       await flushRender();
 
       app.setActiveTab('teams');
-      app.dispatch((s) => {
-        let next = s;
-        next.qualification.matches.forEach((_m, i) => { next = recordQualificationResult(next, i, { scoreA: 1, scoreB: 0 }); });
-        next.teams.forEach((t) => { next = formPlayoffAlliance(next, t.id, t.id); });
-        return startFinals(next, { confirmedShort: true }).state;
-      });
+      const { qualification, teams } = app.getState();
+      dispatchAll(app, [
+        ...qualification.matches.map((_m, i) => ({ type: 'record-result', phase: 'qualification', matchRef: i, scoreA: 1, scoreB: 0 })),
+        ...teams.map((t) => ({ type: 'pick', captainId: t.id, partnerId: t.id })),
+        { type: 'start-finals', confirmedShort: true },
+      ]);
       await flushRender();
       const scrollIntoView = vi.fn();
       Element.prototype.scrollIntoView = scrollIntoView;
@@ -2575,7 +2579,7 @@ describe('initRoboticsApp', () => {
 
       it('shows Match Time and Field on the Current and Up Next cards', async () => {
         const app = await openFinals({ teamCount: 8 });
-        app.dispatch((s) => setTimelineConfig(s, { fieldCount: 2 }));
+        app.dispatch({ type: 'set-timeline-config', patch: { fieldCount: 2 } });
         await flushRender();
         expect(root().querySelector('.robotics-now-playing-meta').textContent).toContain('Field 1');
         expect(root().querySelector('.robotics-up-next-meta').textContent).toContain('Field 2');
@@ -2895,8 +2899,8 @@ describe('initRoboticsApp', () => {
       const app = initRoboticsApp();
       let root = document.getElementById('roboticsApp');
       ['Alpha', 'Bravo', 'Charlie', 'Delta'].forEach((name) => addTeamViaForm(root, name));
-      app.dispatch((s) => setMatchesPerTeam(s, 2));
-      app.dispatch((s) => regenerateMatchups(s));
+      app.dispatch({ type: 'set-matches-per-team', matchesPerTeam: 2 });
+      app.dispatch({ type: 'regenerate-matchups' });
       root = document.getElementById('roboticsApp');
 
       clickButtonWithText(root, 'Reset Results');
@@ -2990,10 +2994,10 @@ describe('live status header', () => {
 
   function scheduledApp({ startTime = START } = {}) {
     app = initRoboticsApp();
-    ['Alpha', 'Bravo', 'Charlie', 'Delta'].forEach((name) => app.dispatch((s) => addTeam(s, { name, members: [] })));
-    app.dispatch((s) => setMatchesPerTeam(s, 2));
-    app.dispatch((s) => regenerateMatchups(s));
-    app.dispatch((s) => setTimelineConfig(s, { startTime, matchDurationMin: 5, gapMin: 0, fieldCount: 1 }));
+    ['Alpha', 'Bravo', 'Charlie', 'Delta'].forEach((name) => app.dispatch({ type: 'add-team', name, members: [] }));
+    app.dispatch({ type: 'set-matches-per-team', matchesPerTeam: 2 });
+    app.dispatch({ type: 'regenerate-matchups' });
+    app.dispatch({ type: 'set-timeline-config', patch: { startTime, matchDurationMin: 5, gapMin: 0, fieldCount: 1 } });
     // dispatch()'s DOM rebuild is deferred to a macrotask (see robotics.js); under these fake
     // timers it only runs once a timer-advance lets it, rather than automatically.
     vi.advanceTimersByTime(0);
@@ -3013,7 +3017,7 @@ describe('live status header', () => {
 
   it('shows Qualification phase, match progress and drift once matches are scheduled', () => {
     scheduledApp();
-    app.dispatch((s) => recordQualificationResult(s, 0, { scoreA: 1, scoreB: 0 }));
+    app.dispatch({ type: 'record-result', phase: 'qualification', matchRef: 0, scoreA: 1, scoreB: 0 });
     vi.advanceTimersByTime(0);
     expect(text('.robotics-status-phase')).toBe('Qualification');
     expect(text('.robotics-status-progress')).toBe('Match 2 of 2');
@@ -3023,14 +3027,14 @@ describe('live status header', () => {
 
   it('shows Elimination progress and drift against the Elimination Current Match during the Finals', () => {
     app = initRoboticsApp();
-    app.dispatch((s) => {
-      let next = s;
-      ['Alpha', 'Bravo', 'Charlie', 'Delta'].forEach((name) => { next = addTeam(next, { name, members: [] }); });
-      next.teams.forEach((t) => { next = formPlayoffAlliance(next, t.id, t.id); });
-      next = startFinals(setBracketConfig(next, { includeThirdPlace: false }), { confirmedShort: true }).state;
-      return setTimelineConfig(next, { startTime: START, matchDurationMin: 5, gapMin: 0, fieldCount: 1 });
-    });
-    app.dispatch((s) => recordEliminationResult(s, 'm1', { scoreA: 1, scoreB: 0 }));
+    dispatchAll(app, ['Alpha', 'Bravo', 'Charlie', 'Delta'].map((name) => ({ type: 'add-team', name, members: [] })));
+    dispatchAll(app, [
+      ...app.getState().teams.map((t) => ({ type: 'pick', captainId: t.id, partnerId: t.id })),
+      { type: 'set-third-place', includeThirdPlace: false },
+      { type: 'start-finals', confirmedShort: true },
+      { type: 'set-timeline-config', patch: { startTime: START, matchDurationMin: 5, gapMin: 0, fieldCount: 1 } },
+    ]);
+    app.dispatch({ type: 'record-result', phase: 'elimination', matchRef: 'm1', scoreA: 1, scoreB: 0 });
     vi.advanceTimersByTime(0);
     expect(text('.robotics-status-phase')).toBe('Elimination');
     expect(text('.robotics-status-progress')).toBe('Elimination 2 of 3');
