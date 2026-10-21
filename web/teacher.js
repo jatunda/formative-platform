@@ -8,8 +8,8 @@ import {
   get
 } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js";
 import { db } from './firebase-config.js';
+import { initializeDatabase } from './database-handle.js';
 import {
-  initializeDateUtils,
   getDateForDayIndex as sharedGetDateForDayIndex,
   getTodayDayIndex,
   getClassDateOffset,
@@ -18,14 +18,8 @@ import {
 import { DEFAULT_CLASS_START_DATE } from './constants.js';
 import { showNotification } from './notification-utils.js';
 import {
-  initializeLessonSearch
-} from "./lesson-search.js";
-import {
   createDateOffsetControl
 } from "./ui-components.js";
-import {
-  initializeDatabase
-} from "./database-utils.js";
 import {
   showErrorState
 } from "./error-ui-utils.js";
@@ -41,11 +35,7 @@ import { renderTeacherNav } from "./teacher-nav.js";
 
 // Database is imported from centralized firebase-config.js
 
-// Initialize database utilities
 initializeDatabase(db);
-
-// Initialize date utilities
-initializeDateUtils(db);
 
 // The currently-selected Class and its Date Offset control. Module-level
 // because they're genuinely shared, mutable "current selection" state, not
@@ -390,7 +380,6 @@ export async function initializeTeacherApp() {
 }
 
 export async function main() {
-  initializeLessonSearch(db);
   renderTeacherNav('teacher');
   document.getElementById("classSelect").onchange = loadFullSchedule;
   await initializeTeacherApp();

@@ -5,7 +5,7 @@
 // with `questionSlugIndex/{slug} -> questionId` as the only source of truth
 // for slug lookups. The Slug rules live in slug-index.js. Page records are
 // the Page module's: this module resolves Question Links and hands the
-// results to page-database-utils.js (which callers must also initialize)
+// results to page-database-utils.js
 // rather than reading or writing `pages/*` itself.
 import {
   ref,
@@ -16,6 +16,7 @@ import {
 import { generateUniqueHash } from "./database-utils.js";
 import { createSlugIndex } from "./slug-index.js";
 import { realtimeStore } from "./realtime-store.js";
+import { getDb } from "./database-handle.js";
 import { QUESTION_LINKS, resolveLinkTargets } from "./backlinks.js";
 import { pageRewriteUpdates, recordPageLinks } from "./page-database-utils.js";
 import { extractQuestionLinkSlugs, rewriteQuestionSlugInContent } from "./question-links.js";
@@ -27,20 +28,8 @@ const QUESTION_SLUGS = {
   takenMessage: (slug) => `The Question Link "[[q:${slug}]]" is already in use by another question.`,
 };
 
-let db;
-let slugs;
-
-/**
- * Initialize database reference
- * @param {import("https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js").Database} database
- */
-export function initializeQuestionDatabase(database) {
-  if (!database) {
-    throw new Error("Database instance is required for initialization");
-  }
-  db = database;
-  slugs = createSlugIndex(QUESTION_SLUGS, realtimeStore(db));
-}
+/** This namespace's Slug index, over the shared database handle. */
+const slugs = () => createSlugIndex(QUESTION_SLUGS, realtimeStore(getDb()));
 
 /**
  * Create a new Question with a unique id. Writes a real placeholder field
@@ -52,7 +41,7 @@ export function initializeQuestionDatabase(database) {
  */
 export async function createNewQuestion() {
   const questionId = await generateUniqueHash("questions");
-  await set(ref(db, `questions/${questionId}`), { createdAt: Date.now() });
+  await set(ref(getDb(), `questions/${questionId}`), { createdAt: Date.now() });
   return questionId;
 }
 
@@ -62,7 +51,7 @@ export async function createNewQuestion() {
  * @returns {Promise<{stem: Array, options: Array, classId: string, topic: string} | null>}
  */
 export async function getQuestionFromDB(questionId) {
-  const snap = await get(ref(db, `questions/${questionId}`));
+  const snap = await get(ref(getDb(), `questions/${questionId}`));
   return snap.exists() ? snap.val() : null;
 }
 
@@ -71,7 +60,7 @@ export async function getQuestionFromDB(questionId) {
  * @returns {Promise<Object | null>} Object mapping questionId to question data
  */
 export async function getAllQuestions() {
-  const snap = await get(ref(db, "questions"));
+  const snap = await get(ref(getDb(), "questions"));
   return snap.exists() ? snap.val() : null;
 }
 
@@ -85,7 +74,7 @@ export async function saveQuestion(questionId, parsed) {
   if (!parsed || !Array.isArray(parsed.stem) || !Array.isArray(parsed.options)) {
     throw new Error("Invalid question content: missing stem or options");
   }
-  await set(ref(db, `questions/${questionId}`), parsed);
+  await set(ref(getDb(), `questions/${questionId}`), parsed);
 }
 
 /**
@@ -96,7 +85,7 @@ export async function saveQuestion(questionId, parsed) {
  * @throws {Error} If zero or more than one Class has this name
  */
 export async function resolveClassNameToId(className) {
-  const snap = await get(ref(db, "classes"));
+  const snap = await get(ref(getDb(), "classes"));
   const classes = snap.exists() ? snap.val() : {};
   const trimmedName = (className || "").trim();
   const matches = Object.entries(classes).filter(
@@ -120,7 +109,7 @@ export async function resolveClassNameToId(className) {
  * @returns {Promise<string[]>} Source pageIds
  */
 export async function getQuestionBacklinks(questionId) {
-  const snap = await get(ref(db, `questionBacklinks/${questionId}`));
+  const snap = await get(ref(getDb(), `questionBacklinks/${questionId}`));
   return snap.exists() ? Object.keys(snap.val()) : [];
 }
 
@@ -149,7 +138,7 @@ export async function updateQuestionBacklinksForPage(pageId, parsed) {
  * @returns {Promise<Object>} Object mapping slug to questionId, or {} if none exist
  */
 export async function getAllQuestionSlugs() {
-  return slugs.getAll();
+  return slugs().getAll();
 }
 
 /**
@@ -161,7 +150,7 @@ export async function getAllQuestionSlugs() {
  * @throws {Error} If the slug is malformed or already taken by another question
  */
 export async function assignQuestionSlug(questionId, slug) {
-  await slugs.claim(questionId, slug);
+  await slugs().claim(questionId, slug);
 }
 
 /**
@@ -171,7 +160,7 @@ export async function assignQuestionSlug(questionId, slug) {
  * @returns {Promise<void>}
  */
 export async function removeQuestionSlug(slug) {
-  await slugs.release(slug);
+  await slugs().release(slug);
 }
 
 /**
@@ -186,12 +175,12 @@ export async function removeQuestionSlug(slug) {
  * @throws {Error} If the new slug is malformed or already taken by another question
  */
 export async function renameQuestionSlug(questionId, oldSlug, newSlug) {
-  const slugUpdates = await slugs.renameUpdates(questionId, oldSlug, newSlug);
+  const slugUpdates = await slugs().renameUpdates(questionId, oldSlug, newSlug);
   const pageUpdates = await pageRewriteUpdates(
     await getQuestionBacklinks(questionId),
     (content) => rewriteQuestionSlugInContent(content, oldSlug, newSlug)
   );
-  await update(ref(db), { ...slugUpdates, ...pageUpdates });
+  await update(ref(getDb()), { ...slugUpdates, ...pageUpdates });
 }
 
 /**
@@ -200,7 +189,7 @@ export async function renameQuestionSlug(questionId, oldSlug, newSlug) {
  * @returns {Promise<string | null>}
  */
 export async function resolveQuestionSlugToId(slug) {
-  return slugs.resolve(slug);
+  return slugs().resolve(slug);
 }
 
 /**
@@ -212,9 +201,9 @@ export async function resolveQuestionSlugToId(slug) {
  * @returns {Promise<void>}
  */
 export async function deleteQuestionAndSlugs(questionId) {
-  await update(ref(db), {
+  await update(ref(getDb()), {
     [`questions/${questionId}`]: null,
     [`questionBacklinks/${questionId}`]: null,
-    ...await slugs.releaseAllUpdates(questionId),
+    ...await slugs().releaseAllUpdates(questionId),
   });
 }

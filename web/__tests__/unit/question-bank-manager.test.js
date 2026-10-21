@@ -6,7 +6,6 @@ vi.mock('../../teacher-nav.js', () => ({ renderTeacherNav: vi.fn() }));
 
 const mockGetClasses = vi.fn(async () => ({}));
 vi.mock('../../database-utils.js', () => ({
-  initializeDatabase: vi.fn(),
   getClasses: (...args) => mockGetClasses(...args),
 }));
 
@@ -14,7 +13,6 @@ const mockCreateNewQuestion = vi.fn(async () => 'new-question-id');
 const mockGetAllQuestions = vi.fn(async () => null);
 const mockGetAllQuestionSlugs = vi.fn(async () => ({}));
 vi.mock('../../question-database-utils.js', () => ({
-  initializeQuestionDatabase: vi.fn(),
   createNewQuestion: (...args) => mockCreateNewQuestion(...args),
   getAllQuestions: (...args) => mockGetAllQuestions(...args),
   getAllQuestionSlugs: (...args) => mockGetAllQuestionSlugs(...args),

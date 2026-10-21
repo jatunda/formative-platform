@@ -8,14 +8,14 @@ Source: candidate 4 of the 2026-10-12 architecture review (hidden init coupling)
 
 **Blocked by:** None (can start immediately).
 
-**Status:** ready-for-agent
+**Status:** closed
 
-- [ ] A shared database-handle module holds the database; no database module keeps its own handle or init function
-- [ ] A page needs one initialization call for all database modules
-- [ ] No database module depends on another module having been initialized separately
-- [ ] All pages that use the database (teacher, lesson planning, editor, page editor/manager/view, question bank/editor, practice set editor/manager/view, student view) still load and work
-- [ ] Test setup initializes once through the same path the pages use
-- [ ] `npm run test:coverage` in `web/` passes clean per `CLAUDE.md`
+- [x] A shared database-handle module holds the database; no database module keeps its own handle or init function
+- [x] A page needs one initialization call for all database modules
+- [x] No database module depends on another module having been initialized separately
+- [x] All pages that use the database (teacher, lesson planning, editor, page editor/manager/view, question bank/editor, practice set editor/manager/view, student view) still load and work
+- [x] Test setup initializes once through the same path the pages use
+- [x] `npm run test:coverage` in `web/` passes clean per `CLAUDE.md`
 
 ## Decisions
 

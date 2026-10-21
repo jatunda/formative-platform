@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { getClassesWithTodaySchedule, renderClassList, loadAndRenderClasses, loadWithErrorHandling } from '../../landing.js';
 
 vi.mock('../../date-utils.js', () => ({
-  initializeDateUtils: vi.fn(),
   getTodayDayIndex: vi.fn(async (classId) => ({ csa: 5, csp: 3 })[classId] ?? 0),
   primeDateOffsetCache: vi.fn(),
 }));

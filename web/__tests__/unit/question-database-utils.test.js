@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
-  initializeQuestionDatabase,
   createNewQuestion,
   getQuestionFromDB,
   getAllQuestions,
@@ -14,7 +13,7 @@ import {
   getQuestionBacklinks,
   updateQuestionBacklinksForPage
 } from '../../question-database-utils.js';
-import { initializePageDatabase } from '../../page-database-utils.js';
+import { initializeDatabase } from '../../database-handle.js';
 
 // Mock Firebase - same in-memory path-keyed store pattern as page-database-utils.test.js
 let mockData = {};
@@ -98,14 +97,9 @@ describe('question-database-utils', () => {
       return Promise.resolve();
     });
 
-    // Page records belong to the Page module, which the Question module
-    // reads and writes them through.
-    initializePageDatabase({});
-    initializeQuestionDatabase({});
-  });
-
-  it('refuses to initialize without a database', () => {
-    expect(() => initializeQuestionDatabase(null)).toThrow('Database instance is required');
+    // One initialization covers the Page module too, which the Question
+    // module reads and writes Page records through.
+    initializeDatabase({});
   });
 
   describe('createNewQuestion', () => {

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { initializeDatabase } from '../../database-handle.js';
 import {
-  initializeDatabase,
   getScheduleForDay,
   updateScheduleForDay,
   getFullSchedule,
@@ -89,27 +89,12 @@ describe('database-utils', () => {
       
       return Promise.resolve();
     });
-  });
 
-  describe('initializeDatabase', () => {
-    it('should initialize database successfully', () => {
-      const mockDb = {};
-      expect(() => initializeDatabase(mockDb)).not.toThrow();
-    });
-
-    it('should throw error if database is null', () => {
-      expect(() => initializeDatabase(null)).toThrow('Database instance is required');
-    });
-
-    it('should throw error if database is undefined', () => {
-      expect(() => initializeDatabase(undefined)).toThrow('Database instance is required');
-    });
+    initializeDatabase({});
   });
 
   describe('getScheduleForDay', () => {
     it('should get schedule for a day', async () => {
-      const mockDb = {};
-      initializeDatabase(mockDb);
       mockData.schedule = {
         class1: {
           0: ['hash1', 'hash2'],
@@ -121,25 +106,15 @@ describe('database-utils', () => {
     });
 
     it('should return empty array for day with no schedule', async () => {
-      const mockDb = {};
-      initializeDatabase(mockDb);
       mockData.schedule = { class1: {} };
       
       const schedule = await getScheduleForDay('class1', 0);
       expect(schedule).toEqual([]);
     });
-
-    it('should throw error if database not initialized', () => {
-      // Test that initializeDatabase validates input
-      expect(() => initializeDatabase(null)).toThrow('Database instance is required');
-      expect(() => initializeDatabase(undefined)).toThrow('Database instance is required');
-    });
   });
 
   describe('updateScheduleForDay', () => {
     it('should update schedule for a day', async () => {
-      const mockDb = {};
-      initializeDatabase(mockDb);
       
       await updateScheduleForDay('class1', 0, ['hash1', 'hash2']);
       
@@ -148,17 +123,10 @@ describe('database-utils', () => {
       expect(call[0].path).toContain('schedule/class1/0');
       expect(call[1]).toEqual(['hash1', 'hash2']);
     });
-
-    it('should throw error if database not initialized', async () => {
-      // Test that initializeDatabase validates input
-      expect(() => initializeDatabase(null)).toThrow('Database instance is required');
-    });
   });
 
   describe('getFullSchedule', () => {
     it('should get full schedule for a class', async () => {
-      const mockDb = {};
-      initializeDatabase(mockDb);
       mockData.schedule = {
         class1: {
           0: ['hash1'],
@@ -174,8 +142,6 @@ describe('database-utils', () => {
     });
 
     it('should return empty object if schedule does not exist', async () => {
-      const mockDb = {};
-      initializeDatabase(mockDb);
       mockData.schedule = {};
       
       const schedule = await getFullSchedule('class1');
@@ -185,8 +151,6 @@ describe('database-utils', () => {
 
   describe('getLessonFromDB', () => {
     it('should get lesson from database', async () => {
-      const mockDb = {};
-      initializeDatabase(mockDb);
       mockData.content = {
         hash1: { title: 'Lesson 1', content: 'Some content' },
       };
@@ -196,8 +160,6 @@ describe('database-utils', () => {
     });
 
     it('should return null if lesson does not exist', async () => {
-      const mockDb = {};
-      initializeDatabase(mockDb);
       
       const lesson = await getLessonFromDB('nonexistent');
       expect(lesson).toBeNull();
@@ -206,8 +168,6 @@ describe('database-utils', () => {
 
   describe('getLessonTitleFromDB', () => {
     it('should get lesson title from database', async () => {
-      const mockDb = {};
-      initializeDatabase(mockDb);
       mockData.content = {
         hash1: { title: 'Lesson 1' },
       };
@@ -217,8 +177,6 @@ describe('database-utils', () => {
     });
 
     it('should return UNTITLED_LESSON if lesson does not exist', async () => {
-      const mockDb = {};
-      initializeDatabase(mockDb);
       
       const title = await getLessonTitleFromDB('nonexistent');
       expect(title).toBe(UNTITLED_LESSON);
@@ -227,8 +185,6 @@ describe('database-utils', () => {
 
   describe('generateUniqueHash', () => {
     it('should generate a unique hash', async () => {
-      const mockDb = {};
-      initializeDatabase(mockDb);
       mockData.content = {};
       
       const hash = await generateUniqueHash();
@@ -238,8 +194,6 @@ describe('database-utils', () => {
     });
 
     it('should generate different hashes on subsequent calls', async () => {
-      const mockDb = {};
-      initializeDatabase(mockDb);
       mockData.content = {};
       
       const hash1 = await generateUniqueHash();
@@ -250,8 +204,6 @@ describe('database-utils', () => {
     });
 
     it('should retry if hash collision occurs', async () => {
-      const mockDb = {};
-      initializeDatabase(mockDb);
       
       let callCount = 0;
       mockGet.mockImplementation((ref) => {
@@ -278,8 +230,6 @@ describe('database-utils', () => {
 
   describe('createNewLesson', () => {
     it('should create a new lesson with default title', async () => {
-      const mockDb = {};
-      initializeDatabase(mockDb);
       mockData.content = {};
       
       const hash = await createNewLesson();
@@ -288,8 +238,6 @@ describe('database-utils', () => {
     });
 
     it('should create a new lesson with custom title', async () => {
-      const mockDb = {};
-      initializeDatabase(mockDb);
       mockData.content = {};
       
       const hash = await createNewLesson('Custom Title');
@@ -303,8 +251,6 @@ describe('database-utils', () => {
 
   describe('getClasses', () => {
     it('should get all classes', async () => {
-      const mockDb = {};
-      initializeDatabase(mockDb);
       mockData.classes = {
         class1: { name: 'Class 1' },
         class2: { name: 'Class 2' },
@@ -318,8 +264,6 @@ describe('database-utils', () => {
     });
 
     it('should return null if no classes exist', async () => {
-      const mockDb = {};
-      initializeDatabase(mockDb);
       
       const classes = await getClasses();
       expect(classes).toBeNull();
@@ -328,8 +272,6 @@ describe('database-utils', () => {
 
   describe('getAllContent', () => {
     it('should get all content', async () => {
-      const mockDb = {};
-      initializeDatabase(mockDb);
       mockData.content = {
         hash1: { title: 'Lesson 1' },
         hash2: { title: 'Lesson 2' },
@@ -343,8 +285,6 @@ describe('database-utils', () => {
     });
 
     it('should return null if no content exists', async () => {
-      const mockDb = {};
-      initializeDatabase(mockDb);
       
       const content = await getAllContent();
       expect(content).toBeNull();
@@ -353,8 +293,6 @@ describe('database-utils', () => {
 
   describe('addLessonToSchedule', () => {
     it('should add lesson to schedule', async () => {
-      const mockDb = {};
-      initializeDatabase(mockDb);
       mockData.schedule = {
         class1: {
           0: ['hash1'],
@@ -374,8 +312,6 @@ describe('database-utils', () => {
 
   describe('removeLessonFromSchedule', () => {
     it('should remove lesson from schedule', async () => {
-      const mockDb = {};
-      initializeDatabase(mockDb);
       mockData.schedule = {
         class1: {
           0: ['hash1', 'hash2', 'hash3'],
@@ -396,8 +332,6 @@ describe('database-utils', () => {
 
   describe('moveLessonInSchedule', () => {
     it('should move lesson within same day', async () => {
-      const mockDb = {};
-      initializeDatabase(mockDb);
       mockData.schedule = {
         class1: {
           0: ['hash1', 'hash2', 'hash3'],
@@ -411,8 +345,6 @@ describe('database-utils', () => {
     });
 
     it('should return false if toIndex is out of bounds', async () => {
-      const mockDb = {};
-      initializeDatabase(mockDb);
       mockData.schedule = {
         class1: {
           0: ['hash1', 'hash2'],
@@ -426,8 +358,6 @@ describe('database-utils', () => {
 
   describe('moveLessonBetweenDays', () => {
     it('should move lesson between days', async () => {
-      const mockDb = {};
-      initializeDatabase(mockDb);
       mockData.schedule = {
         class1: {
           0: ['hash1', 'hash2'],
@@ -444,8 +374,6 @@ describe('database-utils', () => {
 
   describe('getClassDateOffset', () => {
     it('should get date offset for class', async () => {
-      const mockDb = {};
-      initializeDatabase(mockDb);
       mockData.classes = {
         class1: { dateOffset: 5 },
       };
@@ -455,8 +383,6 @@ describe('database-utils', () => {
     });
 
     it('should return 0 if offset does not exist', async () => {
-      const mockDb = {};
-      initializeDatabase(mockDb);
       
       const offset = await getClassDateOffset('class1');
       expect(offset).toBe(0);
@@ -465,8 +391,6 @@ describe('database-utils', () => {
 
   describe('setClassDateOffset', () => {
     it('should set date offset for class', async () => {
-      const mockDb = {};
-      initializeDatabase(mockDb);
       
       await setClassDateOffset('class1', 3);
       
@@ -480,8 +404,6 @@ describe('database-utils', () => {
 
   describe('insertDayAt', () => {
     it('should insert an empty day at the index and shift later days up by one', async () => {
-      const mockDb = {};
-      initializeDatabase(mockDb);
       mockData.schedule = {
         class1: {
           0: ['hash1'],
@@ -501,8 +423,6 @@ describe('database-utils', () => {
     });
 
     it('should read the schedule once and issue all shifted writes in parallel, not one round-trip per day', async () => {
-      const mockDb = {};
-      initializeDatabase(mockDb);
       mockData.schedule = {
         class1: {
           0: ['hash1'],
@@ -526,8 +446,6 @@ describe('database-utils', () => {
     });
 
     it('should backfill a gap day (no prior schedule entry) as empty when shifted', async () => {
-      const mockDb = {};
-      initializeDatabase(mockDb);
       mockData.schedule = {
         class1: {
           0: ['hash1'],
@@ -549,8 +467,6 @@ describe('database-utils', () => {
 
   describe('deleteDayAt', () => {
     it('should delete day and shift remaining days', async () => {
-      const mockDb = {};
-      initializeDatabase(mockDb);
       mockData.schedule = {
         class1: {
           0: ['hash1'],

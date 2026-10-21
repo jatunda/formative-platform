@@ -58,7 +58,6 @@ vi.mock('../../question-link-picker.js', () => ({
 
 const mockUpdateQuestionBacklinksForPage = vi.fn();
 vi.mock('../../question-database-utils.js', () => ({
-  initializeQuestionDatabase: vi.fn(),
   updateQuestionBacklinksForPage: (...args) => mockUpdateQuestionBacklinksForPage(...args),
 }));
 
@@ -72,7 +71,6 @@ const mockRenameSlug = vi.fn();
 const mockGetBacklinks = vi.fn(async () => []);
 const mockUpdateBacklinksForPage = vi.fn();
 vi.mock('../../page-database-utils.js', () => ({
-  initializePageDatabase: vi.fn(),
   getPageFromDB: (...args) => mockGetPageFromDB(...args),
   savePage: (...args) => mockSavePage(...args),
   deletePageAndSlugs: (...args) => mockDeletePageAndSlugs(...args),

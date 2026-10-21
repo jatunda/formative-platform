@@ -1,11 +1,10 @@
 import { db } from './firebase-config.js';
+import { initializeDatabase } from './database-handle.js';
 import { renderContent } from './content-renderer.js';
 import {
-  initializePageDatabase,
   resolveSlugToPageId,
   getPageFromDB
 } from './page-database-utils.js';
-import { initializeQuestionDatabase } from './question-database-utils.js';
 import { mountQuestionEmbeds } from './question-embed.js';
 import { PAGE_NOT_FOUND } from './constants.js';
 
@@ -18,8 +17,7 @@ export function getSlugFromPath(pathname) {
 }
 
 export async function initializePage() {
-  initializePageDatabase(db);
-  initializeQuestionDatabase(db);
+  initializeDatabase(db);
 
   const contentEl = document.getElementById('content');
   // The production /p/<slug> path is served by the pageSSR Cloud Function,

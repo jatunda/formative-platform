@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
-  initializePageDatabase,
   createNewPage,
   getPageFromDB,
   getAllPages,
@@ -14,6 +13,7 @@ import {
   getBacklinks,
   updateBacklinksForPage
 } from '../../page-database-utils.js';
+import { initializeDatabase } from '../../database-handle.js';
 
 // Mock Firebase - same in-memory path-keyed store pattern as database-utils.test.js
 let mockData = {};
@@ -97,11 +97,7 @@ describe('page-database-utils', () => {
       return Promise.resolve();
     });
 
-    initializePageDatabase({});
-  });
-
-  it('refuses to initialize without a database', () => {
-    expect(() => initializePageDatabase(null)).toThrow('Database instance is required');
+    initializeDatabase({});
   });
 
   describe('createNewPage', () => {

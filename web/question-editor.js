@@ -4,6 +4,7 @@ import { TeacherAuth } from './teacher-auth.js';
 window.teacherAuth = new TeacherAuth();
 
 import { db } from './firebase-config.js';
+import { initializeDatabase } from './database-handle.js';
 import { parseQuestionDSL, generateQuestionDSLFromParsed } from './question-dsl.js';
 import { validateQuestionDSL, getQuestionErrorExplanation } from './question-dsl-validation.js';
 import { renderContentItems } from './content-renderer.js';
@@ -17,10 +18,8 @@ import {
   updateUnsavedIndicator,
   handleBeforeUnload
 } from './editor.js';
-import { initializeDatabase, getClasses } from './database-utils.js';
-import { initializePageDatabase } from './page-database-utils.js';
+import { getClasses } from './database-utils.js';
 import {
-  initializeQuestionDatabase,
   getQuestionFromDB,
   saveQuestion,
   deleteQuestionAndSlugs,
@@ -184,9 +183,6 @@ async function classIdToName(classId) {
 
 export async function main() {
   initializeDatabase(db);
-  // A Slug Rename rewrites linking Pages through the Page module.
-  initializePageDatabase(db);
-  initializeQuestionDatabase(db);
   renderTeacherNav('questions');
 
   const params = getQueryParams();

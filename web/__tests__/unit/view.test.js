@@ -3,7 +3,6 @@ import { resolveDayIndex, fetchPages, loadContent, initializePage } from '../../
 import { NO_CONTENT_FOR_TODAY } from '../../constants.js';
 
 vi.mock('../../date-utils.js', () => ({
-  initializeDateUtils: vi.fn(),
   getTodayDayIndex: vi.fn(async () => 7),
 }));
 
@@ -42,7 +41,6 @@ vi.mock('../../content-renderer.js', () => ({
 }));
 
 vi.mock('../../question-database-utils.js', () => ({
-  initializeQuestionDatabase: vi.fn(),
 }));
 
 const mockMountQuestionEmbeds = vi.fn();

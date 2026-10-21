@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
-  initializeDateUtils,
   getClassDateOffset,
   setClassDateOffset,
   clearDateOffsetCache,
@@ -24,12 +23,9 @@ const mockSetClassDateOffset = vi.fn((classId, offset) => {
 });
 
 vi.mock('../../database-utils.js', () => ({
-  initializeDatabase: vi.fn(),
   getClassDateOffset: (classId) => mockGetClassDateOffset(classId),
   setClassDateOffset: (classId, offset) => mockSetClassDateOffset(classId, offset),
 }));
-
-const mockDb = { ref: vi.fn() };
 
 describe('date-utils', () => {
   beforeEach(() => {
@@ -39,17 +35,8 @@ describe('date-utils', () => {
     delete dbOffsets.nonexistent;
   });
 
-  describe('initializeDateUtils', () => {
-    it('should initialize with database', () => {
-      initializeDateUtils(mockDb);
-      // Just verify it doesn't throw
-      expect(true).toBe(true);
-    });
-  });
-
   describe('getClassDateOffset', () => {
     it('should return cached offset if available', async () => {
-      initializeDateUtils(mockDb);
       // First call should fetch from database
       const offset1 = await getClassDateOffset('testClass');
       // Second call should use cache
@@ -57,18 +44,7 @@ describe('date-utils', () => {
       expect(offset1).toBe(offset2);
     });
 
-    it('should return 0 if database not initialized', async () => {
-      // This test verifies the fallback behavior when db is null
-      // The actual implementation returns 0 when db is not initialized
-      // We test this by not calling initializeDateUtils
-      clearDateOffsetCache();
-      // Since we haven't initialized, db will be undefined and should return 0
-      const offset = await getClassDateOffset('nonexistent');
-      expect(offset).toBe(0);
-    });
-
     it('should return 0 and swallow the error if the underlying read fails', async () => {
-      initializeDateUtils(mockDb);
       mockGetClassDateOffset.mockRejectedValueOnce(new Error('boom'));
       const offset = await getClassDateOffset('testClass');
       expect(offset).toBe(0);
@@ -77,7 +53,6 @@ describe('date-utils', () => {
 
   describe('setClassDateOffset', () => {
     it('should write through database-utils and update the cache in place, with no refetch', async () => {
-      initializeDateUtils(mockDb);
       await getClassDateOffset('testClass'); // prime the cache at 2
       mockGetClassDateOffset.mockClear();
 
@@ -90,7 +65,6 @@ describe('date-utils', () => {
     });
 
     it('should propagate a write failure instead of swallowing it', async () => {
-      initializeDateUtils(mockDb);
       mockSetClassDateOffset.mockRejectedValueOnce(new Error('write failed'));
       await expect(setClassDateOffset('testClass', 5)).rejects.toThrow('write failed');
     });
@@ -98,7 +72,6 @@ describe('date-utils', () => {
 
   describe('clearDateOffsetCache', () => {
     it('should clear cache for specific class', async () => {
-      initializeDateUtils(mockDb);
       await getClassDateOffset('testClass');
       clearDateOffsetCache('testClass');
       // Cache should be cleared, will fetch again
@@ -107,7 +80,6 @@ describe('date-utils', () => {
     });
 
     it('should clear all cache when no classId provided', async () => {
-      initializeDateUtils(mockDb);
       await getClassDateOffset('testClass1');
       await getClassDateOffset('testClass2');
       clearDateOffsetCache();
@@ -118,7 +90,6 @@ describe('date-utils', () => {
 
   describe('primeDateOffsetCache', () => {
     it('seeds the cache from a classes payload, avoiding a Firebase read on the next getClassDateOffset call', async () => {
-      initializeDateUtils(mockDb);
       primeDateOffsetCache({ classA: { dateOffset: 3 }, classB: { dateOffset: -1 } });
 
       expect(await getClassDateOffset('classA')).toBe(3);
@@ -127,7 +98,6 @@ describe('date-utils', () => {
     });
 
     it('defaults a missing dateOffset field to 0', async () => {
-      initializeDateUtils(mockDb);
       primeDateOffsetCache({ classA: {} });
 
       expect(await getClassDateOffset('classA')).toBe(0);
@@ -135,7 +105,6 @@ describe('date-utils', () => {
     });
 
     it('does not overwrite a value already cached', async () => {
-      initializeDateUtils(mockDb);
       await getClassDateOffset('testClass'); // caches the real value, 2
 
       primeDateOffsetCache({ testClass: { dateOffset: 999 } });
@@ -151,14 +120,12 @@ describe('date-utils', () => {
 
   describe('getTodayDayIndex', () => {
     it('should calculate day index for today', async () => {
-      initializeDateUtils(mockDb);
       const dayIndex = await getTodayDayIndex('testClass', '2024-01-01');
       expect(typeof dayIndex).toBe('number');
       expect(dayIndex).toBeGreaterThanOrEqual(0);
     });
 
     it('should apply date offset', async () => {
-      initializeDateUtils(mockDb);
       // Mock offset of 2
       const dayIndex = await getTodayDayIndex('testClass', DEFAULT_CLASS_START_DATE);
       expect(typeof dayIndex).toBe('number');
@@ -167,13 +134,11 @@ describe('date-utils', () => {
 
   describe('getDateForDayIndex', () => {
     it('should return formatted date string with weekday', async () => {
-      initializeDateUtils(mockDb);
       const dateStr = await getDateForDayIndex(0, 'testClass', '2024-01-01');
       expect(dateStr).toMatch(/\d+\/\d+\/\d+ \(.+day\)/);
     });
 
     it('should apply date offset', async () => {
-      initializeDateUtils(mockDb);
       const dateStr = await getDateForDayIndex(5, 'testClass', '2024-01-01');
       expect(dateStr).toBeDefined();
     });
@@ -181,13 +146,11 @@ describe('date-utils', () => {
 
   describe('getDateObjectForDayIndex', () => {
     it('should return Date object', async () => {
-      initializeDateUtils(mockDb);
       const date = await getDateObjectForDayIndex(0, 'testClass', '2024-01-01');
       expect(date).toBeInstanceOf(Date);
     });
 
     it('should skip weekends when calculating business days', async () => {
-      initializeDateUtils(mockDb);
       // Start on Monday, add 5 business days should skip weekend
       const date = await getDateObjectForDayIndex(5, 'testClass', '2024-01-01');
       expect(date).toBeInstanceOf(Date);
@@ -196,13 +159,11 @@ describe('date-utils', () => {
 
   describe('isDayIndexToday', () => {
     it('should return boolean', async () => {
-      initializeDateUtils(mockDb);
       const result = await isDayIndexToday(0, 'testClass', '2024-01-01');
       expect(typeof result).toBe('boolean');
     });
 
     it('should check if day index matches today', async () => {
-      initializeDateUtils(mockDb);
       const todayIndex = await getTodayDayIndex('testClass', DEFAULT_CLASS_START_DATE);
       const isToday = await isDayIndexToday(todayIndex, 'testClass', DEFAULT_CLASS_START_DATE);
       // This will depend on actual date, so just check it's a boolean
@@ -212,7 +173,6 @@ describe('date-utils', () => {
 
   describe('business day calculations', () => {
     it('should handle start date on different weekdays', async () => {
-      initializeDateUtils(mockDb);
       // Test with Monday start
       const mondayDate = await getDateForDayIndex(0, 'testClass', '2024-01-01');
       expect(mondayDate).toBeDefined();
@@ -223,7 +183,6 @@ describe('date-utils', () => {
     });
 
     it('should skip weekends in calculations', async () => {
-      initializeDateUtils(mockDb);
       // Test that adding business days skips weekends
       // The offset from mock is 2, so:
       // Day 4 + offset 2 = 6 business days from start

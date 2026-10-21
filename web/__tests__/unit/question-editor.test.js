@@ -47,7 +47,6 @@ vi.mock('../../question-dsl-cheat-sheet.js', () => ({
 
 const mockGetClasses = vi.fn(async () => ({ c1: { name: 'AP CS A' } }));
 vi.mock('../../database-utils.js', () => ({
-  initializeDatabase: vi.fn(),
   getClasses: (...args) => mockGetClasses(...args),
 }));
 
@@ -61,7 +60,6 @@ const mockRemoveQuestionSlug = vi.fn();
 const mockRenameQuestionSlug = vi.fn();
 const mockGetQuestionBacklinks = vi.fn(async () => []);
 vi.mock('../../question-database-utils.js', () => ({
-  initializeQuestionDatabase: vi.fn(),
   getQuestionFromDB: (...args) => mockGetQuestionFromDB(...args),
   saveQuestion: (...args) => mockSaveQuestion(...args),
   deleteQuestionAndSlugs: (...args) => mockDeleteQuestionAndSlugs(...args),

@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
-  initializePracticeSetDatabase,
   createNewPracticeSet,
   getPracticeSetFromDB,
   getAllPracticeSets,
@@ -11,6 +10,7 @@ import {
   resolvePracticeSetSlugToId,
   deletePracticeSetAndSlugs
 } from '../../practice-set-database-utils.js';
+import { initializeDatabase } from '../../database-handle.js';
 
 let mockData = {};
 let mockGet = vi.fn();
@@ -93,7 +93,7 @@ describe('practice-set-database-utils', () => {
       return Promise.resolve();
     });
 
-    initializePracticeSetDatabase({});
+    initializeDatabase({});
   });
 
   describe('createNewPracticeSet', () => {

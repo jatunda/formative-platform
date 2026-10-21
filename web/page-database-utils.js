@@ -18,6 +18,7 @@ import { extractPageLinkSlugs, rewriteSlugInContent } from "./page-links.js";
 import { questionBacklinkRemovals } from "./question-backlinks.js";
 import { createSlugIndex } from "./slug-index.js";
 import { realtimeStore } from "./realtime-store.js";
+import { getDb } from "./database-handle.js";
 import { PAGE_LINKS, diffBacklinks, resolveLinkTargets } from "./backlinks.js";
 
 /** @type {import("./slug-index.js").SlugNamespace} */
@@ -27,20 +28,8 @@ const PAGE_SLUGS = {
   takenMessage: (slug) => `The URL "/p/${slug}" is already in use by another page.`,
 };
 
-let db;
-let slugs;
-
-/**
- * Initialize database reference
- * @param {import("https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js").Database} database
- */
-export function initializePageDatabase(database) {
-  if (!database) {
-    throw new Error("Database instance is required for initialization");
-  }
-  db = database;
-  slugs = createSlugIndex(PAGE_SLUGS, realtimeStore(db));
-}
+/** This namespace's Slug index, over the shared database handle. */
+const slugs = () => createSlugIndex(PAGE_SLUGS, realtimeStore(getDb()));
 
 /**
  * Create a new Page with a unique id
@@ -49,7 +38,7 @@ export function initializePageDatabase(database) {
  */
 export async function createNewPage(title = DEFAULT_PAGE_TITLE) {
   const pageId = await generateUniqueHash("pages");
-  await set(ref(db, `pages/${pageId}`), { title });
+  await set(ref(getDb(), `pages/${pageId}`), { title });
   return pageId;
 }
 
@@ -59,7 +48,7 @@ export async function createNewPage(title = DEFAULT_PAGE_TITLE) {
  * @returns {Promise<{title: string, blocks: Array} | null>}
  */
 export async function getPageFromDB(pageId) {
-  const snap = await get(ref(db, `pages/${pageId}`));
+  const snap = await get(ref(getDb(), `pages/${pageId}`));
   return snap.exists() ? snap.val() : null;
 }
 
@@ -68,7 +57,7 @@ export async function getPageFromDB(pageId) {
  * @returns {Promise<Object | null>} Object mapping pageId to page data
  */
 export async function getAllPages() {
-  const snap = await get(ref(db, "pages"));
+  const snap = await get(ref(getDb(), "pages"));
   return snap.exists() ? snap.val() : null;
 }
 
@@ -82,7 +71,7 @@ export async function savePage(pageId, parsed) {
   if (!parsed || !parsed.title || !parsed.blocks) {
     throw new Error("Invalid page content: missing title or blocks");
   }
-  await set(ref(db, `pages/${pageId}`), parsed);
+  await set(ref(getDb(), `pages/${pageId}`), parsed);
 }
 
 /**
@@ -93,7 +82,7 @@ export async function savePage(pageId, parsed) {
  * @returns {Promise<string[]>} Source pageIds
  */
 export async function getBacklinks(pageId) {
-  const snap = await get(ref(db, `backlinks/${pageId}`));
+  const snap = await get(ref(getDb(), `backlinks/${pageId}`));
   return snap.exists() ? Object.keys(snap.val()) : [];
 }
 
@@ -127,7 +116,7 @@ export async function updateBacklinksForPage(pageId, parsed) {
  * @returns {Promise<void>}
  */
 export async function recordPageLinks(pageId, kind, targetIds) {
-  const snap = await get(ref(db, `pages/${pageId}/${kind.linksToField}`));
+  const snap = await get(ref(getDb(), `pages/${pageId}/${kind.linksToField}`));
   const previousTargets = snap.exists() ? snap.val() : [];
   const { updates, linksChanged } = diffBacklinks(kind, pageId, previousTargets, targetIds);
   /** @type {Record<string, unknown>} */
@@ -136,7 +125,7 @@ export async function recordPageLinks(pageId, kind, targetIds) {
     allUpdates[`pages/${pageId}/${kind.linksToField}`] = targetIds.length > 0 ? targetIds : null;
   }
   if (Object.keys(allUpdates).length > 0) {
-    await update(ref(db), allUpdates);
+    await update(ref(getDb()), allUpdates);
   }
 }
 
@@ -168,7 +157,7 @@ export async function pageRewriteUpdates(pageIds, rewrite) {
  * @returns {Promise<Object>} Object mapping slug to pageId, or {} if none exist
  */
 export async function getAllSlugs() {
-  return slugs.getAll();
+  return slugs().getAll();
 }
 
 /**
@@ -181,7 +170,7 @@ export async function getAllSlugs() {
  * @throws {Error} If the slug is malformed or already taken by another page
  */
 export async function assignSlug(pageId, slug) {
-  await slugs.claim(pageId, slug);
+  await slugs().claim(pageId, slug);
 }
 
 /**
@@ -190,7 +179,7 @@ export async function assignSlug(pageId, slug) {
  * @returns {Promise<void>}
  */
 export async function removeSlug(slug) {
-  await slugs.release(slug);
+  await slugs().release(slug);
 }
 
 /**
@@ -210,12 +199,12 @@ export async function removeSlug(slug) {
  * @throws {Error} If the new slug is malformed or already taken by another page
  */
 export async function renameSlug(pageId, oldSlug, newSlug) {
-  const slugUpdates = await slugs.renameUpdates(pageId, oldSlug, newSlug);
+  const slugUpdates = await slugs().renameUpdates(pageId, oldSlug, newSlug);
   const pageUpdates = await pageRewriteUpdates(
     await getBacklinks(pageId),
     (content) => rewriteSlugInContent(content, oldSlug, newSlug)
   );
-  await update(ref(db), { ...slugUpdates, ...pageUpdates });
+  await update(ref(getDb()), { ...slugUpdates, ...pageUpdates });
 }
 
 /**
@@ -224,7 +213,7 @@ export async function renameSlug(pageId, oldSlug, newSlug) {
  * @returns {Promise<string | null>}
  */
 export async function resolveSlugToPageId(slug) {
-  return slugs.resolve(slug);
+  return slugs().resolve(slug);
 }
 
 /**
@@ -240,9 +229,9 @@ export async function resolveSlugToPageId(slug) {
  */
 export async function deletePageAndSlugs(pageId) {
   const [slugRemovals, linksToSnap, questionBacklinksSnap] = await Promise.all([
-    slugs.releaseAllUpdates(pageId),
-    get(ref(db, `pages/${pageId}/linksTo`)),
-    get(ref(db, "questionBacklinks")),
+    slugs().releaseAllUpdates(pageId),
+    get(ref(getDb(), `pages/${pageId}/linksTo`)),
+    get(ref(getDb(), "questionBacklinks")),
   ]);
   const updates = {
     [`pages/${pageId}`]: null,
@@ -260,5 +249,5 @@ export async function deletePageAndSlugs(pageId) {
   for (const targetId of linksTo) {
     updates[`backlinks/${targetId}/${pageId}`] = null;
   }
-  await update(ref(db), updates);
+  await update(ref(getDb()), updates);
 }

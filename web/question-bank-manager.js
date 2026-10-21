@@ -4,10 +4,10 @@ import { TeacherAuth } from './teacher-auth.js';
 window.teacherAuth = new TeacherAuth();
 
 import { db } from './firebase-config.js';
+import { initializeDatabase } from './database-handle.js';
 import { renderTeacherNav } from './teacher-nav.js';
-import { initializeDatabase, getClasses } from './database-utils.js';
+import { getClasses } from './database-utils.js';
 import {
-  initializeQuestionDatabase,
   createNewQuestion,
   getAllQuestions,
   getAllQuestionSlugs
@@ -95,7 +95,6 @@ async function renderQuestionList(listEl, classes, { classId, topic }) {
 
 export async function main() {
   initializeDatabase(db);
-  initializeQuestionDatabase(db);
   renderTeacherNav('questions');
 
   const listEl = document.getElementById('questionList');

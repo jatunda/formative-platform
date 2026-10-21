@@ -2,14 +2,12 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { main } from '../../page-manager.js';
 
 vi.mock('../../firebase-config.js', () => ({ db: {} }));
-vi.mock('../../database-utils.js', () => ({ initializeDatabase: vi.fn() }));
 vi.mock('../../teacher-nav.js', () => ({ renderTeacherNav: vi.fn() }));
 
 const mockCreateNewPage = vi.fn(async () => 'new-page-id');
 const mockGetAllPages = vi.fn(async () => null);
 const mockGetAllSlugs = vi.fn(async () => ({}));
 vi.mock('../../page-database-utils.js', () => ({
-  initializePageDatabase: vi.fn(),
   createNewPage: (...args) => mockCreateNewPage(...args),
   getAllPages: (...args) => mockGetAllPages(...args),
   getAllSlugs: (...args) => mockGetAllSlugs(...args),

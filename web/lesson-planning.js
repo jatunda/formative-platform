@@ -8,18 +8,16 @@ import {
   get
 } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js";
 import { db } from './firebase-config.js';
+import { initializeDatabase } from './database-handle.js';
 import {
-  initializeDateUtils,
   getDateForDayIndex,
   getTodayDayIndex,
   getClassDateOffset,
   setClassDateOffset
 } from './date-utils.js';
 import { showNotification } from './notification-utils.js';
-import { initializeLessonSearch } from './lesson-search.js';
 import { createDateOffsetControl, withWorkingIndicator } from './ui-components.js';
 import {
-  initializeDatabase,
   getFullSchedule
 } from './database-utils.js';
 import { showErrorState } from './error-ui-utils.js';
@@ -36,11 +34,7 @@ import { renderTeacherNav } from './teacher-nav.js';
 // Window (today, +1, +2, ...). Change this single constant to widen it later.
 const PLANNING_WINDOW_SIZE = 3;
 
-// Initialize database utilities
 initializeDatabase(db);
-
-// Initialize date utilities
-initializeDateUtils(db);
 
 // Check authentication before proceeding. Only run automatically when
 // actually loaded on lesson-planning.html - importing this module elsewhere
@@ -60,7 +54,6 @@ if (document.getElementById('classPanesContainer')) {
 }
 
 async function main() {
-  initializeLessonSearch(db);
   renderTeacherNav('lesson-planning');
   initializeBulkShiftControl();
   await loadAndRenderAllPanes();

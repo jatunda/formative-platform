@@ -11,6 +11,7 @@ import {
 	child
 } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js";
 import { db } from './firebase-config.js';
+import { initializeDatabase } from './database-handle.js';
 import {
 	parseDSL,
 	generateDSLFromContent
@@ -20,7 +21,6 @@ import {
 	getErrorExplanation
 } from "./dsl-validation.js";
 import {
-	initializeLessonSearch,
 	showLessonSearchPopup
 } from "./lesson-search.js";
 import {
@@ -30,12 +30,10 @@ import {
 	AIQuestionGenerator
 } from "./ai-generator.js";
 import {
-	initializeDatabase,
 	generateUniqueHash
 } from "./database-utils.js";
 import { renderTeacherNav } from "./teacher-nav.js";
 import { createDslCheatSheetPanel } from "./dsl-cheat-sheet.js";
-import { initializeQuestionDatabase } from "./question-database-utils.js";
 import { mountQuestionEmbeds } from "./question-embed.js";
 import { showQuestionLinkPicker } from "./question-link-picker.js";
 
@@ -428,12 +426,7 @@ export async function handleExistingPageContext(params, contentIdEl, dslInputEl,
 }
 
 export async function main() {
-  // Initialize database utilities
   initializeDatabase(db);
-  initializeQuestionDatabase(db);
-
-  // Initialize the lesson search module with database reference
-  initializeLessonSearch(db);
 
   renderTeacherNav('editor');
 
@@ -499,7 +492,7 @@ export async function main() {
   // reaching for it lazily
   try {
     validateConfig();
-    new AIQuestionGenerator(db, AI_CONFIG.ANTHROPIC_API_KEY, setEditingEnabled);
+    new AIQuestionGenerator(AI_CONFIG.ANTHROPIC_API_KEY, setEditingEnabled);
   } catch (error) {
     console.warn('AI Generator not available:', error.message);
     // Disable the AI button if configuration is missing

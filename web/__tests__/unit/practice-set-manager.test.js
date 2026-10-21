@@ -8,7 +8,6 @@ const mockCreateNewPracticeSet = vi.fn(async () => 'new-practice-set-id');
 const mockGetAllPracticeSets = vi.fn(async () => null);
 const mockGetAllPracticeSetSlugs = vi.fn(async () => ({}));
 vi.mock('../../practice-set-database-utils.js', () => ({
-  initializePracticeSetDatabase: vi.fn(),
   createNewPracticeSet: (...args) => mockCreateNewPracticeSet(...args),
   getAllPracticeSets: (...args) => mockGetAllPracticeSets(...args),
   getAllPracticeSetSlugs: (...args) => mockGetAllPracticeSetSlugs(...args),

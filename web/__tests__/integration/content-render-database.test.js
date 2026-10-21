@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { parseDSL } from '../../dsl.js';
 import { renderContent, renderMultipleContent } from '../../content-renderer.js';
+import { initializeDatabase } from '../../database-handle.js';
 import {
-  initializeDatabase,
   getLessonFromDB,
   getScheduleForDay,
 } from '../../database-utils.js';

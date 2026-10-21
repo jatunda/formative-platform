@@ -7,11 +7,10 @@
 // - Results sorted by relevance score
 import { ref, get } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js";
 import { UNTITLED_LESSON } from './constants.js';
+import { getDb } from './database-handle.js';
 
 // Cache for page titles to avoid redundant queries
 const pageTitles = {}; // id → title
-
-let db; // Database reference
 
 /**
  * Calculate fuzzy search score between text and query
@@ -82,14 +81,6 @@ function fuzzyScore(text, query) {
 }
 
 /**
- * Initialize the lesson search module with a database reference
- * @param {import("https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js").Database} database - The Firebase database instance
- */
-export function initializeLessonSearch(database) {
-  db = database;
-}
-
-/**
  * Create and show the lesson search popup with fuzzy search functionality
  * Features fuzzy search, visual match quality indicators, and sorted results
  * @param {Object} options - Options object
@@ -97,13 +88,8 @@ export function initializeLessonSearch(database) {
  */
 export function showLessonSearchPopup({ onSelect }) {
   (async () => {
-    if (!db) {
-      console.error("Database not initialized in lesson search module");
-      alert("Database error. Please try again.");
-      return;
-    }
-
     try {
+      const db = getDb();
       // OPTIMIZATION: First get shallow list of IDs to minimize data transfer
       const shallowSnap = await get(ref(db, "content"));
       if (!shallowSnap.exists()) {

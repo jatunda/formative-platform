@@ -1,10 +1,8 @@
 import { ref, get } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js";
 import { AI_CONFIG } from "./ai-config.js";
 import { parseDSL } from "./dsl.js";
-import {
-	initializeDatabase,
-	generateUniqueHash
-} from "./database-utils.js";
+import { generateUniqueHash } from "./database-utils.js";
+import { getDb } from "./database-handle.js";
 
 // Prompt Profile per Class (hard-coded for MVP) - see CONTEXT.md. Distinct
 // from the Class record in Firebase; a Class without an entry here falls
@@ -477,15 +475,11 @@ class ClaudeProvider {
 export class AIQuestionGenerator {
   /**
    * Create an AI Question Generator instance
-   * @param {import("https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js").Database} database - The Firebase database instance
    * @param {string} apiKey - The Anthropic API key
    * @param {(enabled: boolean) => void} enableEditing - Called to enable/disable the host page's editor once questions are generated
    * @param {{generateQuestions: (prompt: string) => Promise<string>}} [llmProvider] - The LLM provider to use; defaults to Claude
    */
-  constructor(database, apiKey, enableEditing, llmProvider = new ClaudeProvider(apiKey)) {
-    this.db = database;
-    // Initialize database utilities with the database instance
-    initializeDatabase(database);
+  constructor(apiKey, enableEditing, llmProvider = new ClaudeProvider(apiKey)) {
     this.llmProvider = llmProvider;
     this.enableEditing = enableEditing;
     this.modal = null;
@@ -538,7 +532,7 @@ export class AIQuestionGenerator {
    */
   async loadClasses() {
     try {
-      const snapshot = await get(ref(this.db, 'classes'));
+      const snapshot = await get(ref(getDb(), 'classes'));
       const classes = snapshot.val();
       
       if (!classes) {

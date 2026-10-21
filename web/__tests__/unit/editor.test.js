@@ -52,7 +52,6 @@ vi.mock('../../dsl-validation.js', () => ({
 }));
 
 vi.mock('../../lesson-search.js', () => ({
-  initializeLessonSearch: vi.fn(),
   showLessonSearchPopup: vi.fn(),
 }));
 
@@ -67,7 +66,6 @@ vi.mock('../../ai-generator.js', () => ({
 
 const mockGenerateUniqueHash = vi.fn(async () => 'newhash123');
 vi.mock('../../database-utils.js', () => ({
-  initializeDatabase: vi.fn(),
   generateUniqueHash: (...args) => mockGenerateUniqueHash(...args),
 }));
 
@@ -85,7 +83,6 @@ vi.mock('../../notification-utils.js', () => ({
 }));
 
 vi.mock('../../question-database-utils.js', () => ({
-  initializeQuestionDatabase: vi.fn(),
 }));
 
 const mockMountQuestionEmbeds = vi.fn();

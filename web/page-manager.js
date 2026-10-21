@@ -4,10 +4,9 @@ import { TeacherAuth } from './teacher-auth.js';
 window.teacherAuth = new TeacherAuth();
 
 import { db } from './firebase-config.js';
+import { initializeDatabase } from './database-handle.js';
 import { renderTeacherNav } from './teacher-nav.js';
-import { initializeDatabase } from './database-utils.js';
 import {
-  initializePageDatabase,
   createNewPage,
   getAllPages,
   getAllSlugs
@@ -84,7 +83,6 @@ async function renderPageList(listEl) {
 
 export async function main() {
   initializeDatabase(db);
-  initializePageDatabase(db);
   renderTeacherNav('pages');
 
   const listEl = document.getElementById('pageList');

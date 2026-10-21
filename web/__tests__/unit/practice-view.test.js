@@ -11,14 +11,12 @@ vi.mock('https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js', () => 
 const mockResolvePracticeSetSlugToId = vi.fn();
 const mockGetPracticeSetFromDB = vi.fn();
 vi.mock('../../practice-set-database-utils.js', () => ({
-  initializePracticeSetDatabase: vi.fn(),
   resolvePracticeSetSlugToId: (...args) => mockResolvePracticeSetSlugToId(...args),
   getPracticeSetFromDB: (...args) => mockGetPracticeSetFromDB(...args),
 }));
 
 const mockGetQuestionFromDB = vi.fn();
 vi.mock('../../question-database-utils.js', () => ({
-  initializeQuestionDatabase: vi.fn(),
   getQuestionFromDB: (...args) => mockGetQuestionFromDB(...args),
 }));
 

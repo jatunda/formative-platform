@@ -4,6 +4,7 @@ import { TeacherAuth } from './teacher-auth.js';
 window.teacherAuth = new TeacherAuth();
 
 import { db } from './firebase-config.js';
+import { initializeDatabase } from './database-handle.js';
 import { parseDSL, generateDSLFromContent } from './dsl.js';
 import { renderTeacherNav } from './teacher-nav.js';
 import { showNotification } from './notification-utils.js';
@@ -21,7 +22,6 @@ import {
   handleBeforeUnload
 } from './editor.js';
 import {
-  initializePageDatabase,
   getPageFromDB,
   savePage,
   deletePageAndSlugs,
@@ -33,7 +33,6 @@ import {
   updateBacklinksForPage
 } from './page-database-utils.js';
 import {
-  initializeQuestionDatabase,
   updateQuestionBacklinksForPage
 } from './question-database-utils.js';
 import { DEFAULT_PAGE_TITLE } from './constants.js';
@@ -111,8 +110,7 @@ async function refreshSlugList(pageId, slugListEl) {
 }
 
 export async function main() {
-  initializePageDatabase(db);
-  initializeQuestionDatabase(db);
+  initializeDatabase(db);
   renderTeacherNav('pages');
 
   const params = getQueryParams();

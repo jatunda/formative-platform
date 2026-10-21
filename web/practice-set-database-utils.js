@@ -17,6 +17,7 @@ import {
 import { generateUniqueHash } from "./database-utils.js";
 import { createSlugIndex } from "./slug-index.js";
 import { realtimeStore } from "./realtime-store.js";
+import { getDb } from "./database-handle.js";
 import { DEFAULT_PRACTICE_SET_TITLE } from "./constants.js";
 
 /** @type {import("./slug-index.js").SlugNamespace} */
@@ -26,20 +27,8 @@ const PRACTICE_SET_SLUGS = {
   takenMessage: (slug) => `The URL "/practice/${slug}" is already in use by another practice set.`,
 };
 
-let db;
-let slugs;
-
-/**
- * Initialize database reference
- * @param {import("https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js").Database} database
- */
-export function initializePracticeSetDatabase(database) {
-  if (!database) {
-    throw new Error("Database instance is required for initialization");
-  }
-  db = database;
-  slugs = createSlugIndex(PRACTICE_SET_SLUGS, realtimeStore(db));
-}
+/** This namespace's Slug index, over the shared database handle. */
+const slugs = () => createSlugIndex(PRACTICE_SET_SLUGS, realtimeStore(getDb()));
 
 /**
  * Create a new Practice Set with a unique id
@@ -48,7 +37,7 @@ export function initializePracticeSetDatabase(database) {
  */
 export async function createNewPracticeSet(title = DEFAULT_PRACTICE_SET_TITLE) {
   const practiceSetId = await generateUniqueHash("practiceSets");
-  await set(ref(db, `practiceSets/${practiceSetId}`), { title });
+  await set(ref(getDb(), `practiceSets/${practiceSetId}`), { title });
   return practiceSetId;
 }
 
@@ -58,7 +47,7 @@ export async function createNewPracticeSet(title = DEFAULT_PRACTICE_SET_TITLE) {
  * @returns {Promise<{title: string, questionIds: string[]} | null>}
  */
 export async function getPracticeSetFromDB(practiceSetId) {
-  const snap = await get(ref(db, `practiceSets/${practiceSetId}`));
+  const snap = await get(ref(getDb(), `practiceSets/${practiceSetId}`));
   return snap.exists() ? snap.val() : null;
 }
 
@@ -67,7 +56,7 @@ export async function getPracticeSetFromDB(practiceSetId) {
  * @returns {Promise<Object | null>} Object mapping practiceSetId to practice set data
  */
 export async function getAllPracticeSets() {
-  const snap = await get(ref(db, "practiceSets"));
+  const snap = await get(ref(getDb(), "practiceSets"));
   return snap.exists() ? snap.val() : null;
 }
 
@@ -81,7 +70,7 @@ export async function savePracticeSet(practiceSetId, practiceSet) {
   if (!practiceSet || !practiceSet.title || !Array.isArray(practiceSet.questionIds)) {
     throw new Error("Invalid practice set: missing title or questionIds");
   }
-  await set(ref(db, `practiceSets/${practiceSetId}`), practiceSet);
+  await set(ref(getDb(), `practiceSets/${practiceSetId}`), practiceSet);
 }
 
 /**
@@ -89,7 +78,7 @@ export async function savePracticeSet(practiceSetId, practiceSet) {
  * @returns {Promise<Object>} Object mapping slug to practiceSetId, or {} if none exist
  */
 export async function getAllPracticeSetSlugs() {
-  return slugs.getAll();
+  return slugs().getAll();
 }
 
 /**
@@ -101,7 +90,7 @@ export async function getAllPracticeSetSlugs() {
  * @throws {Error} If the slug is malformed or already taken by another practice set
  */
 export async function assignPracticeSetSlug(practiceSetId, slug) {
-  await slugs.claim(practiceSetId, slug);
+  await slugs().claim(practiceSetId, slug);
 }
 
 /**
@@ -111,7 +100,7 @@ export async function assignPracticeSetSlug(practiceSetId, slug) {
  * @returns {Promise<void>}
  */
 export async function removePracticeSetSlug(slug) {
-  await slugs.release(slug);
+  await slugs().release(slug);
 }
 
 /**
@@ -126,7 +115,7 @@ export async function removePracticeSetSlug(slug) {
  * @throws {Error} If the new slug is malformed or already taken by another practice set
  */
 export async function renamePracticeSetSlug(practiceSetId, oldSlug, newSlug) {
-  await slugs.rename(practiceSetId, oldSlug, newSlug);
+  await slugs().rename(practiceSetId, oldSlug, newSlug);
 }
 
 /**
@@ -135,7 +124,7 @@ export async function renamePracticeSetSlug(practiceSetId, oldSlug, newSlug) {
  * @returns {Promise<string | null>}
  */
 export async function resolvePracticeSetSlugToId(slug) {
-  return slugs.resolve(slug);
+  return slugs().resolve(slug);
 }
 
 /**
@@ -144,8 +133,8 @@ export async function resolvePracticeSetSlugToId(slug) {
  * @returns {Promise<void>}
  */
 export async function deletePracticeSetAndSlugs(practiceSetId) {
-  await update(ref(db), {
+  await update(ref(getDb()), {
     [`practiceSets/${practiceSetId}`]: null,
-    ...(await slugs.releaseAllUpdates(practiceSetId)),
+    ...(await slugs().releaseAllUpdates(practiceSetId)),
   });
 }

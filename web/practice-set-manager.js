@@ -4,10 +4,9 @@ import { TeacherAuth } from './teacher-auth.js';
 window.teacherAuth = new TeacherAuth();
 
 import { db } from './firebase-config.js';
+import { initializeDatabase } from './database-handle.js';
 import { renderTeacherNav } from './teacher-nav.js';
-import { initializeDatabase } from './database-utils.js';
 import {
-  initializePracticeSetDatabase,
   createNewPracticeSet,
   getAllPracticeSets,
   getAllPracticeSetSlugs
@@ -87,7 +86,6 @@ async function renderPracticeSetList(listEl) {
 
 export async function main() {
   initializeDatabase(db);
-  initializePracticeSetDatabase(db);
   renderTeacherNav('practice-sets');
 
   const listEl = document.getElementById('practiceSetList');

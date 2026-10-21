@@ -4,6 +4,7 @@ import { TeacherAuth } from './teacher-auth.js';
 window.teacherAuth = new TeacherAuth();
 
 import { db } from './firebase-config.js';
+import { initializeDatabase } from './database-handle.js';
 import { renderTeacherNav } from './teacher-nav.js';
 import { showNotification } from './notification-utils.js';
 import { withWorkingIndicator } from './ui-components.js';
@@ -14,10 +15,8 @@ import {
   updateUnsavedIndicator,
   handleBeforeUnload
 } from './editor.js';
-import { initializeDatabase } from './database-utils.js';
-import { initializeQuestionDatabase, getAllQuestions } from './question-database-utils.js';
+import { getAllQuestions } from './question-database-utils.js';
 import {
-  initializePracticeSetDatabase,
   getPracticeSetFromDB,
   savePracticeSet,
   deletePracticeSetAndSlugs,
@@ -145,8 +144,6 @@ async function refreshSlugList(practiceSetId, slugListEl) {
 
 export async function main() {
   initializeDatabase(db);
-  initializeQuestionDatabase(db);
-  initializePracticeSetDatabase(db);
   renderTeacherNav('practice-sets');
 
   const params = getQueryParams();
