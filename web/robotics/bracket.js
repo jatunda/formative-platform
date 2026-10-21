@@ -2,7 +2,10 @@
 import { winningSide } from './match-result.js';
 
 /**
- * @typedef {{bracketSize: number, paddedSize: number, seeds: string[], includeThirdPlace: boolean, matches: object[]}} Bracket
+ * An Elimination Bracket: its Seeds (index 0 = Seed 1) and its matches. Bracket Size and
+ * whether a Third-Place Match is included live only in the Tournament's Elimination settings;
+ * the matches already reflect both (Byes, and the Third-Place Match when there is one).
+ * @typedef {{seeds: string[], matches: object[]}} Bracket
  */
 
 /** Smallest power of two that is >= n. */
@@ -120,7 +123,7 @@ export function buildBracket({ bracketSize, seeds, includeThirdPlace }) {
     });
   }
 
-  return { bracketSize, paddedSize, seeds: [...seeds], includeThirdPlace, matches };
+  return { seeds: [...seeds], matches };
 }
 
 function findMatch(bracket, matchId) {

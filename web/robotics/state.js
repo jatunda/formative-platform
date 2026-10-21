@@ -81,15 +81,35 @@ export function createInitialState() {
 }
 
 /**
- * Brings a Tournament read from storage up to date. A Tournament stored mid-selection by an
- * older version can have alliances but no Bracket Size; Bracket Size is saved now as the
- * effective Bracket Size, raised to the number of alliances formed so none are dropped.
+ * Brings a Tournament read from storage up to date, so nothing else reads an older shape.
+ * Returns `state` itself when it's already current.
  */
 export function upgradeSavedTournament(state) {
+  return saveMissingBracketSize(moveBracketSettingsOutOfBracket(state));
+}
+
+/**
+ * A Tournament stored mid-selection by an older version can have alliances but no Bracket
+ * Size; Bracket Size is saved now as the effective Bracket Size, raised to the number of
+ * alliances formed so none are dropped.
+ */
+function saveMissingBracketSize(state) {
   const { alliances, bracketSize } = state.elimination;
   if (alliances.length === 0 || isBracketSizeSaved(bracketSize)) return state;
   const savedBracketSize = Math.max(savableBracketSize(state), alliances.length);
   return { ...state, elimination: { ...state.elimination, bracketSize: savedBracketSize } };
+}
+
+/**
+ * An older version also stored Bracket Size and the Third-Place setting inside the built
+ * Bracket. Those copies become the Elimination settings (they're what the Bracket's matches
+ * were built with) and leave the Bracket, which keeps only its Seeds and matches.
+ */
+function moveBracketSettingsOutOfBracket(state) {
+  const { bracket } = state.elimination;
+  if (!bracket || !('bracketSize' in bracket)) return state;
+  const { bracketSize, includeThirdPlace, seeds, matches } = bracket;
+  return { ...state, elimination: { ...state.elimination, bracketSize, includeThirdPlace, bracket: { seeds, matches } } };
 }
 
 /** The effective Bracket Size, raised to 2 so an Estimated Bracket Size of 1 still saves as set. */

@@ -2139,7 +2139,7 @@ describe('initRoboticsApp', () => {
         await clickDialogButton(root(), 'Start Finals');
         await flushRender();
         expect(app.getState().elimination.bracketSize).toBe(3);
-        expect(app.getState().elimination.bracket.bracketSize).toBe(3);
+        expect(app.getState().elimination.bracket.seeds).toHaveLength(3);
         expect(document.querySelector('.robotics-tab-btn.active').dataset.tabKey).toBe('finals');
       });
 

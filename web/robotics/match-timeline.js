@@ -1,3 +1,6 @@
+// @ts-check
+import { getPlayedEliminationMatches } from './bracket.js';
+
 export const MINUTE_MS = 60 * 1000;
 
 /**
@@ -67,14 +70,14 @@ export function matchField(fieldCount, globalIndex) {
  * Every match the schedule spans: Qualification Matches plus actual (once a
  * bracket exists) or estimated Elimination Matches.
  * @param {number} qualificationMatchCount
- * @param {{matches: {isBye?: boolean}[]}|null} bracket - the actual Elimination Bracket, once generated
+ * @param {import('./bracket.js').Bracket|null} bracket - the actual Elimination Bracket, once generated
  * @param {number} estimatedBracketSize
  * @param {boolean} estimatedThirdPlace
  * @returns {number}
  */
 export function getScheduledMatchCount(qualificationMatchCount, bracket, estimatedBracketSize, estimatedThirdPlace) {
   const eliminationCount = bracket
-    ? bracket.matches.filter((m) => !m.isBye).length
+    ? getPlayedEliminationMatches(bracket).length
     : estimateEliminationMatchCount(estimatedBracketSize, estimatedThirdPlace);
   return qualificationMatchCount + eliminationCount;
 }
