@@ -3,20 +3,32 @@
 // CONTEXT.md), distinct from Lessons. Stored under `pages/{pageId}`, with
 // `slugIndex/{slug} -> pageId` as the only source of truth for slug lookups
 // (a page's own record never stores its slugs, to avoid two copies of truth).
+// The Slug rules live in slug-index.js and the Backlink diffing in
+// backlinks.js. This is the only module that writes Page records: the
+// Question module hands its link targets and rewrites to the functions here.
 import {
   ref,
   get,
   set,
-  update,
-  remove
+  update
 } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js";
 import { DEFAULT_PAGE_TITLE } from "./constants.js";
 import { generateUniqueHash } from "./database-utils.js";
 import { extractPageLinkSlugs, rewriteSlugInContent } from "./page-links.js";
 import { questionBacklinkRemovals } from "./question-backlinks.js";
-import { isValidSlugFormat } from "./slug-index.js";
+import { createSlugIndex } from "./slug-index.js";
+import { realtimeStore } from "./realtime-store.js";
+import { PAGE_LINKS, diffBacklinks, resolveLinkTargets } from "./backlinks.js";
+
+/** @type {import("./slug-index.js").SlugNamespace} */
+const PAGE_SLUGS = {
+  indexPath: "slugIndex",
+  formatExample: "syllabus",
+  takenMessage: (slug) => `The URL "/p/${slug}" is already in use by another page.`,
+};
 
 let db;
+let slugs;
 
 /**
  * Initialize database reference
@@ -27,11 +39,8 @@ export function initializePageDatabase(database) {
     throw new Error("Database instance is required for initialization");
   }
   db = database;
+  slugs = createSlugIndex(PAGE_SLUGS, realtimeStore(db));
 }
-
-// Re-exported for the Page/Question Slug code that hasn't moved onto
-// slug-index.js yet (ticket 03).
-export { isValidSlugFormat };
 
 /**
  * Create a new Page with a unique id
@@ -99,40 +108,59 @@ export async function getBacklinks(pageId) {
  * @returns {Promise<void>}
  */
 export async function updateBacklinksForPage(pageId, parsed) {
-  const [allSlugs, linksToSnap] = await Promise.all([
-    getAllSlugs(),
-    get(ref(db, `pages/${pageId}/linksTo`)),
-  ]);
-  const previousLinksTo = linksToSnap.exists() ? linksToSnap.val() : [];
+  const allSlugs = await getAllSlugs();
+  await recordPageLinks(
+    pageId,
+    PAGE_LINKS,
+    resolveLinkTargets(extractPageLinkSlugs(parsed), allSlugs, pageId)
+  );
+}
 
-  const referencedSlugs = extractPageLinkSlugs(parsed);
-  const newLinksTo = [...new Set(
-    referencedSlugs
-      .map((slug) => allSlugs[slug])
-      .filter((targetId) => targetId && targetId !== pageId)
-  )];
-
-  const updates = {};
-  for (const oldTarget of previousLinksTo) {
-    if (!newLinksTo.includes(oldTarget)) {
-      updates[`backlinks/${oldTarget}/${pageId}`] = null;
-    }
-  }
-  for (const newTarget of newLinksTo) {
-    if (!previousLinksTo.includes(newTarget)) {
-      updates[`backlinks/${newTarget}/${pageId}`] = true;
-    }
-  }
-
-  const linksChanged = newLinksTo.length !== previousLinksTo.length
-    || newLinksTo.some((id) => !previousLinksTo.includes(id));
+/**
+ * Record which targets a Page's links of one kind (Page Links or Question
+ * Links, see backlinks.js) now point at: diffs against the Page's stored
+ * list for that kind, then writes the Backlink changes and the new list in
+ * one atomic update. A no-op when the targets haven't changed.
+ * @param {string} pageId
+ * @param {import("./backlinks.js").LinkKind} kind
+ * @param {string[]} targetIds - Distinct ids this Page now links to
+ * @returns {Promise<void>}
+ */
+export async function recordPageLinks(pageId, kind, targetIds) {
+  const snap = await get(ref(db, `pages/${pageId}/${kind.linksToField}`));
+  const previousTargets = snap.exists() ? snap.val() : [];
+  const { updates, linksChanged } = diffBacklinks(kind, pageId, previousTargets, targetIds);
+  /** @type {Record<string, unknown>} */
+  const allUpdates = { ...updates };
   if (linksChanged) {
-    updates[`pages/${pageId}/linksTo`] = newLinksTo.length > 0 ? newLinksTo : null;
+    allUpdates[`pages/${pageId}/${kind.linksToField}`] = targetIds.length > 0 ? targetIds : null;
   }
+  if (Object.keys(allUpdates).length > 0) {
+    await update(ref(db), allUpdates);
+  }
+}
 
-  if (Object.keys(updates).length > 0) {
-    await update(ref(db), updates);
+/**
+ * Rewrite the stored content of each given Page, as `pages/{id} -> content`
+ * update paths for just the Pages the rewrite changed - not applied, so a
+ * Slug Rename can fold them into the same atomic update as its Slug index
+ * swap. Pages that no longer exist are skipped.
+ * @param {string[]} pageIds
+ * @param {(content: any) => any} rewrite
+ * @returns {Promise<Record<string, any>>}
+ */
+export async function pageRewriteUpdates(pageIds, rewrite) {
+  /** @type {Record<string, any>} */
+  const updates = {};
+  for (const pageId of pageIds) {
+    const content = await getPageFromDB(pageId);
+    if (!content) continue;
+    const rewritten = rewrite(content);
+    if (JSON.stringify(rewritten) !== JSON.stringify(content)) {
+      updates[`pages/${pageId}`] = rewritten;
+    }
   }
+  return updates;
 }
 
 /**
@@ -140,8 +168,7 @@ export async function updateBacklinksForPage(pageId, parsed) {
  * @returns {Promise<Object>} Object mapping slug to pageId, or {} if none exist
  */
 export async function getAllSlugs() {
-  const snap = await get(ref(db, "slugIndex"));
-  return snap.exists() ? snap.val() : {};
+  return slugs.getAll();
 }
 
 /**
@@ -154,14 +181,7 @@ export async function getAllSlugs() {
  * @throws {Error} If the slug is malformed or already taken by another page
  */
 export async function assignSlug(pageId, slug) {
-  if (!isValidSlugFormat(slug)) {
-    throw new Error("Slugs must be lowercase letters, numbers, and hyphens only (e.g. \"syllabus\").");
-  }
-  const existing = await get(ref(db, `slugIndex/${slug}`));
-  if (existing.exists() && existing.val() !== pageId) {
-    throw new Error(`The URL "/p/${slug}" is already in use by another page.`);
-  }
-  await set(ref(db, `slugIndex/${slug}`), pageId);
+  await slugs.claim(pageId, slug);
 }
 
 /**
@@ -170,7 +190,7 @@ export async function assignSlug(pageId, slug) {
  * @returns {Promise<void>}
  */
 export async function removeSlug(slug) {
-  await remove(ref(db, `slugIndex/${slug}`));
+  await slugs.release(slug);
 }
 
 /**
@@ -190,30 +210,12 @@ export async function removeSlug(slug) {
  * @throws {Error} If the new slug is malformed or already taken by another page
  */
 export async function renameSlug(pageId, oldSlug, newSlug) {
-  if (!isValidSlugFormat(newSlug)) {
-    throw new Error("Slugs must be lowercase letters, numbers, and hyphens only (e.g. \"syllabus\").");
-  }
-  const existing = await get(ref(db, `slugIndex/${newSlug}`));
-  if (existing.exists() && existing.val() !== pageId) {
-    throw new Error(`The URL "/p/${newSlug}" is already in use by another page.`);
-  }
-
-  const sourcePageIds = await getBacklinks(pageId);
-  const updates = {
-    [`slugIndex/${oldSlug}`]: null,
-    [`slugIndex/${newSlug}`]: pageId,
-  };
-
-  for (const sourcePageId of sourcePageIds) {
-    const sourceContent = await getPageFromDB(sourcePageId);
-    if (!sourceContent) continue;
-    const rewritten = rewriteSlugInContent(sourceContent, oldSlug, newSlug);
-    if (JSON.stringify(rewritten) !== JSON.stringify(sourceContent)) {
-      updates[`pages/${sourcePageId}`] = rewritten;
-    }
-  }
-
-  await update(ref(db), updates);
+  const slugUpdates = await slugs.renameUpdates(pageId, oldSlug, newSlug);
+  const pageUpdates = await pageRewriteUpdates(
+    await getBacklinks(pageId),
+    (content) => rewriteSlugInContent(content, oldSlug, newSlug)
+  );
+  await update(ref(db), { ...slugUpdates, ...pageUpdates });
 }
 
 /**
@@ -222,8 +224,7 @@ export async function renameSlug(pageId, oldSlug, newSlug) {
  * @returns {Promise<string | null>}
  */
 export async function resolveSlugToPageId(slug) {
-  const snap = await get(ref(db, `slugIndex/${slug}`));
-  return snap.exists() ? snap.val() : null;
+  return slugs.resolve(slug);
 }
 
 /**
@@ -238,14 +239,15 @@ export async function resolveSlugToPageId(slug) {
  * @returns {Promise<void>}
  */
 export async function deletePageAndSlugs(pageId) {
-  const [allSlugs, linksToSnap, questionBacklinksSnap] = await Promise.all([
-    getAllSlugs(),
+  const [slugRemovals, linksToSnap, questionBacklinksSnap] = await Promise.all([
+    slugs.releaseAllUpdates(pageId),
     get(ref(db, `pages/${pageId}/linksTo`)),
     get(ref(db, "questionBacklinks")),
   ]);
   const updates = {
     [`pages/${pageId}`]: null,
     [`backlinks/${pageId}`]: null,
+    ...slugRemovals,
     // Scans the whole Question Backlink index rather than trusting this
     // Page's `questionLinksTo`, which only reflects its latest save (savePage
     // overwrites the record), so an older entry could otherwise outlive it.
@@ -254,11 +256,6 @@ export async function deletePageAndSlugs(pageId) {
       (sourcePageId) => sourcePageId === pageId
     ),
   };
-  for (const [slug, ownerId] of Object.entries(allSlugs)) {
-    if (ownerId === pageId) {
-      updates[`slugIndex/${slug}`] = null;
-    }
-  }
   const linksTo = linksToSnap.exists() ? linksToSnap.val() : [];
   for (const targetId of linksTo) {
     updates[`backlinks/${targetId}/${pageId}`] = null;

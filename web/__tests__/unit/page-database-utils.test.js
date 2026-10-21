@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   initializePageDatabase,
-  isValidSlugFormat,
   createNewPage,
   getPageFromDB,
   getAllPages,
@@ -101,37 +100,8 @@ describe('page-database-utils', () => {
     initializePageDatabase({});
   });
 
-  describe('isValidSlugFormat', () => {
-    it('accepts a single lowercase word', () => {
-      expect(isValidSlugFormat('syllabus')).toBe(true);
-    });
-
-    it('accepts lowercase words joined by single hyphens', () => {
-      expect(isValidSlugFormat('syllabus-2026')).toBe(true);
-    });
-
-    it('rejects uppercase letters', () => {
-      expect(isValidSlugFormat('Syllabus')).toBe(false);
-    });
-
-    it('rejects spaces', () => {
-      expect(isValidSlugFormat('my syllabus')).toBe(false);
-    });
-
-    it('rejects a leading or trailing hyphen', () => {
-      expect(isValidSlugFormat('-syllabus')).toBe(false);
-      expect(isValidSlugFormat('syllabus-')).toBe(false);
-    });
-
-    it('rejects repeated hyphens', () => {
-      expect(isValidSlugFormat('syllabus--2026')).toBe(false);
-    });
-
-    it('rejects an empty string or non-string input', () => {
-      expect(isValidSlugFormat('')).toBe(false);
-      expect(isValidSlugFormat(null)).toBe(false);
-      expect(isValidSlugFormat(42)).toBe(false);
-    });
+  it('refuses to initialize without a database', () => {
+    expect(() => initializePageDatabase(null)).toThrow('Database instance is required');
   });
 
   describe('createNewPage', () => {
@@ -200,13 +170,13 @@ describe('page-database-utils', () => {
     });
 
     it('rejects a malformed slug without writing anything', async () => {
-      await expect(assignSlug('abc', 'My Syllabus')).rejects.toThrow('lowercase letters');
+      await expect(assignSlug('abc', 'My Syllabus')).rejects.toThrow('Slugs must be lowercase letters, numbers, and hyphens only (e.g. "syllabus").');
       expect(getAtPath('slugIndex/My Syllabus')).toBeUndefined();
     });
 
     it('rejects a slug already owned by a different page', async () => {
       setAtPath('slugIndex/syllabus', 'other-page');
-      await expect(assignSlug('abc', 'syllabus')).rejects.toThrow('already in use');
+      await expect(assignSlug('abc', 'syllabus')).rejects.toThrow('The URL "/p/syllabus" is already in use by another page.');
       expect(getAtPath('slugIndex/syllabus')).toBe('other-page');
     });
 
@@ -379,6 +349,14 @@ describe('page-database-utils', () => {
   });
 
   describe('renameSlug', () => {
+    it('skips a backlinked page that no longer exists instead of recreating it', async () => {
+      setAtPath('slugIndex/old-slug', 'abc');
+      setAtPath('backlinks/abc', { gone: true });
+      await renameSlug('abc', 'old-slug', 'new-slug');
+      expect(getAtPath('pages/gone')).toBeUndefined();
+      expect(getAtPath('slugIndex/new-slug')).toBe('abc');
+    });
+
     it('swaps the slugIndex entry from old to new', async () => {
       setAtPath('slugIndex/old-slug', 'abc');
       await renameSlug('abc', 'old-slug', 'new-slug');
@@ -388,14 +366,14 @@ describe('page-database-utils', () => {
 
     it('rejects a malformed new slug without changing anything', async () => {
       setAtPath('slugIndex/old-slug', 'abc');
-      await expect(renameSlug('abc', 'old-slug', 'Bad Slug')).rejects.toThrow('lowercase letters');
+      await expect(renameSlug('abc', 'old-slug', 'Bad Slug')).rejects.toThrow('Slugs must be lowercase letters, numbers, and hyphens only (e.g. "syllabus").');
       expect(getAtPath('slugIndex/old-slug')).toBe('abc');
     });
 
     it('rejects a new slug already taken by a different page', async () => {
       setAtPath('slugIndex/old-slug', 'abc');
       setAtPath('slugIndex/new-slug', 'other-page');
-      await expect(renameSlug('abc', 'old-slug', 'new-slug')).rejects.toThrow('already in use');
+      await expect(renameSlug('abc', 'old-slug', 'new-slug')).rejects.toThrow('The URL "/p/new-slug" is already in use by another page.');
       expect(getAtPath('slugIndex/old-slug')).toBe('abc');
     });
 

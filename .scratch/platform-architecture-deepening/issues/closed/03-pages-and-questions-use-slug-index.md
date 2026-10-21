@@ -6,11 +6,11 @@ Source: candidate 4 of the 2026-10-12 architecture review. Vocabulary: **Slug**,
 
 **Blocked by:** 02 (Slug index module).
 
-**Status:** ready-for-agent
+**Status:** closed
 
-- [ ] Page and Question Slug claim / rename / release / resolve go through the Slug index module; their own copies are deleted
-- [ ] One Backlink-diffing implementation serves both Page Links and Question Links
-- [ ] Only the Page module writes Page records; the Question module asks it instead
-- [ ] Slug Rename still rewrites every Page Link pointing at the old Slug (existing behaviour)
-- [ ] Page editor, Page manager and Question editor behaviour, error messages included, is unchanged
-- [ ] `npm run test:coverage` in `web/` passes clean per `CLAUDE.md`
+- [x] Page and Question Slug claim / rename / release / resolve go through the Slug index module; their own copies are deleted
+- [x] One Backlink-diffing implementation serves both Page Links and Question Links
+- [x] Only the Page module writes Page records; the Question module asks it instead
+- [x] Slug Rename still rewrites every Page Link pointing at the old Slug (existing behaviour)
+- [x] Page editor, Page manager and Question editor behaviour, error messages included, is unchanged
+- [x] `npm run test:coverage` in `web/` passes clean per `CLAUDE.md`

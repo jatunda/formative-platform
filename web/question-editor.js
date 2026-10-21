@@ -18,6 +18,7 @@ import {
   handleBeforeUnload
 } from './editor.js';
 import { initializeDatabase, getClasses } from './database-utils.js';
+import { initializePageDatabase } from './page-database-utils.js';
 import {
   initializeQuestionDatabase,
   getQuestionFromDB,
@@ -183,6 +184,8 @@ async function classIdToName(classId) {
 
 export async function main() {
   initializeDatabase(db);
+  // A Slug Rename rewrites linking Pages through the Page module.
+  initializePageDatabase(db);
   initializeQuestionDatabase(db);
   renderTeacherNav('questions');
 
