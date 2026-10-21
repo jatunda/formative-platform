@@ -14,6 +14,7 @@ import { DEFAULT_PAGE_TITLE } from "./constants.js";
 import { generateUniqueHash } from "./database-utils.js";
 import { extractPageLinkSlugs, rewriteSlugInContent } from "./page-links.js";
 import { questionBacklinkRemovals } from "./question-backlinks.js";
+import { isValidSlugFormat } from "./slug-index.js";
 
 let db;
 
@@ -28,18 +29,9 @@ export function initializePageDatabase(database) {
   db = database;
 }
 
-const SLUG_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
-
-/**
- * Whether a string is a valid Slug: lowercase alphanumeric segments joined by
- * single hyphens (e.g. "syllabus", "syllabus-2026"). No leading/trailing/
- * repeated hyphens, no uppercase, no spaces or other URL-unsafe characters.
- * @param {string} slug
- * @returns {boolean}
- */
-export function isValidSlugFormat(slug) {
-  return typeof slug === "string" && SLUG_PATTERN.test(slug);
-}
+// Re-exported for the Page/Question Slug code that hasn't moved onto
+// slug-index.js yet (ticket 03).
+export { isValidSlugFormat };
 
 /**
  * Create a new Page with a unique id

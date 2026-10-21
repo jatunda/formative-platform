@@ -138,12 +138,23 @@ describe('practice-set-database-utils', () => {
     });
 
     it('rejects a malformed slug', async () => {
-      await expect(assignPracticeSetSlug('abc', 'Unit 3')).rejects.toThrow('lowercase letters');
+      await expect(assignPracticeSetSlug('abc', 'Unit 3')).rejects.toThrow(
+        'Slugs must be lowercase letters, numbers, and hyphens only (e.g. "unit-3-review").'
+      );
     });
 
     it('rejects a slug already owned by a different practice set', async () => {
       setAtPath('practiceSetSlugIndex/unit-3-review', 'other-set');
-      await expect(assignPracticeSetSlug('abc', 'unit-3-review')).rejects.toThrow('already in use');
+      await expect(assignPracticeSetSlug('abc', 'unit-3-review')).rejects.toThrow(
+        'The URL "/practice/unit-3-review" is already in use by another practice set.'
+      );
+    });
+
+    it('does not collide with a Page or Question holding the same Slug text', async () => {
+      setAtPath('slugIndex/unit-3-review', 'some-page');
+      setAtPath('questionSlugIndex/unit-3-review', 'some-question');
+      await assignPracticeSetSlug('abc', 'unit-3-review');
+      expect(await resolvePracticeSetSlugToId('unit-3-review')).toBe('abc');
     });
 
     it('removes a slug', async () => {
@@ -202,6 +213,21 @@ describe('practice-set-database-utils', () => {
       expect(getAtPath('practiceSetSlugIndex/unit-3')).toBeUndefined();
       expect(getAtPath('practiceSetSlugIndex/unit-3-review')).toBeUndefined();
       expect(getAtPath('practiceSetSlugIndex/unrelated')).toBe('other');
+    });
+
+    it('does it in one atomic update', async () => {
+      setAtPath('practiceSets/abc', { title: 'To Delete' });
+      setAtPath('practiceSetSlugIndex', { 'unit-3': 'abc' });
+
+      await deletePracticeSetAndSlugs('abc');
+
+      expect(mockUpdate).toHaveBeenCalledTimes(1);
+      expect(mockUpdate).toHaveBeenCalledWith({
+        'practiceSets/abc': null,
+        'practiceSetSlugIndex/unit-3': null,
+      });
+      expect(mockSet).not.toHaveBeenCalled();
+      expect(mockRemove).not.toHaveBeenCalled();
     });
   });
 });

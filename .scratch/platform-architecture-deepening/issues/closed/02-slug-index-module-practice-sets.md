@@ -6,10 +6,10 @@ Source: candidate 4 ("One Slug index module", Worth exploring) of the 2026-10-12
 
 **Blocked by:** 01 (Page delete clears Question Backlinks). It touches the Page delete path that ticket 03 moves onto this module.
 
-**Status:** ready-for-agent
+**Status:** closed
 
-- [ ] A Slug index module, scoped by namespace, offers claim / rename / release / resolve and enforces the Slug format and "taken by another" rules
-- [ ] Practice Set Slug operations go through it; the Practice Set module's own copy is deleted
-- [ ] Practice Set editor and manager behaviour (error messages included) is unchanged
-- [ ] Unit tests cover the module directly against the Firebase test double: claim, conflicting claim, rename, release, resolve, two namespaces not colliding on the same Slug text
-- [ ] `npm run test:coverage` in `web/` passes clean per `CLAUDE.md`
+- [x] A Slug index module, scoped by namespace, offers claim / rename / release / resolve and enforces the Slug format and "taken by another" rules
+- [x] Practice Set Slug operations go through it; the Practice Set module's own copy is deleted
+- [x] Practice Set editor and manager behaviour (error messages included) is unchanged
+- [x] Unit tests cover the module directly against the Firebase test double: claim, conflicting claim, rename, release, resolve, two namespaces not colliding on the same Slug text
+- [x] `npm run test:coverage` in `web/` passes clean per `CLAUDE.md`
