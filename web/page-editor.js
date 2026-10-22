@@ -29,11 +29,10 @@ import {
   assignSlug,
   removeSlug,
   renameSlug,
-  getBacklinks,
-  updateBacklinksForPage
+  getBacklinks
 } from './page-database-utils.js';
 import {
-  updateQuestionBacklinksForPage
+  resolveQuestionLinkTargets
 } from './question-database-utils.js';
 import { DEFAULT_PAGE_TITLE } from './constants.js';
 
@@ -209,9 +208,7 @@ export async function main() {
       alert('Parsing failed or content is malformed.');
       return;
     }
-    await savePage(pageId, parsed);
-    await updateBacklinksForPage(pageId, parsed);
-    await updateQuestionBacklinksForPage(pageId, parsed);
+    await savePage(pageId, parsed, await resolveQuestionLinkTargets(parsed));
     showNotification(`"${parsed.title}" saved successfully at ${new Date().toLocaleString()}`, 'success');
     markClean();
   };

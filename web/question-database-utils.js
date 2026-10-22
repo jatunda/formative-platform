@@ -4,8 +4,8 @@
 // Pages' slugIndex (docs/adr/0011). Stored under `questions/{questionId}`,
 // with `questionSlugIndex/{slug} -> questionId` as the only source of truth
 // for slug lookups. The Slug rules live in slug-index.js. Page records are
-// the Page module's: this module resolves Question Links and hands the
-// results to page-database-utils.js
+// the Page module's: this module resolves Question Links (for the caller to
+// pass to savePage) and hands Slug Rename rewrites to page-database-utils.js,
 // rather than reading or writing `pages/*` itself.
 import {
   ref,
@@ -18,8 +18,8 @@ import { createSlugIndex } from "./slug-index.js";
 import { realtimeStore } from "./realtime-store.js";
 import { getDb } from "./database-handle.js";
 import { QUESTION_LINKS, resolveLinkTargets } from "./backlinks.js";
-import { commitSlugRename, recordPageLinks } from "./page-database-utils.js";
-import { extractQuestionLinkSlugs, rewriteQuestionSlugInContent } from "./question-links.js";
+import { commitSlugRename } from "./page-database-utils.js";
+import { rewriteQuestionSlugInContent } from "./question-links.js";
 
 /** @type {import("./slug-index.js").SlugNamespace} */
 const QUESTION_SLUGS = {
@@ -114,23 +114,15 @@ export async function getQuestionBacklinks(questionId) {
 }
 
 /**
- * Recompute a Page's outgoing Question Links and update the Question
- * Backlink index to match - called after every successful Page save
- * alongside updateBacklinksForPage, so both indexes stay accurate at all
- * times. Diffs against the Page's previously-known `questionLinksTo` rather
- * than unconditionally re-writing. This module resolves the Question
- * Links; the Page module records them.
- * @param {string} pageId
- * @param {{title: string, blocks: Array}} parsed - This Page's just-saved content
- * @returns {Promise<void>}
+ * The distinct Questions a Page's content links to via Question Links,
+ * dropping dangling ones - what the Page module records (and diffs the
+ * Question Backlink index against) when the Page is saved. This module
+ * resolves Question Links; page-database-utils.js's savePage records them.
+ * @param {{title: string, blocks: Array}} parsed - The Page's content
+ * @returns {Promise<string[]>} Question ids
  */
-export async function updateQuestionBacklinksForPage(pageId, parsed) {
-  const allQuestionSlugs = await getAllQuestionSlugs();
-  await recordPageLinks(
-    pageId,
-    QUESTION_LINKS,
-    resolveLinkTargets(extractQuestionLinkSlugs(parsed), allQuestionSlugs)
-  );
+export async function resolveQuestionLinkTargets(parsed) {
+  return resolveLinkTargets(QUESTION_LINKS.extractSlugs(parsed), await getAllQuestionSlugs());
 }
 
 /**

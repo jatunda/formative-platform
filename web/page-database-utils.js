@@ -3,9 +3,10 @@
 // CONTEXT.md), distinct from Lessons. Stored under `pages/{pageId}`, with
 // `slugIndex/{slug} -> pageId` as the only source of truth for slug lookups
 // (a page's own record never stores its slugs, to avoid two copies of truth).
-// The Slug rules live in slug-index.js and the Backlink diffing in
-// backlinks.js. This is the only module that writes Page records: the
-// Question module hands its link targets and rewrites to the functions here.
+// The Slug rules live in slug-index.js and the Backlink rules in
+// backlinks.js. This is the only module that writes Page records: Question
+// Link targets (resolved by the Question module) are passed into savePage,
+// and Question Slug Renames go through commitSlugRename.
 import {
   ref,
   get,
@@ -14,12 +15,17 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js";
 import { DEFAULT_PAGE_TITLE } from "./constants.js";
 import { generateUniqueHash } from "./database-utils.js";
-import { extractPageLinkSlugs, rewriteSlugInContent } from "./page-links.js";
-import { questionBacklinkRemovals } from "./question-backlinks.js";
+import { rewriteSlugInContent } from "./page-links.js";
 import { createSlugIndex } from "./slug-index.js";
 import { realtimeStore } from "./realtime-store.js";
 import { getDb } from "./database-handle.js";
-import { PAGE_LINKS, diffBacklinks, resolveLinkTargets } from "./backlinks.js";
+import {
+  PAGE_LINKS,
+  QUESTION_LINKS,
+  backlinkRemovals,
+  diffBacklinks,
+  linkTargets
+} from "./backlinks.js";
 
 /** @type {import("./slug-index.js").SlugNamespace} */
 const PAGE_SLUGS = {
@@ -62,16 +68,41 @@ export async function getAllPages() {
 }
 
 /**
- * Save a Page's parsed DSL content
+ * Save a Page's parsed DSL content, and bring both Backlink indexes in line
+ * with the links it now contains (see docs/adr/0008), all in one atomic
+ * update. Diffs against the Page's stored `linksTo` / `questionLinksTo`
+ * before the record is replaced, so links the edit dropped lose their
+ * Backlinks. Page Links are resolved here; Question Links are resolved by
+ * the Question module (question-database-utils.js's
+ * resolveQuestionLinkTargets) and handed in.
  * @param {string} pageId
  * @param {{title: string, blocks: Array}} parsed
+ * @param {string[]} questionTargetIds - Distinct Question ids this Page now links to
  * @returns {Promise<void>}
  */
-export async function savePage(pageId, parsed) {
+export async function savePage(pageId, parsed, questionTargetIds) {
   if (!parsed || !parsed.title || !parsed.blocks) {
     throw new Error("Invalid page content: missing title or blocks");
   }
-  await set(ref(getDb(), `pages/${pageId}`), parsed);
+  const [previous, allSlugs] = await Promise.all([getPageFromDB(pageId), getAllSlugs()]);
+  /** @type {Record<string, any>} */
+  const record = { ...parsed };
+  /** @type {Record<string, any>} */
+  const updates = {};
+  for (const [kind, targetIds] of /** @type {const} */ ([
+    [PAGE_LINKS, linkTargets(PAGE_LINKS, pageId, parsed, allSlugs)],
+    [QUESTION_LINKS, questionTargetIds],
+  ])) {
+    const previousTargets = (previous && previous[kind.linksToField]) || [];
+    Object.assign(updates, diffBacklinks(kind, pageId, previousTargets, targetIds));
+    if (targetIds.length > 0) {
+      record[kind.linksToField] = targetIds;
+    } else {
+      delete record[kind.linksToField];
+    }
+  }
+  updates[`pages/${pageId}`] = record;
+  await update(ref(getDb()), updates);
 }
 
 /**
@@ -84,49 +115,6 @@ export async function savePage(pageId, parsed) {
 export async function getBacklinks(pageId) {
   const snap = await get(ref(getDb(), `backlinks/${pageId}`));
   return snap.exists() ? Object.keys(snap.val()) : [];
-}
-
-/**
- * Recompute this Page's outgoing Page Links and update the Backlink index to
- * match - called after every successful save, so the index stays accurate
- * at all times, not just at Slug Rename time (see docs/adr/0008). Diffs
- * against the Page's previously-known `linksTo` rather than unconditionally
- * re-writing, so a save that didn't change any links touches nothing here.
- * @param {string} pageId
- * @param {{title: string, blocks: Array}} parsed - This Page's just-saved content
- * @returns {Promise<void>}
- */
-export async function updateBacklinksForPage(pageId, parsed) {
-  const allSlugs = await getAllSlugs();
-  await recordPageLinks(
-    pageId,
-    PAGE_LINKS,
-    resolveLinkTargets(extractPageLinkSlugs(parsed), allSlugs, pageId)
-  );
-}
-
-/**
- * Record which targets a Page's links of one kind (Page Links or Question
- * Links, see backlinks.js) now point at: diffs against the Page's stored
- * list for that kind, then writes the Backlink changes and the new list in
- * one atomic update. A no-op when the targets haven't changed.
- * @param {string} pageId
- * @param {import("./backlinks.js").LinkKind} kind
- * @param {string[]} targetIds - Distinct ids this Page now links to
- * @returns {Promise<void>}
- */
-export async function recordPageLinks(pageId, kind, targetIds) {
-  const snap = await get(ref(getDb(), `pages/${pageId}/${kind.linksToField}`));
-  const previousTargets = snap.exists() ? snap.val() : [];
-  const { updates, linksChanged } = diffBacklinks(kind, pageId, previousTargets, targetIds);
-  /** @type {Record<string, unknown>} */
-  const allUpdates = { ...updates };
-  if (linksChanged) {
-    allUpdates[`pages/${pageId}/${kind.linksToField}`] = targetIds.length > 0 ? targetIds : null;
-  }
-  if (Object.keys(allUpdates).length > 0) {
-    await update(ref(getDb()), allUpdates);
-  }
 }
 
 /**
@@ -231,26 +219,24 @@ export async function resolveSlugToPageId(slug) {
  * @returns {Promise<void>}
  */
 export async function deletePageAndSlugs(pageId) {
-  const [slugRemovals, linksToSnap, questionBacklinksSnap] = await Promise.all([
+  const [slugRemovals, backlinksSnap, questionBacklinksSnap] = await Promise.all([
     slugs().releaseAllUpdates(pageId),
-    get(ref(getDb(), `pages/${pageId}/linksTo`)),
+    get(ref(getDb(), "backlinks")),
     get(ref(getDb(), "questionBacklinks")),
   ]);
-  const updates = {
+  /** @param {any} snap */
+  const valueOf = (snap) => (snap.exists() ? snap.val() : null);
+  // Scans both whole Backlink indexes rather than trusting this Page's
+  // `linksTo` / `questionLinksTo`, so an entry those lists lost track of
+  // can't outlive the Page. Its own incoming entry is removed wholesale
+  // below; skipping it here keeps the update's paths from overlapping.
+  /** @param {string} targetId @param {string} sourcePageId */
+  const isOutgoing = (targetId, sourcePageId) => sourcePageId === pageId && targetId !== pageId;
+  await update(ref(getDb()), {
     [`pages/${pageId}`]: null,
     [`backlinks/${pageId}`]: null,
     ...slugRemovals,
-    // Scans the whole Question Backlink index rather than trusting this
-    // Page's `questionLinksTo`, which only reflects its latest save (savePage
-    // overwrites the record), so an older entry could otherwise outlive it.
-    ...questionBacklinkRemovals(
-      questionBacklinksSnap.exists() ? questionBacklinksSnap.val() : null,
-      (sourcePageId) => sourcePageId === pageId
-    ),
-  };
-  const linksTo = linksToSnap.exists() ? linksToSnap.val() : [];
-  for (const targetId of linksTo) {
-    updates[`backlinks/${targetId}/${pageId}`] = null;
-  }
-  await update(ref(getDb()), updates);
+    ...backlinkRemovals(PAGE_LINKS, valueOf(backlinksSnap), isOutgoing),
+    ...backlinkRemovals(QUESTION_LINKS, valueOf(questionBacklinksSnap), isOutgoing),
+  });
 }

@@ -11,7 +11,7 @@ import {
   resolveQuestionSlugToId,
   deleteQuestionAndSlugs,
   getQuestionBacklinks,
-  updateQuestionBacklinksForPage
+  resolveQuestionLinkTargets
 } from '../../question-database-utils.js';
 import { initializeDatabase } from '../../database-handle.js';
 
@@ -199,41 +199,21 @@ describe('question-database-utils', () => {
     });
   });
 
-  describe('getQuestionBacklinks / updateQuestionBacklinksForPage', () => {
+  describe('getQuestionBacklinks', () => {
     it('returns the source pageIds that link to this question', async () => {
       setAtPath('questionBacklinks/target', { page1: true, page2: true });
       expect(await getQuestionBacklinks('target')).toEqual(['page1', 'page2']);
     });
+  });
 
-    it('adds a backlink for a newly-referenced question', async () => {
-      setAtPath('questionSlugIndex/loops-1', 'question-id');
-      const parsed = { title: 'T', blocks: [{ type: 'question', content: [{ type: 'text', value: '[[q:loops-1]]' }] }] };
+  describe('resolveQuestionLinkTargets', () => {
+    it('resolves a Page\'s Question Links to distinct Question ids, dropping dangling ones', async () => {
+      setAtPath('questionSlugIndex', { 'loops-1': 'q1', 'loops-alias': 'q1', 'arrays-1': 'q2' });
+      const parsed = { title: 'T', blocks: [{ type: 'question', content: [
+        { type: 'text', value: '[[q:loops-1]] [[q:missing]] [[q:loops-alias]] [[q:arrays-1]] [[loops-1]]' },
+      ] }] };
 
-      await updateQuestionBacklinksForPage('page-id', parsed);
-
-      expect(getAtPath('questionBacklinks/question-id/page-id')).toBe(true);
-      expect(getAtPath('pages/page-id/questionLinksTo')).toEqual(['question-id']);
-    });
-
-    it('removes a stale backlink when a link is deleted from the content', async () => {
-      setAtPath('pages/page-id/questionLinksTo', ['old-target']);
-      setAtPath('questionBacklinks/old-target/page-id', true);
-      const parsed = { title: 'T', blocks: [{ type: 'question', content: [{ type: 'text', value: 'no links here' }] }] };
-
-      await updateQuestionBacklinksForPage('page-id', parsed);
-
-      expect(getAtPath('questionBacklinks/old-target/page-id')).toBeUndefined();
-      expect(getAtPath('pages/page-id/questionLinksTo')).toBeUndefined();
-    });
-
-    it('does nothing when the set of linked questions has not changed', async () => {
-      setAtPath('questionSlugIndex/loops-1', 'question-id');
-      setAtPath('pages/page-id/questionLinksTo', ['question-id']);
-      setAtPath('questionBacklinks/question-id/page-id', true);
-      const parsed = { title: 'T', blocks: [{ type: 'question', content: [{ type: 'text', value: '[[q:loops-1]]' }] }] };
-
-      await updateQuestionBacklinksForPage('page-id', parsed);
-
+      expect(await resolveQuestionLinkTargets(parsed)).toEqual(['q1', 'q2']);
       expect(mockUpdate).not.toHaveBeenCalled();
     });
   });
