@@ -160,11 +160,11 @@ export function createEndButtonsContainer(dayIndex, ctx) {
   });
 
   const newBtn = createNewLessonButtonShared(dayIndex, async (idx) => {
-    const hash = await lessonStore().create({ title: DEFAULT_LESSON_TITLE });
+    const lessonId = await lessonStore().create({ title: DEFAULT_LESSON_TITLE });
     const dayRef = ref(getDb(), `schedule/${ctx.classId}/${idx}`);
     const snap = await get(dayRef);
     const lessons = snap.exists() ? snap.val() : [];
-    lessons.push(hash);
+    lessons.push(lessonId);
     await set(dayRef, lessons);
     ctx.onReload();
   });

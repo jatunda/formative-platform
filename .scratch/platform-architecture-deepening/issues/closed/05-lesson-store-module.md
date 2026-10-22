@@ -20,3 +20,10 @@ Source: candidate 6 ("A Lesson store module", Speculative) of the 2026-10-12 arc
 ## Decisions
 
 - **Deleting a Lesson a Schedule still uses (2026-10-12, Eric):** remove it from every Schedule, and warn in the confirm which Classes and Day Indices lose it. A warning alone (leaving "Untitled Lesson" behind) and blocking the delete were both rejected.
+
+## Comments
+
+**2026-10-22, review follow-up:**
+
+- **Lessons deleted before this change.** `scripts/cleanScheduleLessons.js` takes every Lesson that no longer exists out of every Class's Schedule (dry run by default; `--apply` writes one atomic update; a day left empty stays an empty day; no Day Index shifts). It shares `scheduleLessonRemovals` (`web/schedule-lessons.js`) with the Lesson store's delete. Dry run against the live database on 2026-10-22: 280 Lessons, 5 Class Schedules (403 Lesson references across 393 days), and no references to deleted Lessons, so nothing to apply.
+- **New Lesson button ordering.** It now creates the Lesson through the Lesson store first, then writes the Schedule day, one after the other. Before, it wrote both at once (`Promise.all`). If the Schedule write fails, the new Lesson exists but isn't on the Schedule; it's never the other way round (a Schedule pointing at a Lesson that doesn't exist).

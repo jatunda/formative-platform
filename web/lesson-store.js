@@ -6,6 +6,7 @@
 import { generateUniqueKey } from "./unique-key.js";
 import { realtimeStore } from "./realtime-store.js";
 import { getDb } from "./database-handle.js";
+import { scheduleDays, scheduleLessonRemovals } from "./schedule-lessons.js";
 
 const LESSONS_PATH = "content";
 const SCHEDULE_PATH = "schedule";
@@ -127,17 +128,11 @@ export function createLessonStore(store) {
      * @param {string} id
      */
     async delete(id) {
-      const schedules = (await store.read(SCHEDULE_PATH)) ?? {};
-      /** @type {Record<string, any>} */
-      const updates = { [`${LESSONS_PATH}/${id}`]: null };
-      for (const [classId, days] of Object.entries(schedules)) {
-        for (const { dayIndex, lessonIds } of scheduleDays(days)) {
-          if (lessonIds.includes(id)) {
-            updates[`${SCHEDULE_PATH}/${classId}/${dayIndex}`] = lessonIds.filter(l => l !== id);
-          }
-        }
-      }
-      await store.update(updates);
+      const schedules = await store.read(SCHEDULE_PATH);
+      await store.update({
+        [`${LESSONS_PATH}/${id}`]: null,
+        ...scheduleLessonRemovals(schedules, (lessonId) => lessonId === id),
+      });
     },
   };
 }
@@ -148,17 +143,3 @@ export function createLessonStore(store) {
  * @property {string} className - The Class's name, or its id if it has none
  * @property {number[]} dayIndices - Ascending
  */
-
-/**
- * One Class's Schedule as {dayIndex, lessonIds} pairs, ascending. Firebase
- * hands back dense Day Indices as an array (with nulls for gaps) and sparse
- * ones as an object; both read the same here.
- * @param {any} days
- * @returns {Array<{dayIndex: number, lessonIds: string[]}>}
- */
-function scheduleDays(days) {
-  return Object.entries(days ?? {})
-    .filter(([, lessonIds]) => lessonIds)
-    .map(([dayIndex, lessonIds]) => ({ dayIndex: Number(dayIndex), lessonIds: Object.values(lessonIds) }))
-    .sort((a, b) => a.dayIndex - b.dayIndex);
-}
