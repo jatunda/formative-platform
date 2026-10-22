@@ -130,18 +130,22 @@ export async function recordPageLinks(pageId, kind, targetIds) {
 }
 
 /**
- * Rewrite the stored content of each given Page, as `pages/{id} -> content`
- * update paths for just the Pages the rewrite changed - not applied, so a
- * Slug Rename can fold them into the same atomic update as its Slug index
- * swap. Pages that no longer exist are skipped.
- * @param {string[]} pageIds
- * @param {(content: any) => any} rewrite
- * @returns {Promise<Record<string, any>>}
+ * Finish a Slug Rename (of a Page Slug or a Question Slug): rewrite the
+ * stored content of each Page that links to the renamed entity, and write
+ * those Pages together with the caller's Slug index swap in one atomic
+ * update, so a failure partway through can't leave some Pages rewritten and
+ * others not. Only Pages the rewrite actually changed are written; Pages
+ * that no longer exist are skipped rather than recreated.
+ * @param {Record<string, any>} slugUpdates - The validated Slug index swap
+ *   (slug-index.js's renameUpdates)
+ * @param {string[]} linkingPageIds - The renamed entity's Backlinks
+ * @param {(content: any) => any} rewrite - Old Slug -> new Slug in one Page
+ * @returns {Promise<void>}
  */
-export async function pageRewriteUpdates(pageIds, rewrite) {
+export async function commitSlugRename(slugUpdates, linkingPageIds, rewrite) {
   /** @type {Record<string, any>} */
-  const updates = {};
-  for (const pageId of pageIds) {
+  const updates = { ...slugUpdates };
+  for (const pageId of linkingPageIds) {
     const content = await getPageFromDB(pageId);
     if (!content) continue;
     const rewritten = rewrite(content);
@@ -149,7 +153,7 @@ export async function pageRewriteUpdates(pageIds, rewrite) {
       updates[`pages/${pageId}`] = rewritten;
     }
   }
-  return updates;
+  await update(ref(getDb()), updates);
 }
 
 /**
@@ -199,12 +203,11 @@ export async function removeSlug(slug) {
  * @throws {Error} If the new slug is malformed or already taken by another page
  */
 export async function renameSlug(pageId, oldSlug, newSlug) {
-  const slugUpdates = await slugs().renameUpdates(pageId, oldSlug, newSlug);
-  const pageUpdates = await pageRewriteUpdates(
+  await commitSlugRename(
+    await slugs().renameUpdates(pageId, oldSlug, newSlug),
     await getBacklinks(pageId),
     (content) => rewriteSlugInContent(content, oldSlug, newSlug)
   );
-  await update(ref(getDb()), { ...slugUpdates, ...pageUpdates });
 }
 
 /**

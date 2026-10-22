@@ -11,7 +11,8 @@ import {
   resolveSlugToPageId,
   deletePageAndSlugs,
   getBacklinks,
-  updateBacklinksForPage
+  updateBacklinksForPage,
+  commitSlugRename
 } from '../../page-database-utils.js';
 import { initializeDatabase } from '../../database-handle.js';
 
@@ -395,6 +396,26 @@ describe('page-database-utils', () => {
       await renameSlug('abc', 'old-slug', 'new-slug');
 
       expect(getAtPath('pages/source1')).toEqual(original);
+    });
+  });
+
+  describe('commitSlugRename', () => {
+    it('writes the caller\'s index swap and the rewritten Pages in one atomic update, skipping unchanged and missing Pages', async () => {
+      setAtPath('pages/changes', { title: 'old' });
+      setAtPath('pages/same', { title: 'untouched' });
+
+      await commitSlugRename(
+        { 'questionSlugIndex/a': null, 'questionSlugIndex/b': 'q1' },
+        ['changes', 'same', 'gone'],
+        (content) => (content.title === 'old' ? { title: 'new' } : content)
+      );
+
+      expect(mockUpdate).toHaveBeenCalledTimes(1);
+      expect(mockUpdate).toHaveBeenCalledWith({
+        'questionSlugIndex/a': null,
+        'questionSlugIndex/b': 'q1',
+        'pages/changes': { title: 'new' },
+      });
     });
   });
 });

@@ -18,7 +18,7 @@ import { createSlugIndex } from "./slug-index.js";
 import { realtimeStore } from "./realtime-store.js";
 import { getDb } from "./database-handle.js";
 import { QUESTION_LINKS, resolveLinkTargets } from "./backlinks.js";
-import { pageRewriteUpdates, recordPageLinks } from "./page-database-utils.js";
+import { commitSlugRename, recordPageLinks } from "./page-database-utils.js";
 import { extractQuestionLinkSlugs, rewriteQuestionSlugInContent } from "./question-links.js";
 
 /** @type {import("./slug-index.js").SlugNamespace} */
@@ -175,12 +175,11 @@ export async function removeQuestionSlug(slug) {
  * @throws {Error} If the new slug is malformed or already taken by another question
  */
 export async function renameQuestionSlug(questionId, oldSlug, newSlug) {
-  const slugUpdates = await slugs().renameUpdates(questionId, oldSlug, newSlug);
-  const pageUpdates = await pageRewriteUpdates(
+  await commitSlugRename(
+    await slugs().renameUpdates(questionId, oldSlug, newSlug),
     await getQuestionBacklinks(questionId),
     (content) => rewriteQuestionSlugInContent(content, oldSlug, newSlug)
   );
-  await update(ref(getDb()), { ...slugUpdates, ...pageUpdates });
 }
 
 /**
