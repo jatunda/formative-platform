@@ -9,3 +9,7 @@ Teacher-facing results reporting is an explicit future goal for this feature, wh
 ## Consequences
 
 When reporting is eventually built, it will only have data from the point persistence is switched on — there is no retroactive history from v1 usage to report on.
+
+## Update (2026-10-22): Saved Progress in the browser
+
+Students now keep Saved Progress (see `CONTEXT.md`) across refreshes and visits, held in the browser's own storage per Practice Set. This doesn't revisit the decision above: nothing about student activity reaches the database, delivery stays anonymous, and there is still no student identity. Saved Progress is recorded per Question rather than per position, which is also the shape a future database-backed record would want.

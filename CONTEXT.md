@@ -83,10 +83,18 @@ One submitted Option selection for a Question, made by a student working through
 
 **Frontier**:
 For a student working through a Practice Set, the first Question they have not yet finished (see Attempt). A student may freely navigate back and forth among every Question up to and including the Frontier, but cannot advance past it; finishing the Frontier's Question advances the Frontier to the next Question in the set.
-_Avoid_: current question, progress — Frontier specifically names the forward boundary of what's navigable, not simply whichever Question happens to be on screen (a student can be reviewing an earlier one while the Frontier sits further ahead).
+_Avoid_: current question, progress — Frontier specifically names the forward boundary of what's navigable, not simply whichever Question happens to be on screen (a student can be reviewing an earlier one while the Frontier sits further ahead). The Frontier is derived from Saved Progress, never stored on its own.
+
+**Saved Progress**:
+One browser's record of a student's Attempts and Question Outcomes on one Practice Set, including a Question left mid-retry after one wrong Attempt. It survives refreshes and return visits and is shared live across that browser's open tabs, but lives only in that browser — it never follows the student to another device and is never written to the database. Recorded per Question, not per position in the set, so editing a Practice Set's list leaves the student's work on the Questions still in it intact. Cleared only by the student, from the end-of-set summary.
+_Avoid_: progress (alone), session, save — say Saved Progress for the persisted record, Frontier for the navigable boundary derived from it.
 
 **Question Outcome**:
-The one of three results a Question ends in for a given student, once finished: First-Try Correct (right on the first Attempt), Second-Try Correct (wrong once, then right), or Missed (wrong twice, auto-revealed). Tallied into a Practice Set's end-of-set summary; held only in the browser for that session, never written to the database.
+The one of three results a Question ends in for a given student, once finished: First-Try Correct (right on the first Attempt), Second-Try Correct (wrong once, then right), or Missed (wrong twice, auto-revealed). Tallied into the Running Score and a Practice Set's end-of-set summary; kept in Saved Progress, never written to the database.
 
 **Expected Test Grade**:
 A letter grade (A–F, standard 90/80/70/60 cutoffs) shown on a Practice Set's end-of-set summary, estimated from the student's First-Try Correct percentage only — a real test gives one Attempt, so Second-Try Correct doesn't count toward it. A motivational estimate, not a recorded grade; like Question Outcomes it is never written to the database.
+
+**Running Score**:
+First-Try Correct out of the Questions finished so far, shown as a count and percentage while a student works through a Practice Set — the in-progress counterpart of the figure the Expected Test Grade is estimated from. Questions not yet finished don't count against it.
+_Avoid_: tally, streak — a streak is a different (not built) idea.
