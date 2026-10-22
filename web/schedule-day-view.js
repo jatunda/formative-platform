@@ -28,6 +28,7 @@ import {
   deleteDayAt
 } from './database-utils.js';
 import { lessonStore } from './lesson-store.js';
+import { getDb } from './database-handle.js';
 
 // Lesson titles are keyed by Lesson id, which is global (not per-Class),
 // so a single cache here is correct even when multiple Classes are rendered
@@ -138,7 +139,7 @@ export function createActionsCell(dayIndex, onDeleteDay) {
 /**
  * Create the stacked "Link Lesson" / "New Lesson" buttons for a day's lessons cell.
  * @param {number} dayIndex
- * @param {{classId: string, db: object, onReload: () => void}} ctx
+ * @param {{classId: string, onReload: () => void}} ctx
  * @returns {HTMLDivElement}
  */
 export function createEndButtonsContainer(dayIndex, ctx) {
@@ -148,7 +149,7 @@ export function createEndButtonsContainer(dayIndex, ctx) {
   const linkBtn = createStyledButton("Link Lesson", () => {
     showLessonSearchPopup({
       onSelect: async (lessonId) => {
-        const dayRef = ref(ctx.db, `schedule/${ctx.classId}/${dayIndex}`);
+        const dayRef = ref(getDb(), `schedule/${ctx.classId}/${dayIndex}`);
         const snap = await get(dayRef);
         const lessons = snap.exists() ? snap.val() : [];
         lessons.push(lessonId);
@@ -160,7 +161,7 @@ export function createEndButtonsContainer(dayIndex, ctx) {
 
   const newBtn = createNewLessonButtonShared(dayIndex, async (idx) => {
     const hash = await lessonStore().create({ title: DEFAULT_LESSON_TITLE });
-    const dayRef = ref(ctx.db, `schedule/${ctx.classId}/${idx}`);
+    const dayRef = ref(getDb(), `schedule/${ctx.classId}/${idx}`);
     const snap = await get(dayRef);
     const lessons = snap.exists() ? snap.val() : [];
     lessons.push(hash);
@@ -179,7 +180,7 @@ export function createEndButtonsContainer(dayIndex, ctx) {
  * page, which shows several Classes at once) is ignored rather than moved.
  * @param {HTMLTableCellElement} tdLessons
  * @param {number} toDayIndex
- * @param {{classId: string, db: object, onReload: () => void}} ctx
+ * @param {{classId: string, onReload: () => void}} ctx
  */
 export function setupLessonDropHandlers(tdLessons, toDayIndex, ctx) {
   setupDropHandlers(tdLessons, async (data) => {
@@ -192,8 +193,8 @@ export function setupLessonDropHandlers(tdLessons, toDayIndex, ctx) {
     if (Number(fromDayIndex) === Number(toDayIndex)) return;
 
     const [fromSnap, toSnap] = await Promise.all([
-      get(ref(ctx.db, `schedule/${ctx.classId}/${fromDayIndex}`)),
-      get(ref(ctx.db, `schedule/${ctx.classId}/${toDayIndex}`))
+      get(ref(getDb(), `schedule/${ctx.classId}/${fromDayIndex}`)),
+      get(ref(getDb(), `schedule/${ctx.classId}/${toDayIndex}`))
     ]);
 
     const fromLessons = fromSnap.exists() ? fromSnap.val() : [];
@@ -203,8 +204,8 @@ export function setupLessonDropHandlers(tdLessons, toDayIndex, ctx) {
     toLessons.push(lessonHash);
 
     await Promise.all([
-      set(ref(ctx.db, `schedule/${ctx.classId}/${fromDayIndex}`), fromLessons),
-      set(ref(ctx.db, `schedule/${ctx.classId}/${toDayIndex}`), toLessons)
+      set(ref(getDb(), `schedule/${ctx.classId}/${fromDayIndex}`), fromLessons),
+      set(ref(getDb(), `schedule/${ctx.classId}/${toDayIndex}`), toLessons)
     ]);
     ctx.onReload();
   }, {
@@ -221,7 +222,7 @@ export function setupLessonDropHandlers(tdLessons, toDayIndex, ctx) {
  * @param {string[]} lessons - Lesson hashes for this day
  * @param {number|undefined} todayDayIndex - Today's Day Index, for highlighting
  * @param {string} dateLabel - Pre-formatted calendar date for this Day Index
- * @param {{classId: string, db: object, onReload: () => void, onDeleteDay: (dayIndex: number) => void}} ctx
+ * @param {{classId: string, onReload: () => void, onDeleteDay: (dayIndex: number) => void}} ctx
  * @returns {Promise<HTMLTableRowElement>}
  */
 export async function createDayRow(dayIndex, lessons, todayDayIndex, dateLabel, ctx) {
@@ -252,7 +253,6 @@ export async function createDayRow(dayIndex, lessons, todayDayIndex, dateLabel, 
       lessons,
       lessonTitle: titles[i] || DEFAULT_LESSON_TITLE,
       classId: ctx.classId,
-      database: ctx.db,
       onScheduleReload: ctx.onReload
     }));
   }

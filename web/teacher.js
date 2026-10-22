@@ -271,7 +271,7 @@ export function debounce(func, wait) {
 /**
  * Create the final row for adding a new day past the end of the schedule
  * @param {number} nextIndex - The next day index
- * @param {{classId: string, db: object, onReload: () => void}} ctx
+ * @param {{classId: string, onReload: () => void}} ctx
  * @returns {Promise<HTMLTableRowElement>} The final row element
  */
 export async function createFinalRow(nextIndex, ctx) {
@@ -324,7 +324,6 @@ export async function renderScheduleTable(schedule, classId = currentClassId) {
 
   const ctx = {
     classId,
-    db,
     onReload: loadFullSchedule,
     onDeleteDay: makeDeleteDayHandler(classId, loadFullSchedule)
   };

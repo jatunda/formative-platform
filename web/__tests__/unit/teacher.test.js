@@ -282,7 +282,7 @@ describe('teacher', () => {
 
   describe('createFinalRow', () => {
     it('renders the next Day Index, its date, and end-buttons', async () => {
-      const ctx = { classId: 'csa', db: {}, onReload: vi.fn() };
+      const ctx = { classId: 'csa', onReload: vi.fn() };
       const row = await createFinalRow(7, ctx);
 
       const cells = row.querySelectorAll('td');

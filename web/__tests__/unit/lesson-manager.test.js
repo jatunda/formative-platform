@@ -4,6 +4,7 @@ import {
   createLessonClusterWithDB,
 } from '../../lesson-manager.js';
 import { DEFAULT_LESSON_TITLE } from '../../constants.js';
+import { initializeDatabase } from '../../database-handle.js';
 
 // Mock dependencies
 vi.mock('../../ui-components.js', () => ({
@@ -45,6 +46,7 @@ describe('lesson-manager', () => {
     document.body.innerHTML = '';
     vi.clearAllMocks();
     mockSet.mockResolvedValue(undefined);
+    initializeDatabase({});
   });
 
   describe('createLessonCluster', () => {
@@ -284,7 +286,6 @@ describe('lesson-manager', () => {
 
   describe('createLessonClusterWithDB', () => {
     it('should create cluster with database operations', async () => {
-      const mockDb = {};
       const onScheduleReload = vi.fn();
 
       const cluster = createLessonClusterWithDB({
@@ -294,7 +295,6 @@ describe('lesson-manager', () => {
         lessons: ['hash0', 'hash1', 'hash2'],
         lessonTitle: 'Test Lesson',
         classId: 'class1',
-        database: mockDb,
         onScheduleReload,
         onLessonClick: vi.fn(),
       });
@@ -304,7 +304,6 @@ describe('lesson-manager', () => {
     });
 
     it('should move lesson left when onMoveLeft is called', async () => {
-      const mockDb = {};
       const onScheduleReload = vi.fn();
 
       const cluster = createLessonClusterWithDB({
@@ -314,7 +313,6 @@ describe('lesson-manager', () => {
         lessons: ['hash0', 'hash1', 'hash2'],
         lessonTitle: 'Test',
         classId: 'class1',
-        database: mockDb,
         onScheduleReload,
       });
 
@@ -329,7 +327,6 @@ describe('lesson-manager', () => {
     });
 
     it('should not move lesson left if already at first position', async () => {
-      const mockDb = {};
       const onScheduleReload = vi.fn();
 
       const cluster = createLessonClusterWithDB({
@@ -339,7 +336,6 @@ describe('lesson-manager', () => {
         lessons: ['hash0', 'hash1'],
         lessonTitle: 'Test',
         classId: 'class1',
-        database: mockDb,
         onScheduleReload,
       });
 
@@ -354,7 +350,6 @@ describe('lesson-manager', () => {
     });
 
     it('should move lesson right when onMoveRight is called', async () => {
-      const mockDb = {};
       const onScheduleReload = vi.fn();
 
       const cluster = createLessonClusterWithDB({
@@ -364,7 +359,6 @@ describe('lesson-manager', () => {
         lessons: ['hash0', 'hash1', 'hash2'],
         lessonTitle: 'Test',
         classId: 'class1',
-        database: mockDb,
         onScheduleReload,
       });
 
@@ -378,7 +372,6 @@ describe('lesson-manager', () => {
     });
 
     it('should delete lesson when onDelete is called', async () => {
-      const mockDb = {};
       const onScheduleReload = vi.fn();
 
       const cluster = createLessonClusterWithDB({
@@ -388,7 +381,6 @@ describe('lesson-manager', () => {
         lessons: ['hash0', 'hash1', 'hash2'],
         lessonTitle: 'Test',
         classId: 'class1',
-        database: mockDb,
         onScheduleReload,
       });
 
@@ -405,7 +397,6 @@ describe('lesson-manager', () => {
     });
 
     it('should use default onClick handler if not provided', () => {
-      const mockDb = {};
       const cluster = createLessonClusterWithDB({
         lessonHash: 'hash1',
         dayIndex: 0,
@@ -413,7 +404,6 @@ describe('lesson-manager', () => {
         lessons: ['hash1'],
         lessonTitle: 'Test',
         classId: 'class1',
-        database: mockDb,
         onScheduleReload: vi.fn(),
       });
 
@@ -435,7 +425,6 @@ describe('lesson-manager', () => {
     });
 
     it('should use custom onClick handler if provided', () => {
-      const mockDb = {};
       const customOnClick = vi.fn();
       
       const cluster = createLessonClusterWithDB({
@@ -445,7 +434,6 @@ describe('lesson-manager', () => {
         lessons: ['hash1'],
         lessonTitle: 'Test',
         classId: 'class1',
-        database: mockDb,
         onScheduleReload: vi.fn(),
         onLessonClick: customOnClick,
       });

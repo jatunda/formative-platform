@@ -111,7 +111,7 @@ describe('schedule-day-view', () => {
   describe('New Lesson button', () => {
     it('creates an Empty Lesson and adds it to the end of that Day Index', async () => {
       mockData['schedule/class1/2'] = ['hashA'];
-      const container = createEndButtonsContainer(2, { classId: 'class1', db, onReload });
+      const container = createEndButtonsContainer(2, { classId: 'class1', onReload });
       const newBtn = [...container.querySelectorAll('button')].find(b => b.textContent === 'New Lesson');
 
       await newBtn.onclick();
@@ -128,7 +128,7 @@ describe('schedule-day-view', () => {
       mockData['schedule/class1/0'] = ['hashA', 'hashB'];
       mockData['schedule/class1/1'] = ['hashC'];
 
-      setupLessonDropHandlers(tdLessons, 1, { classId: 'class1', db, onReload });
+      setupLessonDropHandlers(tdLessons, 1, { classId: 'class1', onReload });
       await dispatchDrop(tdLessons, {
         lessonHash: 'hashB',
         fromDayIndex: 0,
@@ -145,7 +145,7 @@ describe('schedule-day-view', () => {
       mockData['schedule/class1/0'] = ['hashA'];
       mockData['schedule/class1/1'] = ['hashC'];
 
-      setupLessonDropHandlers(tdLessons, 1, { classId: 'class1', db, onReload });
+      setupLessonDropHandlers(tdLessons, 1, { classId: 'class1', onReload });
       await dispatchDrop(tdLessons, {
         lessonHash: 'hashA',
         fromDayIndex: 0,
@@ -160,7 +160,7 @@ describe('schedule-day-view', () => {
     it('ignores a drop onto the same day it came from', async () => {
       mockData['schedule/class1/0'] = ['hashA'];
 
-      setupLessonDropHandlers(tdLessons, 0, { classId: 'class1', db, onReload });
+      setupLessonDropHandlers(tdLessons, 0, { classId: 'class1', onReload });
       await dispatchDrop(tdLessons, {
         lessonHash: 'hashA',
         fromDayIndex: 0,
@@ -173,7 +173,7 @@ describe('schedule-day-view', () => {
     });
 
     it('accepts the hover state while dragging a lesson from the same Class', () => {
-      setupLessonDropHandlers(tdLessons, 1, { classId: 'class1', db, onReload });
+      setupLessonDropHandlers(tdLessons, 1, { classId: 'class1', onReload });
       startDrag({ lessonHash: 'hashA', fromDayIndex: 0, fromLessonIndex: 0, classId: 'class1' });
 
       const event = dispatchDragOver(tdLessons);
@@ -183,7 +183,7 @@ describe('schedule-day-view', () => {
     });
 
     it('rejects the hover state while dragging a lesson from a different Class', () => {
-      setupLessonDropHandlers(tdLessons, 1, { classId: 'class1', db, onReload });
+      setupLessonDropHandlers(tdLessons, 1, { classId: 'class1', onReload });
       startDrag({ lessonHash: 'hashA', fromDayIndex: 0, fromLessonIndex: 0, classId: 'class2' });
 
       const event = dispatchDragOver(tdLessons);

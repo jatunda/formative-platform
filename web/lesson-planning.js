@@ -204,7 +204,6 @@ export async function renderClassPane(classId, className, containerEl) {
   const onReload = () => renderClassPane(classId, className, containerEl);
   const ctx = {
     classId,
-    db,
     onReload,
     onDeleteDay: makeDeleteDayHandler(classId, onReload)
   };
