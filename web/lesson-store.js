@@ -12,15 +12,6 @@ const SCHEDULE_PATH = "schedule";
 const CLASSES_PATH = "classes";
 
 /**
- * The storage the Lesson store reads and writes through. `update` applies a
- * multi-path update atomically, `null` values deleting (Realtime Database
- * semantics). Same shape as slug-index.js's SlugStore.
- * @typedef {object} LessonStorePort
- * @property {(path: string) => Promise<any>} read
- * @property {(updates: Record<string, any>) => Promise<void>} update
- */
-
-/**
  * The Lesson store over the page's database (see database-handle.js). Call it
  * per use rather than once at import time, so it picks up the handle the
  * page initialized.
@@ -30,7 +21,8 @@ export function lessonStore() {
 }
 
 /**
- * @param {LessonStorePort} store
+ * @param {import("./realtime-store.js").Store} store - The storage the Lesson
+ *   store reads and writes through
  */
 export function createLessonStore(store) {
   return {

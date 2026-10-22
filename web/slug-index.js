@@ -18,15 +18,6 @@ export function isValidSlugFormat(slug) {
 }
 
 /**
- * The storage the index reads and writes through. `update` applies a
- * multi-path update atomically, `null` values deleting (Realtime Database
- * semantics).
- * @typedef {object} SlugStore
- * @property {(path: string) => Promise<any>} read
- * @property {(updates: Record<string, any>) => Promise<void>} update
- */
-
-/**
  * @typedef {object} SlugNamespace
  * @property {string} indexPath
  * @property {string} formatExample
@@ -35,7 +26,8 @@ export function isValidSlugFormat(slug) {
 
 /**
  * @param {SlugNamespace} namespace
- * @param {SlugStore} store
+ * @param {import("./realtime-store.js").Store} store - The storage the index
+ *   reads and writes through
  */
 export function createSlugIndex(namespace, store) {
   const { indexPath } = namespace;

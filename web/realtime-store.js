@@ -1,6 +1,7 @@
+// @ts-check
 // Adapts a Firebase Realtime Database to the small read/update port that
-// storage-agnostic modules (slug-index.js) take, so they stay pure and
-// testable against the Firebase test double.
+// storage-agnostic modules (slug-index.js, lesson-store.js) take, so they
+// stay pure and testable against the Firebase test double.
 import {
   ref,
   get,
@@ -8,8 +9,17 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js";
 
 /**
- * @param {import("https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js").Database} db
- * @returns {import("./slug-index.js").SlugStore}
+ * The storage port: `read` resolves a path to its value (null when absent);
+ * `update` applies a multi-path update atomically, `null` values deleting
+ * (Realtime Database semantics).
+ * @typedef {object} Store
+ * @property {(path: string) => Promise<any>} read
+ * @property {(updates: Record<string, any>) => Promise<void>} update
+ */
+
+/**
+ * @param {import("./database-handle.js").Database} db
+ * @returns {Store}
  */
 export function realtimeStore(db) {
   return {

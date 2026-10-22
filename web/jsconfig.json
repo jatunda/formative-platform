@@ -13,5 +13,5 @@
     "strict": false,
     "strictNullChecks": true
   },
-  "include": ["robotics/**/*.js", "question-backlinks.js", "slug-index.js", "backlinks.js", "database-handle.js", "lesson-store.js", "unique-key.js"]
+  "include": ["robotics/**/*.js", "question-backlinks.js", "slug-index.js", "backlinks.js", "database-handle.js", "lesson-store.js", "unique-key.js", "realtime-store.js", "firebase-database.d.ts"]
 }

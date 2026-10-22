@@ -29,30 +29,30 @@ import {
 } from './database-utils.js';
 import { lessonStore } from './lesson-store.js';
 
-// Lesson titles are keyed by content hash, which is global (not per-Class),
+// Lesson titles are keyed by Lesson id, which is global (not per-Class),
 // so a single cache here is correct even when multiple Classes are rendered
 // at once on the Lesson Planning page.
 const titleCache = {};
 
 /**
- * Get titles for a batch of lesson hashes, fetching only the ones not already cached.
- * @param {string[]} hashes
- * @returns {Promise<string[]>} Titles in the same order as `hashes`
+ * Get titles for a batch of Lesson ids, fetching only the ones not already cached.
+ * @param {string[]} lessonIds
+ * @returns {Promise<string[]>} Titles in the same order as `lessonIds`
  */
-export async function getLessonTitles(hashes) {
-  const missing = [...new Set(hashes)].filter(hash => !(hash in titleCache));
+export async function getLessonTitles(lessonIds) {
+  const missing = [...new Set(lessonIds)].filter(id => !(id in titleCache));
 
   if (missing.length > 0) {
     const lessons = lessonStore();
-    const results = await Promise.all(missing.map(async (hash) => {
-      return [hash, (await lessons.getTitle(hash)) ?? UNTITLED_LESSON];
+    const results = await Promise.all(missing.map(async (id) => {
+      return [id, (await lessons.getTitle(id)) ?? UNTITLED_LESSON];
     }));
-    results.forEach(([hash, title]) => {
-      titleCache[hash] = title;
+    results.forEach(([id, title]) => {
+      titleCache[id] = title;
     });
   }
 
-  return hashes.map(hash => titleCache[hash]);
+  return lessonIds.map(id => titleCache[id]);
 }
 
 /**

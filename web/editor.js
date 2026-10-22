@@ -236,13 +236,13 @@ export function setEditingEnabled(enabled) {
  */
 export async function saveLesson(id, dslText) {
   if (!id || id === NO_CONTENT_SELECTED) {
-    alert("No content ID available.");
+    alert("No Lesson ID available.");
     return false;
   }
 
   const parsed = parseDSL(dslText);
   if (!parsed.title || !parsed.blocks) {
-    alert("Parsing failed or content is malformed.");
+    alert("Parsing failed or the Lesson is malformed.");
     return false;
   }
 
@@ -260,11 +260,11 @@ export async function saveLesson(id, dslText) {
  * duplicated Lesson on success, so the caller can update the editor and
  * the lesson dropdown - or null if duplication didn't happen (invalid
  * DSL, or a save failure, both already alerted/notified here).
- * @returns {Promise<{newHash: string, duplicatedContent: Object}|null>}
+ * @returns {Promise<{id: string, lesson: Object}|null>}
  */
 export async function duplicateLesson(currentId, dslText) {
   if (!currentId || currentId === NO_CONTENT_SELECTED) {
-    alert("No content ID available.");
+    alert("No Lesson ID available.");
     return null;
   }
 
@@ -272,21 +272,21 @@ export async function duplicateLesson(currentId, dslText) {
   try {
     parsed = parseDSL(dslText);
     if (!parsed.title || !parsed.blocks) {
-      alert("Cannot duplicate: Current content is malformed or empty.");
+      alert("Cannot duplicate: The current Lesson is malformed or empty.");
       return null;
     }
   } catch (err) {
-    alert("Cannot duplicate: Failed to parse current content.");
+    alert("Cannot duplicate: Failed to parse the current Lesson.");
     return null;
   }
 
   try {
-    const { id: newHash, lesson: duplicatedContent } = await lessonStore().duplicate(parsed);
-    alert(`Content duplicated successfully!\nNew ID: ${newHash}`);
-    return { newHash, duplicatedContent };
+    const { id, lesson } = await lessonStore().duplicate(parsed);
+    alert(`Lesson duplicated successfully!\nNew ID: ${id}`);
+    return { id, lesson };
   } catch (error) {
-    console.error("Error duplicating content:", error);
-    showNotification("Failed to duplicate content. Please try again.", "error");
+    console.error("Error duplicating Lesson:", error);
+    showNotification("Failed to duplicate the Lesson. Please try again.", "error");
     return null;
   }
 }
@@ -316,7 +316,7 @@ export function deleteLessonConfirmMessage(title, id, uses) {
  */
 export async function deleteLesson(id, dslText) {
   if (!id || id === NO_CONTENT_SELECTED) {
-    alert("No content ID available.");
+    alert("No Lesson ID available.");
     return false;
   }
 
@@ -399,8 +399,8 @@ export async function loadContent(id, dslInputEl, previewEl) {
 export async function handleNewLessonContext(params, contentIdEl, dslInputEl, previewEl) {
   if (params.new !== "1") return;
 
-  const newHash = await lessonStore().newId();
-  contentIdEl.textContent = newHash;
+  const lessonId = await lessonStore().newId();
+  contentIdEl.textContent = lessonId;
   const dslText = generateDSLFromContent({
     title: "New Lesson",
     blocks: [{ type: "question", content: [{ type: "text", value: "Type your question or content here..." }] }]
@@ -546,15 +546,15 @@ export async function main() {
     const result = await duplicateLesson(contentIdEl.textContent.trim(), dslInput.value);
     if (!result) return;
 
-    const { newHash, duplicatedContent } = result;
-    contentIdEl.textContent = newHash;
-    const newDslText = generateDSLFromContent(duplicatedContent);
+    const { id, lesson } = result;
+    contentIdEl.textContent = id;
+    const newDslText = generateDSLFromContent(lesson);
     dslInput.value = newDslText;
     updatePreview(newDslText, preview);
     markClean();
 
     existingContentSelect.value = "";
-    await loadExistingContentList(existingContentSelect, newHash);
+    await loadExistingContentList(existingContentSelect, id);
     previousSelectedValue = existingContentSelect.value;
   };
 

@@ -331,7 +331,7 @@ describe('editor', () => {
     it('alerts, does not save, and reports failure when there is no Lesson id', async () => {
       const result = await saveLesson('', '# Title');
       expect(await lessons.listTitles()).toEqual({});
-      expect(alert).toHaveBeenCalledWith('No content ID available.');
+      expect(alert).toHaveBeenCalledWith('No Lesson ID available.');
       expect(result).toBe(false);
     });
 
@@ -339,7 +339,7 @@ describe('editor', () => {
       mockParseDSL.mockReturnValue({ title: null, blocks: null });
       const result = await saveLesson('abc123', 'garbage');
       expect(await lessons.get('abc123')).toBeNull();
-      expect(alert).toHaveBeenCalledWith('Parsing failed or content is malformed.');
+      expect(alert).toHaveBeenCalledWith('Parsing failed or the Lesson is malformed.');
       expect(result).toBe(false);
     });
   });
@@ -350,28 +350,29 @@ describe('editor', () => {
 
       const result = await duplicateLesson('abc123', '# Original');
 
-      expect(result.duplicatedContent.title).toBe('Original (Copy)');
-      expect(await lessons.get(result.newHash)).toEqual({ title: 'Original (Copy)', blocks: [{}] });
-      expect(alert).toHaveBeenCalledWith(expect.stringContaining(result.newHash));
+      expect(result.lesson.title).toBe('Original (Copy)');
+      expect(await lessons.get(result.id)).toEqual({ title: 'Original (Copy)', blocks: [{}] });
+      expect(alert).toHaveBeenCalledWith(`Lesson duplicated successfully!\nNew ID: ${result.id}`);
     });
 
     it('returns null and alerts when there is no current Lesson id', async () => {
       const result = await duplicateLesson('', '# Title');
       expect(result).toBeNull();
-      expect(alert).toHaveBeenCalledWith('No content ID available.');
+      expect(alert).toHaveBeenCalledWith('No Lesson ID available.');
     });
 
     it('returns null and alerts when the current Lesson is malformed', async () => {
       mockParseDSL.mockReturnValue({ title: null, blocks: null });
       const result = await duplicateLesson('abc123', 'garbage');
       expect(result).toBeNull();
+      expect(alert).toHaveBeenCalledWith('Cannot duplicate: The current Lesson is malformed or empty.');
     });
 
     it('returns null and alerts when parsing throws', async () => {
       mockParseDSL.mockImplementation(() => { throw new Error('boom'); });
       const result = await duplicateLesson('abc123', 'garbage');
       expect(result).toBeNull();
-      expect(alert).toHaveBeenCalledWith('Cannot duplicate: Failed to parse current content.');
+      expect(alert).toHaveBeenCalledWith('Cannot duplicate: Failed to parse the current Lesson.');
     });
 
     it('returns null and notifies on a save failure', async () => {
@@ -452,7 +453,7 @@ describe('editor', () => {
     it('alerts and does nothing when there is no Lesson id', async () => {
       const result = await deleteLesson('', '# Title');
       expect(result).toBe(false);
-      expect(alert).toHaveBeenCalledWith('No content ID available.');
+      expect(alert).toHaveBeenCalledWith('No Lesson ID available.');
     });
 
     it('falls back to the title from the database when the current DSL fails to parse', async () => {

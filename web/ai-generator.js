@@ -666,7 +666,7 @@ export class AIQuestionGenerator {
       }
 
       // Reserve an unused Lesson id
-      const contentId = await lessonStore().newId();
+      const lessonId = await lessonStore().newId();
 
       // Get class metadata
       const selectedOption = this.classSelect.selectedOptions[0];
@@ -685,14 +685,14 @@ export class AIQuestionGenerator {
       // Call LLM
       const generatedContent = await this.llmProvider.generateQuestions(prompt);
       
-      // Insert into editor with the unique content ID
-      this.insertIntoEditor(generatedContent, contentId);
+      // Insert into editor with the reserved Lesson id
+      this.insertIntoEditor(generatedContent, lessonId);
       
       // Enable editing in the editor
       this.enableEditing(true);
       
       // Update dropdown list to include the new content
-      await this.updateContentList(contentId);
+      await this.updateContentList(lessonId);
       
       // Close modal
       this.hideModal();
@@ -709,12 +709,12 @@ export class AIQuestionGenerator {
    * Insert generated content into the editor
    * Formats the content to ensure it follows DSL format and triggers preview update
    * @param {string} content - The generated DSL content
-   * @param {string} contentId - The unique content ID
+   * @param {string} lessonId - The reserved Lesson id
    * @private
    */
-  insertIntoEditor(content, contentId) {
+  insertIntoEditor(content, lessonId) {
     const dslInput = document.getElementById('dslInput');
-    const contentIdEl = document.getElementById('contentId');
+    const lessonIdEl = document.getElementById('contentId');
     
     if (dslInput) {
       // Format the AI-generated content to ensure it follows DSL format
@@ -732,9 +732,9 @@ export class AIQuestionGenerator {
       
       dslInput.value = formattedContent;
       
-      // Set the content ID
-      if (contentIdEl) {
-        contentIdEl.textContent = contentId;
+      // Set the Lesson id
+      if (lessonIdEl) {
+        lessonIdEl.textContent = lessonId;
       }
       
       // Trigger the existing preview update
@@ -755,11 +755,11 @@ export class AIQuestionGenerator {
 
   /**
    * Update the content list dropdown (currently just clears selection)
-   * @param {string} contentId - The content ID (currently unused)
+   * @param {string} lessonId - The Lesson id (currently unused)
    * @returns {Promise<void>}
    * @private
    */
-  async updateContentList(contentId) {
+  async updateContentList(lessonId) {
     // Get the select element
     const existingContentSelect = document.getElementById('existingContent');
     if (!existingContentSelect) return;
