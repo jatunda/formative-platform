@@ -257,7 +257,7 @@ describe('lesson-planning', () => {
 
       await renderClassPane('csa', 'CS A', containerEl);
 
-      expect(mockGetLessonTitles).toHaveBeenCalledWith(expect.anything(), ['hashA', 'hashB']);
+      expect(mockGetLessonTitles).toHaveBeenCalledWith(['hashA', 'hashB']);
     });
 
     it("builds delete/insert handlers scoped to this Class and today's max Day Index", async () => {

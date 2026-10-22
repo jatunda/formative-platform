@@ -199,7 +199,7 @@ export async function renderClassPane(classId, className, containerEl) {
 
   // Preload titles for lessons visible in this pane's window only.
   const lessonHashesInWindow = windowIndexes.flatMap(idx => schedule[idx] || []);
-  await getLessonTitles(db, lessonHashesInWindow);
+  await getLessonTitles(lessonHashesInWindow);
 
   const onReload = () => renderClassPane(classId, className, containerEl);
   const ctx = {

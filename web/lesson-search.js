@@ -5,9 +5,8 @@
 // - Supports abbreviations and acronyms
 // - Visual match quality indicators (green=exact, yellow=good, gray=weak)
 // - Results sorted by relevance score
-import { ref, get } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js";
 import { UNTITLED_LESSON } from './constants.js';
-import { getDb } from './database-handle.js';
+import { lessonStore } from './lesson-store.js';
 
 // Cache for page titles to avoid redundant queries
 const pageTitles = {}; // id → title
@@ -89,34 +88,18 @@ function fuzzyScore(text, query) {
 export function showLessonSearchPopup({ onSelect }) {
   (async () => {
     try {
-      const db = getDb();
-      // OPTIMIZATION: First get shallow list of IDs to minimize data transfer
-      const shallowSnap = await get(ref(db, "content"));
-      if (!shallowSnap.exists()) {
+      const titles = await lessonStore().listTitles();
+      if (Object.keys(titles).length === 0) {
         alert("No lessons found.");
         return;
       }
-      
-      const allIds = Object.keys(shallowSnap.val());
-      
-      // OPTIMIZATION: Batch fetch only titles for existing lessons
-      const titlePromises = allIds.map(async (id) => {
-        // Check cache first
-        if (pageTitles[id]) {
-          return { id, title: pageTitles[id] };
-        }
-        
-        const titleSnap = await get(ref(db, `content/${id}/title`));
-        const title = titleSnap.exists() ? titleSnap.val() : UNTITLED_LESSON;
-        pageTitles[id] = title; // Cache it
-        return { id, title };
-      });
-      
-      const titleResults = await Promise.all(titlePromises);
+
       const contentMap = {};
-      titleResults.forEach(({ id, title }) => {
+      for (const [id, storedTitle] of Object.entries(titles)) {
+        const title = storedTitle ?? UNTITLED_LESSON;
+        pageTitles[id] = title; // Cache it
         contentMap[id] = { title };
-      });
+      }
       
       console.log(`Loaded ${Object.keys(contentMap).length} lesson titles`);
       

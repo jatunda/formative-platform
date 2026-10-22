@@ -4,12 +4,8 @@ import {
   getScheduleForDay,
   updateScheduleForDay,
   getFullSchedule,
-  getLessonFromDB,
-  getLessonTitleFromDB,
-  createNewLesson,
   generateUniqueHash,
   getClasses,
-  getAllContent,
   addLessonToSchedule,
   removeLessonFromSchedule,
   moveLessonInSchedule,
@@ -19,7 +15,6 @@ import {
   insertDayAt,
   deleteDayAt,
 } from '../../database-utils.js';
-import { UNTITLED_LESSON } from '../../constants.js';
 
 // Mock Firebase
 let mockData = {};
@@ -149,55 +144,21 @@ describe('database-utils', () => {
     });
   });
 
-  describe('getLessonFromDB', () => {
-    it('should get lesson from database', async () => {
-      mockData.content = {
-        hash1: { title: 'Lesson 1', content: 'Some content' },
-      };
-      
-      const lesson = await getLessonFromDB('hash1');
-      expect(lesson).toEqual({ title: 'Lesson 1', content: 'Some content' });
-    });
-
-    it('should return null if lesson does not exist', async () => {
-      
-      const lesson = await getLessonFromDB('nonexistent');
-      expect(lesson).toBeNull();
-    });
-  });
-
-  describe('getLessonTitleFromDB', () => {
-    it('should get lesson title from database', async () => {
-      mockData.content = {
-        hash1: { title: 'Lesson 1' },
-      };
-      
-      const title = await getLessonTitleFromDB('hash1');
-      expect(title).toBe('Lesson 1');
-    });
-
-    it('should return UNTITLED_LESSON if lesson does not exist', async () => {
-      
-      const title = await getLessonTitleFromDB('nonexistent');
-      expect(title).toBe(UNTITLED_LESSON);
-    });
-  });
-
   describe('generateUniqueHash', () => {
     it('should generate a unique hash', async () => {
-      mockData.content = {};
+      mockData.pages = {};
       
-      const hash = await generateUniqueHash();
+      const hash = await generateUniqueHash('pages');
       expect(hash).toBeDefined();
       expect(hash.length).toBe(32);
       expect(/^[0-9a-f]{32}$/.test(hash)).toBe(true);
     });
 
     it('should generate different hashes on subsequent calls', async () => {
-      mockData.content = {};
+      mockData.pages = {};
       
-      const hash1 = await generateUniqueHash();
-      const hash2 = await generateUniqueHash();
+      const hash1 = await generateUniqueHash('pages');
+      const hash2 = await generateUniqueHash('pages');
       // Very unlikely to be the same, but possible
       expect(hash1).toBeDefined();
       expect(hash2).toBeDefined();
@@ -222,32 +183,12 @@ describe('database-utils', () => {
         });
       });
       
-      const hash = await generateUniqueHash();
+      const hash = await generateUniqueHash('pages');
       expect(hash).toBeDefined();
       expect(callCount).toBeGreaterThan(1);
     });
   });
 
-  describe('createNewLesson', () => {
-    it('should create a new lesson with default title', async () => {
-      mockData.content = {};
-      
-      const hash = await createNewLesson();
-      expect(hash).toBeDefined();
-      expect(mockSet).toHaveBeenCalled();
-    });
-
-    it('should create a new lesson with custom title', async () => {
-      mockData.content = {};
-      
-      const hash = await createNewLesson('Custom Title');
-      expect(hash).toBeDefined();
-      const setCall = mockSet.mock.calls.find(call => 
-        call[0].path.includes('content/')
-      );
-      expect(setCall[1]).toEqual({ title: 'Custom Title' });
-    });
-  });
 
   describe('getClasses', () => {
     it('should get all classes', async () => {
@@ -270,26 +211,6 @@ describe('database-utils', () => {
     });
   });
 
-  describe('getAllContent', () => {
-    it('should get all content', async () => {
-      mockData.content = {
-        hash1: { title: 'Lesson 1' },
-        hash2: { title: 'Lesson 2' },
-      };
-      
-      const content = await getAllContent();
-      expect(content).toEqual({
-        hash1: { title: 'Lesson 1' },
-        hash2: { title: 'Lesson 2' },
-      });
-    });
-
-    it('should return null if no content exists', async () => {
-      
-      const content = await getAllContent();
-      expect(content).toBeNull();
-    });
-  });
 
   describe('addLessonToSchedule', () => {
     it('should add lesson to schedule', async () => {

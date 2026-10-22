@@ -3,13 +3,6 @@ import { TeacherAuth } from './teacher-auth.js';
 // Initialize teacher authentication
 window.teacherAuth = new TeacherAuth();
 
-import {
-	ref,
-	get,
-	set,
-	remove,
-	child
-} from "https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js";
 import { db } from './firebase-config.js';
 import { initializeDatabase } from './database-handle.js';
 import {
@@ -29,9 +22,7 @@ import {
 import {
 	AIQuestionGenerator
 } from "./ai-generator.js";
-import {
-	generateUniqueHash
-} from "./database-utils.js";
+import { lessonStore } from "./lesson-store.js";
 import { renderTeacherNav } from "./teacher-nav.js";
 import { createDslCheatSheetPanel } from "./dsl-cheat-sheet.js";
 import { mountQuestionEmbeds } from "./question-embed.js";
@@ -255,7 +246,7 @@ export async function saveLesson(id, dslText) {
     return false;
   }
 
-  await set(ref(db, `content/${id}`), parsed);
+  await lessonStore().save(id, parsed);
 
   const timestamp = new Date().toLocaleString();
   const lessonTitle = parsed.title || UNTITLED_LESSON;
@@ -264,11 +255,11 @@ export async function saveLesson(id, dslText) {
 }
 
 /**
- * Duplicate a Lesson: parse the current DSL, save a copy under a new hash
- * with "(Copy)" appended to its title. Returns the new hash and the
- * duplicated content on success, so the caller can update the editor and
+ * Duplicate a Lesson: parse the current DSL, save a copy under a new id
+ * with "(Copy)" appended to its title. Returns the new id and the
+ * duplicated Lesson on success, so the caller can update the editor and
  * the lesson dropdown - or null if duplication didn't happen (invalid
- * content, or a save failure, both already alerted/notified here).
+ * DSL, or a save failure, both already alerted/notified here).
  * @returns {Promise<{newHash: string, duplicatedContent: Object}|null>}
  */
 export async function duplicateLesson(currentId, dslText) {
@@ -290,9 +281,7 @@ export async function duplicateLesson(currentId, dslText) {
   }
 
   try {
-    const newHash = await generateUniqueHash();
-    const duplicatedContent = { ...parsed, title: `${parsed.title} (Copy)` };
-    await set(ref(db, `content/${newHash}`), duplicatedContent);
+    const { id: newHash, lesson: duplicatedContent } = await lessonStore().duplicate(parsed);
     alert(`Content duplicated successfully!\nNew ID: ${newHash}`);
     return { newHash, duplicatedContent };
   } catch (error) {
@@ -303,8 +292,26 @@ export async function duplicateLesson(currentId, dslText) {
 }
 
 /**
- * Delete a Lesson after confirming with the teacher (using its title from
- * the current DSL, falling back to the database, then to a generic title).
+ * The delete confirm's text: names every Class and Day Index that will lose
+ * the Lesson, or says no Schedule uses it.
+ * @param {string} title
+ * @param {string} id
+ * @param {import("./lesson-store.js").ScheduleUse[]} uses
+ * @returns {string}
+ */
+export function deleteLessonConfirmMessage(title, id, uses) {
+  const schedules = uses.length === 0
+    ? "No Class's Schedule uses it."
+    : "It will also be removed from these Schedules:\n" +
+      uses.map(({ className, dayIndices }) => `  - ${className}: Day Index ${dayIndices.join(", ")}`).join("\n");
+  return `Are you sure you want to delete the lesson "${title}"?\n\n${schedules}\n\nLesson ID: ${id}\nThis action cannot be undone.`;
+}
+
+/**
+ * Delete a Lesson after confirming with the teacher. The confirm uses its
+ * title from the current DSL (falling back to the database, then to a
+ * generic title) and warns which Classes' Schedules will lose it; the delete
+ * takes it out of those Schedules too.
  * @returns {Promise<boolean>} Whether the delete actually happened
  */
 export async function deleteLesson(id, dslText) {
@@ -313,6 +320,7 @@ export async function deleteLesson(id, dslText) {
     return false;
   }
 
+  const lessons = lessonStore();
   let title = UNTITLED_LESSON;
   try {
     const parsed = parseDSL(dslText);
@@ -321,25 +329,22 @@ export async function deleteLesson(id, dslText) {
     }
   } catch (err) {
     try {
-      const snap = await get(ref(db, `content/${id}/title`));
-      if (snap.exists()) {
-        title = snap.val();
-      }
+      title = (await lessons.getTitle(id)) ?? UNTITLED_LESSON;
     } catch (dbErr) {
       // Keep default title if both methods fail
     }
   }
 
-  const confirmed = confirm(`Are you sure you want to delete the lesson "${title}"?\n\nContent ID: ${id}\nThis action cannot be undone.`);
-  if (!confirmed) return false;
-
   try {
-    await remove(ref(db, `content/${id}`));
-    showNotification("Content deleted successfully!", "success");
+    const uses = await lessons.findScheduleUses(id);
+    if (!confirm(deleteLessonConfirmMessage(title, id, uses))) return false;
+
+    await lessons.delete(id);
+    showNotification("Lesson deleted.", "success");
     return true;
   } catch (error) {
-    console.error("Error deleting content:", error);
-    showNotification("Failed to delete content. Please try again.", "error");
+    console.error("Error deleting lesson:", error);
+    showNotification("Failed to delete the lesson. Please try again.", "error");
     return false;
   }
 }
@@ -347,14 +352,11 @@ export async function deleteLesson(id, dslText) {
 export async function loadExistingContentList(existingContentSelectEl, selectLessonId = null) {
   existingContentSelectEl.innerHTML = '<option value="">-- Select a lesson --</option>';
 
-  const snap = await get(child(ref(db), "content"));
-  if (!snap.exists()) return;
-
-  const contentMap = snap.val();
-  const sortedKeys = Object.keys(contentMap).sort();
+  const titles = await lessonStore().listTitles();
+  const sortedKeys = Object.keys(titles).sort();
 
   for (let id of sortedKeys) {
-    const title = contentMap[id]?.title || UNTITLED_LESSON_LOWERCASE;
+    const title = titles[id] || UNTITLED_LESSON_LOWERCASE;
     const option = document.createElement("option");
     option.value = id;
     option.textContent = title;
@@ -372,20 +374,19 @@ export async function loadExistingContentList(existingContentSelectEl, selectLes
 }
 
 /**
- * Load a Lesson's content into the editor and preview. Does not enable
+ * Load a Lesson into the editor and preview. Does not enable
  * editing itself - callers do that, since they already need to decide
  * whether to (e.g. handleExistingPageContext doesn't, on a load failure).
  * @returns {Promise<boolean>} Whether the Lesson was found and loaded
  */
 export async function loadContent(id, dslInputEl, previewEl) {
-  const snap = await get(ref(db, `content/${id}`));
-  if (!snap.exists()) {
+  const lesson = await lessonStore().get(id);
+  if (!lesson) {
     alert(CONTENT_NOT_FOUND);
     return false;
   }
 
-  const data = snap.val();
-  const dslText = generateDSLFromContent(data);
+  const dslText = generateDSLFromContent(lesson);
   dslInputEl.value = dslText;
   updatePreview(dslText, previewEl);
   return true;
@@ -393,12 +394,12 @@ export async function loadContent(id, dslInputEl, previewEl) {
 
 /**
  * If ?new=1 is in the URL, seed the editor with a blank, ready-to-edit
- * Lesson and a fresh content id.
+ * Lesson and a fresh Lesson id.
  */
 export async function handleNewLessonContext(params, contentIdEl, dslInputEl, previewEl) {
   if (params.new !== "1") return;
 
-  const newHash = await generateUniqueHash();
+  const newHash = await lessonStore().newId();
   contentIdEl.textContent = newHash;
   const dslText = generateDSLFromContent({
     title: "New Lesson",

@@ -258,7 +258,7 @@ describe('teacher', () => {
       scheduleFixture();
       await renderScheduleTable({ 0: ['hashA'], 1: ['hashB', 'hashC'] }, 'csa');
 
-      expect(mockGetLessonTitles).toHaveBeenCalledWith(expect.anything(), ['hashA', 'hashB', 'hashC']);
+      expect(mockGetLessonTitles).toHaveBeenCalledWith(['hashA', 'hashB', 'hashC']);
     });
 
     it('scopes the delete/insert handlers to the given Class and its max Day Index', async () => {

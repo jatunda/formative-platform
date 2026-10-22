@@ -4,8 +4,9 @@ import {
   get,
   set
 } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js";
-import { DEFAULT_LESSON_TITLE, UNTITLED_LESSON } from "./constants.js";
 import { getDb } from "./database-handle.js";
+import { realtimeStore } from "./realtime-store.js";
+import { generateUniqueKey } from "./unique-key.js";
 
 /**
  * Get schedule for a specific day
@@ -59,52 +60,13 @@ export async function getFullSchedule(classId) {
 }
 
 /**
- * Get lesson data from database
- * @param {string} hash - The lesson hash/ID
- * @returns {Promise<Object | null>} The lesson data, or null if not found
- */
-export async function getLessonFromDB(hash) {
-  const snap = await get(ref(getDb(), `content/${hash}`));
-  return snap.exists() ? snap.val() : null;
-}
-
-/**
- * Get lesson title from database
- * @param {string} hash - The lesson hash/ID
- * @returns {Promise<string>} The lesson title, or UNTITLED_LESSON if not found
- */
-export async function getLessonTitleFromDB(hash) {
-  const snap = await get(ref(getDb(), `content/${hash}/title`));
-  return snap.exists() ? snap.val() : UNTITLED_LESSON;
-}
-
-/**
- * Create a new lesson in the database with a unique hash
- * @param {string} [title=DEFAULT_LESSON_TITLE] - The lesson title
- * @returns {Promise<string>} The generated unique hash for the lesson
- */
-export async function createNewLesson(title = DEFAULT_LESSON_TITLE) {
-  const hash = await generateUniqueHash();
-  await set(ref(getDb(), `content/${hash}`), { title });
-  return hash;
-}
-
-/**
- * Generate a unique hash for new database records (lessons, pages, ...)
- * Continuously generates hashes until one is found that doesn't exist under basePath
- * @param {string} [basePath="content"] - The top-level DB tree to check uniqueness against
+ * Generate a unique id for a new Page, Question or Practice Set record.
+ * (Lessons get theirs from the Lesson store's newId/create.)
+ * @param {string} basePath - The top-level DB tree to check uniqueness against
  * @returns {Promise<string>} A unique 32-character hexadecimal hash
  */
-export async function generateUniqueHash(basePath = "content") {
-  let hash;
-  let exists = true;
-  while (exists) {
-    hash = Array.from(crypto.getRandomValues(new Uint8Array(16)))
-      .map(b => b.toString(16).padStart(2, "0")).join("");
-    const snap = await get(ref(getDb(), `${basePath}/${hash}`));
-    exists = snap.exists();
-  }
-  return hash;
+export function generateUniqueHash(basePath) {
+  return generateUniqueKey(realtimeStore(getDb()).read, basePath);
 }
 
 /**
@@ -114,15 +76,6 @@ export async function generateUniqueHash(basePath = "content") {
 export async function getClasses() {
   const snap = await get(ref(getDb(), "classes"));
   return snap.val();
-}
-
-/**
- * Get all content (for lesson linking popup)
- * @returns {Promise<Object | null>} Object mapping lesson hashes to lesson data, or null if none exist
- */
-export async function getAllContent() {
-  const snap = await get(ref(getDb(), "content"));
-  return snap.exists() ? snap.val() : null;
 }
 
 /**

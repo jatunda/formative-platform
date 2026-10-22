@@ -1,7 +1,7 @@
 import { ref, get } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js";
 import { AI_CONFIG } from "./ai-config.js";
 import { parseDSL } from "./dsl.js";
-import { generateUniqueHash } from "./database-utils.js";
+import { lessonStore } from "./lesson-store.js";
 import { getDb } from "./database-handle.js";
 
 // Prompt Profile per Class (hard-coded for MVP) - see CONTEXT.md. Distinct
@@ -636,7 +636,6 @@ export class AIQuestionGenerator {
     document.getElementById('errorState').style.display = 'none';
   }
 
-  // generateUniqueHash is imported from database-utils.js
 
   /**
    * Generate questions using AI based on user inputs
@@ -666,8 +665,8 @@ export class AIQuestionGenerator {
         return;
       }
 
-      // Generate a unique content ID
-      const contentId = await generateUniqueHash();
+      // Reserve an unused Lesson id
+      const contentId = await lessonStore().newId();
 
       // Get class metadata
       const selectedOption = this.classSelect.selectedOptions[0];

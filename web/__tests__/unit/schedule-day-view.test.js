@@ -3,7 +3,11 @@ import {
   setupLessonDropHandlers,
   makeDeleteDayHandler,
   makeInsertDayHandler,
+  getLessonTitles,
+  createEndButtonsContainer,
 } from '../../schedule-day-view.js';
+import { initializeDatabase } from '../../database-handle.js';
+import { DEFAULT_LESSON_TITLE, UNTITLED_LESSON } from '../../constants.js';
 import { setupDragHandlers } from '../../drag-drop-utils.js';
 
 // Mock Firebase - schedule-day-view.js reads/writes schedule/{classId}/{dayIndex}
@@ -23,6 +27,11 @@ vi.mock('https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js', () => 
   set: (ref, value) => {
     mockSet(ref.path, value);
     mockData[ref.path] = value;
+    return Promise.resolve();
+  },
+  // The Lesson store writes through multi-path updates (realtime-store.js)
+  update: (ref, updates) => {
+    Object.assign(mockData, updates);
     return Promise.resolve();
   },
 }));
@@ -85,9 +94,33 @@ describe('schedule-day-view', () => {
   beforeEach(() => {
     mockData = {};
     vi.clearAllMocks();
+    initializeDatabase(db);
     tdLessons = document.createElement('td');
     document.body.appendChild(tdLessons);
     onReload = vi.fn();
+  });
+
+  describe('getLessonTitles', () => {
+    it("returns each Lesson's title, and the Untitled fallback for one that no longer exists", async () => {
+      mockData['content/titled1/title'] = 'Fractions';
+
+      expect(await getLessonTitles(['titled1', 'gone1'])).toEqual(['Fractions', UNTITLED_LESSON]);
+    });
+  });
+
+  describe('New Lesson button', () => {
+    it('creates an Empty Lesson and adds it to the end of that Day Index', async () => {
+      mockData['schedule/class1/2'] = ['hashA'];
+      const container = createEndButtonsContainer(2, { classId: 'class1', db, onReload });
+      const newBtn = [...container.querySelectorAll('button')].find(b => b.textContent === 'New Lesson');
+
+      await newBtn.onclick();
+
+      const [, newId] = mockData['schedule/class1/2'];
+      expect(newId).toMatch(/^[0-9a-f]{32}$/);
+      expect(mockData[`content/${newId}`]).toEqual({ title: DEFAULT_LESSON_TITLE });
+      expect(onReload).toHaveBeenCalled();
+    });
   });
 
   describe('setupLessonDropHandlers', () => {

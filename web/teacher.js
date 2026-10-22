@@ -320,7 +320,7 @@ export async function renderScheduleTable(schedule, classId = currentClassId) {
     const lessons = schedule[dayIndex] || [];
     allLessonHashes.push(...lessons);
   }
-  await getLessonTitles(db, allLessonHashes);
+  await getLessonTitles(allLessonHashes);
 
   const ctx = {
     classId,

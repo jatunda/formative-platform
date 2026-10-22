@@ -2,6 +2,7 @@
 import { ref, get } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js";
 import { db } from './firebase-config.js';
 import { initializeDatabase } from './database-handle.js';
+import { lessonStore } from './lesson-store.js';
 import { getTodayDayIndex } from './date-utils.js';
 import { renderMultipleContent } from './content-renderer.js';
 import { mountQuestionEmbeds } from './question-embed.js';
@@ -31,9 +32,9 @@ export async function resolveDayIndex(classId, dayFromUrl) {
  */
 export async function fetchPages(pageIds) {
   const cache = {};
+  const lessons = lessonStore();
   await Promise.all(pageIds.map(async (id) => {
-    const snap = await get(ref(db, `content/${id}`));
-    cache[id] = snap.val();
+    cache[id] = await lessons.get(id);
   }));
   return cache;
 }

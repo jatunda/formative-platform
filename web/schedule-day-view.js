@@ -25,9 +25,9 @@ import { showLessonSearchPopup } from './lesson-search.js';
 import { showNotification } from './notification-utils.js';
 import {
   insertDayAt,
-  deleteDayAt,
-  generateUniqueHash
+  deleteDayAt
 } from './database-utils.js';
+import { lessonStore } from './lesson-store.js';
 
 // Lesson titles are keyed by content hash, which is global (not per-Class),
 // so a single cache here is correct even when multiple Classes are rendered
@@ -36,17 +36,16 @@ const titleCache = {};
 
 /**
  * Get titles for a batch of lesson hashes, fetching only the ones not already cached.
- * @param {import("https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js").Database} db
  * @param {string[]} hashes
  * @returns {Promise<string[]>} Titles in the same order as `hashes`
  */
-export async function getLessonTitles(db, hashes) {
+export async function getLessonTitles(hashes) {
   const missing = [...new Set(hashes)].filter(hash => !(hash in titleCache));
 
   if (missing.length > 0) {
+    const lessons = lessonStore();
     const results = await Promise.all(missing.map(async (hash) => {
-      const snap = await get(ref(db, `content/${hash}/title`));
-      return [hash, snap.exists() ? snap.val() : UNTITLED_LESSON];
+      return [hash, (await lessons.getTitle(hash)) ?? UNTITLED_LESSON];
     }));
     results.forEach(([hash, title]) => {
       titleCache[hash] = title;
@@ -54,17 +53,6 @@ export async function getLessonTitles(db, hashes) {
   }
 
   return hashes.map(hash => titleCache[hash]);
-}
-
-/**
- * Get the title for a single lesson hash (see getLessonTitles).
- * @param {import("https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js").Database} db
- * @param {string} hash
- * @returns {Promise<string>}
- */
-export async function getLessonTitle(db, hash) {
-  const [title] = await getLessonTitles(db, [hash]);
-  return title;
 }
 
 /**
@@ -171,15 +159,12 @@ export function createEndButtonsContainer(dayIndex, ctx) {
   });
 
   const newBtn = createNewLessonButtonShared(dayIndex, async (idx) => {
-    const hash = await generateUniqueHash();
+    const hash = await lessonStore().create({ title: DEFAULT_LESSON_TITLE });
     const dayRef = ref(ctx.db, `schedule/${ctx.classId}/${idx}`);
     const snap = await get(dayRef);
     const lessons = snap.exists() ? snap.val() : [];
     lessons.push(hash);
-    await Promise.all([
-      set(ref(ctx.db, `content/${hash}`), { title: DEFAULT_LESSON_TITLE }),
-      set(dayRef, lessons)
-    ]);
+    await set(dayRef, lessons);
     ctx.onReload();
   });
 
@@ -257,7 +242,7 @@ export async function createDayRow(dayIndex, lessons, todayDayIndex, dateLabel, 
   const tdLessons = document.createElement("td");
   tdLessons.className = "lessons-cell";
 
-  const titles = await getLessonTitles(ctx.db, lessons);
+  const titles = await getLessonTitles(lessons);
   for (let i = 0; i < lessons.length; i++) {
     const lessonHash = lessons[i];
     tdLessons.appendChild(createLessonClusterWithDB({
