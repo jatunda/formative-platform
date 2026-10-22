@@ -378,41 +378,36 @@ export function renderTeamsTab(state, dispatch) {
 
 // ---- Tab: Schedule / Swiss Live ----
 
-/*
- * Every view of a match (its list row or bracket card, and the Now Playing display) edits it
- * through the same match actions, named by `phase` ('qualification' | 'elimination') and
- * `matchRef` (the Qualification Match's index or the Elimination Match's id), so they always
- * edit the same draft.
+/**
+ * The match actions for one match. Every view of a match (its list row or bracket card, and
+ * the Now Playing display) edits it through these, named by `phase` ('qualification' |
+ * 'elimination') and `matchRef` (the Qualification Match's index or the Elimination Match's
+ * id), so they always edit the same draft.
  */
+function matchActions(dispatch, phase, matchRef) {
+  return {
+    saveDraftScore: (field, value) => dispatch({ type: 'set-draft-score', phase, matchRef, field, value }),
+    recordResult: (scoreA, scoreB) => dispatch({ type: 'record-result', phase, matchRef, scoreA, scoreB }),
+    /** The No-Show toggle for the match's Teams. */
+    toggleNoShow: (teamId, noShow) => dispatch({ type: 'set-no-show', phase, matchRef, teamId, noShow }),
+  };
+}
 
 /** Draft-score inputs for one match (Qualification or Elimination): each edit is saved as a draft (re-rendering every view of the match). */
-function renderScoreInputs(dispatch, match, phase, matchRef) {
+function renderScoreInputs(match, actions) {
   const scoreA = el('input', { type: 'number', className: 'robotics-score-input is-red', value: match.scoreA ?? '' });
   const scoreB = el('input', { type: 'number', className: 'robotics-score-input is-blue', value: match.scoreB ?? '' });
-  const saveDraft = (field, input) => dispatch({
-    type: 'set-draft-score', phase, matchRef, field, value: input.value === '' ? null : parseInt(input.value, 10) || 0,
-  });
+  const saveDraft = (field, input) => actions.saveDraftScore(field, input.value === '' ? null : parseInt(input.value, 10) || 0);
   scoreA.addEventListener('change', () => saveDraft('scoreA', scoreA));
   scoreB.addEventListener('change', () => saveDraft('scoreB', scoreB));
   return { scoreA, scoreB };
 }
 
-function renderMarkMatchCompleteButton(dispatch, match, phase, matchRef, { scoreA, scoreB }, className) {
+function renderMarkMatchCompleteButton(match, actions, { scoreA, scoreB }, className) {
   return el('button', {
     className,
-    onClick: () => dispatch({
-      type: 'record-result',
-      phase,
-      matchRef,
-      scoreA: parseInt(scoreA.value, 10) || 0,
-      scoreB: parseInt(scoreB.value, 10) || 0,
-    }),
+    onClick: () => actions.recordResult(parseInt(scoreA.value, 10) || 0, parseInt(scoreB.value, 10) || 0),
   }, [match.completed ? 'Save Edit' : 'Mark Complete']);
-}
-
-/** The No-Show toggle for one match's Teams. */
-function noShowToggle(dispatch, phase, matchRef) {
-  return (teamId, noShow) => dispatch({ type: 'set-no-show', phase, matchRef, teamId, noShow });
 }
 
 function renderMatchRow(state, dispatch, entry, liveMatch) {
@@ -443,18 +438,18 @@ function renderMatchRow(state, dispatch, entry, liveMatch) {
   }
   row.appendChild(el('span', dotProps));
 
-  const scores = renderScoreInputs(dispatch, match, 'qualification', qualIndex);
+  const qualificationActions = matchActions(dispatch, 'qualification', qualIndex);
+  const scores = renderScoreInputs(match, qualificationActions);
   const { scoreA, scoreB } = scores;
   const winner = winningSide(match);
-  const toggleQualificationNoShow = noShowToggle(dispatch, 'qualification', qualIndex);
   // Each side and each score is its own grid cell so columns line up down the list.
-  row.appendChild(renderAllianceSide(state, match.allianceA, match.noShow, toggleQualificationNoShow, winner === 'A', 'red'));
+  row.appendChild(renderAllianceSide(state, match.allianceA, match.noShow, qualificationActions.toggleNoShow, winner === 'A', 'red'));
   row.appendChild(scoreA);
   row.appendChild(scoreB);
-  row.appendChild(renderAllianceSide(state, match.allianceB, match.noShow, toggleQualificationNoShow, winner === 'B', 'blue'));
+  row.appendChild(renderAllianceSide(state, match.allianceB, match.noShow, qualificationActions.toggleNoShow, winner === 'B', 'blue'));
 
   const actions = el('div', { className: 'robotics-match-actions' });
-  actions.appendChild(renderMarkMatchCompleteButton(dispatch, match, 'qualification', qualIndex, scores, 'robotics-btn robotics-btn-secondary robotics-btn-sm'));
+  actions.appendChild(renderMarkMatchCompleteButton(match, qualificationActions, scores, 'robotics-btn robotics-btn-secondary robotics-btn-sm'));
 
   if (match.completed) {
     actions.appendChild(el('span', { className: 'robotics-complete-badge' }, ['✓ Complete']));
@@ -654,9 +649,9 @@ function renderNowPlaying(state, dispatch, { liveMatch, phase, placeholder }) {
   }
 
   const { current, upNext } = liveMatch;
-  const { ref: matchRef, entry: { match } } = current;
-  const toggleNoShow = noShowToggle(dispatch, phase, matchRef);
-  const scores = renderScoreInputs(dispatch, match, phase, matchRef);
+  const { match } = current.entry;
+  const actions = matchActions(dispatch, phase, current.ref);
+  const scores = renderScoreInputs(match, actions);
 
   wrap.appendChild(el('section', { className: 'robotics-now-playing', 'aria-label': 'Now Playing' }, [
     el('div', { className: 'robotics-now-playing-header' }, [
@@ -664,13 +659,13 @@ function renderNowPlaying(state, dispatch, { liveMatch, phase, placeholder }) {
       renderMatchMeta(state, current, 'robotics-now-playing-meta'),
     ]),
     el('div', { className: 'robotics-now-playing-arena' }, [
-      renderNowPlayingSide(state, match, current.sideA.teamIds, toggleNoShow, 'red'),
+      renderNowPlayingSide(state, match, current.sideA.teamIds, actions.toggleNoShow, 'red'),
       scores.scoreA,
       el('div', { className: 'robotics-match-vs' }, ['vs']),
       scores.scoreB,
-      renderNowPlayingSide(state, match, current.sideB.teamIds, toggleNoShow, 'blue'),
+      renderNowPlayingSide(state, match, current.sideB.teamIds, actions.toggleNoShow, 'blue'),
     ]),
-    renderMarkMatchCompleteButton(dispatch, match, phase, matchRef, scores, 'robotics-btn robotics-btn-primary robotics-now-playing-complete'),
+    renderMarkMatchCompleteButton(match, actions, scores, 'robotics-btn robotics-btn-primary robotics-now-playing-complete'),
   ]));
 
   if (upNext) wrap.appendChild(renderUpNext(state, upNext));
@@ -1153,25 +1148,25 @@ function renderBracketMatch(state, dispatch, match) {
   }
 
   const winner = getMatchWinner(state.elimination.bracket, match.id);
-  const toggleEliminationNoShow = noShowToggle(dispatch, 'elimination', match.id);
+  const eliminationActions = matchActions(dispatch, 'elimination', match.id);
 
-  const scores = renderScoreInputs(dispatch, match, 'elimination', match.id);
+  const scores = renderScoreInputs(match, eliminationActions);
   card.appendChild(el('div', { className: 'robotics-bracket-side is-red' }, [
     sides.allianceA
-      ? renderAllianceSide(state, playoffAllianceTeamIds(state, sides.allianceA), match.noShow, toggleEliminationNoShow, winner === sides.allianceA, 'red')
+      ? renderAllianceSide(state, playoffAllianceTeamIds(state, sides.allianceA), match.noShow, eliminationActions.toggleNoShow, winner === sides.allianceA, 'red')
       : el('span', { className: 'robotics-match-alliance' }, ['TBD']),
     scores.scoreA,
   ]));
   card.appendChild(el('div', { className: 'robotics-match-vs' }, ['vs']));
   card.appendChild(el('div', { className: 'robotics-bracket-side is-blue' }, [
     sides.allianceB
-      ? renderAllianceSide(state, playoffAllianceTeamIds(state, sides.allianceB), match.noShow, toggleEliminationNoShow, winner === sides.allianceB, 'blue')
+      ? renderAllianceSide(state, playoffAllianceTeamIds(state, sides.allianceB), match.noShow, eliminationActions.toggleNoShow, winner === sides.allianceB, 'blue')
       : el('span', { className: 'robotics-match-alliance' }, ['TBD']),
     scores.scoreB,
   ]));
 
   const actions = el('div', { className: 'robotics-match-actions' });
-  actions.appendChild(renderMarkMatchCompleteButton(dispatch, match, 'elimination', match.id, scores, 'robotics-btn robotics-btn-secondary robotics-btn-sm'));
+  actions.appendChild(renderMarkMatchCompleteButton(match, eliminationActions, scores, 'robotics-btn robotics-btn-secondary robotics-btn-sm'));
   if (match.completed) actions.appendChild(el('span', { className: 'robotics-complete-badge' }, ['✓ Complete']));
   card.appendChild(actions);
   return card;
