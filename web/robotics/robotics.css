@@ -1414,6 +1414,11 @@ body {
   flex: 1;
 }
 
+/* The Third-Place Match toggle under the bracket: teacher-only, so kept small. */
+.robotics-finals-settings {
+  align-self: flex-start;
+}
+
 /* Round columns grow to fill the width; the bracket scrolls inside its own box
    only when the rounds' minimum widths no longer fit. */
 .robotics-bracket {

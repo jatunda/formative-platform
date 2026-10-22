@@ -5,13 +5,13 @@
 // the database (docs/adr/0012) - frontierIndex, viewingIndex, and
 // perQuestionState all live only in memory for this page load.
 import { db } from './firebase-config.js';
+import { initializeDatabase } from './database-handle.js';
 import { renderQuestionWidget } from './question-widget.js';
 import {
-  initializePracticeSetDatabase,
   resolvePracticeSetSlugToId,
   getPracticeSetFromDB
 } from './practice-set-database-utils.js';
-import { initializeQuestionDatabase, getQuestionFromDB } from './question-database-utils.js';
+import { getQuestionFromDB } from './question-database-utils.js';
 import { PRACTICE_SET_NOT_FOUND } from './constants.js';
 
 /**
@@ -230,8 +230,7 @@ export function startPracticeSet(rootEl, questions) {
 }
 
 export async function initializePage() {
-  initializePracticeSetDatabase(db);
-  initializeQuestionDatabase(db);
+  initializeDatabase(db);
 
   const contentEl = document.getElementById('content');
   // The production /practice/<slug> path is served by the practiceSetSSR

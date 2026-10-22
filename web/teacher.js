@@ -8,8 +8,8 @@ import {
   get
 } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js";
 import { db } from './firebase-config.js';
+import { initializeDatabase } from './database-handle.js';
 import {
-  initializeDateUtils,
   getDateForDayIndex as sharedGetDateForDayIndex,
   getTodayDayIndex,
   getClassDateOffset,
@@ -18,14 +18,8 @@ import {
 import { DEFAULT_CLASS_START_DATE } from './constants.js';
 import { showNotification } from './notification-utils.js';
 import {
-  initializeLessonSearch
-} from "./lesson-search.js";
-import {
   createDateOffsetControl
 } from "./ui-components.js";
-import {
-  initializeDatabase
-} from "./database-utils.js";
 import {
   showErrorState
 } from "./error-ui-utils.js";
@@ -41,11 +35,7 @@ import { renderTeacherNav } from "./teacher-nav.js";
 
 // Database is imported from centralized firebase-config.js
 
-// Initialize database utilities
 initializeDatabase(db);
-
-// Initialize date utilities
-initializeDateUtils(db);
 
 // The currently-selected Class and its Date Offset control. Module-level
 // because they're genuinely shared, mutable "current selection" state, not
@@ -281,7 +271,7 @@ export function debounce(func, wait) {
 /**
  * Create the final row for adding a new day past the end of the schedule
  * @param {number} nextIndex - The next day index
- * @param {{classId: string, db: object, onReload: () => void}} ctx
+ * @param {{classId: string, onReload: () => void}} ctx
  * @returns {Promise<HTMLTableRowElement>} The final row element
  */
 export async function createFinalRow(nextIndex, ctx) {
@@ -330,11 +320,10 @@ export async function renderScheduleTable(schedule, classId = currentClassId) {
     const lessons = schedule[dayIndex] || [];
     allLessonHashes.push(...lessons);
   }
-  await getLessonTitles(db, allLessonHashes);
+  await getLessonTitles(allLessonHashes);
 
   const ctx = {
     classId,
-    db,
     onReload: loadFullSchedule,
     onDeleteDay: makeDeleteDayHandler(classId, loadFullSchedule)
   };
@@ -390,7 +379,6 @@ export async function initializeTeacherApp() {
 }
 
 export async function main() {
-  initializeLessonSearch(db);
   renderTeacherNav('teacher');
   document.getElementById("classSelect").onchange = loadFullSchedule;
   await initializeTeacherApp();

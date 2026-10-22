@@ -14,8 +14,23 @@ import {
   movePlayoffAlliance,
   removePlayoffAlliance,
   setBracketConfig,
+  getThirdPlaceBlockReason,
+  setThirdPlace,
   startFinals,
   discardBracket,
+  setQualificationDraftScore,
+  recordQualificationResult,
+  setQualificationNoShow,
+  reorderQualificationMatch,
+  applyMatchTimeline,
+  setEliminationDraftScore,
+  recordEliminationResult,
+  setEliminationNoShow,
+  getNextPlaceToReveal,
+  revealNextPlacement,
+  replayReveal,
+  resetResults,
+  newTournament,
 } from './state.js';
 import { getAllianceSelectionBlockReason } from './alliance-selection.js';
 
@@ -41,6 +56,21 @@ function updateMembers(state, teamId, change) {
 /** Alliance Selection actions are blocked by the rule keyed by their own type. */
 function selectionBlockReason(state, action) {
   return getAllianceSelectionBlockReason(state, action.type, action);
+}
+
+/**
+ * The match setters for each phase. A match action names its `phase` and a `matchRef`: the
+ * Qualification Match's index, or the Elimination Match's id.
+ */
+const MATCH_SETTERS = {
+  qualification: { setDraftScore: setQualificationDraftScore, recordResult: recordQualificationResult, setNoShow: setQualificationNoShow },
+  elimination: { setDraftScore: setEliminationDraftScore, recordResult: recordEliminationResult, setNoShow: setEliminationNoShow },
+};
+
+function matchSetters(phase) {
+  const setters = MATCH_SETTERS[phase];
+  if (!setters) throw new Error(`Unknown match phase: ${phase}`);
+  return setters;
 }
 
 /** @type {Record<string, ActionHandler>} */
@@ -103,9 +133,11 @@ const HANDLERS = {
     blockReason: selectionBlockReason,
     apply: (state, { bracketSize }) => setBracketConfig(state, { bracketSize }),
   },
+  // Allowed on a live Bracket too: `now` (epoch ms, defaulting to the clock) is where the
+  // recalculated Match Times start from when the Third-Place Match is added or removed.
   'set-third-place': {
-    blockReason: selectionBlockReason,
-    apply: (state, { includeThirdPlace }) => setBracketConfig(state, { includeThirdPlace }),
+    blockReason: getThirdPlaceBlockReason,
+    apply: (state, { includeThirdPlace, now }) => setThirdPlace(state, includeThirdPlace, { now }),
   },
   // Short of Bracket Size it builds nothing until confirmedShort; the outcome says which happened.
   'start-finals': {
@@ -117,6 +149,35 @@ const HANDLERS = {
   },
   'discard-bracket': {
     apply: (state) => discardBracket(state),
+  },
+  'set-draft-score': {
+    apply: (state, { phase, matchRef, field, value }) => matchSetters(phase).setDraftScore(state, matchRef, field, value),
+  },
+  'record-result': {
+    apply: (state, { phase, matchRef, scoreA, scoreB }) => matchSetters(phase).recordResult(state, matchRef, { scoreA, scoreB }),
+  },
+  'set-no-show': {
+    apply: (state, { phase, matchRef, teamId, noShow }) => matchSetters(phase).setNoShow(state, matchRef, teamId, noShow),
+  },
+  'reorder-qualification-match': {
+    apply: (state, { qualIndex, direction }) => reorderQualificationMatch(state, qualIndex, direction),
+  },
+  'apply-match-timeline': {
+    apply: (state, { mode, time }) => applyMatchTimeline(state, { mode, time }),
+  },
+  // Reports the place it uncovered (null when none was left), read from the Tournament as it
+  // is when the action runs, so back-to-back reveals each get their own place.
+  'reveal-next-placement': {
+    applyWithOutcome: (state) => ({ state: revealNextPlacement(state), outcome: { revealedPlace: getNextPlaceToReveal(state) } }),
+  },
+  'replay-reveal': {
+    apply: (state) => replayReveal(state),
+  },
+  'reset-results': {
+    apply: (state) => resetResults(state),
+  },
+  'new-tournament': {
+    apply: (state) => newTournament(state),
   },
 };
 
@@ -139,7 +200,8 @@ export function getActionBlockReason(state, action) {
 /**
  * The one entry point for a named tournament action: checks its block reason, then applies it
  * to the Tournament and to the screen state it owns. A blocked action changes nothing and
- * reports why. `outcome` is set only by actions that report what they did (Start Finals).
+ * reports why. `outcome` is set only by actions that report what they did (Start Finals, a
+ * Podium reveal).
  * @param {*} state - the Tournament
  * @param {Screen} screen
  * @param {TournamentAction} action

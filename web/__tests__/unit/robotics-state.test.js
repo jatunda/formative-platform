@@ -20,6 +20,7 @@ import {
   formPlayoffAlliance,
   removePlayoffAlliance,
   setBracketConfig,
+  setThirdPlace,
   movePlayoffAlliance,
   declineTeam,
   undoDecline,
@@ -537,7 +538,13 @@ describe('startFinals', () => {
   it('shrinks Bracket Size to the number of alliances formed when fewer have', () => {
     const next = startFinals(setBracketConfig(withAlliances(3), { bracketSize: 8 }), { confirmedShort: true }).state;
     expect(next.elimination.bracketSize).toBe(3);
-    expect(next.elimination.bracket.bracketSize).toBe(3);
+    expect(next.elimination.bracket.seeds).toHaveLength(3);
+  });
+
+  it('stores Bracket Size and the Third-Place setting only in the Elimination settings, not in the Bracket', () => {
+    const next = startFinals(setBracketConfig(withAlliances(4), { bracketSize: 4 })).state;
+    expect(next.elimination).toMatchObject({ bracketSize: 4, includeThirdPlace: true });
+    expect(Object.keys(next.elimination.bracket).sort()).toEqual(['matches', 'seeds']);
   });
 
   it('ignores a Bracket Size below 2 and enters every alliance', () => {
@@ -577,7 +584,6 @@ describe('Alliance Selection locked while a Bracket exists', () => {
     expect(movePlayoffAlliance(s, allianceB, -1)).toBe(s);
     expect(undoDecline(s, delta)).toBe(s);
     expect(setBracketConfig(s, { bracketSize: 4 })).toBe(s);
-    expect(setBracketConfig(s, { includeThirdPlace: true })).toBe(s);
     expect(startFinals(s, { confirmedShort: true }).state).toBe(s);
   });
 
@@ -739,6 +745,38 @@ describe('upgradeSavedTournament', () => {
     const saved = setBracketConfig(withFourTeams(createInitialState()), { bracketSize: 3 });
     expect(upgradeSavedTournament(saved)).toBe(saved);
   });
+
+  describe('a Tournament saved with Bracket settings duplicated inside the Bracket', () => {
+    /** 4 single-Team alliances in Finals, saved in the old shape (the Bracket carrying its own settings). */
+    function oldShape({ bracketThirdPlace }) {
+      let s = withFourTeams(createInitialState());
+      s.teams.forEach((t) => { s = formPlayoffAlliance(s, t.id, t.id); });
+      s = setBracketConfig(s, { bracketSize: 4, includeThirdPlace: bracketThirdPlace });
+      s = startFinals(s).state;
+      const bracket = { bracketSize: 4, paddedSize: 4, seeds: s.elimination.bracket.seeds, includeThirdPlace: bracketThirdPlace, matches: s.elimination.bracket.matches };
+      return { ...s, elimination: { ...s.elimination, includeThirdPlace: true, bracket } };
+    }
+
+    it('keeps only Seeds and matches in the Bracket', () => {
+      const upgraded = upgradeSavedTournament(oldShape({ bracketThirdPlace: true }));
+      expect(Object.keys(upgraded.elimination.bracket).sort()).toEqual(['matches', 'seeds']);
+      expect(upgraded.elimination.bracketSize).toBe(4);
+    });
+
+    it("takes the Third-Place setting from the Bracket, since that's what its matches were built with", () => {
+      const upgraded = upgradeSavedTournament(oldShape({ bracketThirdPlace: false }));
+      expect(upgraded.elimination.includeThirdPlace).toBe(false);
+      expect(upgraded.elimination.bracket.matches.some((m) => m.round === 'third-place')).toBe(false);
+    });
+
+    it('plays on the same as before: results advance and Placements come out', () => {
+      let s = upgradeSavedTournament(oldShape({ bracketThirdPlace: true }));
+      for (const match of getAllMatchesInScheduleOrder(s).filter((m) => m.kind === 'elimination')) {
+        s = recordEliminationResult(s, match.match.id, { scoreA: 2, scoreB: 1 });
+      }
+      expect(getRevealedPlaces(revealNextPlacement(revealNextPlacement(revealNextPlacement(s)))).size).toBe(3);
+    });
+  });
 });
 
 describe('newTournament', () => {
@@ -767,6 +805,11 @@ describe('Podium reveal', () => {
     for (const m of s.elimination.bracket.matches) s = recordEliminationResult(s, m.id, { scoreA: 9, scoreB: 1 });
     return s;
   }
+
+  it('setThirdPlace is a no-op once the Third-Place Match is complete', () => {
+    const s = completeAll(withBracket({ size: 4, includeThirdPlace: true }));
+    expect(setThirdPlace(s, false, { now: 0 })).toBe(s);
+  });
 
   it('starts with nothing revealed, including for a state saved before reveal progress existed', () => {
     expect(getRevealedCount(createInitialState())).toBe(0);

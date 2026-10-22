@@ -25,46 +25,35 @@ import { showLessonSearchPopup } from './lesson-search.js';
 import { showNotification } from './notification-utils.js';
 import {
   insertDayAt,
-  deleteDayAt,
-  generateUniqueHash
+  deleteDayAt
 } from './database-utils.js';
+import { lessonStore } from './lesson-store.js';
+import { getDb } from './database-handle.js';
 
-// Lesson titles are keyed by content hash, which is global (not per-Class),
+// Lesson titles are keyed by Lesson id, which is global (not per-Class),
 // so a single cache here is correct even when multiple Classes are rendered
 // at once on the Lesson Planning page.
 const titleCache = {};
 
 /**
- * Get titles for a batch of lesson hashes, fetching only the ones not already cached.
- * @param {import("https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js").Database} db
- * @param {string[]} hashes
- * @returns {Promise<string[]>} Titles in the same order as `hashes`
+ * Get titles for a batch of Lesson ids, fetching only the ones not already cached.
+ * @param {string[]} lessonIds
+ * @returns {Promise<string[]>} Titles in the same order as `lessonIds`
  */
-export async function getLessonTitles(db, hashes) {
-  const missing = [...new Set(hashes)].filter(hash => !(hash in titleCache));
+export async function getLessonTitles(lessonIds) {
+  const missing = [...new Set(lessonIds)].filter(id => !(id in titleCache));
 
   if (missing.length > 0) {
-    const results = await Promise.all(missing.map(async (hash) => {
-      const snap = await get(ref(db, `content/${hash}/title`));
-      return [hash, snap.exists() ? snap.val() : UNTITLED_LESSON];
+    const lessons = lessonStore();
+    const results = await Promise.all(missing.map(async (id) => {
+      return [id, (await lessons.getTitle(id)) ?? UNTITLED_LESSON];
     }));
-    results.forEach(([hash, title]) => {
-      titleCache[hash] = title;
+    results.forEach(([id, title]) => {
+      titleCache[id] = title;
     });
   }
 
-  return hashes.map(hash => titleCache[hash]);
-}
-
-/**
- * Get the title for a single lesson hash (see getLessonTitles).
- * @param {import("https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js").Database} db
- * @param {string} hash
- * @returns {Promise<string>}
- */
-export async function getLessonTitle(db, hash) {
-  const [title] = await getLessonTitles(db, [hash]);
-  return title;
+  return lessonIds.map(id => titleCache[id]);
 }
 
 /**
@@ -150,7 +139,7 @@ export function createActionsCell(dayIndex, onDeleteDay) {
 /**
  * Create the stacked "Link Lesson" / "New Lesson" buttons for a day's lessons cell.
  * @param {number} dayIndex
- * @param {{classId: string, db: object, onReload: () => void}} ctx
+ * @param {{classId: string, onReload: () => void}} ctx
  * @returns {HTMLDivElement}
  */
 export function createEndButtonsContainer(dayIndex, ctx) {
@@ -160,7 +149,7 @@ export function createEndButtonsContainer(dayIndex, ctx) {
   const linkBtn = createStyledButton("Link Lesson", () => {
     showLessonSearchPopup({
       onSelect: async (lessonId) => {
-        const dayRef = ref(ctx.db, `schedule/${ctx.classId}/${dayIndex}`);
+        const dayRef = ref(getDb(), `schedule/${ctx.classId}/${dayIndex}`);
         const snap = await get(dayRef);
         const lessons = snap.exists() ? snap.val() : [];
         lessons.push(lessonId);
@@ -171,15 +160,12 @@ export function createEndButtonsContainer(dayIndex, ctx) {
   });
 
   const newBtn = createNewLessonButtonShared(dayIndex, async (idx) => {
-    const hash = await generateUniqueHash();
-    const dayRef = ref(ctx.db, `schedule/${ctx.classId}/${idx}`);
+    const lessonId = await lessonStore().create({ title: DEFAULT_LESSON_TITLE });
+    const dayRef = ref(getDb(), `schedule/${ctx.classId}/${idx}`);
     const snap = await get(dayRef);
     const lessons = snap.exists() ? snap.val() : [];
-    lessons.push(hash);
-    await Promise.all([
-      set(ref(ctx.db, `content/${hash}`), { title: DEFAULT_LESSON_TITLE }),
-      set(dayRef, lessons)
-    ]);
+    lessons.push(lessonId);
+    await set(dayRef, lessons);
     ctx.onReload();
   });
 
@@ -194,7 +180,7 @@ export function createEndButtonsContainer(dayIndex, ctx) {
  * page, which shows several Classes at once) is ignored rather than moved.
  * @param {HTMLTableCellElement} tdLessons
  * @param {number} toDayIndex
- * @param {{classId: string, db: object, onReload: () => void}} ctx
+ * @param {{classId: string, onReload: () => void}} ctx
  */
 export function setupLessonDropHandlers(tdLessons, toDayIndex, ctx) {
   setupDropHandlers(tdLessons, async (data) => {
@@ -207,8 +193,8 @@ export function setupLessonDropHandlers(tdLessons, toDayIndex, ctx) {
     if (Number(fromDayIndex) === Number(toDayIndex)) return;
 
     const [fromSnap, toSnap] = await Promise.all([
-      get(ref(ctx.db, `schedule/${ctx.classId}/${fromDayIndex}`)),
-      get(ref(ctx.db, `schedule/${ctx.classId}/${toDayIndex}`))
+      get(ref(getDb(), `schedule/${ctx.classId}/${fromDayIndex}`)),
+      get(ref(getDb(), `schedule/${ctx.classId}/${toDayIndex}`))
     ]);
 
     const fromLessons = fromSnap.exists() ? fromSnap.val() : [];
@@ -218,8 +204,8 @@ export function setupLessonDropHandlers(tdLessons, toDayIndex, ctx) {
     toLessons.push(lessonHash);
 
     await Promise.all([
-      set(ref(ctx.db, `schedule/${ctx.classId}/${fromDayIndex}`), fromLessons),
-      set(ref(ctx.db, `schedule/${ctx.classId}/${toDayIndex}`), toLessons)
+      set(ref(getDb(), `schedule/${ctx.classId}/${fromDayIndex}`), fromLessons),
+      set(ref(getDb(), `schedule/${ctx.classId}/${toDayIndex}`), toLessons)
     ]);
     ctx.onReload();
   }, {
@@ -236,7 +222,7 @@ export function setupLessonDropHandlers(tdLessons, toDayIndex, ctx) {
  * @param {string[]} lessons - Lesson hashes for this day
  * @param {number|undefined} todayDayIndex - Today's Day Index, for highlighting
  * @param {string} dateLabel - Pre-formatted calendar date for this Day Index
- * @param {{classId: string, db: object, onReload: () => void, onDeleteDay: (dayIndex: number) => void}} ctx
+ * @param {{classId: string, onReload: () => void, onDeleteDay: (dayIndex: number) => void}} ctx
  * @returns {Promise<HTMLTableRowElement>}
  */
 export async function createDayRow(dayIndex, lessons, todayDayIndex, dateLabel, ctx) {
@@ -257,7 +243,7 @@ export async function createDayRow(dayIndex, lessons, todayDayIndex, dateLabel, 
   const tdLessons = document.createElement("td");
   tdLessons.className = "lessons-cell";
 
-  const titles = await getLessonTitles(ctx.db, lessons);
+  const titles = await getLessonTitles(lessons);
   for (let i = 0; i < lessons.length; i++) {
     const lessonHash = lessons[i];
     tdLessons.appendChild(createLessonClusterWithDB({
@@ -267,7 +253,6 @@ export async function createDayRow(dayIndex, lessons, todayDayIndex, dateLabel, 
       lessons,
       lessonTitle: titles[i] || DEFAULT_LESSON_TITLE,
       classId: ctx.classId,
-      database: ctx.db,
       onScheduleReload: ctx.onReload
     }));
   }

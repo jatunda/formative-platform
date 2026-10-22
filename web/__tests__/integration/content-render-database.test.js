@@ -1,11 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { parseDSL } from '../../dsl.js';
 import { renderContent, renderMultipleContent } from '../../content-renderer.js';
-import {
-  initializeDatabase,
-  getLessonFromDB,
-  getScheduleForDay,
-} from '../../database-utils.js';
+import { initializeDatabase } from '../../database-handle.js';
+import { lessonStore } from '../../lesson-store.js';
+import { getScheduleForDay } from '../../database-utils.js';
 
 // Mock Firebase
 let mockData = {};
@@ -73,7 +71,7 @@ console.log("test");
   });
 
   it('should fetch lesson from database and render it', async () => {
-    const lesson = await getLessonFromDB('hash1');
+    const lesson = await lessonStore().get('hash1');
     expect(lesson).toBeTruthy();
     
     if (lesson && lesson.content) {
@@ -91,7 +89,7 @@ console.log("test");
     expect(schedule.length).toBeGreaterThan(0);
     
     const lessons = await Promise.all(
-      schedule.map(hash => getLessonFromDB(hash))
+      schedule.map(hash => lessonStore().get(hash))
     );
     
     const parsedLessons = lessons
@@ -108,7 +106,7 @@ console.log("test");
   });
 
   it('should handle missing lesson gracefully', async () => {
-    const lesson = await getLessonFromDB('nonexistent');
+    const lesson = await lessonStore().get('nonexistent');
     expect(lesson).toBeNull();
     
     // Should not crash when trying to render null

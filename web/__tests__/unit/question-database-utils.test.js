@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
-  initializeQuestionDatabase,
   createNewQuestion,
   getQuestionFromDB,
   getAllQuestions,
@@ -12,8 +11,9 @@ import {
   resolveQuestionSlugToId,
   deleteQuestionAndSlugs,
   getQuestionBacklinks,
-  updateQuestionBacklinksForPage
+  resolveQuestionLinkTargets
 } from '../../question-database-utils.js';
+import { initializeDatabase } from '../../database-handle.js';
 
 // Mock Firebase - same in-memory path-keyed store pattern as page-database-utils.test.js
 let mockData = {};
@@ -97,7 +97,9 @@ describe('question-database-utils', () => {
       return Promise.resolve();
     });
 
-    initializeQuestionDatabase({});
+    // One initialization covers the Page module too, which the Question
+    // module reads and writes Page records through.
+    initializeDatabase({});
   });
 
   describe('createNewQuestion', () => {
@@ -125,6 +127,10 @@ describe('question-database-utils', () => {
       await expect(saveQuestion('abc', { stem: [] })).rejects.toThrow('Invalid question content');
     });
 
+    it('returns null when there are no questions', async () => {
+      expect(await getAllQuestions()).toBeNull();
+    });
+
     it('returns all questions', async () => {
       setAtPath('questions', { a: { stem: [] }, b: { stem: [] } });
       expect(await getAllQuestions()).toEqual({ a: { stem: [] }, b: { stem: [] } });
@@ -140,6 +146,15 @@ describe('question-database-utils', () => {
     it('trims whitespace before matching', async () => {
       setAtPath('classes', { c1: { name: 'AP CS A' } });
       expect(await resolveClassNameToId('  AP CS A  ')).toBe('c1');
+    });
+
+    it('reports no match when there are no classes', async () => {
+      await expect(resolveClassNameToId('AP CS A')).rejects.toThrow('No class named "AP CS A" found.');
+    });
+
+    it('treats a missing name as blank on both sides', async () => {
+      setAtPath('classes', { c1: { name: 'AP CS A' }, c2: {} });
+      expect(await resolveClassNameToId(undefined)).toBe('c2');
     });
 
     it('throws when no class matches', async () => {
@@ -160,12 +175,12 @@ describe('question-database-utils', () => {
     });
 
     it('rejects a malformed slug', async () => {
-      await expect(assignQuestionSlug('abc', 'Loops 1')).rejects.toThrow('lowercase letters');
+      await expect(assignQuestionSlug('abc', 'Loops 1')).rejects.toThrow('Slugs must be lowercase letters, numbers, and hyphens only (e.g. "loops-1").');
     });
 
     it('rejects a slug already owned by a different question', async () => {
       setAtPath('questionSlugIndex/loops-1', 'other-question');
-      await expect(assignQuestionSlug('abc', 'loops-1')).rejects.toThrow('already in use');
+      await expect(assignQuestionSlug('abc', 'loops-1')).rejects.toThrow('The Question Link "[[q:loops-1]]" is already in use by another question.');
     });
 
     it('removes a slug', async () => {
@@ -184,41 +199,21 @@ describe('question-database-utils', () => {
     });
   });
 
-  describe('getQuestionBacklinks / updateQuestionBacklinksForPage', () => {
+  describe('getQuestionBacklinks', () => {
     it('returns the source pageIds that link to this question', async () => {
       setAtPath('questionBacklinks/target', { page1: true, page2: true });
       expect(await getQuestionBacklinks('target')).toEqual(['page1', 'page2']);
     });
+  });
 
-    it('adds a backlink for a newly-referenced question', async () => {
-      setAtPath('questionSlugIndex/loops-1', 'question-id');
-      const parsed = { title: 'T', blocks: [{ type: 'question', content: [{ type: 'text', value: '[[q:loops-1]]' }] }] };
+  describe('resolveQuestionLinkTargets', () => {
+    it('resolves a Page\'s Question Links to distinct Question ids, dropping dangling ones', async () => {
+      setAtPath('questionSlugIndex', { 'loops-1': 'q1', 'loops-alias': 'q1', 'arrays-1': 'q2' });
+      const parsed = { title: 'T', blocks: [{ type: 'question', content: [
+        { type: 'text', value: '[[q:loops-1]] [[q:missing]] [[q:loops-alias]] [[q:arrays-1]] [[loops-1]]' },
+      ] }] };
 
-      await updateQuestionBacklinksForPage('page-id', parsed);
-
-      expect(getAtPath('questionBacklinks/question-id/page-id')).toBe(true);
-      expect(getAtPath('pages/page-id/questionLinksTo')).toEqual(['question-id']);
-    });
-
-    it('removes a stale backlink when a link is deleted from the content', async () => {
-      setAtPath('pages/page-id/questionLinksTo', ['old-target']);
-      setAtPath('questionBacklinks/old-target/page-id', true);
-      const parsed = { title: 'T', blocks: [{ type: 'question', content: [{ type: 'text', value: 'no links here' }] }] };
-
-      await updateQuestionBacklinksForPage('page-id', parsed);
-
-      expect(getAtPath('questionBacklinks/old-target/page-id')).toBeUndefined();
-      expect(getAtPath('pages/page-id/questionLinksTo')).toBeUndefined();
-    });
-
-    it('does nothing when the set of linked questions has not changed', async () => {
-      setAtPath('questionSlugIndex/loops-1', 'question-id');
-      setAtPath('pages/page-id/questionLinksTo', ['question-id']);
-      setAtPath('questionBacklinks/question-id/page-id', true);
-      const parsed = { title: 'T', blocks: [{ type: 'question', content: [{ type: 'text', value: '[[q:loops-1]]' }] }] };
-
-      await updateQuestionBacklinksForPage('page-id', parsed);
-
+      expect(await resolveQuestionLinkTargets(parsed)).toEqual(['q1', 'q2']);
       expect(mockUpdate).not.toHaveBeenCalled();
     });
   });
@@ -234,7 +229,7 @@ describe('question-database-utils', () => {
     it('rejects a new slug already taken by a different question', async () => {
       setAtPath('questionSlugIndex/old-slug', 'abc');
       setAtPath('questionSlugIndex/new-slug', 'other-question');
-      await expect(renameQuestionSlug('abc', 'old-slug', 'new-slug')).rejects.toThrow('already in use');
+      await expect(renameQuestionSlug('abc', 'old-slug', 'new-slug')).rejects.toThrow('The Question Link "[[q:new-slug]]" is already in use by another question.');
       expect(getAtPath('questionSlugIndex/old-slug')).toBe('abc');
     });
 

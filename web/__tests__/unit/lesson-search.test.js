@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
-  initializeLessonSearch,
   showLessonSearchPopup,
   getCachedTitle,
   clearTitleCache,
 } from '../../lesson-search.js';
+import { initializeDatabase } from '../../database-handle.js';
 
 // Mock Firebase
 let mockData = {};
@@ -48,8 +48,7 @@ describe('lesson-search', () => {
       });
     });
 
-    const mockDb = {};
-    initializeLessonSearch(mockDb);
+    initializeDatabase({});
     clearTitleCache();
     document.body.innerHTML = '';
   });
@@ -146,19 +145,6 @@ describe('lesson-search', () => {
       
       const resultsDiv = document.querySelector('.lesson-popup-results');
       expect(resultsDiv).toBeTruthy();
-    });
-
-    it('should handle database not initialized', async () => {
-      // Reset initialization
-      initializeLessonSearch(null);
-      
-      // Should show alert (we can't easily test alert, but we can verify it doesn't crash)
-      await showLessonSearchPopup({ onSelect: vi.fn() });
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-      // Popup should not be created
-      const popup = document.querySelector('.lesson-popup');
-      expect(popup).toBeFalsy();
     });
 
     it('should handle no lessons found', async () => {

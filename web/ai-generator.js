@@ -1,10 +1,8 @@
 import { ref, get } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js";
 import { AI_CONFIG } from "./ai-config.js";
 import { parseDSL } from "./dsl.js";
-import {
-	initializeDatabase,
-	generateUniqueHash
-} from "./database-utils.js";
+import { lessonStore } from "./lesson-store.js";
+import { getDb } from "./database-handle.js";
 
 // Prompt Profile per Class (hard-coded for MVP) - see CONTEXT.md. Distinct
 // from the Class record in Firebase; a Class without an entry here falls
@@ -477,15 +475,11 @@ class ClaudeProvider {
 export class AIQuestionGenerator {
   /**
    * Create an AI Question Generator instance
-   * @param {import("https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js").Database} database - The Firebase database instance
    * @param {string} apiKey - The Anthropic API key
    * @param {(enabled: boolean) => void} enableEditing - Called to enable/disable the host page's editor once questions are generated
    * @param {{generateQuestions: (prompt: string) => Promise<string>}} [llmProvider] - The LLM provider to use; defaults to Claude
    */
-  constructor(database, apiKey, enableEditing, llmProvider = new ClaudeProvider(apiKey)) {
-    this.db = database;
-    // Initialize database utilities with the database instance
-    initializeDatabase(database);
+  constructor(apiKey, enableEditing, llmProvider = new ClaudeProvider(apiKey)) {
     this.llmProvider = llmProvider;
     this.enableEditing = enableEditing;
     this.modal = null;
@@ -538,7 +532,7 @@ export class AIQuestionGenerator {
    */
   async loadClasses() {
     try {
-      const snapshot = await get(ref(this.db, 'classes'));
+      const snapshot = await get(ref(getDb(), 'classes'));
       const classes = snapshot.val();
       
       if (!classes) {
@@ -642,7 +636,6 @@ export class AIQuestionGenerator {
     document.getElementById('errorState').style.display = 'none';
   }
 
-  // generateUniqueHash is imported from database-utils.js
 
   /**
    * Generate questions using AI based on user inputs
@@ -672,8 +665,8 @@ export class AIQuestionGenerator {
         return;
       }
 
-      // Generate a unique content ID
-      const contentId = await generateUniqueHash();
+      // Reserve an unused Lesson id
+      const lessonId = await lessonStore().newId();
 
       // Get class metadata
       const selectedOption = this.classSelect.selectedOptions[0];
@@ -692,14 +685,14 @@ export class AIQuestionGenerator {
       // Call LLM
       const generatedContent = await this.llmProvider.generateQuestions(prompt);
       
-      // Insert into editor with the unique content ID
-      this.insertIntoEditor(generatedContent, contentId);
+      // Insert into editor with the reserved Lesson id
+      this.insertIntoEditor(generatedContent, lessonId);
       
       // Enable editing in the editor
       this.enableEditing(true);
       
       // Update dropdown list to include the new content
-      await this.updateContentList(contentId);
+      await this.updateContentList(lessonId);
       
       // Close modal
       this.hideModal();
@@ -716,12 +709,12 @@ export class AIQuestionGenerator {
    * Insert generated content into the editor
    * Formats the content to ensure it follows DSL format and triggers preview update
    * @param {string} content - The generated DSL content
-   * @param {string} contentId - The unique content ID
+   * @param {string} lessonId - The reserved Lesson id
    * @private
    */
-  insertIntoEditor(content, contentId) {
+  insertIntoEditor(content, lessonId) {
     const dslInput = document.getElementById('dslInput');
-    const contentIdEl = document.getElementById('contentId');
+    const lessonIdEl = document.getElementById('contentId');
     
     if (dslInput) {
       // Format the AI-generated content to ensure it follows DSL format
@@ -739,9 +732,9 @@ export class AIQuestionGenerator {
       
       dslInput.value = formattedContent;
       
-      // Set the content ID
-      if (contentIdEl) {
-        contentIdEl.textContent = contentId;
+      // Set the Lesson id
+      if (lessonIdEl) {
+        lessonIdEl.textContent = lessonId;
       }
       
       // Trigger the existing preview update
@@ -762,11 +755,11 @@ export class AIQuestionGenerator {
 
   /**
    * Update the content list dropdown (currently just clears selection)
-   * @param {string} contentId - The content ID (currently unused)
+   * @param {string} lessonId - The Lesson id (currently unused)
    * @returns {Promise<void>}
    * @private
    */
-  async updateContentList(contentId) {
+  async updateContentList(lessonId) {
     // Get the select element
     const existingContentSelect = document.getElementById('existingContent');
     if (!existingContentSelect) return;

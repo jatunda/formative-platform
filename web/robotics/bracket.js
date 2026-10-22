@@ -2,7 +2,10 @@
 import { winningSide } from './match-result.js';
 
 /**
- * @typedef {{bracketSize: number, paddedSize: number, seeds: string[], includeThirdPlace: boolean, matches: object[]}} Bracket
+ * An Elimination Bracket: its Seeds (index 0 = Seed 1) and its matches. Bracket Size and
+ * whether a Third-Place Match is included live only in the Tournament's Elimination settings;
+ * the matches already reflect both (Byes, and the Third-Place Match when there is one).
+ * @typedef {{seeds: string[], matches: object[]}} Bracket
  */
 
 /** Smallest power of two that is >= n. */
@@ -101,26 +104,65 @@ export function buildBracket({ bracketSize, seeds, includeThirdPlace }) {
   rounds[rounds.length - 1].forEach((id) => {
     matches.find((m) => m.id === id).round = 'final';
   });
-  const semifinalRound = rounds.length >= 2 ? rounds[rounds.length - 2] : null;
 
-  if (includeThirdPlace && semifinalRound && semifinalRound.length === 2) {
-    matches.push({
-      id: `m${matchIdCounter + 1}`,
-      round: 'third-place',
-      slot: 0,
-      seedA: null,
-      seedB: null,
-      isBye: false,
-      fromMatch: [semifinalRound[0], semifinalRound[1]],
-      resolveAs: 'loser',
-      scoreA: null,
-      scoreB: null,
-      completed: false,
-      noShow: {},
-    });
+  return withThirdPlaceMatch({ seeds: [...seeds], matches }, includeThirdPlace);
+}
+
+/**
+ * Whether the Bracket has two Semifinal-round losers to play a Third-Place Match: not for a
+ * lone Final (no Semifinal round), nor when a Semifinal is a Bye (Bracket Size 3).
+ * @param {Bracket} bracket
+ * @returns {boolean}
+ */
+export function canHaveThirdPlaceMatch(bracket) {
+  const semifinalIds = semifinalIdsOf(bracket);
+  return !!semifinalIds && semifinalIds.every((id) => !findMatch(bracket, id).isBye);
+}
+
+/** @returns {string[]|null} the ids of the two matches feeding the Final, or null for a lone Final */
+function semifinalIdsOf(bracket) {
+  return bracket.matches.find((m) => m.round === 'final').fromMatch;
+}
+
+/** The Bracket's Third-Place Match, if it has one. */
+function thirdPlaceMatchOf(bracket) {
+  return bracket.matches.find((m) => m.round === 'third-place');
+}
+
+/** The next unused `m<N>` match id. */
+function nextMatchId(bracket) {
+  return `m${Math.max(...bracket.matches.map((m) => Number(m.id.slice(1)))) + 1}`;
+}
+
+/**
+ * The Bracket with its Third-Place Match added (fed by the two Semifinal-round losers) or
+ * removed; every other match is untouched. A Bracket that can't have one (see
+ * canHaveThirdPlaceMatch) never gets one. Returns `bracket` itself when nothing changes.
+ * @param {Bracket} bracket
+ * @param {boolean} includeThirdPlace
+ * @returns {Bracket}
+ */
+export function withThirdPlaceMatch(bracket, includeThirdPlace) {
+  const existing = thirdPlaceMatchOf(bracket);
+  if (!includeThirdPlace) {
+    return existing ? { ...bracket, matches: bracket.matches.filter((m) => m !== existing) } : bracket;
   }
-
-  return { bracketSize, paddedSize, seeds: [...seeds], includeThirdPlace, matches };
+  if (existing || !canHaveThirdPlaceMatch(bracket)) return bracket;
+  const thirdPlace = {
+    id: nextMatchId(bracket),
+    round: 'third-place',
+    slot: 0,
+    seedA: null,
+    seedB: null,
+    isBye: false,
+    fromMatch: [.../** @type {string[]} */ (semifinalIdsOf(bracket))],
+    resolveAs: 'loser',
+    scoreA: null,
+    scoreB: null,
+    completed: false,
+    noShow: {},
+  };
+  return { ...bracket, matches: [...bracket.matches, thirdPlace] };
 }
 
 function findMatch(bracket, matchId) {

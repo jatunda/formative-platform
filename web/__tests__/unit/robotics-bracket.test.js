@@ -62,6 +62,11 @@ describe('buildBracket', () => {
     expect(withThird.matches.some((m) => m.round === 'third-place')).toBe(true);
   });
 
+  it('includes no Third-Place Match when a Semifinal is a Bye, since it would have only one runner-up', () => {
+    const bracket = buildBracket({ bracketSize: 3, seeds: alliances(3).map((a) => a.id), includeThirdPlace: true });
+    expect(bracket.matches.some((m) => m.round === 'third-place')).toBe(false);
+  });
+
   it('resolves round 1 sides directly from seeds', () => {
     const seeds = alliances(4).map((a) => a.id);
     const bracket = buildBracket({ bracketSize: 4, seeds, includeThirdPlace: false });

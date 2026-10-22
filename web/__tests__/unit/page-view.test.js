@@ -13,7 +13,6 @@ vi.mock('https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js', () => 
 const mockResolveSlugToPageId = vi.fn();
 const mockGetPageFromDB = vi.fn();
 vi.mock('../../page-database-utils.js', () => ({
-  initializePageDatabase: vi.fn(),
   resolveSlugToPageId: (...args) => mockResolveSlugToPageId(...args),
   getPageFromDB: (...args) => mockGetPageFromDB(...args),
 }));
@@ -26,7 +25,6 @@ vi.mock('../../content-renderer.js', () => ({
 }));
 
 vi.mock('../../question-database-utils.js', () => ({
-  initializeQuestionDatabase: vi.fn(),
 }));
 
 const mockMountQuestionEmbeds = vi.fn();

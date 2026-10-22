@@ -1,6 +1,5 @@
 // Shared Date Utilities
 import {
-  initializeDatabase,
   getClassDateOffset as getClassDateOffsetFromDB,
   setClassDateOffset as setClassDateOffsetInDB
 } from "./database-utils.js";
@@ -11,21 +10,8 @@ import {
  */
 export const DEFAULT_CLASS_START_DATE = "2024-08-19";
 
-let db; // Database reference
-
 // Cache for date offsets to avoid redundant queries
 const dateOffsetCache = new Map();
-
-/**
- * Initialize date utilities with a database reference. Also initializes
- * database-utils.js, since Date Offset reads/writes go through it - callers
- * only need to call this one function, not both.
- * @param {import("https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js").Database} database - The Firebase database instance
- */
-export function initializeDateUtils(database) {
-  db = database;
-  initializeDatabase(database);
-}
 
 /**
  * Get date offset for a class (with caching). database-utils.js is the only
@@ -41,10 +27,6 @@ export async function getClassDateOffset(classId) {
     return dateOffsetCache.get(classId);
   }
 
-  if (!db) {
-    console.warn("Database not initialized in date utils");
-    return 0;
-  }
   try {
     const offset = await getClassDateOffsetFromDB(classId);
     dateOffsetCache.set(classId, offset);

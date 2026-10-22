@@ -56,10 +56,9 @@ vi.mock('../../question-link-picker.js', () => ({
   showQuestionLinkPicker: (...args) => mockShowQuestionLinkPicker(...args),
 }));
 
-const mockUpdateQuestionBacklinksForPage = vi.fn();
+const mockResolveQuestionLinkTargets = vi.fn();
 vi.mock('../../question-database-utils.js', () => ({
-  initializeQuestionDatabase: vi.fn(),
-  updateQuestionBacklinksForPage: (...args) => mockUpdateQuestionBacklinksForPage(...args),
+  resolveQuestionLinkTargets: (...args) => mockResolveQuestionLinkTargets(...args),
 }));
 
 const mockGetPageFromDB = vi.fn();
@@ -70,9 +69,7 @@ const mockAssignSlug = vi.fn();
 const mockRemoveSlug = vi.fn();
 const mockRenameSlug = vi.fn();
 const mockGetBacklinks = vi.fn(async () => []);
-const mockUpdateBacklinksForPage = vi.fn();
 vi.mock('../../page-database-utils.js', () => ({
-  initializePageDatabase: vi.fn(),
   getPageFromDB: (...args) => mockGetPageFromDB(...args),
   savePage: (...args) => mockSavePage(...args),
   deletePageAndSlugs: (...args) => mockDeletePageAndSlugs(...args),
@@ -81,7 +78,6 @@ vi.mock('../../page-database-utils.js', () => ({
   removeSlug: (...args) => mockRemoveSlug(...args),
   renameSlug: (...args) => mockRenameSlug(...args),
   getBacklinks: (...args) => mockGetBacklinks(...args),
-  updateBacklinksForPage: (...args) => mockUpdateBacklinksForPage(...args),
 }));
 
 global.alert = vi.fn();
@@ -117,10 +113,9 @@ describe('page-editor', () => {
     mockRemoveSlug.mockReset().mockResolvedValue(undefined);
     mockRenameSlug.mockReset().mockResolvedValue(undefined);
     mockGetBacklinks.mockReset().mockResolvedValue([]);
-    mockUpdateBacklinksForPage.mockReset().mockResolvedValue(undefined);
     mockShowPageLinkPicker.mockReset();
     mockShowQuestionLinkPicker.mockReset();
-    mockUpdateQuestionBacklinksForPage.mockReset().mockResolvedValue(undefined);
+    mockResolveQuestionLinkTargets.mockReset().mockResolvedValue([]);
     mockParseDSL.mockReset().mockReturnValue({ title: 'Parsed Title', blocks: [{ type: 'question', content: [] }] });
     mockGenerateDSLFromContent.mockClear();
     global.alert.mockClear();
@@ -215,7 +210,8 @@ describe('page-editor', () => {
     });
 
     describe('save', () => {
-      it('parses and saves the current DSL, then notifies success', async () => {
+      it('parses and saves the current DSL with its Question Link targets, then notifies success', async () => {
+        mockResolveQuestionLinkTargets.mockResolvedValue(['q1']);
         const { showNotification } = await import('../../notification-utils.js');
         await main();
         document.getElementById('dslInput').value = '# Parsed Title';
@@ -223,9 +219,8 @@ describe('page-editor', () => {
         document.getElementById('saveBtn').onclick();
         await new Promise((resolve) => setTimeout(resolve, 0));
 
-        expect(mockSavePage).toHaveBeenCalledWith('abc123', { title: 'Parsed Title', blocks: [{ type: 'question', content: [] }] });
-        expect(mockUpdateBacklinksForPage).toHaveBeenCalledWith('abc123', { title: 'Parsed Title', blocks: [{ type: 'question', content: [] }] });
-        expect(mockUpdateQuestionBacklinksForPage).toHaveBeenCalledWith('abc123', { title: 'Parsed Title', blocks: [{ type: 'question', content: [] }] });
+        expect(mockSavePage).toHaveBeenCalledWith('abc123', { title: 'Parsed Title', blocks: [{ type: 'question', content: [] }] }, ['q1']);
+        expect(mockResolveQuestionLinkTargets).toHaveBeenCalledWith({ title: 'Parsed Title', blocks: [{ type: 'question', content: [] }] });
         expect(showNotification).toHaveBeenCalledWith(expect.stringContaining('Parsed Title'), 'success');
       });
 

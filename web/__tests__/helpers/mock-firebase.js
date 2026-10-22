@@ -95,6 +95,20 @@ export function createMockDatabase(initialData = {}) {
 }
 
 /**
+ * Adapt a createMockDatabase() double to the {read, update} store port that
+ * realtime-store.js gives pure modules (lesson-store.js, slug-index.js).
+ */
+export function mockStorePort(mockDb) {
+  return {
+    read: async (path) => {
+      const snap = await mockDb.get(mockDb.ref(path));
+      return snap.exists() ? snap.val() : null;
+    },
+    update: (updates) => mockDb.update(updates),
+  };
+}
+
+/**
  * Create a mock Firebase database reference
  */
 export function createMockRef(path) {

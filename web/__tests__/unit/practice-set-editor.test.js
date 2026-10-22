@@ -27,7 +27,6 @@ vi.mock('../../question-picker.js', () => ({
 
 const mockGetAllQuestions = vi.fn(async () => ({}));
 vi.mock('../../question-database-utils.js', () => ({
-  initializeQuestionDatabase: vi.fn(),
   getAllQuestions: (...args) => mockGetAllQuestions(...args),
 }));
 
@@ -39,7 +38,6 @@ const mockAssignPracticeSetSlug = vi.fn();
 const mockRemovePracticeSetSlug = vi.fn();
 const mockRenamePracticeSetSlug = vi.fn();
 vi.mock('../../practice-set-database-utils.js', () => ({
-  initializePracticeSetDatabase: vi.fn(),
   getPracticeSetFromDB: (...args) => mockGetPracticeSetFromDB(...args),
   savePracticeSet: (...args) => mockSavePracticeSet(...args),
   deletePracticeSetAndSlugs: (...args) => mockDeletePracticeSetAndSlugs(...args),

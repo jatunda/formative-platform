@@ -9,3 +9,5 @@ Reusing the existing `slugIndex`/`[[slug]]` machinery for Questions was the chea
 ## Consequences
 
 Page and Question Slugs never collide with each other, and the two link forms are visually distinguishable at a glance in source — at the cost of Questions needing their own parallel Slug Rename / backlink-style machinery if those features are ever extended to Questions, rather than getting them for free from the Page implementation.
+
+Separate namespaces don't mean separate code. `web/slug-index.js` holds the shared Slug rules (format, claim, Slug Rename, release, resolve), scoped by namespace: each caller passes its own index path and error messages. Pages (`slugIndex`), Questions (`questionSlugIndex`) and Practice Sets (`practiceSetSlugIndex`) all use it. Likewise, Page Links and Question Links keep separate Backlink indexes (`backlinks`, `questionBacklinks`) but share one diffing implementation in `web/backlinks.js`.

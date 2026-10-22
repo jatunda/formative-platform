@@ -3,34 +3,32 @@
 // human-chosen Slug in its own namespace (see CONTEXT.md's Practice Set and
 // Slug entries). Stored under `practiceSets/{practiceSetId}`, with
 // `practiceSetSlugIndex/{slug} -> practiceSetId` as the only source of truth
-// for slug lookups - mirrors page-database-utils.js's shape, but with no
-// Backlinks-equivalent: a Practice Set's Slug is never embedded as text
-// anywhere (there's no `[[...]]` form for it, only a bare shared URL), so
-// renaming one is a plain slugIndex swap, not a rewrite-every-source-page
-// operation.
+// for slug lookups. The Slug rules themselves live in slug-index.js. Unlike
+// Pages there is no Backlinks-equivalent: a Practice Set's Slug is never
+// embedded as text anywhere (there's no `[[...]]` form for it, only a bare
+// shared URL), so renaming one is a plain Slug index swap, not a
+// rewrite-every-source-page operation.
 import {
   ref,
   get,
   set,
-  update,
-  remove
+  update
 } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js";
 import { generateUniqueHash } from "./database-utils.js";
-import { isValidSlugFormat } from "./page-database-utils.js";
+import { createSlugIndex } from "./slug-index.js";
+import { realtimeStore } from "./realtime-store.js";
+import { getDb } from "./database-handle.js";
 import { DEFAULT_PRACTICE_SET_TITLE } from "./constants.js";
 
-let db;
+/** @type {import("./slug-index.js").SlugNamespace} */
+const PRACTICE_SET_SLUGS = {
+  indexPath: "practiceSetSlugIndex",
+  formatExample: "unit-3-review",
+  takenMessage: (slug) => `The URL "/practice/${slug}" is already in use by another practice set.`,
+};
 
-/**
- * Initialize database reference
- * @param {import("https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js").Database} database
- */
-export function initializePracticeSetDatabase(database) {
-  if (!database) {
-    throw new Error("Database instance is required for initialization");
-  }
-  db = database;
-}
+/** This namespace's Slug index, over the shared database handle. */
+const slugs = () => createSlugIndex(PRACTICE_SET_SLUGS, realtimeStore(getDb()));
 
 /**
  * Create a new Practice Set with a unique id
@@ -39,7 +37,7 @@ export function initializePracticeSetDatabase(database) {
  */
 export async function createNewPracticeSet(title = DEFAULT_PRACTICE_SET_TITLE) {
   const practiceSetId = await generateUniqueHash("practiceSets");
-  await set(ref(db, `practiceSets/${practiceSetId}`), { title });
+  await set(ref(getDb(), `practiceSets/${practiceSetId}`), { title });
   return practiceSetId;
 }
 
@@ -49,7 +47,7 @@ export async function createNewPracticeSet(title = DEFAULT_PRACTICE_SET_TITLE) {
  * @returns {Promise<{title: string, questionIds: string[]} | null>}
  */
 export async function getPracticeSetFromDB(practiceSetId) {
-  const snap = await get(ref(db, `practiceSets/${practiceSetId}`));
+  const snap = await get(ref(getDb(), `practiceSets/${practiceSetId}`));
   return snap.exists() ? snap.val() : null;
 }
 
@@ -58,7 +56,7 @@ export async function getPracticeSetFromDB(practiceSetId) {
  * @returns {Promise<Object | null>} Object mapping practiceSetId to practice set data
  */
 export async function getAllPracticeSets() {
-  const snap = await get(ref(db, "practiceSets"));
+  const snap = await get(ref(getDb(), "practiceSets"));
   return snap.exists() ? snap.val() : null;
 }
 
@@ -72,7 +70,7 @@ export async function savePracticeSet(practiceSetId, practiceSet) {
   if (!practiceSet || !practiceSet.title || !Array.isArray(practiceSet.questionIds)) {
     throw new Error("Invalid practice set: missing title or questionIds");
   }
-  await set(ref(db, `practiceSets/${practiceSetId}`), practiceSet);
+  await set(ref(getDb(), `practiceSets/${practiceSetId}`), practiceSet);
 }
 
 /**
@@ -80,8 +78,7 @@ export async function savePracticeSet(practiceSetId, practiceSet) {
  * @returns {Promise<Object>} Object mapping slug to practiceSetId, or {} if none exist
  */
 export async function getAllPracticeSetSlugs() {
-  const snap = await get(ref(db, "practiceSetSlugIndex"));
-  return snap.exists() ? snap.val() : {};
+  return slugs().getAll();
 }
 
 /**
@@ -93,14 +90,7 @@ export async function getAllPracticeSetSlugs() {
  * @throws {Error} If the slug is malformed or already taken by another practice set
  */
 export async function assignPracticeSetSlug(practiceSetId, slug) {
-  if (!isValidSlugFormat(slug)) {
-    throw new Error("Slugs must be lowercase letters, numbers, and hyphens only (e.g. \"unit-3-review\").");
-  }
-  const existing = await get(ref(db, `practiceSetSlugIndex/${slug}`));
-  if (existing.exists() && existing.val() !== practiceSetId) {
-    throw new Error(`The URL "/practice/${slug}" is already in use by another practice set.`);
-  }
-  await set(ref(db, `practiceSetSlugIndex/${slug}`), practiceSetId);
+  await slugs().claim(practiceSetId, slug);
 }
 
 /**
@@ -110,15 +100,14 @@ export async function assignPracticeSetSlug(practiceSetId, slug) {
  * @returns {Promise<void>}
  */
 export async function removePracticeSetSlug(slug) {
-  await remove(ref(db, `practiceSetSlugIndex/${slug}`));
+  await slugs().release(slug);
 }
 
 /**
  * Rename a Practice Set's Slug while keeping it pointing at the same
  * Practice Set. Unlike a Page's or Question's Slug Rename, there is nothing
- * to rewrite elsewhere - a Practice Set Slug is never embedded as text in
- * any other content (see this module's top comment) - so this is a bare
- * slugIndex swap.
+ * to rewrite elsewhere (see this module's top comment), so this is a bare
+ * Slug index swap.
  * @param {string} practiceSetId
  * @param {string} oldSlug
  * @param {string} newSlug
@@ -126,17 +115,7 @@ export async function removePracticeSetSlug(slug) {
  * @throws {Error} If the new slug is malformed or already taken by another practice set
  */
 export async function renamePracticeSetSlug(practiceSetId, oldSlug, newSlug) {
-  if (!isValidSlugFormat(newSlug)) {
-    throw new Error("Slugs must be lowercase letters, numbers, and hyphens only (e.g. \"unit-3-review\").");
-  }
-  const existing = await get(ref(db, `practiceSetSlugIndex/${newSlug}`));
-  if (existing.exists() && existing.val() !== practiceSetId) {
-    throw new Error(`The URL "/practice/${newSlug}" is already in use by another practice set.`);
-  }
-  await update(ref(db), {
-    [`practiceSetSlugIndex/${oldSlug}`]: null,
-    [`practiceSetSlugIndex/${newSlug}`]: practiceSetId,
-  });
+  await slugs().rename(practiceSetId, oldSlug, newSlug);
 }
 
 /**
@@ -145,8 +124,7 @@ export async function renamePracticeSetSlug(practiceSetId, oldSlug, newSlug) {
  * @returns {Promise<string | null>}
  */
 export async function resolvePracticeSetSlugToId(slug) {
-  const snap = await get(ref(db, `practiceSetSlugIndex/${slug}`));
-  return snap.exists() ? snap.val() : null;
+  return slugs().resolve(slug);
 }
 
 /**
@@ -155,14 +133,8 @@ export async function resolvePracticeSetSlugToId(slug) {
  * @returns {Promise<void>}
  */
 export async function deletePracticeSetAndSlugs(practiceSetId) {
-  const allSlugs = await getAllPracticeSetSlugs();
-  const updates = {
+  await update(ref(getDb()), {
     [`practiceSets/${practiceSetId}`]: null,
-  };
-  for (const [slug, ownerId] of Object.entries(allSlugs)) {
-    if (ownerId === practiceSetId) {
-      updates[`practiceSetSlugIndex/${slug}`] = null;
-    }
-  }
-  await update(ref(db), updates);
+    ...(await slugs().releaseAllUpdates(practiceSetId)),
+  });
 }

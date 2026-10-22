@@ -9,6 +9,7 @@ import {
   timeOfDayInputValue,
   timeOfDayToEpochMs,
 } from '../../robotics/match-timeline.js';
+import { buildBracket } from '../../robotics/bracket.js';
 
 const START = new Date('2026-10-02T08:00:00Z').getTime();
 
@@ -139,7 +140,13 @@ describe('getScheduledMatchCount', () => {
   });
 
   it('uses the actual bracket once one exists, excluding Byes, ignoring the estimate', () => {
-    const bracket = { matches: [{ isBye: true }, {}, {}] };
-    expect(getScheduledMatchCount(12, bracket, 8, false)).toBe(14);
+    // 6 alliances pad to 8: 2 of the 4 Round 1 slots are Byes, leaving 2 + 2 + 1 played matches.
+    const bracket = buildBracket({ bracketSize: 6, seeds: ['a', 'b', 'c', 'd', 'e', 'f'], includeThirdPlace: false });
+    expect(getScheduledMatchCount(12, bracket, 8, true)).toBe(17);
+  });
+
+  it('counts the actual Third-Place Match alongside Byes', () => {
+    const bracket = buildBracket({ bracketSize: 6, seeds: ['a', 'b', 'c', 'd', 'e', 'f'], includeThirdPlace: true });
+    expect(getScheduledMatchCount(12, bracket, 8, false)).toBe(18);
   });
 });

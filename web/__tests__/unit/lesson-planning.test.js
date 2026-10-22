@@ -27,7 +27,6 @@ vi.mock('https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js', () => 
 }));
 
 vi.mock('../../date-utils.js', () => ({
-  initializeDateUtils: vi.fn(),
   getDateForDayIndex: vi.fn(async (dayIndex) => `date-for-${dayIndex}`),
   getTodayDayIndex: vi.fn(async () => 10),
   getClassDateOffset: vi.fn(async (classId) => ({ csa: 5, csp: 2 })[classId] ?? 0),
@@ -39,12 +38,10 @@ vi.mock('../../notification-utils.js', () => ({
 }));
 
 vi.mock('../../lesson-search.js', () => ({
-  initializeLessonSearch: vi.fn(),
 }));
 
 const mockGetFullSchedule = vi.fn();
 vi.mock('../../database-utils.js', () => ({
-  initializeDatabase: vi.fn(),
   getFullSchedule: (...args) => mockGetFullSchedule(...args),
 }));
 
@@ -260,7 +257,7 @@ describe('lesson-planning', () => {
 
       await renderClassPane('csa', 'CS A', containerEl);
 
-      expect(mockGetLessonTitles).toHaveBeenCalledWith(expect.anything(), ['hashA', 'hashB']);
+      expect(mockGetLessonTitles).toHaveBeenCalledWith(['hashA', 'hashB']);
     });
 
     it("builds delete/insert handlers scoped to this Class and today's max Day Index", async () => {

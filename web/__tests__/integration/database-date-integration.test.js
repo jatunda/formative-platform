@@ -1,10 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { initializeDatabase } from '../../database-handle.js';
+import { getScheduleForDay } from '../../database-utils.js';
 import {
-  initializeDatabase,
-  getScheduleForDay,
-} from '../../database-utils.js';
-import {
-  initializeDateUtils,
   getTodayDayIndex,
   getDateForDayIndex,
   isDayIndexToday,
@@ -76,7 +73,6 @@ describe('Database and Date Integration', () => {
 
     const mockDb = {};
     initializeDatabase(mockDb);
-    initializeDateUtils(mockDb);
   });
 
   it('should get schedule for today using date calculations', async () => {

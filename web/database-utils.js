@@ -4,21 +4,9 @@ import {
   get,
   set
 } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js";
-import { DEFAULT_LESSON_TITLE, UNTITLED_LESSON } from "./constants.js";
-
-let db; // Database reference will be set by initializeDatabase
-
-/**
- * Initialize database reference
- * @param {import("https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js").Database} database - The Firebase database instance
- * @throws {Error} If database instance is not provided
- */
-export function initializeDatabase(database) {
-  if (!database) {
-    throw new Error("Database instance is required for initialization");
-  }
-  db = database;
-}
+import { getDb } from "./database-handle.js";
+import { realtimeStore } from "./realtime-store.js";
+import { generateUniqueKey } from "./unique-key.js";
 
 /**
  * Get schedule for a specific day
@@ -28,11 +16,8 @@ export function initializeDatabase(database) {
  * @throws {Error} If database is not initialized or operation fails
  */
 export async function getScheduleForDay(classId, dayIndex) {
-  if (!db) {
-    throw new Error("Database not initialized. Call initializeDatabase first.");
-  }
   try {
-    const snap = await get(ref(db, `schedule/${classId}/${dayIndex}`));
+    const snap = await get(ref(getDb(), `schedule/${classId}/${dayIndex}`));
     return snap.val() || [];
   } catch (error) {
     console.error(`Failed to get schedule for class ${classId}, day ${dayIndex}:`, error);
@@ -49,11 +34,8 @@ export async function getScheduleForDay(classId, dayIndex) {
  * @throws {Error} If database is not initialized or operation fails
  */
 export async function updateScheduleForDay(classId, dayIndex, lessons) {
-  if (!db) {
-    throw new Error("Database not initialized. Call initializeDatabase first.");
-  }
   try {
-    const dayRef = ref(db, `schedule/${classId}/${dayIndex}`);
+    const dayRef = ref(getDb(), `schedule/${classId}/${dayIndex}`);
     await set(dayRef, lessons);
   } catch (error) {
     console.error(`Failed to update schedule for class ${classId}, day ${dayIndex}:`, error);
@@ -68,11 +50,8 @@ export async function updateScheduleForDay(classId, dayIndex, lessons) {
  * @throws {Error} If database is not initialized or operation fails
  */
 export async function getFullSchedule(classId) {
-  if (!db) {
-    throw new Error("Database not initialized. Call initializeDatabase first.");
-  }
   try {
-    const snap = await get(ref(db, `schedule/${classId}`));
+    const snap = await get(ref(getDb(), `schedule/${classId}`));
     return snap.exists() ? snap.val() : {};
   } catch (error) {
     console.error(`Failed to get full schedule for class ${classId}:`, error);
@@ -81,52 +60,13 @@ export async function getFullSchedule(classId) {
 }
 
 /**
- * Get lesson data from database
- * @param {string} hash - The lesson hash/ID
- * @returns {Promise<Object | null>} The lesson data, or null if not found
- */
-export async function getLessonFromDB(hash) {
-  const snap = await get(ref(db, `content/${hash}`));
-  return snap.exists() ? snap.val() : null;
-}
-
-/**
- * Get lesson title from database
- * @param {string} hash - The lesson hash/ID
- * @returns {Promise<string>} The lesson title, or UNTITLED_LESSON if not found
- */
-export async function getLessonTitleFromDB(hash) {
-  const snap = await get(ref(db, `content/${hash}/title`));
-  return snap.exists() ? snap.val() : UNTITLED_LESSON;
-}
-
-/**
- * Create a new lesson in the database with a unique hash
- * @param {string} [title=DEFAULT_LESSON_TITLE] - The lesson title
- * @returns {Promise<string>} The generated unique hash for the lesson
- */
-export async function createNewLesson(title = DEFAULT_LESSON_TITLE) {
-  const hash = await generateUniqueHash();
-  await set(ref(db, `content/${hash}`), { title });
-  return hash;
-}
-
-/**
- * Generate a unique hash for new database records (lessons, pages, ...)
- * Continuously generates hashes until one is found that doesn't exist under basePath
- * @param {string} [basePath="content"] - The top-level DB tree to check uniqueness against
+ * Generate a unique id for a new Page, Question or Practice Set record.
+ * (Lessons get theirs from the Lesson store's newId/create.)
+ * @param {string} basePath - The top-level DB tree to check uniqueness against
  * @returns {Promise<string>} A unique 32-character hexadecimal hash
  */
-export async function generateUniqueHash(basePath = "content") {
-  let hash;
-  let exists = true;
-  while (exists) {
-    hash = Array.from(crypto.getRandomValues(new Uint8Array(16)))
-      .map(b => b.toString(16).padStart(2, "0")).join("");
-    const snap = await get(ref(db, `${basePath}/${hash}`));
-    exists = snap.exists();
-  }
-  return hash;
+export function generateUniqueHash(basePath) {
+  return generateUniqueKey(realtimeStore(getDb()).read, basePath);
 }
 
 /**
@@ -134,17 +74,8 @@ export async function generateUniqueHash(basePath = "content") {
  * @returns {Promise<Object | null>} Object mapping class IDs to class data, or null if none exist
  */
 export async function getClasses() {
-  const snap = await get(ref(db, "classes"));
+  const snap = await get(ref(getDb(), "classes"));
   return snap.val();
-}
-
-/**
- * Get all content (for lesson linking popup)
- * @returns {Promise<Object | null>} Object mapping lesson hashes to lesson data, or null if none exist
- */
-export async function getAllContent() {
-  const snap = await get(ref(db, "content"));
-  return snap.exists() ? snap.val() : null;
 }
 
 /**
@@ -229,11 +160,8 @@ export async function moveLessonBetweenDays(classId, fromDayIndex, fromLessonInd
  * @throws {Error} If database is not initialized or operation fails
  */
 export async function getClassDateOffset(classId) {
-  if (!db) {
-    throw new Error("Database not initialized. Call initializeDatabase first.");
-  }
   try {
-    const snap = await get(ref(db, `classes/${classId}/dateOffset`));
+    const snap = await get(ref(getDb(), `classes/${classId}/dateOffset`));
     return snap.exists() ? snap.val() : 0; // Default offset is 0
   } catch (error) {
     console.error(`Failed to get date offset for class ${classId}:`, error);
@@ -251,11 +179,8 @@ export async function getClassDateOffset(classId) {
  * @throws {Error} If database is not initialized or operation fails
  */
 export async function setClassDateOffset(classId, offset) {
-  if (!db) {
-    throw new Error("Database not initialized. Call initializeDatabase first.");
-  }
   try {
-    await set(ref(db, `classes/${classId}/dateOffset`), Number(offset));
+    await set(ref(getDb(), `classes/${classId}/dateOffset`), Number(offset));
   } catch (error) {
     console.error(`Failed to set date offset for class ${classId}:`, error);
     throw new Error(`Unable to save date offset. Please try again.`, { cause: error });
@@ -275,16 +200,16 @@ export async function insertDayAt(classId, index, maxDayIndex) {
   // day's write in parallel - mirrors deleteDayAt's shape below, rather
   // than the previous read-one-day/write-one-day loop, which took two
   // sequential network round-trips per shifted day.
-  const scheduleSnap = await get(ref(db, `schedule/${classId}`));
+  const scheduleSnap = await get(ref(getDb(), `schedule/${classId}`));
   const scheduleData = scheduleSnap.exists() ? scheduleSnap.val() : {};
 
   const writeOperations = [];
   for (let i = maxDayIndex; i >= index; i--) {
     const dayData = scheduleData[i] !== undefined ? scheduleData[i] : [];
-    writeOperations.push(set(ref(db, `schedule/${classId}/${i + 1}`), dayData));
+    writeOperations.push(set(ref(getDb(), `schedule/${classId}/${i + 1}`), dayData));
   }
   // Set the new day to empty
-  writeOperations.push(set(ref(db, `schedule/${classId}/${index}`), []));
+  writeOperations.push(set(ref(getDb(), `schedule/${classId}/${index}`), []));
 
   await Promise.all(writeOperations);
 }
@@ -297,12 +222,9 @@ export async function insertDayAt(classId, index, maxDayIndex) {
  * @throws {Error} If database is not initialized or operation fails
  */
 export async function deleteDayAt(classId, index) {
-  if (!db) {
-    throw new Error("Database not initialized. Call initializeDatabase first.");
-  }
   try {
     // Read all schedule data at once for batch operations
-    const scheduleSnap = await get(ref(db, `schedule/${classId}`));
+    const scheduleSnap = await get(ref(getDb(), `schedule/${classId}`));
     const scheduleData = scheduleSnap.exists() ? scheduleSnap.val() : {};
     
     // Get all day indices and find max
@@ -317,14 +239,14 @@ export async function deleteDayAt(classId, index) {
       if (dayIdx > index) {
         // Move this day's data to the previous index
         writeOperations.push(
-          set(ref(db, `schedule/${classId}/${dayIdx - 1}`), scheduleData[dayIdx])
+          set(ref(getDb(), `schedule/${classId}/${dayIdx - 1}`), scheduleData[dayIdx])
         );
       }
     }
     
     // Remove the last day (set to null to delete it)
     writeOperations.push(
-      set(ref(db, `schedule/${classId}/${maxDayIndex}`), null)
+      set(ref(getDb(), `schedule/${classId}/${maxDayIndex}`), null)
     );
     
     // Perform all updates in parallel

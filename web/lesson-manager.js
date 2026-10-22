@@ -13,6 +13,7 @@ import {
 import {
   setupDragHandlers
 } from './drag-drop-utils.js';
+import { getDb } from './database-handle.js';
 
 /**
  * Create a lesson cluster UI component with drag-and-drop support
@@ -99,7 +100,6 @@ export function createLessonCluster({
  * @param {string[]} options.lessons - Array of all lesson hashes for this day
  * @param {string} options.lessonTitle - The lesson title to display
  * @param {string} options.classId - The current class ID
- * @param {import("https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js").Database} options.database - The Firebase database instance
  * @param {Function} options.onScheduleReload - Callback to reload the schedule after changes
  * @param {Function} options.onLessonClick - Callback when lesson is clicked (optional)
  * @returns {HTMLElement} The lesson cluster element
@@ -111,7 +111,6 @@ export function createLessonClusterWithDB({
   lessons,
   lessonTitle,
   classId,
-  database,
   onScheduleReload,
   onLessonClick
 }) {
@@ -129,7 +128,7 @@ export function createLessonClusterWithDB({
     classId,
     onMoveLeft: async () => {
       if (lessonIndex > 0) {
-        const dayRef = ref(database, `schedule/${classId}/${dayIndex}`);
+        const dayRef = ref(getDb(), `schedule/${classId}/${dayIndex}`);
         const newLessons = [...lessons];
         [newLessons[lessonIndex - 1], newLessons[lessonIndex]] = [newLessons[lessonIndex], newLessons[lessonIndex - 1]];
         await set(dayRef, newLessons);
@@ -138,7 +137,7 @@ export function createLessonClusterWithDB({
     },
     onMoveRight: async () => {
       if (lessonIndex < lessons.length - 1) {
-        const dayRef = ref(database, `schedule/${classId}/${dayIndex}`);
+        const dayRef = ref(getDb(), `schedule/${classId}/${dayIndex}`);
         const newLessons = [...lessons];
         [newLessons[lessonIndex], newLessons[lessonIndex + 1]] = [newLessons[lessonIndex + 1], newLessons[lessonIndex]];
         await set(dayRef, newLessons);
@@ -146,7 +145,7 @@ export function createLessonClusterWithDB({
       }
     },
     onDelete: async () => {
-      const dayRef = ref(database, `schedule/${classId}/${dayIndex}`);
+      const dayRef = ref(getDb(), `schedule/${classId}/${dayIndex}`);
       const newLessons = lessons.filter((_, idx) => idx !== lessonIndex);
       await set(dayRef, newLessons);
       onScheduleReload();

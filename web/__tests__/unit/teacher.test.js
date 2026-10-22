@@ -37,7 +37,6 @@ vi.mock('../../date-utils.js', () => ({
   // constants.js re-exports this from date-utils.js, and teacher.js imports
   // it from constants.js - needs to be here for that chain to resolve.
   DEFAULT_CLASS_START_DATE: '2024-08-19',
-  initializeDateUtils: vi.fn(),
   getDateForDayIndex: vi.fn(async (dayIndex, classId) => `date-for-${classId}-${dayIndex}`),
   getTodayDayIndex: vi.fn(async () => 10),
   getClassDateOffset: vi.fn(async () => 5),
@@ -49,7 +48,6 @@ vi.mock('../../notification-utils.js', () => ({
 }));
 
 vi.mock('../../lesson-search.js', () => ({
-  initializeLessonSearch: vi.fn(),
 }));
 
 const mockCreateDateOffsetControl = vi.fn((config) => {
@@ -63,7 +61,6 @@ vi.mock('../../ui-components.js', () => ({
 }));
 
 vi.mock('../../database-utils.js', () => ({
-  initializeDatabase: vi.fn(),
 }));
 
 vi.mock('../../error-ui-utils.js', () => ({
@@ -261,7 +258,7 @@ describe('teacher', () => {
       scheduleFixture();
       await renderScheduleTable({ 0: ['hashA'], 1: ['hashB', 'hashC'] }, 'csa');
 
-      expect(mockGetLessonTitles).toHaveBeenCalledWith(expect.anything(), ['hashA', 'hashB', 'hashC']);
+      expect(mockGetLessonTitles).toHaveBeenCalledWith(['hashA', 'hashB', 'hashC']);
     });
 
     it('scopes the delete/insert handlers to the given Class and its max Day Index', async () => {
@@ -285,7 +282,7 @@ describe('teacher', () => {
 
   describe('createFinalRow', () => {
     it('renders the next Day Index, its date, and end-buttons', async () => {
-      const ctx = { classId: 'csa', db: {}, onReload: vi.fn() };
+      const ctx = { classId: 'csa', onReload: vi.fn() };
       const row = await createFinalRow(7, ctx);
 
       const cells = row.querySelectorAll('td');

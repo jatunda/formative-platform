@@ -3,23 +3,10 @@ import {
   createInitialState,
   hasEvenMatchCounts,
   suggestEvenMatchesPerTeam,
-  recordQualificationResult,
-  setQualificationNoShow,
-  setQualificationDraftScore,
   canMoveQualificationMatch,
-  reorderQualificationMatch,
-  setTimelineConfig,
-  applyMatchTimeline,
   upgradeSavedTournament,
-  recordEliminationResult,
-  setEliminationNoShow,
-  setEliminationDraftScore,
-  resetResults,
-  newTournament,
   getRevealedPlaces,
   getNextPlaceToReveal,
-  revealNextPlacement,
-  replayReveal,
   playoffAllianceTeamIds,
   teamName,
   allianceTeamNames,
@@ -34,7 +21,7 @@ import {
 } from './match-timeline.js';
 import { computeStandings, formatRecord } from './standings.js';
 import { winningSide } from './match-result.js';
-import { resolveMatchSides, getMatchWinner, isBracketComplete, countUndecidedMatches, getPlacements, getPlayedEliminationMatches, eliminationMatchLabel } from './bracket.js';
+import { resolveMatchSides, getMatchWinner, isBracketComplete, countUndecidedMatches, getPlacements, getPlayedEliminationMatches, eliminationMatchLabel, canHaveThirdPlaceMatch } from './bracket.js';
 import {
   getAllianceCaptain,
   getSelectionRowStatus,
@@ -360,7 +347,7 @@ export function renderTeamsTab(state, dispatch) {
         message: 'This clears the Qualification Round, all Match results, alliances and declines, and the Elimination Bracket. The Team roster is kept.',
         confirmLabel: 'Reset Results',
       }).then((confirmed) => {
-        if (confirmed) dispatch((s) => resetResults(s));
+        if (confirmed) dispatch({ type: 'reset-results' });
       });
     },
   }, ['Reset Results']);
@@ -373,7 +360,7 @@ export function renderTeamsTab(state, dispatch) {
         message: 'This discards everything, including the Team roster, and starts a brand-new Tournament.',
         confirmLabel: 'Reset Everything',
       }).then((confirmed) => {
-        if (confirmed) dispatch((s) => newTournament(s));
+        if (confirmed) dispatch({ type: 'new-tournament' });
       });
     },
   }, ['Reset Everything / New Tournament']);
@@ -392,41 +379,34 @@ export function renderTeamsTab(state, dispatch) {
 // ---- Tab: Schedule / Swiss Live ----
 
 /**
- * The score-draft, record-result, and No-Show actions for each match kind, each
- * (state, matchRef, ...). Every view of a match uses the same bundle, so a list
- * row or bracket card and the Now Playing display always edit the same draft.
+ * The match actions for one match. Every view of a match (its list row or bracket card, and
+ * the Now Playing display) edits it through these, named by `phase` ('qualification' |
+ * 'elimination') and `matchRef` (the Qualification Match's index or the Elimination Match's
+ * id), so they always edit the same draft.
  */
-const QUALIFICATION_MATCH_ACTIONS = {
-  setDraftScore: setQualificationDraftScore,
-  recordResult: recordQualificationResult,
-  setNoShow: setQualificationNoShow,
-};
-const ELIMINATION_MATCH_ACTIONS = {
-  setDraftScore: setEliminationDraftScore,
-  recordResult: recordEliminationResult,
-  setNoShow: setEliminationNoShow,
-};
+function matchActions(dispatch, phase, matchRef) {
+  return {
+    saveDraftScore: (field, value) => dispatch({ type: 'set-draft-score', phase, matchRef, field, value }),
+    recordResult: (scoreA, scoreB) => dispatch({ type: 'record-result', phase, matchRef, scoreA, scoreB }),
+    /** The No-Show toggle for the match's Teams. */
+    toggleNoShow: (teamId, noShow) => dispatch({ type: 'set-no-show', phase, matchRef, teamId, noShow }),
+  };
+}
 
 /** Draft-score inputs for one match (Qualification or Elimination): each edit is saved as a draft (re-rendering every view of the match). */
-function renderScoreInputs(dispatch, match, matchRef, setDraftScore) {
+function renderScoreInputs(match, actions) {
   const scoreA = el('input', { type: 'number', className: 'robotics-score-input is-red', value: match.scoreA ?? '' });
   const scoreB = el('input', { type: 'number', className: 'robotics-score-input is-blue', value: match.scoreB ?? '' });
-  scoreA.addEventListener('change', () => {
-    dispatch((s) => setDraftScore(s, matchRef, 'scoreA', scoreA.value === '' ? null : parseInt(scoreA.value, 10) || 0));
-  });
-  scoreB.addEventListener('change', () => {
-    dispatch((s) => setDraftScore(s, matchRef, 'scoreB', scoreB.value === '' ? null : parseInt(scoreB.value, 10) || 0));
-  });
+  const saveDraft = (field, input) => actions.saveDraftScore(field, input.value === '' ? null : parseInt(input.value, 10) || 0);
+  scoreA.addEventListener('change', () => saveDraft('scoreA', scoreA));
+  scoreB.addEventListener('change', () => saveDraft('scoreB', scoreB));
   return { scoreA, scoreB };
 }
 
-function renderMarkMatchCompleteButton(dispatch, match, matchRef, { scoreA, scoreB }, className, recordResult) {
+function renderMarkMatchCompleteButton(match, actions, { scoreA, scoreB }, className) {
   return el('button', {
     className,
-    onClick: () => dispatch((s) => recordResult(s, matchRef, {
-      scoreA: parseInt(scoreA.value, 10) || 0,
-      scoreB: parseInt(scoreB.value, 10) || 0,
-    })),
+    onClick: () => actions.recordResult(parseInt(scoreA.value, 10) || 0, parseInt(scoreB.value, 10) || 0),
   }, [match.completed ? 'Save Edit' : 'Mark Complete']);
 }
 
@@ -458,18 +438,18 @@ function renderMatchRow(state, dispatch, entry, liveMatch) {
   }
   row.appendChild(el('span', dotProps));
 
-  const scores = renderScoreInputs(dispatch, match, qualIndex, QUALIFICATION_MATCH_ACTIONS.setDraftScore);
+  const qualificationActions = matchActions(dispatch, 'qualification', qualIndex);
+  const scores = renderScoreInputs(match, qualificationActions);
   const { scoreA, scoreB } = scores;
   const winner = winningSide(match);
-  const toggleQualificationNoShow = (teamId, next) => dispatch((s) => QUALIFICATION_MATCH_ACTIONS.setNoShow(s, qualIndex, teamId, next));
   // Each side and each score is its own grid cell so columns line up down the list.
-  row.appendChild(renderAllianceSide(state, match.allianceA, match.noShow, toggleQualificationNoShow, winner === 'A', 'red'));
+  row.appendChild(renderAllianceSide(state, match.allianceA, match.noShow, qualificationActions.toggleNoShow, winner === 'A', 'red'));
   row.appendChild(scoreA);
   row.appendChild(scoreB);
-  row.appendChild(renderAllianceSide(state, match.allianceB, match.noShow, toggleQualificationNoShow, winner === 'B', 'blue'));
+  row.appendChild(renderAllianceSide(state, match.allianceB, match.noShow, qualificationActions.toggleNoShow, winner === 'B', 'blue'));
 
   const actions = el('div', { className: 'robotics-match-actions' });
-  actions.appendChild(renderMarkMatchCompleteButton(dispatch, match, qualIndex, scores, 'robotics-btn robotics-btn-secondary robotics-btn-sm', QUALIFICATION_MATCH_ACTIONS.recordResult));
+  actions.appendChild(renderMarkMatchCompleteButton(match, qualificationActions, scores, 'robotics-btn robotics-btn-secondary robotics-btn-sm'));
 
   if (match.completed) {
     actions.appendChild(el('span', { className: 'robotics-complete-badge' }, ['✓ Complete']));
@@ -477,13 +457,13 @@ function renderMatchRow(state, dispatch, entry, liveMatch) {
     const moveUpBtn = el('button', {
       className: 'robotics-btn robotics-btn-ghost robotics-btn-sm',
       'aria-label': 'Move match up',
-      onClick: () => dispatch((s) => reorderQualificationMatch(s, qualIndex, -1)),
+      onClick: () => dispatch({ type: 'reorder-qualification-match', qualIndex, direction: -1 }),
     }, ['↑']);
     moveUpBtn.disabled = !canMoveQualificationMatch(state.qualification.matches, qualIndex, -1);
     const moveDownBtn = el('button', {
       className: 'robotics-btn robotics-btn-ghost robotics-btn-sm',
       'aria-label': 'Move match down',
-      onClick: () => dispatch((s) => reorderQualificationMatch(s, qualIndex, 1)),
+      onClick: () => dispatch({ type: 'reorder-qualification-match', qualIndex, direction: 1 }),
     }, ['↓']);
     moveDownBtn.disabled = !canMoveQualificationMatch(state.qualification.matches, qualIndex, 1);
     actions.appendChild(moveUpBtn);
@@ -507,7 +487,7 @@ function renderTimelineControls(state, dispatch) {
     if (state.timeline.mode === mode) opt.setAttribute('selected', 'selected');
     modeSelect.appendChild(opt);
   });
-  modeSelect.addEventListener('change', () => dispatch((s) => setTimelineConfig(s, { mode: modeSelect.value })));
+  modeSelect.addEventListener('change', () => dispatch({ type: 'set-timeline-config', patch: { mode: modeSelect.value } }));
   panel.appendChild(el('label', { className: 'robotics-field robotics-timeline-mode' }, ['Mode', modeSelect]));
 
   const isForward = state.timeline.mode === 'forward';
@@ -516,7 +496,7 @@ function renderTimelineControls(state, dispatch) {
     className: 'robotics-btn robotics-btn-primary',
     onClick: () => {
       const time = timeOfDayToEpochMs(timeInput.value);
-      dispatch((s) => applyMatchTimeline(s, { mode: state.timeline.mode, time }));
+      dispatch({ type: 'apply-match-timeline', mode: state.timeline.mode, time });
     },
   }, ['Apply']);
   panel.appendChild(el('div', { className: 'robotics-timeline-time' }, [
@@ -525,11 +505,11 @@ function renderTimelineControls(state, dispatch) {
   ]));
 
   const durationInput = el('input', { type: 'number', value: state.timeline.matchDurationMin });
-  durationInput.addEventListener('change', () => dispatch((s) => setTimelineConfig(s, { matchDurationMin: parseInt(durationInput.value, 10) || 1 })));
+  durationInput.addEventListener('change', () => dispatch({ type: 'set-timeline-config', patch: { matchDurationMin: parseInt(durationInput.value, 10) || 1 } }));
   const gapInput = el('input', { type: 'number', value: state.timeline.gapMin });
-  gapInput.addEventListener('change', () => dispatch((s) => setTimelineConfig(s, { gapMin: parseInt(gapInput.value, 10) || 0 })));
+  gapInput.addEventListener('change', () => dispatch({ type: 'set-timeline-config', patch: { gapMin: parseInt(gapInput.value, 10) || 0 } }));
   const fieldInput = el('input', { type: 'number', value: state.timeline.fieldCount });
-  fieldInput.addEventListener('change', () => dispatch((s) => setTimelineConfig(s, { fieldCount: parseInt(fieldInput.value, 10) || 1 })));
+  fieldInput.addEventListener('change', () => dispatch({ type: 'set-timeline-config', patch: { fieldCount: parseInt(fieldInput.value, 10) || 1 } }));
   panel.appendChild(el('div', { className: 'robotics-timeline-pacing' }, [
     el('label', { className: 'robotics-field' }, ['Duration (min)', durationInput]),
     el('label', { className: 'robotics-field' }, ['Gap (min)', gapInput]),
@@ -653,15 +633,15 @@ function renderPhaseCompleteCard({ message, buttonLabel, destinationTab, setActi
 
 /**
  * A Live Match's Current Match spotlighted for the projected audience, beside
- * its Up Next preview. Works for either phase: the caller supplies the actions
- * to dispatch, the same ones as the match's list row or bracket card, so both
- * always show the same draft.
+ * its Up Next preview. Works for either phase: it dispatches the same match
+ * actions as the match's list row or bracket card, so both always show the
+ * same draft.
  *
  * - liveMatch: getQualificationLiveMatch / getEliminationLiveMatch, or null
- * - actions: { setDraftScore, recordResult, setNoShow }, each (state, matchRef, ...)
+ * - phase: 'qualification' | 'elimination', naming the match actions
  * - placeholder: the card shown when there is no Live Match
  */
-function renderNowPlaying(state, dispatch, { liveMatch, actions, placeholder }) {
+function renderNowPlaying(state, dispatch, { liveMatch, phase, placeholder }) {
   const wrap = el('div', { className: 'robotics-now-playing-layout' });
   if (!liveMatch) {
     wrap.appendChild(placeholder);
@@ -669,9 +649,9 @@ function renderNowPlaying(state, dispatch, { liveMatch, actions, placeholder }) 
   }
 
   const { current, upNext } = liveMatch;
-  const { ref: matchRef, entry: { match } } = current;
-  const toggleNoShow = (teamId, next) => dispatch((s) => actions.setNoShow(s, matchRef, teamId, next));
-  const scores = renderScoreInputs(dispatch, match, matchRef, actions.setDraftScore);
+  const { match } = current.entry;
+  const actions = matchActions(dispatch, phase, current.ref);
+  const scores = renderScoreInputs(match, actions);
 
   wrap.appendChild(el('section', { className: 'robotics-now-playing', 'aria-label': 'Now Playing' }, [
     el('div', { className: 'robotics-now-playing-header' }, [
@@ -679,13 +659,13 @@ function renderNowPlaying(state, dispatch, { liveMatch, actions, placeholder }) 
       renderMatchMeta(state, current, 'robotics-now-playing-meta'),
     ]),
     el('div', { className: 'robotics-now-playing-arena' }, [
-      renderNowPlayingSide(state, match, current.sideA.teamIds, toggleNoShow, 'red'),
+      renderNowPlayingSide(state, match, current.sideA.teamIds, actions.toggleNoShow, 'red'),
       scores.scoreA,
       el('div', { className: 'robotics-match-vs' }, ['vs']),
       scores.scoreB,
-      renderNowPlayingSide(state, match, current.sideB.teamIds, toggleNoShow, 'blue'),
+      renderNowPlayingSide(state, match, current.sideB.teamIds, actions.toggleNoShow, 'blue'),
     ]),
-    renderMarkMatchCompleteButton(dispatch, match, matchRef, scores, 'robotics-btn robotics-btn-primary robotics-now-playing-complete', actions.recordResult),
+    renderMarkMatchCompleteButton(match, actions, scores, 'robotics-btn robotics-btn-primary robotics-now-playing-complete'),
   ]));
 
   if (upNext) wrap.appendChild(renderUpNext(state, upNext));
@@ -705,7 +685,7 @@ function renderQualificationNowPlaying(state, dispatch, liveMatch, setActiveTab)
         setActiveTab,
       });
   }
-  return renderNowPlaying(state, dispatch, { liveMatch, actions: QUALIFICATION_MATCH_ACTIONS, placeholder });
+  return renderNowPlaying(state, dispatch, { liveMatch, phase: 'qualification', placeholder });
 }
 
 export function renderScheduleTab(state, dispatch, { setActiveTab }) {
@@ -891,10 +871,28 @@ function renderSelectionStandings(state, dispatch, captainId, { pick, pickDeclin
 }
 
 /**
+ * The Third-Place Match toggle, saved as soon as it changes. It stays switchable on a live
+ * Bracket (adding or removing the match, from now), and locks once the Third-Place Match is
+ * complete.
+ */
+function renderThirdPlaceToggle(state, dispatch) {
+  const input = el('input', { type: 'checkbox' });
+  input.checked = state.elimination.includeThirdPlace;
+  input.addEventListener('change', () => {
+    const { blockReason } = dispatch({ type: 'set-third-place', includeThirdPlace: input.checked, now: Date.now() });
+    if (blockReason) input.checked = state.elimination.includeThirdPlace;
+  });
+  const reason = getActionBlockReason(state, { type: 'set-third-place' });
+  if (reason) lockField(input, reason);
+  return el('label', { className: 'robotics-field robotics-checkbox-field' }, [input, 'Include third-place match']);
+}
+
+/**
  * Bracket Size and the Third-Place Match toggle, each saved as soon as it changes. Bracket
  * Size shows the Estimated Bracket Size until it's saved (the teacher sets it, or the first
  * alliance forms). Lowering it below the number of alliances formed, or clearing it once
- * saved, is refused with a toast, and the input reverts. Both are locked while a Bracket exists.
+ * saved, is refused with a toast, and the input reverts. Bracket Size is locked while a
+ * Bracket exists.
  */
 function renderSelectionSettings(state, dispatch) {
   const card = el('div', { className: 'robotics-card robotics-selection-settings' });
@@ -906,18 +904,10 @@ function renderSelectionSettings(state, dispatch) {
     const { blockReason } = dispatch({ type: 'set-bracket-size', bracketSize: isBracketSizeSaved(size) ? size : null });
     if (blockReason) sizeInput.value = savedSize;
   });
-  const thirdPlaceInput = el('input', { type: 'checkbox' });
-  thirdPlaceInput.checked = state.elimination.includeThirdPlace;
-  thirdPlaceInput.addEventListener('change', () => {
-    const { blockReason } = dispatch({ type: 'set-third-place', includeThirdPlace: thirdPlaceInput.checked });
-    if (blockReason) thirdPlaceInput.checked = state.elimination.includeThirdPlace;
-  });
-  const thirdPlaceReason = getActionBlockReason(state, { type: 'set-third-place' });
   const sizeReason = getActionBlockReason(state, { type: 'set-bracket-size', bracketSize: savedSize });
   if (sizeReason) lockField(sizeInput, sizeReason);
-  if (thirdPlaceReason) lockField(thirdPlaceInput, thirdPlaceReason);
   card.appendChild(el('label', { className: 'robotics-field' }, ['Bracket size', sizeInput]));
-  card.appendChild(el('label', { className: 'robotics-field robotics-checkbox-field' }, [thirdPlaceInput, 'Include third-place match']));
+  card.appendChild(renderThirdPlaceToggle(state, dispatch));
   return card;
 }
 
@@ -1158,25 +1148,25 @@ function renderBracketMatch(state, dispatch, match) {
   }
 
   const winner = getMatchWinner(state.elimination.bracket, match.id);
-  const toggleEliminationNoShow = (teamId, next) => dispatch((s) => ELIMINATION_MATCH_ACTIONS.setNoShow(s, match.id, teamId, next));
+  const eliminationActions = matchActions(dispatch, 'elimination', match.id);
 
-  const scores = renderScoreInputs(dispatch, match, match.id, ELIMINATION_MATCH_ACTIONS.setDraftScore);
+  const scores = renderScoreInputs(match, eliminationActions);
   card.appendChild(el('div', { className: 'robotics-bracket-side is-red' }, [
     sides.allianceA
-      ? renderAllianceSide(state, playoffAllianceTeamIds(state, sides.allianceA), match.noShow, toggleEliminationNoShow, winner === sides.allianceA, 'red')
+      ? renderAllianceSide(state, playoffAllianceTeamIds(state, sides.allianceA), match.noShow, eliminationActions.toggleNoShow, winner === sides.allianceA, 'red')
       : el('span', { className: 'robotics-match-alliance' }, ['TBD']),
     scores.scoreA,
   ]));
   card.appendChild(el('div', { className: 'robotics-match-vs' }, ['vs']));
   card.appendChild(el('div', { className: 'robotics-bracket-side is-blue' }, [
     sides.allianceB
-      ? renderAllianceSide(state, playoffAllianceTeamIds(state, sides.allianceB), match.noShow, toggleEliminationNoShow, winner === sides.allianceB, 'blue')
+      ? renderAllianceSide(state, playoffAllianceTeamIds(state, sides.allianceB), match.noShow, eliminationActions.toggleNoShow, winner === sides.allianceB, 'blue')
       : el('span', { className: 'robotics-match-alliance' }, ['TBD']),
     scores.scoreB,
   ]));
 
   const actions = el('div', { className: 'robotics-match-actions' });
-  actions.appendChild(renderMarkMatchCompleteButton(dispatch, match, match.id, scores, 'robotics-btn robotics-btn-secondary robotics-btn-sm', ELIMINATION_MATCH_ACTIONS.recordResult));
+  actions.appendChild(renderMarkMatchCompleteButton(match, eliminationActions, scores, 'robotics-btn robotics-btn-secondary robotics-btn-sm'));
   if (match.completed) actions.appendChild(el('span', { className: 'robotics-complete-badge' }, ['✓ Complete']));
   card.appendChild(actions);
   return card;
@@ -1237,7 +1227,7 @@ function renderFinalsNowPlaying(state, dispatch, setActiveTab) {
     destinationTab: 'results',
     setActiveTab,
   });
-  return renderNowPlaying(state, dispatch, { liveMatch, actions: ELIMINATION_MATCH_ACTIONS, placeholder });
+  return renderNowPlaying(state, dispatch, { liveMatch, phase: 'elimination', placeholder });
 }
 
 /** The Elimination Bracket under its Now Playing, or where to go to start one. Playoff setup lives on the Alliance Selection tab. */
@@ -1253,6 +1243,10 @@ export function renderFinalsTab(state, dispatch, { setActiveTab }) {
 
   section.appendChild(renderFinalsNowPlaying(state, dispatch, setActiveTab));
   section.appendChild(renderBracket(state, dispatch));
+  // Without two Semifinal-round losers there's no Third-Place Match to toggle.
+  if (canHaveThirdPlaceMatch(state.elimination.bracket)) {
+    section.appendChild(el('div', { className: 'robotics-card robotics-finals-settings' }, [renderThirdPlaceToggle(state, dispatch)]));
+  }
   return section;
 }
 
@@ -1326,23 +1320,14 @@ export function renderResultsTab(state, dispatch) {
   }
 
   const revealNext = () => {
-    // Read the place to reveal from live state inside the updater, not the outer `nextPlace`
-    // closed over at render time: dispatch()'s rebuild is deferred, so a second reveal
-    // triggered before that rebuild runs must not re-read the same stale `nextPlace` as the
-    // first — each call needs its own.
-    let revealedPlace;
-    dispatch(
-      (s) => {
-        revealedPlace = getNextPlaceToReveal(s);
-        return revealNextPlacement(s);
-      },
-      () => {
-        // This runs once the freshly rebuilt block for this place actually exists.
-        const block = document.querySelector(`.robotics-podium-block[data-place="${revealedPlace}"]`);
-        block?.classList.add('is-rising');
-        if (revealedPlace === 1) launchConfetti(block);
-      },
-    );
+    // The action reports the place it uncovered, so a second reveal before the rebuild runs
+    // gets its own place rather than this render's `nextPlace`.
+    const { outcome } = dispatch({ type: 'reveal-next-placement' }, () => {
+      // This runs once the freshly rebuilt block for this place actually exists.
+      const block = document.querySelector(`.robotics-podium-block[data-place="${outcome.revealedPlace}"]`);
+      block?.classList.add('is-rising');
+      if (outcome.revealedPlace === 1) launchConfetti(block);
+    });
   };
   const podium = nextPlace
     ? el('div', {
@@ -1364,7 +1349,7 @@ export function renderResultsTab(state, dispatch) {
 
   const actions = el('div', { className: 'robotics-form-row' });
   if (revealed.size > 0) {
-    actions.appendChild(el('button', { className: 'robotics-btn robotics-btn-secondary', onClick: () => dispatch(replayReveal) }, ['Replay reveal']));
+    actions.appendChild(el('button', { className: 'robotics-btn robotics-btn-secondary', onClick: () => dispatch({ type: 'replay-reveal' }) }, ['Replay reveal']));
   }
   const placementsForExport = placements.map(({ place, allianceId }) => ({ place, teamIds: playoffAllianceTeamIds(state, allianceId) }));
   actions.appendChild(el('button', {
@@ -1496,17 +1481,10 @@ export function initRoboticsApp({ mountId = 'roboticsApp', storageKey = 'robotic
   /**
    * Applies a named tournament action ({ type, ...payload }, see actions.js) and re-renders,
    * or explains a blocked one in an error toast and changes nothing. Returns what the action
-   * entry point reported. Still also takes a raw (state) => state function for the handlers
-   * not yet moved onto named actions; that path returns null.
+   * entry point reported.
    */
-  function dispatch(actionOrUpdater, afterRender) {
-    if (typeof actionOrUpdater === 'function') {
-      state = actionOrUpdater(state);
-      storage.save(state);
-      loop.requestRender(afterRender);
-      return null;
-    }
-    const result = applyTournamentAction(state, screen, actionOrUpdater);
+  function dispatch(action, afterRender) {
+    const result = applyTournamentAction(state, screen, action);
     if (result.blockReason) {
       showToast(result.blockReason, { isError: true });
       return result;

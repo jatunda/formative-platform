@@ -1,7 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
-  initializePageDatabase,
-  isValidSlugFormat,
   createNewPage,
   getPageFromDB,
   getAllPages,
@@ -13,8 +11,9 @@ import {
   resolveSlugToPageId,
   deletePageAndSlugs,
   getBacklinks,
-  updateBacklinksForPage
+  commitSlugRename
 } from '../../page-database-utils.js';
+import { initializeDatabase } from '../../database-handle.js';
 
 // Mock Firebase - same in-memory path-keyed store pattern as database-utils.test.js
 let mockData = {};
@@ -66,6 +65,11 @@ function setAtPath(path, value) {
   }
 }
 
+/** Parsed Page content whose one text item is `text`. */
+function linking(text) {
+  return { title: 'T', blocks: [{ type: 'question', content: [{ type: 'text', value: text }] }] };
+}
+
 describe('page-database-utils', () => {
   beforeEach(() => {
     mockData = {};
@@ -98,40 +102,7 @@ describe('page-database-utils', () => {
       return Promise.resolve();
     });
 
-    initializePageDatabase({});
-  });
-
-  describe('isValidSlugFormat', () => {
-    it('accepts a single lowercase word', () => {
-      expect(isValidSlugFormat('syllabus')).toBe(true);
-    });
-
-    it('accepts lowercase words joined by single hyphens', () => {
-      expect(isValidSlugFormat('syllabus-2026')).toBe(true);
-    });
-
-    it('rejects uppercase letters', () => {
-      expect(isValidSlugFormat('Syllabus')).toBe(false);
-    });
-
-    it('rejects spaces', () => {
-      expect(isValidSlugFormat('my syllabus')).toBe(false);
-    });
-
-    it('rejects a leading or trailing hyphen', () => {
-      expect(isValidSlugFormat('-syllabus')).toBe(false);
-      expect(isValidSlugFormat('syllabus-')).toBe(false);
-    });
-
-    it('rejects repeated hyphens', () => {
-      expect(isValidSlugFormat('syllabus--2026')).toBe(false);
-    });
-
-    it('rejects an empty string or non-string input', () => {
-      expect(isValidSlugFormat('')).toBe(false);
-      expect(isValidSlugFormat(null)).toBe(false);
-      expect(isValidSlugFormat(42)).toBe(false);
-    });
+    initializeDatabase({});
   });
 
   describe('createNewPage', () => {
@@ -172,8 +143,66 @@ describe('page-database-utils', () => {
 
   describe('savePage', () => {
     it('saves valid parsed content', async () => {
-      await savePage('abc', { title: 'T', blocks: [{}] });
+      await savePage('abc', { title: 'T', blocks: [{}] }, []);
       expect(getAtPath('pages/abc')).toEqual({ title: 'T', blocks: [{}] });
+    });
+
+    it('removes the Backlink for a Page Link the edit dropped, keeping the ones still linked', async () => {
+      setAtPath('slugIndex', { kept: 'kept-id', dropped: 'dropped-id' });
+      await savePage('src', linking('[[kept]] [[dropped]]'), []);
+
+      await savePage('src', linking('[[kept]]'), []);
+
+      expect(getAtPath('backlinks/dropped-id/src')).toBeUndefined();
+      expect(getAtPath('backlinks/kept-id/src')).toBe(true);
+      expect(getAtPath('pages/src/linksTo')).toEqual(['kept-id']);
+    });
+
+    it('removes the Question Backlink for a Question Link the edit dropped', async () => {
+      await savePage('src', linking('two questions'), ['q-kept', 'q-dropped']);
+
+      await savePage('src', linking('one question'), ['q-kept']);
+
+      expect(getAtPath('questionBacklinks/q-dropped/src')).toBeUndefined();
+      expect(getAtPath('questionBacklinks/q-kept/src')).toBe(true);
+      expect(getAtPath('pages/src/questionLinksTo')).toEqual(['q-kept']);
+    });
+
+    it('clears the stored link lists when the Page no longer links to anything', async () => {
+      setAtPath('slugIndex/target', 'target-id');
+      await savePage('src', linking('[[target]]'), ['q1']);
+
+      await savePage('src', linking('no links'), []);
+
+      expect(getAtPath('pages/src')).toEqual(linking('no links'));
+      expect(getAtPath('backlinks/target-id/src')).toBeUndefined();
+      expect(getAtPath('questionBacklinks/q1/src')).toBeUndefined();
+    });
+
+    it('skips dangling Page Links and Page Links to itself', async () => {
+      setAtPath('slugIndex/self', 'src');
+
+      await savePage('src', linking('[[self]] [[nonexistent]]'), []);
+
+      expect(getAtPath('backlinks')).toBeUndefined();
+      expect(getAtPath('pages/src/linksTo')).toBeUndefined();
+    });
+
+    it('writes the content and every Backlink change in one atomic update', async () => {
+      setAtPath('slugIndex/target', 'target-id');
+      setAtPath('pages/src', { ...linking('old'), questionLinksTo: ['q-old'] });
+      setAtPath('questionBacklinks/q-old/src', true);
+
+      await savePage('src', linking('[[target]]'), ['q-new']);
+
+      expect(mockSet).not.toHaveBeenCalled();
+      expect(mockUpdate).toHaveBeenCalledTimes(1);
+      expect(mockUpdate).toHaveBeenCalledWith({
+        'pages/src': { ...linking('[[target]]'), linksTo: ['target-id'], questionLinksTo: ['q-new'] },
+        'backlinks/target-id/src': true,
+        'questionBacklinks/q-old/src': null,
+        'questionBacklinks/q-new/src': true,
+      });
     });
 
     it('throws on missing title or blocks', async () => {
@@ -200,13 +229,13 @@ describe('page-database-utils', () => {
     });
 
     it('rejects a malformed slug without writing anything', async () => {
-      await expect(assignSlug('abc', 'My Syllabus')).rejects.toThrow('lowercase letters');
+      await expect(assignSlug('abc', 'My Syllabus')).rejects.toThrow('Slugs must be lowercase letters, numbers, and hyphens only (e.g. "syllabus").');
       expect(getAtPath('slugIndex/My Syllabus')).toBeUndefined();
     });
 
     it('rejects a slug already owned by a different page', async () => {
       setAtPath('slugIndex/syllabus', 'other-page');
-      await expect(assignSlug('abc', 'syllabus')).rejects.toThrow('already in use');
+      await expect(assignSlug('abc', 'syllabus')).rejects.toThrow('The URL "/p/syllabus" is already in use by another page.');
       expect(getAtPath('slugIndex/syllabus')).toBe('other-page');
     });
 
@@ -265,8 +294,8 @@ describe('page-database-utils', () => {
       expect(getAtPath('backlinks/abc')).toBeUndefined();
     });
 
-    it('removes this page\'s outgoing backlink entries using its stored linksTo', async () => {
-      setAtPath('pages/abc', { title: 'To Delete', linksTo: ['target1', 'target2'] });
+    it('removes this page\'s outgoing backlink entries even when its linksTo no longer lists them', async () => {
+      setAtPath('pages/abc', { title: 'To Delete', linksTo: ['target1'] });
       setAtPath('backlinks/target1/abc', true);
       setAtPath('backlinks/target2/abc', true);
       setAtPath('backlinks/target1/unrelated', true);
@@ -276,6 +305,53 @@ describe('page-database-utils', () => {
       expect(getAtPath('backlinks/target1/abc')).toBeUndefined();
       expect(getAtPath('backlinks/target2/abc')).toBeUndefined();
       expect(getAtPath('backlinks/target1/unrelated')).toBe(true);
+    });
+
+    it('removes a stale self-Backlink only via its incoming entry, so no two update paths overlap', async () => {
+      setAtPath('pages/abc', { title: 'To Delete' });
+      setAtPath('backlinks/abc', { abc: true, other: true });
+
+      await deletePageAndSlugs('abc');
+
+      expect(Object.keys(mockUpdate.mock.calls[0][0])).not.toContain('backlinks/abc/abc');
+      expect(getAtPath('backlinks/abc')).toBeUndefined();
+    });
+
+    it('removes this page from the Question Backlinks of every Question it linked to', async () => {
+      setAtPath('pages/abc', { title: 'To Delete', questionLinksTo: ['q1', 'q2'] });
+      setAtPath('questionBacklinks/q1', { abc: true, other: true });
+      setAtPath('questionBacklinks/q2', { abc: true });
+      setAtPath('questionBacklinks/q3', { other: true });
+
+      await deletePageAndSlugs('abc');
+
+      expect(getAtPath('questionBacklinks/q1/abc')).toBeUndefined();
+      expect(getAtPath('questionBacklinks/q1/other')).toBe(true);
+      expect(getAtPath('questionBacklinks/q2/abc')).toBeUndefined();
+      expect(getAtPath('questionBacklinks/q3/other')).toBe(true);
+    });
+
+    it('removes a Question Backlink entry even when the page\'s questionLinksTo no longer lists it', async () => {
+      // savePage overwrites the whole page record, so questionLinksTo only
+      // reflects the latest save - an older entry can outlive it.
+      setAtPath('pages/abc', { title: 'To Delete' });
+      setAtPath('questionBacklinks/q1', { abc: true });
+
+      await deletePageAndSlugs('abc');
+
+      expect(getAtPath('questionBacklinks/q1/abc')).toBeUndefined();
+    });
+
+    it('deletes everything in one atomic update', async () => {
+      setAtPath('pages/abc', { title: 'To Delete', questionLinksTo: ['q1'] });
+      setAtPath('questionBacklinks/q1', { abc: true });
+      setAtPath('slugIndex', { syllabus: 'abc' });
+
+      await deletePageAndSlugs('abc');
+
+      expect(mockUpdate).toHaveBeenCalledTimes(1);
+      expect(mockSet).not.toHaveBeenCalled();
+      expect(mockRemove).not.toHaveBeenCalled();
     });
   });
 
@@ -290,58 +366,15 @@ describe('page-database-utils', () => {
     });
   });
 
-  describe('updateBacklinksForPage', () => {
-    it('adds a backlink for a newly-referenced page', async () => {
-      setAtPath('slugIndex/target-slug', 'target-id');
-      const parsed = { title: 'T', blocks: [{ type: 'question', content: [{ type: 'text', value: '[[target-slug]]' }] }] };
-
-      await updateBacklinksForPage('source-id', parsed);
-
-      expect(getAtPath('backlinks/target-id/source-id')).toBe(true);
-      expect(getAtPath('pages/source-id/linksTo')).toEqual(['target-id']);
-    });
-
-    it('removes a stale backlink when a link is deleted from the content', async () => {
-      setAtPath('pages/source-id/linksTo', ['old-target']);
-      setAtPath('backlinks/old-target/source-id', true);
-      const parsed = { title: 'T', blocks: [{ type: 'question', content: [{ type: 'text', value: 'no links here' }] }] };
-
-      await updateBacklinksForPage('source-id', parsed);
-
-      expect(getAtPath('backlinks/old-target/source-id')).toBeUndefined();
-      expect(getAtPath('pages/source-id/linksTo')).toBeUndefined();
-    });
-
-    it('does nothing when the set of linked pages has not changed', async () => {
-      setAtPath('slugIndex/target-slug', 'target-id');
-      setAtPath('pages/source-id/linksTo', ['target-id']);
-      setAtPath('backlinks/target-id/source-id', true);
-      const parsed = { title: 'T', blocks: [{ type: 'question', content: [{ type: 'text', value: '[[target-slug]]' }] }] };
-
-      await updateBacklinksForPage('source-id', parsed);
-
-      // mockUpdate should not have been called with any actual changes -
-      // verify by confirming the update call count stayed at zero
-      expect(mockUpdate).not.toHaveBeenCalled();
-    });
-
-    it('skips a Page Link that does not resolve to any page', async () => {
-      const parsed = { title: 'T', blocks: [{ type: 'question', content: [{ type: 'text', value: '[[nonexistent-slug]]' }] }] };
-      await updateBacklinksForPage('source-id', parsed);
-      expect(getAtPath('pages/source-id/linksTo')).toBeUndefined();
-    });
-
-    it('does not create a backlink from a page to itself', async () => {
-      setAtPath('slugIndex/self-slug', 'source-id');
-      const parsed = { title: 'T', blocks: [{ type: 'question', content: [{ type: 'text', value: '[[self-slug]]' }] }] };
-
-      await updateBacklinksForPage('source-id', parsed);
-
-      expect(getAtPath('backlinks/source-id/source-id')).toBeUndefined();
-    });
-  });
-
   describe('renameSlug', () => {
+    it('skips a backlinked page that no longer exists instead of recreating it', async () => {
+      setAtPath('slugIndex/old-slug', 'abc');
+      setAtPath('backlinks/abc', { gone: true });
+      await renameSlug('abc', 'old-slug', 'new-slug');
+      expect(getAtPath('pages/gone')).toBeUndefined();
+      expect(getAtPath('slugIndex/new-slug')).toBe('abc');
+    });
+
     it('swaps the slugIndex entry from old to new', async () => {
       setAtPath('slugIndex/old-slug', 'abc');
       await renameSlug('abc', 'old-slug', 'new-slug');
@@ -351,14 +384,14 @@ describe('page-database-utils', () => {
 
     it('rejects a malformed new slug without changing anything', async () => {
       setAtPath('slugIndex/old-slug', 'abc');
-      await expect(renameSlug('abc', 'old-slug', 'Bad Slug')).rejects.toThrow('lowercase letters');
+      await expect(renameSlug('abc', 'old-slug', 'Bad Slug')).rejects.toThrow('Slugs must be lowercase letters, numbers, and hyphens only (e.g. "syllabus").');
       expect(getAtPath('slugIndex/old-slug')).toBe('abc');
     });
 
     it('rejects a new slug already taken by a different page', async () => {
       setAtPath('slugIndex/old-slug', 'abc');
       setAtPath('slugIndex/new-slug', 'other-page');
-      await expect(renameSlug('abc', 'old-slug', 'new-slug')).rejects.toThrow('already in use');
+      await expect(renameSlug('abc', 'old-slug', 'new-slug')).rejects.toThrow('The URL "/p/new-slug" is already in use by another page.');
       expect(getAtPath('slugIndex/old-slug')).toBe('abc');
     });
 
@@ -384,6 +417,26 @@ describe('page-database-utils', () => {
       await renameSlug('abc', 'old-slug', 'new-slug');
 
       expect(getAtPath('pages/source1')).toEqual(original);
+    });
+  });
+
+  describe('commitSlugRename', () => {
+    it('writes the caller\'s index swap and the rewritten Pages in one atomic update, skipping unchanged and missing Pages', async () => {
+      setAtPath('pages/changes', { title: 'old' });
+      setAtPath('pages/same', { title: 'untouched' });
+
+      await commitSlugRename(
+        { 'questionSlugIndex/a': null, 'questionSlugIndex/b': 'q1' },
+        ['changes', 'same', 'gone'],
+        (content) => (content.title === 'old' ? { title: 'new' } : content)
+      );
+
+      expect(mockUpdate).toHaveBeenCalledTimes(1);
+      expect(mockUpdate).toHaveBeenCalledWith({
+        'questionSlugIndex/a': null,
+        'questionSlugIndex/b': 'q1',
+        'pages/changes': { title: 'new' },
+      });
     });
   });
 });

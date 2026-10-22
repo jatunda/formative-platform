@@ -1,12 +1,12 @@
 // public/landing.js
 import { ref, get } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js";
 import { db } from './firebase-config.js';
-import { initializeDateUtils, getTodayDayIndex, primeDateOffsetCache } from './date-utils.js';
+import { initializeDatabase } from './database-handle.js';
+import { getTodayDayIndex, primeDateOffsetCache } from './date-utils.js';
 import { showErrorState, showSlowConnectionMessage, withConnectionTimeout } from './error-ui-utils.js';
 
 
-// Initialize date utilities with database
-initializeDateUtils(db);
+initializeDatabase(db);
 
 /**
  * Fetch every Class, each with today's Day Index and that day's Schedule

@@ -11,6 +11,7 @@ import {
   saveLesson,
   duplicateLesson,
   deleteLesson,
+  deleteLessonConfirmMessage,
   loadExistingContentList,
   loadContent,
   handleNewLessonContext,
@@ -20,21 +21,24 @@ import {
   handleBeforeUnload,
 } from '../../editor.js';
 
+import { createLessonStore } from '../../lesson-store.js';
+import { createMockDatabase, mockStorePort } from '../helpers/mock-firebase.js';
+
 // firebase-app.js and firebase-database.js both alias to this same mock
 // module (see vitest.config.js) since editor.js pulls in firebase-config.js.
-const mockData = {};
 vi.mock('https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js', () => ({
   initializeApp: () => ({}),
   getDatabase: () => ({}),
   connectDatabaseEmulator: () => {},
-  ref: (db, path) => ({ path }),
-  get: async (ref) => {
-    const value = mockData[ref.path];
-    return { exists: () => value !== undefined, val: () => value };
-  },
-  set: vi.fn(async (ref, value) => { mockData[ref.path] = value; }),
-  remove: vi.fn(async (ref) => { delete mockData[ref.path]; }),
-  child: (ref, path) => ({ path: `${ref.path ?? ''}${path}` }),
+}));
+
+// The editor reaches Lessons only through the Lesson store, so the tests run
+// the real store over the Firebase test double instead of mocking writes.
+let db;
+let lessons;
+vi.mock('../../lesson-store.js', async (importOriginal) => ({
+  ...(await importOriginal()),
+  lessonStore: () => lessons,
 }));
 
 const mockParseDSL = vi.fn((text) => ({ title: 'Parsed Title', blocks: [] }));
@@ -52,7 +56,6 @@ vi.mock('../../dsl-validation.js', () => ({
 }));
 
 vi.mock('../../lesson-search.js', () => ({
-  initializeLessonSearch: vi.fn(),
   showLessonSearchPopup: vi.fn(),
 }));
 
@@ -63,12 +66,6 @@ vi.mock('../../content-renderer.js', () => ({
 
 vi.mock('../../ai-generator.js', () => ({
   AIQuestionGenerator: vi.fn(),
-}));
-
-const mockGenerateUniqueHash = vi.fn(async () => 'newhash123');
-vi.mock('../../database-utils.js', () => ({
-  initializeDatabase: vi.fn(),
-  generateUniqueHash: (...args) => mockGenerateUniqueHash(...args),
 }));
 
 vi.mock('../../teacher-nav.js', () => ({
@@ -85,7 +82,6 @@ vi.mock('../../notification-utils.js', () => ({
 }));
 
 vi.mock('../../question-database-utils.js', () => ({
-  initializeQuestionDatabase: vi.fn(),
 }));
 
 const mockMountQuestionEmbeds = vi.fn();
@@ -103,7 +99,8 @@ global.confirm = vi.fn(() => true);
 
 describe('editor', () => {
   beforeEach(() => {
-    for (const key of Object.keys(mockData)) delete mockData[key];
+    db = createMockDatabase();
+    lessons = createLessonStore(mockStorePort(db));
     vi.clearAllMocks();
     mockParseDSL.mockReturnValue({ title: 'Parsed Title', blocks: [{ type: 'question', content: [] }] });
     mockValidateDSL.mockReturnValue(null);
@@ -320,68 +317,68 @@ describe('editor', () => {
   });
 
   describe('saveLesson', () => {
-    it('saves the parsed content, shows a success notification, and reports success', async () => {
+    it('saves the parsed Lesson, shows a success notification, and reports success', async () => {
       const { showNotification } = await import('../../notification-utils.js');
       mockParseDSL.mockReturnValue({ title: 'My Lesson', blocks: [{}] });
 
       const result = await saveLesson('abc123', '# My Lesson');
 
-      expect(mockData['content/abc123']).toEqual({ title: 'My Lesson', blocks: [{}] });
+      expect(await lessons.get('abc123')).toEqual({ title: 'My Lesson', blocks: [{}] });
       expect(showNotification).toHaveBeenCalledWith(expect.stringContaining('My Lesson'), 'success');
       expect(result).toBe(true);
     });
 
-    it('alerts, does not save, and reports failure when there is no content id', async () => {
+    it('alerts, does not save, and reports failure when there is no Lesson id', async () => {
       const result = await saveLesson('', '# Title');
-      expect(mockData['content/']).toBeUndefined();
-      expect(alert).toHaveBeenCalledWith('No content ID available.');
+      expect(await lessons.listTitles()).toEqual({});
+      expect(alert).toHaveBeenCalledWith('No Lesson ID available.');
       expect(result).toBe(false);
     });
 
-    it('alerts, does not save, and reports failure when parsing produced malformed content', async () => {
+    it('alerts, does not save, and reports failure when parsing produced a malformed Lesson', async () => {
       mockParseDSL.mockReturnValue({ title: null, blocks: null });
       const result = await saveLesson('abc123', 'garbage');
-      expect(mockData['content/abc123']).toBeUndefined();
-      expect(alert).toHaveBeenCalledWith('Parsing failed or content is malformed.');
+      expect(await lessons.get('abc123')).toBeNull();
+      expect(alert).toHaveBeenCalledWith('Parsing failed or the Lesson is malformed.');
       expect(result).toBe(false);
     });
   });
 
   describe('duplicateLesson', () => {
-    it('saves a copy under a new hash with "(Copy)" appended to the title', async () => {
+    it('saves a copy under a new id with "(Copy)" appended to the title', async () => {
       mockParseDSL.mockReturnValue({ title: 'Original', blocks: [{}] });
 
       const result = await duplicateLesson('abc123', '# Original');
 
-      expect(result.newHash).toBe('newhash123');
-      expect(result.duplicatedContent.title).toBe('Original (Copy)');
-      expect(mockData['content/newhash123'].title).toBe('Original (Copy)');
+      expect(result.lesson.title).toBe('Original (Copy)');
+      expect(await lessons.get(result.id)).toEqual({ title: 'Original (Copy)', blocks: [{}] });
+      expect(alert).toHaveBeenCalledWith(`Lesson duplicated successfully!\nNew ID: ${result.id}`);
     });
 
-    it('returns null and alerts when there is no current content id', async () => {
+    it('returns null and alerts when there is no current Lesson id', async () => {
       const result = await duplicateLesson('', '# Title');
       expect(result).toBeNull();
-      expect(alert).toHaveBeenCalledWith('No content ID available.');
+      expect(alert).toHaveBeenCalledWith('No Lesson ID available.');
     });
 
-    it('returns null and alerts when the current content is malformed', async () => {
+    it('returns null and alerts when the current Lesson is malformed', async () => {
       mockParseDSL.mockReturnValue({ title: null, blocks: null });
       const result = await duplicateLesson('abc123', 'garbage');
       expect(result).toBeNull();
+      expect(alert).toHaveBeenCalledWith('Cannot duplicate: The current Lesson is malformed or empty.');
     });
 
     it('returns null and alerts when parsing throws', async () => {
       mockParseDSL.mockImplementation(() => { throw new Error('boom'); });
       const result = await duplicateLesson('abc123', 'garbage');
       expect(result).toBeNull();
-      expect(alert).toHaveBeenCalledWith('Cannot duplicate: Failed to parse current content.');
+      expect(alert).toHaveBeenCalledWith('Cannot duplicate: Failed to parse the current Lesson.');
     });
 
     it('returns null and notifies on a save failure', async () => {
       mockParseDSL.mockReturnValue({ title: 'Original', blocks: [{}] });
-      const { set } = await import('https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js');
+      lessons = createLessonStore({ ...mockStorePort(db), update: async () => { throw new Error('write failed'); } });
       const { showNotification } = await import('../../notification-utils.js');
-      set.mockRejectedValueOnce(new Error('write failed'));
 
       const result = await duplicateLesson('abc123', '# Original');
 
@@ -390,65 +387,161 @@ describe('editor', () => {
     });
   });
 
+  describe('deleteLessonConfirmMessage', () => {
+    it('names each Class and Day Index that will lose the Lesson', () => {
+      const message = deleteLessonConfirmMessage('Fractions', 'abc123', [
+        { classId: 'p1', className: 'Period 1', dayIndices: [3, 7] },
+        { classId: 'p2', className: 'Period 2', dayIndices: [0] },
+      ]);
+      expect(message).toBe(
+        'Are you sure you want to delete the lesson "Fractions"?\n\n' +
+        'It will also be removed from these Schedules:\n' +
+        '  - Period 1: Day Index 3, 7\n' +
+        '  - Period 2: Day Index 0\n\n' +
+        'Lesson ID: abc123\nThis action cannot be undone.'
+      );
+    });
+
+    it('says so when no Schedule uses the Lesson', () => {
+      expect(deleteLessonConfirmMessage('Fractions', 'abc123', [])).toBe(
+        'Are you sure you want to delete the lesson "Fractions"?\n\n' +
+        "No Class's Schedule uses it.\n\n" +
+        'Lesson ID: abc123\nThis action cannot be undone.'
+      );
+    });
+  });
+
   describe('deleteLesson', () => {
-    it('deletes after confirmation and notifies success', async () => {
-      mockData['content/abc123'] = { title: 'To Delete' };
+    beforeEach(() => {
+      db.reset({
+        content: { abc123: { title: 'To Delete' }, other: { title: 'Other' } },
+        classes: { p1: { name: 'Period 1' } },
+        schedule: { p1: { 2: ['abc123', 'other'] } },
+      });
+    });
+
+    it('warns which Schedules use the Lesson, then deletes it from them too', async () => {
       const { showNotification } = await import('../../notification-utils.js');
+      mockParseDSL.mockReturnValue({ title: 'To Delete', blocks: [{}] });
 
       const result = await deleteLesson('abc123', '# To Delete');
 
+      expect(confirm).toHaveBeenCalledWith(expect.stringContaining('  - Period 1: Day Index 2'));
       expect(result).toBe(true);
-      expect(mockData['content/abc123']).toBeUndefined();
-      expect(showNotification).toHaveBeenCalledWith('Content deleted successfully!', 'success');
+      expect(await lessons.get('abc123')).toBeNull();
+      expect(await lessons.findScheduleUses('abc123')).toEqual([]);
+      expect(await lessons.findScheduleUses('other')).toEqual([{ classId: 'p1', className: 'Period 1', dayIndices: [2] }]);
+      expect(showNotification).toHaveBeenCalledWith('Lesson deleted.', 'success');
     });
 
     it('includes the parsed title in the confirmation prompt', async () => {
       mockParseDSL.mockReturnValue({ title: 'A Specific Title', blocks: [{}] });
       await deleteLesson('abc123', '# A Specific Title');
-      expect(confirm).toHaveBeenCalledWith(expect.stringContaining('A Specific Title'));
+      expect(confirm).toHaveBeenCalledWith(expect.stringContaining('"A Specific Title"'));
     });
 
     it('does not delete when the teacher cancels the confirmation', async () => {
-      mockData['content/abc123'] = { title: 'Keep Me' };
       global.confirm.mockReturnValue(false);
 
-      const result = await deleteLesson('abc123', '# Keep Me');
+      const result = await deleteLesson('abc123', '# To Delete');
 
       expect(result).toBe(false);
-      expect(mockData['content/abc123']).toBeDefined();
+      expect(await lessons.get('abc123')).toEqual({ title: 'To Delete' });
+      expect(await lessons.findScheduleUses('abc123')).toHaveLength(1);
     });
 
-    it('alerts and does nothing when there is no content id', async () => {
+    it('alerts and does nothing when there is no Lesson id', async () => {
       const result = await deleteLesson('', '# Title');
       expect(result).toBe(false);
-      expect(alert).toHaveBeenCalledWith('No content ID available.');
+      expect(alert).toHaveBeenCalledWith('No Lesson ID available.');
     });
 
     it('falls back to the title from the database when the current DSL fails to parse', async () => {
-      mockData['content/abc123/title'] = 'DB Title';
       mockParseDSL.mockImplementation(() => { throw new Error('bad dsl'); });
 
       await deleteLesson('abc123', 'garbage');
 
-      expect(confirm).toHaveBeenCalledWith(expect.stringContaining('DB Title'));
+      expect(confirm).toHaveBeenCalledWith(expect.stringContaining('"To Delete"'));
+    });
+
+    it('falls back to a generic title when neither the DSL nor the database has one', async () => {
+      mockParseDSL.mockImplementation(() => { throw new Error('bad dsl'); });
+      db.reset({ content: { abc123: { blocks: [] } } });
+
+      await deleteLesson('abc123', 'garbage');
+
+      expect(confirm).toHaveBeenCalledWith(expect.stringContaining('"(Untitled)"'));
+    });
+
+    it('keeps the generic title when the DSL parses without one', async () => {
+      mockParseDSL.mockReturnValue({ blocks: [] });
+
+      await deleteLesson('abc123', 'no title');
+
+      expect(confirm).toHaveBeenCalledWith(expect.stringContaining('"(Untitled)"'));
+    });
+
+    it('keeps the generic title when the database title read fails too', async () => {
+      mockParseDSL.mockImplementation(() => { throw new Error('bad dsl'); });
+      const port = mockStorePort(db);
+      lessons = createLessonStore({
+        ...port,
+        read: async (path) => {
+          if (path.endsWith('/title')) throw new Error('read failed');
+          return port.read(path);
+        },
+      });
+
+      await deleteLesson('abc123', 'garbage');
+
+      expect(confirm).toHaveBeenCalledWith(expect.stringContaining('"(Untitled)"'));
+    });
+
+    it('does not delete, and notifies, when the Schedules cannot be checked', async () => {
+      const { showNotification } = await import('../../notification-utils.js');
+      const port = mockStorePort(db);
+      lessons = createLessonStore({
+        ...port,
+        read: async (path) => {
+          if (path === 'schedule') throw new Error('read failed');
+          return port.read(path);
+        },
+      });
+
+      const result = await deleteLesson('abc123', '# To Delete');
+
+      expect(result).toBe(false);
+      expect(confirm).not.toHaveBeenCalled();
+      expect(await lessons.get('abc123')).toEqual({ title: 'To Delete' });
+      expect(showNotification).toHaveBeenCalledWith(expect.stringContaining('Failed'), 'error');
+    });
+
+    it('notifies and reports failure when the delete itself fails', async () => {
+      const { showNotification } = await import('../../notification-utils.js');
+      lessons = createLessonStore({ ...mockStorePort(db), update: async () => { throw new Error('write failed'); } });
+
+      const result = await deleteLesson('abc123', '# To Delete');
+
+      expect(result).toBe(false);
+      expect(showNotification).toHaveBeenCalledWith(expect.stringContaining('Failed'), 'error');
     });
   });
 
   describe('loadExistingContentList', () => {
     it('populates the dropdown, sorted by id, with a leading placeholder option', async () => {
-      mockData['content'] = {
-        b: { title: 'Lesson B' },
-        a: { title: 'Lesson A' },
-      };
+      await lessons.save('b', { title: 'Lesson B' });
+      await lessons.save('a', { title: 'Lesson A' });
+      await lessons.save('c', { blocks: [] });
       const select = document.createElement('select');
 
       await loadExistingContentList(select);
 
-      expect([...select.options].map((o) => o.textContent)).toEqual(['-- Select a lesson --', 'Lesson A', 'Lesson B']);
+      expect([...select.options].map((o) => o.textContent)).toEqual(['-- Select a lesson --', 'Lesson A', 'Lesson B', '(untitled)']);
     });
 
     it('selects the given Lesson id, if present', async () => {
-      mockData['content'] = { a: { title: 'Lesson A' }, b: { title: 'Lesson B' } };
+      await lessons.save('a', { title: 'Lesson A' });
+      await lessons.save('b', { title: 'Lesson B' });
       const select = document.createElement('select');
 
       await loadExistingContentList(select, 'b');
@@ -456,7 +549,7 @@ describe('editor', () => {
       expect(select.value).toBe('b');
     });
 
-    it('leaves only the placeholder option when there is no content', async () => {
+    it('leaves only the placeholder option when there are no Lessons', async () => {
       const select = document.createElement('select');
       await loadExistingContentList(select);
       expect(select.options).toHaveLength(1);
@@ -465,7 +558,7 @@ describe('editor', () => {
 
   describe('loadContent', () => {
     it('loads and renders a found Lesson', async () => {
-      mockData['content/abc123'] = { title: 'Found Lesson' };
+      await lessons.save('abc123', { title: 'Found Lesson' });
       mockGenerateDSLFromContent.mockReturnValue('# Found Lesson');
       const dslInput = document.createElement('textarea');
       const preview = document.createElement('div');
@@ -489,14 +582,15 @@ describe('editor', () => {
   });
 
   describe('handleNewLessonContext', () => {
-    it('seeds a blank Lesson and a fresh id when ?new=1', async () => {
+    it('seeds a blank Lesson and a fresh, unused id when ?new=1', async () => {
       const contentIdEl = document.createElement('div');
       const preview = document.createElement('div');
       document.body.innerHTML = '<textarea id="dslInput"></textarea><button id="saveBtn"></button><button id="duplicateBtn"></button><button id="deleteBtn"></button>';
 
       await handleNewLessonContext({ new: '1' }, contentIdEl, document.getElementById('dslInput'), preview);
 
-      expect(contentIdEl.textContent).toBe('newhash123');
+      expect(contentIdEl.textContent).toMatch(/^[0-9a-f]{32}$/);
+      expect(await lessons.get(contentIdEl.textContent)).toBeNull();
       expect(document.getElementById('dslInput').disabled).toBe(false);
     });
 
@@ -508,13 +602,13 @@ describe('editor', () => {
       await handleNewLessonContext({}, contentIdEl, dslInput, preview);
 
       expect(contentIdEl.textContent).toBe('');
-      expect(mockGenerateUniqueHash).not.toHaveBeenCalled();
+      expect(dslInput.value).toBe('');
     });
   });
 
   describe('handleExistingPageContext', () => {
     it('loads and enables editing for ?page=<id>', async () => {
-      mockData['content/abc123'] = { title: 'Existing' };
+      await lessons.save('abc123', { title: 'Existing' });
       document.body.innerHTML = '<textarea id="dslInput"></textarea><button id="saveBtn"></button><button id="duplicateBtn"></button><button id="deleteBtn"></button>';
       const contentIdEl = document.createElement('div');
       const preview = document.createElement('div');

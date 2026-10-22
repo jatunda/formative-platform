@@ -5,13 +5,11 @@
 // - Supports abbreviations and acronyms
 // - Visual match quality indicators (green=exact, yellow=good, gray=weak)
 // - Results sorted by relevance score
-import { ref, get } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js";
 import { UNTITLED_LESSON } from './constants.js';
+import { lessonStore } from './lesson-store.js';
 
 // Cache for page titles to avoid redundant queries
 const pageTitles = {}; // id → title
-
-let db; // Database reference
 
 /**
  * Calculate fuzzy search score between text and query
@@ -82,14 +80,6 @@ function fuzzyScore(text, query) {
 }
 
 /**
- * Initialize the lesson search module with a database reference
- * @param {import("https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js").Database} database - The Firebase database instance
- */
-export function initializeLessonSearch(database) {
-  db = database;
-}
-
-/**
  * Create and show the lesson search popup with fuzzy search functionality
  * Features fuzzy search, visual match quality indicators, and sorted results
  * @param {Object} options - Options object
@@ -97,40 +87,19 @@ export function initializeLessonSearch(database) {
  */
 export function showLessonSearchPopup({ onSelect }) {
   (async () => {
-    if (!db) {
-      console.error("Database not initialized in lesson search module");
-      alert("Database error. Please try again.");
-      return;
-    }
-
     try {
-      // OPTIMIZATION: First get shallow list of IDs to minimize data transfer
-      const shallowSnap = await get(ref(db, "content"));
-      if (!shallowSnap.exists()) {
+      const titles = await lessonStore().listTitles();
+      if (Object.keys(titles).length === 0) {
         alert("No lessons found.");
         return;
       }
-      
-      const allIds = Object.keys(shallowSnap.val());
-      
-      // OPTIMIZATION: Batch fetch only titles for existing lessons
-      const titlePromises = allIds.map(async (id) => {
-        // Check cache first
-        if (pageTitles[id]) {
-          return { id, title: pageTitles[id] };
-        }
-        
-        const titleSnap = await get(ref(db, `content/${id}/title`));
-        const title = titleSnap.exists() ? titleSnap.val() : UNTITLED_LESSON;
-        pageTitles[id] = title; // Cache it
-        return { id, title };
-      });
-      
-      const titleResults = await Promise.all(titlePromises);
+
       const contentMap = {};
-      titleResults.forEach(({ id, title }) => {
+      for (const [id, storedTitle] of Object.entries(titles)) {
+        const title = storedTitle ?? UNTITLED_LESSON;
+        pageTitles[id] = title; // Cache it
         contentMap[id] = { title };
-      });
+      }
       
       console.log(`Loaded ${Object.keys(contentMap).length} lesson titles`);
       
