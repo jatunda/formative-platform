@@ -392,19 +392,35 @@ export function startPracticeSet(rootEl, questions, store = createInMemorySavedP
   showQuestion(frontierIndexOf(ordered, progress));
 }
 
-// The Practice Set id: embedded in the page by the practiceSetSSR shell
-// (<body data-practice-set-id>), else resolved from the Slug - the ?slug=
-// fallback exists so practice-set-view.html can be opened directly for
-// local dev/testing, where there's no server-side shell (mirrors
-// page-view.js). Null when neither names a Practice Set.
-async function findPracticeSetId(read) {
+// The Practice Set this URL names, and its id; null when there is none.
+// The practiceSetSSR shell embeds the id it resolved (<body
+// data-practice-set-id>), but that shell is CDN-cached for a day, so the
+// Slug is re-checked in parallel with reading the embedded set: they
+// normally agree, costing no extra round trip; if the Slug has since been
+// pointed elsewhere (or freed), the Slug wins. With no embedded id - the
+// ?slug= dev page, opened directly with no server-side shell (mirrors
+// page-view.js) - the Slug is resolved first.
+async function readNamedPracticeSet(read) {
   const embeddedId = document.body.dataset.practiceSetId;
-  if (embeddedId) return embeddedId;
   const slug = getSlugFromPath(window.location.pathname)
     || new URLSearchParams(window.location.search).get('slug');
-  if (!slug) return null;
-  const id = await read(['practiceSetSlugIndex', slug]);
-  return typeof id === 'string' ? id : null;
+  const slugToId = async () => {
+    const id = slug ? await read(['practiceSetSlugIndex', slug]) : null;
+    return typeof id === 'string' ? id : null;
+  };
+
+  let id = embeddedId;
+  let practiceSet = null;
+  if (embeddedId && slug) {
+    let embeddedSet;
+    [id, embeddedSet] = await Promise.all([slugToId(), read(['practiceSets', embeddedId])]);
+    if (id === embeddedId) practiceSet = embeddedSet;
+  } else if (!embeddedId) {
+    id = await slugToId();
+  }
+  if (!id) return null;
+  if (!practiceSet) practiceSet = await read(['practiceSets', id]);
+  return practiceSet ? { id, practiceSet } : null;
 }
 
 // A load this slow is worth acknowledging; a faster one shouldn't flicker.
@@ -430,18 +446,13 @@ export async function initializePage() {
 // Reads the Practice Set and its Questions, then renders it (or the
 // not-found / empty-set message) in place of the frame.
 async function loadPracticeSet(contentEl, read) {
-  const practiceSetId = await findPracticeSetId(read);
-  if (!practiceSetId) {
+  const named = await readNamedPracticeSet(read);
+  // No Slug, a freed Slug, or a set deleted since the Slug index was written.
+  if (!named) {
     contentEl.textContent = PRACTICE_SET_NOT_FOUND;
     return;
   }
-
-  const practiceSet = await read(['practiceSets', practiceSetId]);
-  // Deleted since the shell was cached, or a stale Slug index entry.
-  if (!practiceSet) {
-    contentEl.textContent = PRACTICE_SET_NOT_FOUND;
-    return;
-  }
+  const { id: practiceSetId, practiceSet } = named;
   const questionIds = practiceSet.questionIds || [];
 
   // Fetched up front, in parallel, rather than lazily per-question, so

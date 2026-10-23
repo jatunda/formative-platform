@@ -950,6 +950,7 @@ describe('initializePage', () => {
     window.history.pushState(null, '', '/practice/unit-3-review');
     servedShell('ps1');
     fakeDatabase({
+      'practiceSetSlugIndex/unit-3-review': 'ps1',
       'practiceSets/ps1': { title: 'Unit 3 Review', questionIds: ['q1', 'q2'] },
       'questions/q1': Q1,
       'questions/q2': Q2,
@@ -957,9 +958,80 @@ describe('initializePage', () => {
 
     await initializePage();
 
-    expect(fetchedPaths()).toEqual(['practiceSets/ps1', 'questions/q1', 'questions/q2']);
+    expect(fetchedPaths()).toEqual(['practiceSetSlugIndex/unit-3-review', 'practiceSets/ps1', 'questions/q1', 'questions/q2']);
     expect(document.getElementById('practiceSetTitle').textContent).toBe('Unit 3 Review');
     expect(document.getElementById('content').textContent).toContain('Stem for right1');
+  });
+
+  it('loads the Slug\'s current Practice Set when the cached shell carries an old id', async () => {
+    window.history.pushState(null, '', '/practice/unit-3-review');
+    servedShell('ps-old');
+    fakeDatabase({
+      'practiceSetSlugIndex/unit-3-review': 'ps-new',
+      'practiceSets/ps-old': { title: 'Old Set', questionIds: ['q1'] },
+      'practiceSets/ps-new': { title: 'New Set', questionIds: ['q2'] },
+      'questions/q1': Q1,
+      'questions/q2': Q2,
+    });
+
+    await initializePage();
+
+    expect(document.getElementById('practiceSetTitle').textContent).toBe('New Set');
+    expect(document.getElementById('content').textContent).toContain('Stem for right2');
+  });
+
+  it('keeps Saved Progress with the Slug\'s current Practice Set, not the cached id', async () => {
+    window.history.pushState(null, '', '/practice/unit-3-review');
+    fakeDatabase({
+      'practiceSetSlugIndex/unit-3-review': 'ps-new',
+      'practiceSets/ps-old': { title: 'Old Set', questionIds: ['q1', 'q2'] },
+      'practiceSets/ps-new': { title: 'New Set', questionIds: ['q1', 'q2'] },
+      'questions/q1': Q1,
+      'questions/q2': Q2,
+    });
+    servedShell('ps-old');
+    await initializePage();
+    const content = document.getElementById('content');
+    radios(content)[0].click();
+    submitBtn(content).click();
+
+    servedShell('ps-new'); // the CDN copy has since refreshed
+    await initializePage();
+
+    expect(document.getElementById('content').textContent).toContain('Stem for right2');
+  });
+
+  it('checks the Slug while reading the cached id\'s Practice Set, not after', async () => {
+    window.history.pushState(null, '', '/practice/unit-3-review');
+    servedShell('ps1');
+    fakeDatabase({
+      'practiceSetSlugIndex/unit-3-review': 'ps1',
+      'practiceSets/ps1': { title: 'T', questionIds: ['q1'] },
+      'questions/q1': Q1,
+    });
+    const base = fetchMock.getMockImplementation();
+    let answer;
+    const gate = new Promise((resolve) => { answer = resolve; });
+    fetchMock.mockImplementation(async (url) => { await gate; return base(url); });
+
+    const loading = initializePage();
+    await vi.waitFor(() => expect(fetchedPaths()).toHaveLength(2));
+    expect(fetchedPaths()).toEqual(['practiceSetSlugIndex/unit-3-review', 'practiceSets/ps1']);
+    answer();
+    await loading;
+
+    // Agreeing reads cost nothing more: the set isn't read a second time.
+    expect(fetchedPaths()).toEqual(['practiceSetSlugIndex/unit-3-review', 'practiceSets/ps1', 'questions/q1']);
+  });
+
+  it('shows "Practice set not found" when the Slug was freed after the shell was cached', async () => {
+    window.history.pushState(null, '', '/practice/unit-3-review');
+    servedShell('ps1');
+    fakeDatabase({ 'practiceSets/ps1': { title: 'Still Here', questionIds: ['q1'] }, 'questions/q1': Q1 });
+
+    await initializePage();
+
+    expect(document.getElementById('content').textContent).toBe(PRACTICE_SET_NOT_FOUND);
   });
 
   // Every element's tag + classes in document order, to compare layouts.
@@ -969,6 +1041,7 @@ describe('initializePage', () => {
     window.history.pushState(null, '', '/practice/unit-3-review');
     servedShell('ps1');
     fakeDatabase({
+      'practiceSetSlugIndex/unit-3-review': 'ps1',
       'practiceSets/ps1': { title: 'Unit 3 Review', questionIds: ['q1'] },
       'questions/q1': Q1,
     });
@@ -1009,7 +1082,7 @@ describe('initializePage', () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     window.history.pushState(null, '', '/practice/unit-3-review');
     servedShell('ps1');
-    const answer = gatedDatabase({ 'practiceSets/ps1': { title: 'T', questionIds: ['q1'] }, 'questions/q1': Q1 });
+    const answer = gatedDatabase({ 'practiceSetSlugIndex/unit-3-review': 'ps1', 'practiceSets/ps1': { title: 'T', questionIds: ['q1'] }, 'questions/q1': Q1 });
 
     const loading = initializePage();
     vi.advanceTimersByTime(900);
@@ -1028,7 +1101,7 @@ describe('initializePage', () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     window.history.pushState(null, '', '/practice/unit-3-review');
     servedShell('ps1');
-    fakeDatabase({ 'practiceSets/ps1': { title: 'T', questionIds: ['q1'] }, 'questions/q1': Q1 });
+    fakeDatabase({ 'practiceSetSlugIndex/unit-3-review': 'ps1', 'practiceSets/ps1': { title: 'T', questionIds: ['q1'] }, 'questions/q1': Q1 });
 
     await initializePage();
     vi.advanceTimersByTime(2000);
@@ -1040,7 +1113,7 @@ describe('initializePage', () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     window.history.pushState(null, '', '/practice/empty');
     servedShell('ps1');
-    const answer = gatedDatabase({ 'practiceSets/ps1': { title: 'Empty', questionIds: [] } });
+    const answer = gatedDatabase({ 'practiceSetSlugIndex/empty': 'ps1', 'practiceSets/ps1': { title: 'Empty', questionIds: [] } });
 
     const loading = initializePage();
     vi.advanceTimersByTime(1100);
@@ -1055,7 +1128,7 @@ describe('initializePage', () => {
     document.title = 'Old Title From The Cached Shell';
     window.history.pushState(null, '', '/practice/unit-3-review');
     servedShell('ps1');
-    fakeDatabase({ 'practiceSets/ps1': { title: 'Unit 3 Review (renamed)', questionIds: ['q1'] }, 'questions/q1': Q1 });
+    fakeDatabase({ 'practiceSetSlugIndex/unit-3-review': 'ps1', 'practiceSets/ps1': { title: 'Unit 3 Review (renamed)', questionIds: ['q1'] }, 'questions/q1': Q1 });
 
     await initializePage();
 
@@ -1065,6 +1138,7 @@ describe('initializePage', () => {
   it('opens a returning student straight on their Frontier, never showing Question 1 first', async () => {
     window.history.pushState(null, '', '/practice/unit-3-review');
     fakeDatabase({
+      'practiceSetSlugIndex/unit-3-review': 'ps1',
       'practiceSets/ps1': { title: 'T', questionIds: ['q1', 'q2'] },
       'questions/q1': Q1,
       'questions/q2': Q2,
@@ -1089,15 +1163,15 @@ describe('initializePage', () => {
   it('requests every Question at once, without waiting for any of them', async () => {
     window.history.pushState(null, '', '/practice/unit-3-review');
     servedShell('ps1');
-    fakeDatabase({ 'practiceSets/ps1': { title: 'T', questionIds: ['q1', 'q2', 'q3'] } });
+    fakeDatabase({ 'practiceSetSlugIndex/unit-3-review': 'ps1', 'practiceSets/ps1': { title: 'T', questionIds: ['q1', 'q2', 'q3'] } });
     const base = fetchMock.getMockImplementation();
     const neverAnswers = new Promise(() => {});
     fetchMock.mockImplementation((url) => (pathOf(url).startsWith('questions/') ? neverAnswers : base(url)));
 
     initializePage();
-    await vi.waitFor(() => expect(fetchedPaths()).toHaveLength(4));
+    await vi.waitFor(() => expect(fetchedPaths()).toHaveLength(5));
 
-    expect(fetchedPaths()).toEqual(['practiceSets/ps1', 'questions/q1', 'questions/q2', 'questions/q3']);
+    expect(fetchedPaths()).toEqual(['practiceSetSlugIndex/unit-3-review', 'practiceSets/ps1', 'questions/q1', 'questions/q2', 'questions/q3']);
   });
 
   it('resolves the ?slug= Slug first on the local dev page, then reads the same way', async () => {
@@ -1118,6 +1192,7 @@ describe('initializePage', () => {
   it('saves progress in the browser, so reloading the page resumes on the Frontier', async () => {
     window.history.pushState(null, '', '/practice/unit-3-review');
     fakeDatabase({
+      'practiceSetSlugIndex/unit-3-review': 'ps1',
       'practiceSets/ps1': { title: 'Unit 3 Review', questionIds: ['q1', 'q2'] },
       'questions/q1': Q1,
       'questions/q2': Q2,
@@ -1137,7 +1212,7 @@ describe('initializePage', () => {
   it('skips a referenced question that no longer exists', async () => {
     window.history.pushState(null, '', '/practice/unit-3-review');
     servedShell('ps1');
-    fakeDatabase({ 'practiceSets/ps1': { title: 'T', questionIds: ['deleted-id', 'q1'] }, 'questions/q1': Q1 });
+    fakeDatabase({ 'practiceSetSlugIndex/unit-3-review': 'ps1', 'practiceSets/ps1': { title: 'T', questionIds: ['deleted-id', 'q1'] }, 'questions/q1': Q1 });
 
     await initializePage();
 
@@ -1148,7 +1223,7 @@ describe('initializePage', () => {
   it('shows a message when the practice set has no questions', async () => {
     window.history.pushState(null, '', '/practice/empty');
     servedShell('ps1');
-    fakeDatabase({ 'practiceSets/ps1': { title: 'Empty', questionIds: [] } });
+    fakeDatabase({ 'practiceSetSlugIndex/empty': 'ps1', 'practiceSets/ps1': { title: 'Empty', questionIds: [] } });
 
     await initializePage();
 
@@ -1158,7 +1233,7 @@ describe('initializePage', () => {
   it('shows the no-questions message when every referenced Question was deleted', async () => {
     window.history.pushState(null, '', '/practice/unit-3-review');
     servedShell('ps1');
-    fakeDatabase({ 'practiceSets/ps1': { title: 'T', questionIds: ['deleted-1', 'deleted-2'] } });
+    fakeDatabase({ 'practiceSetSlugIndex/unit-3-review': 'ps1', 'practiceSets/ps1': { title: 'T', questionIds: ['deleted-1', 'deleted-2'] } });
 
     await initializePage();
 
@@ -1169,7 +1244,7 @@ describe('initializePage', () => {
     document.title = 'Shell Title';
     window.history.pushState(null, '', '/practice/gone');
     servedShell('ps-deleted');
-    fakeDatabase({});
+    fakeDatabase({ 'practiceSetSlugIndex/gone': 'ps-deleted' });
 
     await initializePage();
 
