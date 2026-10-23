@@ -354,7 +354,7 @@ describe('renderQuestionWidget', () => {
     });
   });
 
-  it('keeps Submit visible but grayed out once finished, rather than removing it', () => {
+  it('keeps Submit visible but grayed out once finished, rather than removing it (an embedded Question Link)', () => {
     renderQuestionWidget(container, QUESTION);
     radios(container)[0].click();
     submitBtn(container).click();
@@ -362,6 +362,27 @@ describe('renderQuestionWidget', () => {
     const btn = submitBtn(container);
     expect(btn).not.toBeNull();
     expect(btn.disabled).toBe(true);
+  });
+
+  describe('callerOwnsNext option (Practice Set delivery)', () => {
+    it('removes Submit once finished, leaving its slot to the caller-owned Next', () => {
+      renderQuestionWidget(container, QUESTION, { callerOwnsNext: true });
+      radios(container)[0].click();
+      expect(submitBtn(container)).not.toBeNull();
+
+      submitBtn(container).click();
+
+      expect(submitBtn(container)).toBeNull();
+    });
+
+    it('shows no Submit when restoring an already-finished Question', () => {
+      renderQuestionWidget(container, QUESTION, {
+        callerOwnsNext: true,
+        restoreState: { selectedIndex: 0, lastSubmittedWrongIndex: null, attemptCount: 0, finished: true, outcome: 'firstTry' },
+      });
+
+      expect(submitBtn(container)).toBeNull();
+    });
   });
 
   it('ignores a change event on an option once finished (defensive no-op against synthetic events)', () => {
