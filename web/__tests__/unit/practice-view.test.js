@@ -16,6 +16,13 @@ vi.mock('../../practice-set-database-utils.js', () => ({
   getPracticeSetFromDB: (...args) => mockGetPracticeSetFromDB(...args),
 }));
 
+const mockCelebrate = vi.fn();
+const mockPlayCorrectSound = vi.fn();
+vi.mock('../../celebration.js', () => ({
+  celebrate: (...args) => mockCelebrate(...args),
+  playCorrectSound: (...args) => mockPlayCorrectSound(...args),
+}));
+
 const mockGetQuestionFromDB = vi.fn();
 vi.mock('../../question-database-utils.js', () => ({
   getQuestionFromDB: (...args) => mockGetQuestionFromDB(...args),
@@ -493,6 +500,86 @@ describe('startPracticeSet (Saved Progress)', () => {
     answerCorrectly();
 
     expect(nextBtn(root).textContent).toContain('See results');
+  });
+});
+
+describe('startPracticeSet (tab sync)', () => {
+  const Q3 = question('right3', [{ text: 'right3' }, { text: 'wrong3' }]);
+  const SET = [{ id: 'q1', data: Q1 }, { id: 'q2', data: Q2 }, { id: 'q3', data: Q3 }];
+  let tabA;
+  let tabB;
+
+  // Two tabs of one Practice Set: two controllers whose stores share one
+  // record, each hearing only the other's changes.
+  beforeEach(() => {
+    document.body.innerHTML = '';
+    tabA = document.createElement('div');
+    tabB = document.createElement('div');
+    document.body.append(tabA, tabB);
+    const storeA = createInMemorySavedProgressStore();
+    startPracticeSet(tabA, SET, storeA);
+    startPracticeSet(tabB, SET, createInMemorySavedProgressStore({ sharedWith: storeA }));
+  });
+
+  function answer(tab, optionIndex) {
+    radios(tab)[optionIndex].click();
+    submitBtn(tab).click();
+  }
+
+  it('shows an answer made in one tab on the same Question in the other', () => {
+    answer(tabA, 0);
+
+    expect(tabB.textContent).toContain('Explanation for right1');
+    expect(radios(tabB).every((r) => r.disabled)).toBe(true);
+    expect(nextBtn(tabB).hidden).toBe(false);
+  });
+
+  it('celebrates only in the tab that answered', () => {
+    mockCelebrate.mockClear();
+    mockPlayCorrectSound.mockClear();
+
+    answer(tabA, 0);
+
+    expect(mockCelebrate).toHaveBeenCalledTimes(1);
+    expect(mockPlayCorrectSound).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps each tab on the Question it was viewing, while the Frontier advances in both', () => {
+    answer(tabA, 0);
+    nextBtn(tabA).click();
+    answer(tabA, 0); // tab A finishes Question 2; tab B still on Question 1
+
+    expect(tabB.textContent).toContain('Stem for right1');
+    nextBtn(tabB).click();
+    expect(tabB.textContent).toContain('Explanation for right2');
+    expect(nextBtn(tabB).hidden).toBe(false); // Question 3 is now reachable
+    expect(tabA.textContent).toContain('Stem for right2');
+  });
+
+  it('does not redraw a tab for its own answer, so its celebration stays on screen', () => {
+    mockCelebrate.mockClear();
+
+    answer(tabA, 1); // wrong first, then right: two saves from tab A
+    answer(tabA, 0);
+
+    expect(tabA.contains(mockCelebrate.mock.calls[0][0])).toBe(true);
+    expect(tabB.textContent).toContain('Explanation for right1');
+  });
+
+  it('a reset in one tab sends the other back to Question 1 with nothing answered', () => {
+    for (let i = 0; i < SET.length; i += 1) {
+      answer(tabA, 0);
+      nextBtn(tabA).click();
+    }
+    nextBtn(tabB).click(); // tab B reviewing Question 2
+    expect(tabB.textContent).toContain('Stem for right2');
+
+    [...tabA.querySelectorAll('button')].find((b) => b.textContent === 'Reset answers & start over').click();
+
+    expect(tabB.textContent).toContain('Stem for right1');
+    expect(radios(tabB).some((r) => r.checked || r.disabled)).toBe(false);
+    expect(backBtn(tabB).disabled).toBe(true);
+    expect(nextBtn(tabB).hidden).toBe(true);
   });
 });
 

@@ -166,6 +166,12 @@ function isNavigable(ordered, progress, index) {
   return index >= 0 && index <= frontierIndexOf(ordered, progress);
 }
 
+// Saved Question states hold only primitives, so their JSON is a faithful
+// comparison (both sides come from the same store, so key order matches).
+function sameState(a, b) {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
 /**
  * Drive the Frontier navigation controller for one Practice Set.
  * @param {HTMLElement} rootEl - mounts its own nav bar + question container into this
@@ -273,6 +279,25 @@ export function startPracticeSet(rootEl, questions, store = createInMemorySavedP
     // showing, so let Enter advance from here too.
     if (!nextBtn.hidden) nextBtn.focus({ preventScroll: true });
   }
+
+  // A change from another tab (the store never echoes this tab's own
+  // changes back). Redraws the viewed Question only if its state changed;
+  // restoring is silent, so only the tab that acted celebrates.
+  store.subscribe((incoming) => {
+    const previous = progress;
+    progress = incoming;
+    // A reset (another tab's clear) is the one change that moves this tab.
+    const wasReset = Object.keys(incoming.questions).length === 0
+      && Object.keys(previous.questions).length > 0;
+    if (wasReset) {
+      showQuestion(0);
+      return;
+    }
+    const viewed = ordered[viewingIndex];
+    if (viewed && !sameState(previous.questions[viewed.id], incoming.questions[viewed.id])) {
+      showQuestion(viewingIndex);
+    }
+  });
 
   backBtn.onclick = () => showQuestion(viewingIndex - 1);
   nextBtn.onclick = () => showQuestion(viewingIndex + 1);
