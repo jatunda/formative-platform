@@ -1655,8 +1655,18 @@ ol.lesson-list {
   color: var(--text-secondary);
 }
 
+/* Submit and the green Next share one box size, wide enough for the longest
+   label ("See results"), so "Submit", "Next" and "See results" all fill the
+   same slot and nothing jumps when one replaces the other. */
+.question-widget-submit,
+.practice-next-btn {
+  min-width: 11.5rem;
+  justify-content: center;
+}
+
 /* The green Next: same .primary-action-btn box and key-hint pill as Submit,
-   in Submit's slot (no extra margin), told apart only by color. */
+   mounted in Submit's slot (question-widget.js's nextButton), told apart
+   only by color. */
 .practice-next-btn {
   background-color: var(--success-green);
   border-color: var(--success-green);

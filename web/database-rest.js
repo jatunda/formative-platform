@@ -5,6 +5,7 @@
 // and no live connection (see the pmcq-improvements spec, "Data loading in
 // the browser").
 
+// Also in functions/preview-handler.js (CommonJS there, browser ESM here, so they can't share a module).
 export const DATABASE_URL = "https://formative-platform-default-rtdb.firebaseio.com";
 
 // Local dev mirrors firebase-config.js: on localhost/127.0.0.1, reads go to

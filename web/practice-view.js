@@ -15,6 +15,7 @@ import {
 import { createToast } from './toast.js';
 
 const CANT_ADVANCE_MESSAGE = 'Answer this question to move on';
+const NO_QUESTIONS_MESSAGE = 'This practice set has no questions yet.';
 
 /**
  * Extract the Slug from a /practice/<slug> URL path.
@@ -84,11 +85,11 @@ export function summarizeOutcomes(tally) {
 const floorPercent = (p) => `${Math.floor(p)}%`;
 
 // The Running Score (see CONTEXT.md): First-Try Correct out of the
-// Questions finished so far, from the same tally as the summary.
-function formatRunningScore(tally) {
-  const finished = tally.firstTry + tally.secondTry + tally.missed;
+// Questions finished so far, from the same outcome counts as the summary.
+function formatRunningScore(outcomeCounts) {
+  const finished = outcomeCounts.firstTry + outcomeCounts.secondTry + outcomeCounts.missed;
   if (finished === 0) return '- / -';
-  return `${tally.firstTry} / ${finished} first try · ${floorPercent((tally.firstTry / finished) * 100)}`;
+  return `${outcomeCounts.firstTry} / ${finished} first try · ${floorPercent((outcomeCounts.firstTry / finished) * 100)}`;
 }
 
 function renderSummary(containerEl, perQuestionState, onReset) {
@@ -179,8 +180,8 @@ function sameState(a, b) {
 }
 
 // The page frame: the top bar (Back, the top-bar Next, Question N of M,
-// the Running Score, the keyboard hint), the question area, the green Next
-// and the toast, in their loading state. initializePage draws it before any
+// the Running Score, the keyboard hint), the question area and the toast,
+// in their loading state, plus the (not yet mounted) green Next. initializePage draws it before any
 // read and startPracticeSet redraws the same layout, so nothing shifts when
 // the data arrives.
 function drawFrame(rootEl) {
@@ -224,9 +225,9 @@ function drawFrame(rootEl) {
   const questionContainer = document.createElement('div');
   questionContainer.className = 'practice-question-area';
 
-  // The green Next: takes Submit's exact slot (the widget drops Submit once
-  // the Question is finished, via callerOwnsNext) and only exists on screen
-  // once moving forward is actually allowed: the next index is navigable and
+  // The green Next: the widget mounts it in Submit's exact slot once the
+  // Question is finished (passed as nextButton), so it's on screen only once
+  // moving forward is actually allowed: the next index is navigable and
   // there's somewhere to go (never on the summary).
   const nextBtn = document.createElement('button');
   nextBtn.type = 'button';
@@ -237,7 +238,6 @@ function drawFrame(rootEl) {
   rootEl.innerHTML = '';
   rootEl.appendChild(navBar);
   rootEl.appendChild(questionContainer);
-  rootEl.appendChild(nextBtn);
   rootEl.appendChild(toast.element);
 
   backBtn.disabled = true;
@@ -260,8 +260,17 @@ function drawFrame(rootEl) {
 export function startPracticeSet(rootEl, questions, store = createInMemorySavedProgressStore()) {
   let progress = store.load();
   const ordered = orderQuestions(questions, progress);
+  // Nothing to practice: no Questions, or none that still exist.
+  if (ordered.length === 0) {
+    rootEl.textContent = NO_QUESTIONS_MESSAGE;
+    return;
+  }
   let viewingIndex = 0;
   let currentWidget = null;
+
+  // Each ordered Question's saved state (null if untouched), for the
+  // Running Score and the summary.
+  const orderedStates = () => ordered.map((question) => progress.questions[question.id] || null);
 
   const {
     backBtn, topNextBtn, questionNumber, runningScore, questionContainer, nextBtn, toast,
@@ -279,9 +288,7 @@ export function startPracticeSet(rootEl, questions, store = createInMemorySavedP
     questionNumber.textContent = viewingIndex < ordered.length
       ? `Question ${viewingIndex + 1} of ${ordered.length}`
       : '';
-    runningScore.textContent = formatRunningScore(
-      tallyOutcomes(ordered.map((question) => progress.questions[question.id] || null)),
-    );
+    runningScore.textContent = formatRunningScore(tallyOutcomes(orderedStates()));
     backBtn.disabled = !isNavigable(ordered, progress, viewingIndex - 1);
     const advancing = canAdvance();
     const onLastQuestion = viewingIndex === ordered.length - 1;
@@ -305,7 +312,9 @@ export function startPracticeSet(rootEl, questions, store = createInMemorySavedP
     showQuestion(0);
   }
 
-  function showQuestion(index) {
+  // takeFocus is false for a redraw caused by another tab, which restores
+  // state silently: the student's focus stays wherever it was.
+  function showQuestion(index, { takeFocus = true } = {}) {
     if (currentWidget) {
       currentWidget.destroy();
       currentWidget = null;
@@ -315,11 +324,7 @@ export function startPracticeSet(rootEl, questions, store = createInMemorySavedP
     updateNavControls();
 
     if (viewingIndex >= ordered.length) {
-      renderSummary(
-        questionContainer,
-        ordered.map((question) => progress.questions[question.id] || null),
-        resetAndStartOver,
-      );
+      renderSummary(questionContainer, orderedStates(), resetAndStartOver);
       return;
     }
 
@@ -329,9 +334,9 @@ export function startPracticeSet(rootEl, questions, store = createInMemorySavedP
       // Keeps a fresh question keyboard-navigable from the moment it
       // appears, so arrow keys work immediately without first clicking an
       // option - the Frontier can be driven end-to-end without a mouse.
-      autoFocus: true,
-      // The green Next below replaces Submit once finished.
-      callerOwnsNext: true,
+      autoFocus: takeFocus,
+      // The green Next replaces Submit, in its slot, once finished.
+      nextButton: nextBtn,
       // Every pick and submit is saved, not just finishing, so a refresh
       // can't buy a free retry or lose an unsubmitted pick.
       onStateChange: (state) => {
@@ -348,7 +353,7 @@ export function startPracticeSet(rootEl, questions, store = createInMemorySavedP
 
     // Reviewing an earlier, already-finished question: Next is already
     // showing, so let Enter advance from here too.
-    if (!nextBtn.hidden) nextBtn.focus({ preventScroll: true });
+    if (takeFocus && !nextBtn.hidden) nextBtn.focus({ preventScroll: true });
   }
 
   // A change from another tab (the store never echoes this tab's own
@@ -358,15 +363,16 @@ export function startPracticeSet(rootEl, questions, store = createInMemorySavedP
     const previous = progress;
     progress = incoming;
     // A reset (another tab's clear) is the one change that moves this tab.
+    // Neither redraw takes focus: that stays in the tab the student is using.
     const wasReset = Object.keys(incoming.questions).length === 0
       && Object.keys(previous.questions).length > 0;
     if (wasReset) {
-      showQuestion(0);
+      showQuestion(0, { takeFocus: false });
       return;
     }
     const viewed = ordered[viewingIndex];
     if (viewed && !sameState(previous.questions[viewed.id], incoming.questions[viewed.id])) {
-      showQuestion(viewingIndex);
+      showQuestion(viewingIndex, { takeFocus: false });
     } else {
       // The Running Score (and Next) can change even when the viewed
       // Question didn't.
@@ -431,26 +437,25 @@ async function loadPracticeSet(contentEl, read) {
   }
 
   const practiceSet = await read(['practiceSets', practiceSetId]);
-  const questionIds = (practiceSet && practiceSet.questionIds) || [];
+  // Deleted since the shell was cached, or a stale Slug index entry.
+  if (!practiceSet) {
+    contentEl.textContent = PRACTICE_SET_NOT_FOUND;
+    return;
+  }
+  const questionIds = practiceSet.questionIds || [];
 
   // Fetched up front, in parallel, rather than lazily per-question, so
   // Frontier Back/Forward navigation is instant with no loading flicker -
   // Practice Sets are expected to be small (see the implementation plan).
+  // Questions that no longer exist are dropped by the Order step.
   const questionData = await Promise.all(questionIds.map((id) => read(['questions', id])));
-  const questions = questionIds
-    .map((id, index) => ({ id, data: questionData[index] }))
-    .filter((question) => question.data);
+  const questions = questionIds.map((id, index) => ({ id, data: questionData[index] }));
 
   const titleEl = document.getElementById('practiceSetTitle');
-  if (titleEl) titleEl.textContent = practiceSet?.title || '';
+  if (titleEl) titleEl.textContent = practiceSet.title || '';
   // The shell's <title> can be a day old (CDN-cached); the tab follows a
   // rename as soon as the student loads.
-  if (practiceSet?.title) document.title = practiceSet.title;
-
-  if (questions.length === 0) {
-    contentEl.textContent = 'This practice set has no questions yet.';
-    return;
-  }
+  if (practiceSet.title) document.title = practiceSet.title;
 
   startPracticeSet(contentEl, questions, createLocalStorageSavedProgressStore(practiceSetId));
 }

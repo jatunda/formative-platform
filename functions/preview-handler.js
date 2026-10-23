@@ -5,6 +5,7 @@
 // fetch and moved unchanged to another runtime (e.g. a Cloudflare Worker).
 // See docs/adr/0004-page-rendering-and-link-previews.md.
 
+// Also in web/database-rest.js (browser ESM there, CommonJS here, so they can't share a module).
 const DATABASE_URL = "https://formative-platform-default-rtdb.firebaseio.com";
 
 // Found shells carry only preview metadata (everything a visitor sees is

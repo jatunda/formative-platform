@@ -102,6 +102,11 @@ function backBtn(root) {
 function nextBtn(root) {
   return root.querySelector('.practice-next-btn');
 }
+// The green Next is on screen: mounted in Submit's slot and not hidden.
+function nextShown(root) {
+  const btn = nextBtn(root);
+  return Boolean(btn) && !btn.hidden;
+}
 
 describe('startPracticeSet (Frontier navigation)', () => {
   let root;
@@ -116,7 +121,7 @@ describe('startPracticeSet (Frontier navigation)', () => {
 
     expect(root.textContent).toContain('Stem for right1');
     expect(backBtn(root).disabled).toBe(true);
-    expect(nextBtn(root).hidden).toBe(true);
+    expect(nextShown(root)).toBe(false);
   });
 
   it('shows a subtle hint that the whole set is keyboard-navigable', () => {
@@ -168,7 +173,7 @@ describe('startPracticeSet (Frontier navigation)', () => {
     submitBtn(root).click();
 
     expect(root.textContent).toContain('Stem for right1'); // still on Q1 - no auto-advance
-    expect(nextBtn(root).hidden).toBe(false);
+    expect(nextShown(root)).toBe(true);
     expect(nextBtn(root).textContent).toContain('Enter');
   });
 
@@ -178,7 +183,7 @@ describe('startPracticeSet (Frontier navigation)', () => {
     radios(root)[1].click();
     submitBtn(root).click();
 
-    expect(nextBtn(root).hidden).toBe(true);
+    expect(nextShown(root)).toBe(false);
   });
 
   it('focuses Next after finishing so Enter advances', () => {
@@ -245,7 +250,7 @@ describe('startPracticeSet (Frontier navigation)', () => {
     submitBtn(root).click();
     nextBtn(root).onclick(); // viewing Q2, frontier still at Q2 (unfinished)
 
-    expect(nextBtn(root).hidden).toBe(true);
+    expect(nextShown(root)).toBe(false);
   });
 
   it('shows the end-of-set summary with correct tallies once every question is finished', () => {
@@ -307,7 +312,7 @@ describe('startPracticeSet (Frontier navigation)', () => {
     nextBtn(root).onclick();
 
     expect(root.textContent).toContain("You're done!");
-    expect(nextBtn(root).hidden).toBe(true);
+    expect(nextShown(root)).toBe(false);
   });
 });
 
@@ -342,8 +347,31 @@ describe('startPracticeSet (Next buttons)', () => {
     answerCorrectly();
 
     expect(submitBtn(root)).toBeNull();
-    expect(nextBtn(root).hidden).toBe(false);
+    expect(nextShown(root)).toBe(true);
     expect(nextBtn(root).textContent).toContain('Enter ↵');
+  });
+
+  it('puts the green Next in Submit\'s exact slot, directly below the options', () => {
+    startPracticeSet(root, [{ id: 'q1', data: Q1 }, { id: 'q2', data: Q2 }]);
+    const slotBefore = root.querySelector('.question-widget-options').nextElementSibling;
+    expect(slotBefore).toBe(submitBtn(root));
+
+    answerCorrectly();
+
+    const slotAfter = root.querySelector('.question-widget-options').nextElementSibling;
+    expect(slotAfter).toBe(nextBtn(root));
+    expect(slotAfter.parentElement).toBe(root.querySelector('.practice-question-area'));
+    expect(slotAfter.classList.contains('primary-action-btn')).toBe(true);
+  });
+
+  it('keeps the green Next in Submit\'s slot when revisiting a finished Question', () => {
+    startPracticeSet(root, [{ id: 'q1', data: Q1 }, { id: 'q2', data: Q2 }]);
+    answerCorrectly();
+    nextBtn(root).click();
+
+    backBtn(root).click();
+
+    expect(root.querySelector('.question-widget-options').nextElementSibling).toBe(nextBtn(root));
   });
 
   it('shows the green Next, not a grayed-out Submit, when revisiting a finished Question', () => {
@@ -355,7 +383,7 @@ describe('startPracticeSet (Next buttons)', () => {
 
     expect(root.textContent).toContain('Stem for right1');
     expect(submitBtn(root)).toBeNull();
-    expect(nextBtn(root).hidden).toBe(false);
+    expect(nextShown(root)).toBe(true);
     expect(document.activeElement).toBe(nextBtn(root));
   });
 
@@ -538,7 +566,7 @@ describe('startPracticeSet (Saved Progress)', () => {
     expect(root.textContent).toContain('Stem for right1');
     expect(radios(root).some((r) => r.checked || r.disabled)).toBe(false);
     expect(backBtn(root).disabled).toBe(true);
-    expect(nextBtn(root).hidden).toBe(true);
+    expect(nextShown(root)).toBe(false);
     remount(SET, store);
     expect(root.textContent).toContain('Stem for right1');
     expect(radios(root).some((r) => r.checked)).toBe(false);
@@ -574,7 +602,7 @@ describe('startPracticeSet (Saved Progress)', () => {
     remount(SET, store); // q2 inserted in the middle
 
     expect(root.textContent).toContain('Stem for right2');
-    expect(nextBtn(root).hidden).toBe(true);
+    expect(nextShown(root)).toBe(false);
   });
 
   it('keeps answers with their Questions when the set is reordered', () => {
@@ -590,7 +618,7 @@ describe('startPracticeSet (Saved Progress)', () => {
     nextBtn(root).onclick();
     expect(root.textContent).toContain('Stem for right1');
     expect(root.textContent).toContain('Explanation for right1'); // still finished
-    expect(nextBtn(root).hidden).toBe(false);
+    expect(nextShown(root)).toBe(true);
   });
 
   it('drops a Question whose data no longer exists from the order', () => {
@@ -773,6 +801,7 @@ describe('startPracticeSet (tab sync)', () => {
   const SET = [{ id: 'q1', data: Q1 }, { id: 'q2', data: Q2 }, { id: 'q3', data: Q3 }];
   let tabA;
   let tabB;
+  let storeA;
 
   // Two tabs of one Practice Set: two controllers whose stores share one
   // record, each hearing only the other's changes.
@@ -781,7 +810,7 @@ describe('startPracticeSet (tab sync)', () => {
     tabA = document.createElement('div');
     tabB = document.createElement('div');
     document.body.append(tabA, tabB);
-    const storeA = createInMemorySavedProgressStore();
+    storeA = createInMemorySavedProgressStore();
     startPracticeSet(tabA, SET, storeA);
     startPracticeSet(tabB, SET, createInMemorySavedProgressStore({ sharedWith: storeA }));
   });
@@ -796,7 +825,7 @@ describe('startPracticeSet (tab sync)', () => {
 
     expect(tabB.textContent).toContain('Explanation for right1');
     expect(radios(tabB).every((r) => r.disabled)).toBe(true);
-    expect(nextBtn(tabB).hidden).toBe(false);
+    expect(nextShown(tabB)).toBe(true);
   });
 
   it('celebrates only in the tab that answered', () => {
@@ -817,7 +846,7 @@ describe('startPracticeSet (tab sync)', () => {
     expect(tabB.textContent).toContain('Stem for right1');
     nextBtn(tabB).click();
     expect(tabB.textContent).toContain('Explanation for right2');
-    expect(nextBtn(tabB).hidden).toBe(false); // Question 3 is now reachable
+    expect(nextShown(tabB)).toBe(true); // Question 3 is now reachable
     expect(tabA.textContent).toContain('Stem for right2');
   });
 
@@ -829,6 +858,43 @@ describe('startPracticeSet (tab sync)', () => {
 
     expect(tabA.contains(mockCelebrate.mock.calls[0][0])).toBe(true);
     expect(tabB.textContent).toContain('Explanation for right1');
+  });
+
+  // Another tab's changes arrive straight through the shared store here, so
+  // tab A's own focus handling can't mask where tab B puts focus.
+  function focusElsewhere() {
+    const elsewhere = document.createElement('input');
+    document.body.appendChild(elsewhere);
+    elsewhere.focus();
+    return elsewhere;
+  }
+
+  it('does not move focus when another tab\'s pick redraws this tab', () => {
+    const elsewhere = focusElsewhere();
+
+    storeA.record('q1', { selectedIndex: 1, lastSubmittedWrongIndex: null, attemptCount: 0, finished: false, outcome: null });
+
+    expect(radios(tabB)[1].checked).toBe(true);
+    expect(document.activeElement).toBe(elsewhere);
+  });
+
+  it('does not move focus when another tab\'s finish redraws this tab', () => {
+    const elsewhere = focusElsewhere();
+
+    storeA.record('q1', { selectedIndex: 0, lastSubmittedWrongIndex: null, attemptCount: 0, finished: true, outcome: 'firstTry' });
+
+    expect(nextShown(tabB)).toBe(true);
+    expect(document.activeElement).toBe(elsewhere);
+  });
+
+  it('does not move focus when another tab\'s reset sends this tab back to Question 1', () => {
+    storeA.record('q1', { selectedIndex: 0, lastSubmittedWrongIndex: null, attemptCount: 0, finished: true, outcome: 'firstTry' });
+    const elsewhere = focusElsewhere();
+
+    storeA.clear();
+
+    expect(radios(tabB).some((r) => r.checked || r.disabled)).toBe(false);
+    expect(document.activeElement).toBe(elsewhere);
   });
 
   it('a reset in one tab sends the other back to Question 1 with nothing answered', () => {
@@ -844,7 +910,7 @@ describe('startPracticeSet (tab sync)', () => {
     expect(tabB.textContent).toContain('Stem for right1');
     expect(radios(tabB).some((r) => r.checked || r.disabled)).toBe(false);
     expect(backBtn(tabB).disabled).toBe(true);
-    expect(nextBtn(tabB).hidden).toBe(true);
+    expect(nextShown(tabB)).toBe(false);
   });
 });
 
@@ -1089,7 +1155,17 @@ describe('initializePage', () => {
     expect(document.getElementById('content').textContent).toBe('This practice set has no questions yet.');
   });
 
-  it('treats an embedded id whose Practice Set is gone as an empty set, keeping the tab title', async () => {
+  it('shows the no-questions message when every referenced Question was deleted', async () => {
+    window.history.pushState(null, '', '/practice/unit-3-review');
+    servedShell('ps1');
+    fakeDatabase({ 'practiceSets/ps1': { title: 'T', questionIds: ['deleted-1', 'deleted-2'] } });
+
+    await initializePage();
+
+    expect(document.getElementById('content').textContent).toBe('This practice set has no questions yet.');
+  });
+
+  it('shows "Practice set not found" when the embedded id\'s Practice Set was deleted, keeping the tab title', async () => {
     document.title = 'Shell Title';
     window.history.pushState(null, '', '/practice/gone');
     servedShell('ps-deleted');
@@ -1097,8 +1173,17 @@ describe('initializePage', () => {
 
     await initializePage();
 
-    expect(document.getElementById('content').textContent).toBe('This practice set has no questions yet.');
+    expect(document.getElementById('content').textContent).toBe(PRACTICE_SET_NOT_FOUND);
     expect(document.title).toBe('Shell Title');
+  });
+
+  it('shows "Practice set not found" when the ?slug= Slug resolves to a deleted Practice Set', async () => {
+    window.history.pushState(null, '', '/practice-set-view.html?slug=stale');
+    fakeDatabase({ 'practiceSetSlugIndex/stale': 'ps-deleted' });
+
+    await initializePage();
+
+    expect(document.getElementById('content').textContent).toBe(PRACTICE_SET_NOT_FOUND);
   });
 
   it('shows "Practice set not found" when the ?slug= Slug does not resolve', async () => {
