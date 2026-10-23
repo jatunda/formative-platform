@@ -1,6 +1,7 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { getSlugFromPath, tallyOutcomes, summarizeOutcomes, letterGradeFor, startPracticeSet, initializePage } from '../../practice-view.js';
 import { PRACTICE_SET_NOT_FOUND } from '../../constants.js';
+import { createInMemorySavedProgressStore } from '../../saved-progress.js';
 
 vi.mock('https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js', () => ({
   initializeApp: () => ({}),
@@ -321,8 +322,187 @@ describe('startPracticeSet (Frontier navigation)', () => {
   });
 });
 
-describe('initializePage', () => {
+function summaryRows(root) {
+  return Object.fromEntries([...root.querySelectorAll('.practice-summary-table tr')]
+    .map((tr) => [tr.querySelector('th').textContent, tr.querySelector('td').textContent]));
+}
+
+describe('startPracticeSet (Saved Progress)', () => {
+  let root;
+  const Q3 = question('right3', [{ text: 'right3' }, { text: 'wrong3' }]);
+  const SET = [{ id: 'q1', data: Q1 }, { id: 'q2', data: Q2 }, { id: 'q3', data: Q3 }];
+
   beforeEach(() => {
+    document.body.innerHTML = '';
+    root = document.createElement('div');
+    document.body.appendChild(root);
+  });
+
+  // Stands in for a page refresh: a brand-new controller on the same store.
+  function remount(questions, store) {
+    root.remove();
+    root = document.createElement('div');
+    document.body.appendChild(root);
+    startPracticeSet(root, questions, store);
+  }
+
+  function answerCorrectly() {
+    radios(root)[0].click();
+    submitBtn(root).click();
+  }
+
+  it('resumes on the Frontier after a refresh', () => {
+    const store = createInMemorySavedProgressStore();
+    startPracticeSet(root, SET, store);
+    answerCorrectly();
+    nextBtn(root).onclick();
+
+    remount(SET, store);
+
+    expect(root.textContent).toContain('Stem for right2');
+    expect(backBtn(root).disabled).toBe(false);
+  });
+
+  it('resumes on the summary when every Question was finished', () => {
+    const store = createInMemorySavedProgressStore();
+    startPracticeSet(root, SET, store);
+    answerCorrectly();
+    nextBtn(root).onclick();
+    answerCorrectly();
+    nextBtn(root).onclick();
+    answerCorrectly();
+
+    remount(SET, store);
+
+    expect(root.textContent).toContain("You're done!");
+    expect(root.querySelector('.practice-grade-letter').textContent).toBe('A');
+    expect(backBtn(root).disabled).toBe(false);
+  });
+
+  it('keeps a half-done Question across a refresh: the used Attempt and the wrong pick\'s Explanation', () => {
+    const store = createInMemorySavedProgressStore();
+    startPracticeSet(root, SET, store);
+    radios(root)[1].click(); // wrong1
+    submitBtn(root).click();
+
+    remount(SET, store);
+
+    expect(root.textContent).toContain('Stem for right1');
+    expect(root.textContent).toContain('Explanation for wrong1');
+    expect(radios(root)[1].checked).toBe(true);
+    // The first Attempt is spent: one more wrong pick ends it as Missed.
+    radios(root)[1].click();
+    submitBtn(root).click();
+    expect(radios(root).every((r) => r.disabled)).toBe(true);
+    nextBtn(root).onclick();
+    answerCorrectly();
+    nextBtn(root).onclick();
+    answerCorrectly();
+    nextBtn(root).onclick();
+    const rows = summaryRows(root);
+    expect(rows['Missed']).toBe('1 of 3');
+  });
+
+  it('keeps an unsubmitted pick across a refresh', () => {
+    const store = createInMemorySavedProgressStore();
+    startPracticeSet(root, SET, store);
+    radios(root)[1].click();
+
+    remount(SET, store);
+
+    expect(radios(root)[1].checked).toBe(true);
+    expect(submitBtn(root).disabled).toBe(false);
+    expect(root.textContent).not.toContain('Explanation for wrong1');
+  });
+
+  it('shows Reset answers & start over only on the summary, and it wipes everything and starts at Question 1', () => {
+    const store = createInMemorySavedProgressStore();
+    startPracticeSet(root, SET, store);
+    const resetButton = () => [...root.querySelectorAll('button')].find((b) => b.textContent === 'Reset answers & start over');
+    answerCorrectly();
+    expect(resetButton()).toBeUndefined();
+    nextBtn(root).onclick();
+    answerCorrectly();
+    nextBtn(root).onclick();
+    answerCorrectly();
+    nextBtn(root).onclick();
+
+    resetButton().click();
+
+    expect(root.textContent).toContain('Stem for right1');
+    expect(radios(root).some((r) => r.checked || r.disabled)).toBe(false);
+    expect(backBtn(root).disabled).toBe(true);
+    expect(nextBtn(root).hidden).toBe(true);
+    remount(SET, store);
+    expect(root.textContent).toContain('Stem for right1');
+    expect(radios(root).some((r) => r.checked)).toBe(false);
+  });
+
+  it('ignores answers to Questions removed from the set in the Frontier and summary', () => {
+    const store = createInMemorySavedProgressStore();
+    startPracticeSet(root, SET, store);
+    answerCorrectly(); // q1 first try
+    nextBtn(root).onclick();
+    radios(root)[1].click(); // q2 missed
+    submitBtn(root).click();
+    radios(root)[1].click();
+    submitBtn(root).click();
+
+    remount([SET[0], SET[2]], store); // q2 removed
+
+    expect(root.textContent).toContain('Stem for right3');
+    answerCorrectly();
+    nextBtn(root).onclick();
+    const rows = summaryRows(root);
+    expect(rows['Correct on first try']).toBe('2 of 2');
+    expect(rows['Missed']).toBe('0 of 2');
+  });
+
+  it('moves the Frontier back to a Question added before it', () => {
+    const store = createInMemorySavedProgressStore();
+    startPracticeSet(root, [SET[0], SET[2]], store);
+    answerCorrectly();
+    nextBtn(root).onclick();
+    answerCorrectly(); // finished: would resume on the summary
+
+    remount(SET, store); // q2 inserted in the middle
+
+    expect(root.textContent).toContain('Stem for right2');
+    expect(nextBtn(root).hidden).toBe(true);
+  });
+
+  it('keeps answers with their Questions when the set is reordered', () => {
+    const store = createInMemorySavedProgressStore();
+    startPracticeSet(root, SET, store);
+    answerCorrectly(); // q1 only
+
+    remount([SET[1], SET[0], SET[2]], store);
+
+    expect(root.textContent).toContain('Stem for right2'); // q2 now first and unfinished
+    expect(backBtn(root).disabled).toBe(true);
+    answerCorrectly();
+    nextBtn(root).onclick();
+    expect(root.textContent).toContain('Stem for right1');
+    expect(root.textContent).toContain('Explanation for right1'); // still finished
+    expect(nextBtn(root).hidden).toBe(false);
+  });
+
+  it('drops a Question whose data no longer exists from the order', () => {
+    const store = createInMemorySavedProgressStore();
+    startPracticeSet(root, [SET[0], { id: 'gone', data: null }], store);
+    answerCorrectly();
+
+    expect(nextBtn(root).textContent).toContain('See results');
+  });
+});
+
+describe('initializePage', () => {
+  afterEach(() => {
+    localStorage.clear();
+  });
+
+  beforeEach(() => {
+    localStorage.clear();
     document.body.innerHTML = '<h1 id="practiceSetTitle"></h1><div id="content"></div>';
     mockResolvePracticeSetSlugToId.mockReset();
     mockGetPracticeSetFromDB.mockReset();
@@ -341,6 +521,22 @@ describe('initializePage', () => {
     expect(mockGetQuestionFromDB).toHaveBeenCalledWith('q2');
     expect(document.getElementById('practiceSetTitle').textContent).toBe('Unit 3 Review');
     expect(document.getElementById('content').textContent).toContain('Stem for right1');
+  });
+
+  it('saves progress in the browser, so reloading the page resumes on the Frontier', async () => {
+    window.history.pushState(null, '', '/practice/unit-3-review');
+    mockResolvePracticeSetSlugToId.mockResolvedValue('ps1');
+    mockGetPracticeSetFromDB.mockResolvedValue({ title: 'Unit 3 Review', questionIds: ['q1', 'q2'] });
+    mockGetQuestionFromDB.mockImplementation(async (id) => (id === 'q1' ? Q1 : Q2));
+    await initializePage();
+    const content = document.getElementById('content');
+    radios(content)[0].click();
+    submitBtn(content).click();
+
+    document.body.innerHTML = '<h1 id="practiceSetTitle"></h1><div id="content"></div>';
+    await initializePage();
+
+    expect(document.getElementById('content').textContent).toContain('Stem for right2');
   });
 
   it('skips a referenced question that no longer exists', async () => {

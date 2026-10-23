@@ -1682,6 +1682,11 @@ ol.lesson-list {
   text-align: right;
 }
 
+.practice-reset-btn {
+  display: block;
+  margin-top: var(--spacing-lg);
+}
+
 /* ========================================
    Responsive
    ======================================== */

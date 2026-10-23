@@ -5,7 +5,9 @@
 // anything about a Frontier/other questions. Advancing to a next question is
 // entirely the caller's concern: practice-view.js shows its own Next button
 // once onOutcome fires; an embedded single question in a Lesson/Page has
-// nothing further to show at all.
+// nothing further to show at all. Restoring a saved state (restoreState) is
+// silent: celebration and sound only ever follow a live submit, and a
+// finished Question takes no focus even with autoFocus.
 import { renderContentItems } from './content-renderer.js';
 import { celebrate, playCorrectSound } from './celebration.js';
 
@@ -31,10 +33,10 @@ function isTypingOrActivating(target) {
  * Mount an interactive Question into containerEl.
  * @param {HTMLElement} containerEl
  * @param {{stem: Array, options: Array<{text: string, correct: boolean, explanation: string, mistakeCategory: string|null}>}} questionData
- * @param {{restoreState?: object, onOutcome?: (outcome: "firstTry"|"secondTry"|"missed") => void, autoFocus?: boolean}} [options]
+ * @param {{restoreState?: object, onOutcome?: (outcome: "firstTry"|"secondTry"|"missed") => void, onStateChange?: (state: object) => void, autoFocus?: boolean}} [options]
  * @returns {{getState: () => object, destroy: () => void}}
  */
-export function renderQuestionWidget(containerEl, questionData, { restoreState, onOutcome, autoFocus } = {}) {
+export function renderQuestionWidget(containerEl, questionData, { restoreState, onOutcome, onStateChange, autoFocus } = {}) {
   widgetCounter += 1;
   const widgetId = widgetCounter;
   // Unique per widget so radios in two embedded Questions on the same page
@@ -56,6 +58,18 @@ export function renderQuestionWidget(containerEl, questionData, { restoreState, 
       finished: false,
       outcome: null,
     };
+  // A saved state can outlive an edit that removed Options; an index past
+  // the end would make submit() read a missing Option.
+  const optionCount = questionData.options.length;
+  if (state.selectedIndex !== null && state.selectedIndex >= optionCount) state.selectedIndex = null;
+  if (state.lastSubmittedWrongIndex !== null && state.lastSubmittedWrongIndex >= optionCount) state.lastSubmittedWrongIndex = null;
+
+  // Fired on every state change (a pick, not just a submit), so a caller
+  // saving progress keeps a half-done Question across a refresh. Runs before
+  // onOutcome, so the caller's saved state already includes the outcome.
+  function stateChanged() {
+    if (onStateChange) onStateChange({ ...state });
+  }
 
   function selectOption(index) {
     if (state.finished) return;
@@ -65,6 +79,7 @@ export function renderQuestionWidget(containerEl, questionData, { restoreState, 
     // something else to compare it against, until they actually resubmit
     // (submit() is what clears/replaces it, on a real new attempt).
     render();
+    stateChanged();
   }
 
   function submit() {
@@ -78,6 +93,7 @@ export function renderQuestionWidget(containerEl, questionData, { restoreState, 
       render();
       playCorrectSound();
       celebrate(containerEl.querySelector('.question-widget-option-correct'));
+      stateChanged();
       if (onOutcome) onOutcome(state.outcome);
       return;
     }
@@ -91,10 +107,12 @@ export function renderQuestionWidget(containerEl, questionData, { restoreState, 
       state.outcome = "missed";
       state.lastSubmittedWrongIndex = null;
       render();
+      stateChanged();
       if (onOutcome) onOutcome(state.outcome);
     } else {
       state.lastSubmittedWrongIndex = state.selectedIndex;
       render();
+      stateChanged();
     }
   }
 

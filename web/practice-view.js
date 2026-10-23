@@ -1,9 +1,10 @@
 // Student-facing Practice Set delivery. Mirrors page-view.js's resolve ->
 // fetch -> render shape for /practice/<slug>, but owns a real interaction
 // state machine on top: the Frontier navigation controller (see CONTEXT.md's
-// Frontier entry) and the end-of-set summary (with an expected test grade). Nothing here is persisted to
-// the database (docs/adr/0012) - frontierIndex, viewingIndex, and
-// perQuestionState all live only in memory for this page load.
+// Frontier entry) and the end-of-set summary (with an expected test grade).
+// Per-Question state is kept as Saved Progress in browser storage
+// (saved-progress.js), never in the database (docs/adr/0012); the Frontier
+// is derived from it on demand.
 import { db } from './firebase-config.js';
 import { initializeDatabase } from './database-handle.js';
 import { renderQuestionWidget } from './question-widget.js';
@@ -13,6 +14,10 @@ import {
 } from './practice-set-database-utils.js';
 import { getQuestionFromDB } from './question-database-utils.js';
 import { PRACTICE_SET_NOT_FOUND } from './constants.js';
+import {
+  createInMemorySavedProgressStore,
+  createLocalStorageSavedProgressStore
+} from './saved-progress.js';
 
 /**
  * Extract the Slug from a /practice/<slug> URL path.
@@ -75,7 +80,7 @@ export function summarizeOutcomes(tally) {
   };
 }
 
-function renderSummary(containerEl, perQuestionState) {
+function renderSummary(containerEl, perQuestionState, onReset) {
   const tally = tallyOutcomes(perQuestionState);
   const stats = summarizeOutcomes(tally);
   const fmt = (p) => `${Math.round(p)}%`;
@@ -127,17 +132,51 @@ function renderSummary(containerEl, perQuestionState) {
   });
   table.appendChild(tbody);
   containerEl.appendChild(table);
+
+  // Only offered here, never mid-set, so unfinished work can't be wiped by
+  // accident. No confirm: the label already says the answers go.
+  const resetBtn = document.createElement('button');
+  resetBtn.type = 'button';
+  resetBtn.className = 'schedule-action-btn practice-reset-btn';
+  resetBtn.textContent = 'Reset answers & start over';
+  resetBtn.onclick = onReset;
+  containerEl.appendChild(resetBtn);
+}
+
+// The Order step: this student's ordered Questions. Today that's the
+// Practice Set's current order with Questions that no longer exist dropped;
+// a shuffled order would be generated once and kept in Saved Progress.
+function orderQuestions(questions, _progress) {
+  return questions.filter((question) => question.data);
+}
+
+// The Frontier (see CONTEXT.md): the first Question in this student's order
+// not finished in Saved Progress, or ordered.length once all are (the
+// summary). Derived on demand, never stored, so answers saved for Questions
+// since removed from the set can't move it.
+function frontierIndexOf(ordered, progress) {
+  const index = ordered.findIndex((question) => !progress.questions[question.id]?.finished);
+  return index === -1 ? ordered.length : index;
+}
+
+// The Navigable step: which indexes (ordered.length being the summary) a
+// student may view. Today, locked order: everything up to and including the
+// Frontier. Skip-ahead would swap this rule.
+function isNavigable(ordered, progress, index) {
+  return index >= 0 && index <= frontierIndexOf(ordered, progress);
 }
 
 /**
  * Drive the Frontier navigation controller for one Practice Set.
  * @param {HTMLElement} rootEl - mounts its own nav bar + question container into this
  * @param {Array<{id: string, data: object}>} questions - in Practice Set order
+ * @param {import('./saved-progress.js').SavedProgressStore} [store] - this
+ * Practice Set's Saved Progress; defaults to in-memory (nothing survives a refresh)
  */
-export function startPracticeSet(rootEl, questions) {
-  let frontierIndex = 0;
+export function startPracticeSet(rootEl, questions, store = createInMemorySavedProgressStore()) {
+  let progress = store.load();
+  const ordered = orderQuestions(questions, progress);
   let viewingIndex = 0;
-  const perQuestionState = new Array(questions.length).fill(null);
   let currentWidget = null;
 
   rootEl.innerHTML = '';
@@ -160,8 +199,8 @@ export function startPracticeSet(rootEl, questions) {
 
   // Lives below the question (where Submit was) rather than in the top nav
   // bar, and only exists on screen once moving forward is actually allowed:
-  // the viewed question is finished (viewingIndex < frontierIndex) and
-  // there's somewhere to go (never on the summary).
+  // the next index is navigable and there's somewhere to go (never on the
+  // summary).
   const nextBtn = document.createElement('button');
   nextBtn.type = 'button';
   nextBtn.className = 'primary-action-btn practice-next-btn';
@@ -171,11 +210,11 @@ export function startPracticeSet(rootEl, questions) {
   rootEl.appendChild(nextBtn);
 
   function updateNavControls() {
-    backBtn.disabled = viewingIndex === 0;
-    const canAdvance = viewingIndex < questions.length && viewingIndex < frontierIndex;
+    backBtn.disabled = !isNavigable(ordered, progress, viewingIndex - 1);
+    const canAdvance = viewingIndex < ordered.length && isNavigable(ordered, progress, viewingIndex + 1);
     nextBtn.hidden = !canAdvance;
     nextBtn.textContent = '';
-    nextBtn.append(viewingIndex === questions.length - 1 ? 'See results ' : 'Next ');
+    nextBtn.append(viewingIndex === ordered.length - 1 ? 'See results ' : 'Next ');
     // Matches Submit's own "Enter ↵" key-hint pill (question-widget.js), so
     // the two primary-action buttons read as one consistent control.
     const hint = document.createElement('kbd');
@@ -185,9 +224,14 @@ export function startPracticeSet(rootEl, questions) {
     nextBtn.title = 'Shortcut: Enter';
   }
 
+  function resetAndStartOver() {
+    store.clear();
+    progress = store.load();
+    showQuestion(0);
+  }
+
   function showQuestion(index) {
     if (currentWidget) {
-      perQuestionState[viewingIndex] = currentWidget.getState();
       currentWidget.destroy();
       currentWidget = null;
     }
@@ -195,22 +239,29 @@ export function startPracticeSet(rootEl, questions) {
     viewingIndex = index;
     updateNavControls();
 
-    if (viewingIndex >= questions.length) {
-      renderSummary(questionContainer, perQuestionState);
+    if (viewingIndex >= ordered.length) {
+      renderSummary(
+        questionContainer,
+        ordered.map((question) => progress.questions[question.id] || null),
+        resetAndStartOver,
+      );
       return;
     }
 
-    currentWidget = renderQuestionWidget(questionContainer, questions[viewingIndex].data, {
-      restoreState: perQuestionState[viewingIndex] || undefined,
+    const { id, data } = ordered[viewingIndex];
+    currentWidget = renderQuestionWidget(questionContainer, data, {
+      restoreState: progress.questions[id],
       // Keeps a fresh question keyboard-navigable from the moment it
       // appears, so arrow keys work immediately without first clicking an
       // option - the Frontier can be driven end-to-end without a mouse.
       autoFocus: true,
+      // Every pick and submit is saved, not just finishing, so a refresh
+      // can't buy a free retry or lose an unsubmitted pick.
+      onStateChange: (state) => {
+        store.record(id, state);
+        progress = store.load();
+      },
       onOutcome: () => {
-        perQuestionState[viewingIndex] = currentWidget.getState();
-        if (viewingIndex === frontierIndex) {
-          frontierIndex += 1;
-        }
         updateNavControls();
         // Focusing Next makes the same Enter key that submitted the answer
         // also advance on its next press (native button activation).
@@ -226,7 +277,9 @@ export function startPracticeSet(rootEl, questions) {
   backBtn.onclick = () => showQuestion(viewingIndex - 1);
   nextBtn.onclick = () => showQuestion(viewingIndex + 1);
 
-  showQuestion(0);
+  // Opens on the Frontier: the first unfinished Question, or the summary
+  // when every Question is finished.
+  showQuestion(frontierIndexOf(ordered, progress));
 }
 
 export async function initializePage() {
@@ -271,7 +324,7 @@ export async function initializePage() {
     return;
   }
 
-  startPracticeSet(contentEl, questions);
+  startPracticeSet(contentEl, questions, createLocalStorageSavedProgressStore(practiceSetId));
 }
 
 if (document.getElementById('content')) {

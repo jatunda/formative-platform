@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { renderQuestionWidget } from '../../question-widget.js';
 
 const QUESTION = {
@@ -300,6 +300,47 @@ describe('renderQuestionWidget', () => {
       expect(container.textContent).toContain('Off by one.');
       expect(radios(container)[1].checked).toBe(true);
       expect(submitBtn(container).disabled).toBe(false);
+    });
+
+    it('restores a finished Question silently: no celebration, no sound, no focus taken', () => {
+      const AudioContext = vi.fn();
+      window.AudioContext = AudioContext;
+      const elsewhere = document.createElement('button');
+      document.body.appendChild(elsewhere);
+      elsewhere.focus();
+      const restoreState = { selectedIndex: 0, lastSubmittedWrongIndex: null, attemptCount: 0, finished: true, outcome: 'firstTry' };
+
+      try {
+        renderQuestionWidget(container, QUESTION, { restoreState, autoFocus: true });
+      } finally {
+        delete window.AudioContext;
+      }
+
+      expect(container.querySelector('.question-widget-celebrate')).toBeNull();
+      expect(AudioContext).not.toHaveBeenCalled();
+      expect(document.activeElement).toBe(elsewhere);
+    });
+
+    it('drops a saved pick that no longer points at an Option (the Question was edited)', () => {
+      const restoreState = { selectedIndex: 7, lastSubmittedWrongIndex: 7, attemptCount: 1, finished: false, outcome: null };
+      const widget = renderQuestionWidget(container, QUESTION, { restoreState });
+
+      expect(submitBtn(container).disabled).toBe(true);
+      container.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+      expect(widget.getState()).toMatchObject({ selectedIndex: null, lastSubmittedWrongIndex: null, attemptCount: 1 });
+    });
+
+    it('reports every state change (a pick and a submit) to onStateChange', () => {
+      const changes = [];
+      renderQuestionWidget(container, QUESTION, { onStateChange: (s) => changes.push(s) });
+
+      radios(container)[1].click();
+      submitBtn(container).click();
+
+      expect(changes).toEqual([
+        { selectedIndex: 1, lastSubmittedWrongIndex: null, attemptCount: 0, finished: false, outcome: null },
+        { selectedIndex: 1, lastSubmittedWrongIndex: 1, attemptCount: 1, finished: false, outcome: null },
+      ]);
     });
 
     it('reproduces a missed state with the correct answer revealed', () => {
