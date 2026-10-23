@@ -18,6 +18,9 @@ import {
   createInMemorySavedProgressStore,
   createLocalStorageSavedProgressStore
 } from './saved-progress.js';
+import { createToast } from './toast.js';
+
+const CANT_ADVANCE_MESSAGE = 'Answer this question to move on';
 
 /**
  * Extract the Slug from a /practice/<slug> URL path.
@@ -201,11 +204,17 @@ export function startPracticeSet(rootEl, questions, store = createInMemorySavedP
   backBtn.type = 'button';
   backBtn.className = 'schedule-action-btn';
   backBtn.textContent = '← Back';
-  // Grouped so a top-bar Next can sit beside Back, and so the status group
-  // wraps below the buttons as one unit on narrow screens.
+  // Styled like Back so the green Next below stays the main action. Grayed
+  // out via aria-disabled rather than `disabled`, so a click while it can't
+  // advance still arrives and can explain itself with a toast.
+  const topNextBtn = document.createElement('button');
+  topNextBtn.type = 'button';
+  topNextBtn.className = 'schedule-action-btn practice-top-next-btn';
+  // Grouped so the status group wraps below the buttons as one unit on
+  // narrow screens.
   const navButtons = document.createElement('div');
   navButtons.className = 'practice-nav-buttons';
-  navButtons.appendChild(backBtn);
+  navButtons.append(backBtn, topNextBtn);
   navBar.appendChild(navButtons);
 
   const status = document.createElement('div');
@@ -226,17 +235,26 @@ export function startPracticeSet(rootEl, questions, store = createInMemorySavedP
 
   const questionContainer = document.createElement('div');
 
-  // Lives below the question (where Submit was) rather than in the top nav
-  // bar, and only exists on screen once moving forward is actually allowed:
-  // the next index is navigable and there's somewhere to go (never on the
-  // summary).
+  // The green Next: takes Submit's exact slot (the widget drops Submit once
+  // the Question is finished, via callerOwnsNext) and only exists on screen
+  // once moving forward is actually allowed: the next index is navigable and
+  // there's somewhere to go (never on the summary).
   const nextBtn = document.createElement('button');
   nextBtn.type = 'button';
   nextBtn.className = 'primary-action-btn practice-next-btn';
 
+  const toast = createToast('practice-toast');
+
   rootEl.appendChild(navBar);
   rootEl.appendChild(questionContainer);
   rootEl.appendChild(nextBtn);
+  rootEl.appendChild(toast.element);
+
+  // Whether the viewed screen can move forward, from the Navigable step;
+  // there's nowhere further from the summary.
+  function canAdvance() {
+    return viewingIndex < ordered.length && isNavigable(ordered, progress, viewingIndex + 1);
+  }
 
   function updateNavControls() {
     // The viewed Question, counted in this student's order; blank on the
@@ -248,10 +266,13 @@ export function startPracticeSet(rootEl, questions, store = createInMemorySavedP
       tallyOutcomes(ordered.map((question) => progress.questions[question.id] || null)),
     );
     backBtn.disabled = !isNavigable(ordered, progress, viewingIndex - 1);
-    const canAdvance = viewingIndex < ordered.length && isNavigable(ordered, progress, viewingIndex + 1);
-    nextBtn.hidden = !canAdvance;
+    const advancing = canAdvance();
+    const onLastQuestion = viewingIndex === ordered.length - 1;
+    topNextBtn.textContent = onLastQuestion ? 'Results →' : 'Next →';
+    topNextBtn.setAttribute('aria-disabled', String(!advancing));
+    nextBtn.hidden = !advancing;
     nextBtn.textContent = '';
-    nextBtn.append(viewingIndex === ordered.length - 1 ? 'See results ' : 'Next ');
+    nextBtn.append(onLastQuestion ? 'See results ' : 'Next ');
     // Matches Submit's own "Enter ↵" key-hint pill (question-widget.js), so
     // the two primary-action buttons read as one consistent control.
     const hint = document.createElement('kbd');
@@ -292,6 +313,8 @@ export function startPracticeSet(rootEl, questions, store = createInMemorySavedP
       // appears, so arrow keys work immediately without first clicking an
       // option - the Frontier can be driven end-to-end without a mouse.
       autoFocus: true,
+      // The green Next below replaces Submit once finished.
+      callerOwnsNext: true,
       // Every pick and submit is saved, not just finishing, so a refresh
       // can't buy a free retry or lose an unsubmitted pick.
       onStateChange: (state) => {
@@ -336,6 +359,10 @@ export function startPracticeSet(rootEl, questions, store = createInMemorySavedP
 
   backBtn.onclick = () => showQuestion(viewingIndex - 1);
   nextBtn.onclick = () => showQuestion(viewingIndex + 1);
+  topNextBtn.onclick = () => {
+    if (canAdvance()) showQuestion(viewingIndex + 1);
+    else if (viewingIndex < ordered.length) toast.show(CANT_ADVANCE_MESSAGE);
+  };
 
   // Opens on the Frontier: the first unfinished Question, or the summary
   // when every Question is finished.

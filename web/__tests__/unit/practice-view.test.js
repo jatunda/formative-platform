@@ -253,7 +253,7 @@ describe('startPracticeSet (Frontier navigation)', () => {
 
     expect(root.textContent).toContain('Stem for right1');
     expect(root.textContent).toContain('Explanation for right1');
-    expect(submitBtn(root).disabled).toBe(true); // still finished, not reset
+    expect(radios(root).every((r) => r.disabled)).toBe(true); // still finished, not reset
   });
 
   it('does not allow Next to skip past the frontier while reviewing an earlier question', () => {
@@ -326,6 +326,123 @@ describe('startPracticeSet (Frontier navigation)', () => {
 
     expect(root.textContent).toContain("You're done!");
     expect(nextBtn(root).hidden).toBe(true);
+  });
+});
+
+function topNextBtn(root) {
+  return root.querySelector('.practice-nav-buttons .practice-top-next-btn');
+}
+function visibleToast(root) {
+  return root.querySelector('.practice-toast-visible');
+}
+
+describe('startPracticeSet (Next buttons)', () => {
+  let root;
+
+  beforeEach(() => {
+    root = document.createElement('div');
+    document.body.appendChild(root);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function answerCorrectly() {
+    radios(root)[0].click();
+    submitBtn(root).click();
+  }
+
+  it('replaces Submit with the green Next once the Question is finished', () => {
+    startPracticeSet(root, [{ id: 'q1', data: Q1 }, { id: 'q2', data: Q2 }]);
+    expect(submitBtn(root)).not.toBeNull();
+
+    answerCorrectly();
+
+    expect(submitBtn(root)).toBeNull();
+    expect(nextBtn(root).hidden).toBe(false);
+    expect(nextBtn(root).textContent).toContain('Enter ↵');
+  });
+
+  it('shows the green Next, not a grayed-out Submit, when revisiting a finished Question', () => {
+    startPracticeSet(root, [{ id: 'q1', data: Q1 }, { id: 'q2', data: Q2 }]);
+    answerCorrectly();
+    nextBtn(root).click();
+
+    backBtn(root).click();
+
+    expect(root.textContent).toContain('Stem for right1');
+    expect(submitBtn(root)).toBeNull();
+    expect(nextBtn(root).hidden).toBe(false);
+    expect(document.activeElement).toBe(nextBtn(root));
+  });
+
+  it('puts a top-bar Next beside Back, grayed out (but still clickable) on an unfinished Question', () => {
+    startPracticeSet(root, [{ id: 'q1', data: Q1 }, { id: 'q2', data: Q2 }]);
+
+    const top = topNextBtn(root);
+    expect(top.textContent).toBe('Next →');
+    expect(top.getAttribute('aria-disabled')).toBe('true');
+    expect(top.disabled).toBe(false);
+  });
+
+  it('enables the top-bar Next once the Question is finished, and it advances', () => {
+    startPracticeSet(root, [{ id: 'q1', data: Q1 }, { id: 'q2', data: Q2 }]);
+    answerCorrectly();
+
+    expect(topNextBtn(root).getAttribute('aria-disabled')).toBe('false');
+    topNextBtn(root).click();
+
+    expect(root.textContent).toContain('Stem for right2');
+    expect(topNextBtn(root).getAttribute('aria-disabled')).toBe('true');
+  });
+
+  it('labels the top-bar Next "Results →" on the last Question and leads to the summary', () => {
+    startPracticeSet(root, [{ id: 'q1', data: Q1 }]);
+
+    expect(topNextBtn(root).textContent).toBe('Results →');
+    answerCorrectly();
+    topNextBtn(root).click();
+
+    expect(root.textContent).toContain("You're done!");
+  });
+
+  it('labels the green Next "See results" on the last Question', () => {
+    startPracticeSet(root, [{ id: 'q1', data: Q1 }, { id: 'q2', data: Q2 }]);
+    answerCorrectly();
+    expect(nextBtn(root).textContent).toContain('Next');
+    nextBtn(root).click();
+
+    answerCorrectly();
+
+    expect(nextBtn(root).textContent).toContain('See results');
+  });
+
+  it('explains a click on the grayed-out top-bar Next with a toast that fades and does not stack', () => {
+    vi.useFakeTimers();
+    startPracticeSet(root, [{ id: 'q1', data: Q1 }, { id: 'q2', data: Q2 }]);
+
+    topNextBtn(root).click();
+    topNextBtn(root).click();
+
+    expect(root.textContent).toContain('Stem for right1'); // didn't advance
+    expect(visibleToast(root).textContent).toBe('Answer this question to move on');
+    expect(root.querySelectorAll('[role="status"]')).toHaveLength(1);
+
+    vi.advanceTimersByTime(5000);
+    expect(visibleToast(root)).toBeNull();
+  });
+
+  it('grays out the top-bar Next on the summary, with no toast on click', () => {
+    startPracticeSet(root, [{ id: 'q1', data: Q1 }]);
+    answerCorrectly();
+    nextBtn(root).click();
+
+    expect(topNextBtn(root).getAttribute('aria-disabled')).toBe('true');
+    topNextBtn(root).click();
+
+    expect(root.textContent).toContain("You're done!");
+    expect(visibleToast(root)).toBeNull();
   });
 });
 

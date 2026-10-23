@@ -3,9 +3,10 @@
 // the single-question Attempt/Outcome interaction (see CONTEXT.md's Attempt
 // and Question Outcome entries) - it does not render a "Next" control or know
 // anything about a Frontier/other questions. Advancing to a next question is
-// entirely the caller's concern: practice-view.js shows its own Next button
-// once onOutcome fires; an embedded single question in a Lesson/Page has
-// nothing further to show at all. Restoring a saved state (restoreState) is
+// entirely the caller's concern: with callerOwnsNext, practice-view.js's own
+// green Next takes Submit's slot once the Question is finished (Submit is
+// removed); an embedded single question in a Lesson/Page has nothing further
+// to show, so it keeps a grayed-out Submit. Restoring a saved state (restoreState) is
 // silent: celebration and sound only ever follow a live submit, and a
 // finished Question takes no focus even with autoFocus.
 import { renderContentItems, processInlineCode } from './content-renderer.js';
@@ -33,10 +34,10 @@ function isTypingOrActivating(target) {
  * Mount an interactive Question into containerEl.
  * @param {HTMLElement} containerEl
  * @param {{stem: Array, options: Array<{text: string, correct: boolean, explanation: string, mistakeCategory: string|null}>}} questionData
- * @param {{restoreState?: object, onOutcome?: (outcome: "firstTry"|"secondTry"|"missed") => void, onStateChange?: (state: object) => void, autoFocus?: boolean}} [options]
+ * @param {{restoreState?: object, onOutcome?: (outcome: "firstTry"|"secondTry"|"missed") => void, onStateChange?: (state: object) => void, autoFocus?: boolean, callerOwnsNext?: boolean}} [options]
  * @returns {{getState: () => object, destroy: () => void}}
  */
-export function renderQuestionWidget(containerEl, questionData, { restoreState, onOutcome, onStateChange, autoFocus } = {}) {
+export function renderQuestionWidget(containerEl, questionData, { restoreState, onOutcome, onStateChange, autoFocus, callerOwnsNext } = {}) {
   widgetCounter += 1;
   const widgetId = widgetCounter;
   // Unique per widget so radios in two embedded Questions on the same page
@@ -189,9 +190,21 @@ export function renderQuestionWidget(containerEl, questionData, { restoreState, 
 
     containerEl.appendChild(optionsEl);
 
-    // Stays mounted (grayed out via :disabled) rather than disappearing once
-    // finished, so the transition to Next reads as "this control is now
-    // done" instead of an abrupt layout jump.
+    // A finished Question with a caller-owned Next leaves Submit's slot to
+    // that Next (rendered right after this container, same box size), so
+    // nothing jumps. Without one (an embedded Question Link), Submit stays
+    // mounted, grayed out via :disabled, so finishing reads as "this
+    // control is now done" instead of an abrupt layout jump.
+    if (!(state.finished && callerOwnsNext)) containerEl.appendChild(renderSubmit());
+
+    if (hadFocus) {
+      const radios = containerEl.querySelectorAll('input[type="radio"]');
+      const toFocus = radios[state.selectedIndex];
+      if (toFocus && !toFocus.disabled) toFocus.focus();
+    }
+  }
+
+  function renderSubmit() {
     const submitBtn = document.createElement("button");
     submitBtn.type = "button";
     submitBtn.className = "primary-action-btn question-widget-submit";
@@ -203,13 +216,7 @@ export function renderQuestionWidget(containerEl, questionData, { restoreState, 
     submitBtn.title = "Submit (shortcut: Enter)";
     submitBtn.disabled = state.finished || state.selectedIndex === null;
     submitBtn.onclick = submit;
-    containerEl.appendChild(submitBtn);
-
-    if (hadFocus) {
-      const radios = containerEl.querySelectorAll('input[type="radio"]');
-      const toFocus = radios[state.selectedIndex];
-      if (toFocus && !toFocus.disabled) toFocus.focus();
-    }
+    return submitBtn;
   }
 
   document.addEventListener("keydown", handleKeydown);
