@@ -25,6 +25,17 @@ If coverage fails:
 
 Lowering `coverage.thresholds` to make a failing run pass is not an acceptable fix on its own — raising it is reserved for when coverage has genuinely improved.
 
+## Before considering any `functions/` change complete
+
+Run the link-preview function's tests (Node's built-in test runner, no emulator or network; run `npm ci` first in a fresh checkout):
+
+```
+cd functions
+npm test
+```
+
+It must exit clean. Request handling lives in `functions/preview-handler.js` as pure functions tested with an injected fake fetch; keep `index.js` a thin Cloud Functions adapter. Never deploy as part of a change.
+
 ## Agent skills
 
 ### Issue tracker

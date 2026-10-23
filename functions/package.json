@@ -1,10 +1,13 @@
 {
   "name": "functions",
-  "description": "Server-rendered link-preview metadata for /p/** Pages. See docs/adr/0004-page-rendering-and-link-previews.md.",
+  "description": "Server-rendered link-preview metadata for /p/** Pages and /practice/** Practice Sets. See docs/adr/0004-page-rendering-and-link-previews.md.",
   "engines": {
     "node": "22"
   },
   "main": "index.js",
+  "scripts": {
+    "test": "node --test"
+  },
   "dependencies": {
     "firebase-admin": "^13.4.0",
     "firebase-functions": "^6.0.0"
