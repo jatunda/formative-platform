@@ -404,23 +404,26 @@ async function readNamedPracticeSet(read) {
   const embeddedId = document.body.dataset.practiceSetId;
   const slug = getSlugFromPath(window.location.pathname)
     || new URLSearchParams(window.location.search).get('slug');
+  const readSet = async (id) => {
+    const practiceSet = id ? await read(['practiceSets', id]) : null;
+    return practiceSet ? { id, practiceSet } : null;
+  };
   const slugToId = async () => {
-    const id = slug ? await read(['practiceSetSlugIndex', slug]) : null;
+    const id = await read(['practiceSetSlugIndex', slug]);
     return typeof id === 'string' ? id : null;
   };
 
-  let id = embeddedId;
-  let practiceSet = null;
-  if (embeddedId && slug) {
-    let embeddedSet;
-    [id, embeddedSet] = await Promise.all([slugToId(), read(['practiceSets', embeddedId])]);
-    if (id === embeddedId) practiceSet = embeddedSet;
-  } else if (!embeddedId) {
-    id = await slugToId();
-  }
-  if (!id) return null;
-  if (!practiceSet) practiceSet = await read(['practiceSets', id]);
-  return practiceSet ? { id, practiceSet } : null;
+  // No Slug to check (never the case for the server shell).
+  if (!slug) return readSet(embeddedId);
+  // The ?slug= dev page: resolve first.
+  if (!embeddedId) return readSet(await slugToId());
+  // The check only confirms the embedded id, so if it fails, the embedded
+  // set is still the best answer rather than a broken page.
+  const [currentId, embeddedSet] = await Promise.all([
+    slugToId().catch(() => embeddedId),
+    readSet(embeddedId),
+  ]);
+  return currentId === embeddedId ? embeddedSet : readSet(currentId);
 }
 
 // A load this slow is worth acknowledging; a faster one shouldn't flicker.
@@ -446,13 +449,13 @@ export async function initializePage() {
 // Reads the Practice Set and its Questions, then renders it (or the
 // not-found / empty-set message) in place of the frame.
 async function loadPracticeSet(contentEl, read) {
-  const named = await readNamedPracticeSet(read);
+  const found = await readNamedPracticeSet(read);
   // No Slug, a freed Slug, or a set deleted since the Slug index was written.
-  if (!named) {
+  if (!found) {
     contentEl.textContent = PRACTICE_SET_NOT_FOUND;
     return;
   }
-  const { id: practiceSetId, practiceSet } = named;
+  const { id: practiceSetId, practiceSet } = found;
   const questionIds = practiceSet.questionIds || [];
 
   // Fetched up front, in parallel, rather than lazily per-question, so

@@ -1024,6 +1024,31 @@ describe('initializePage', () => {
     expect(fetchedPaths()).toEqual(['practiceSetSlugIndex/unit-3-review', 'practiceSets/ps1', 'questions/q1']);
   });
 
+  it('falls back to the cached id\'s Practice Set when the Slug check itself fails', async () => {
+    window.history.pushState(null, '', '/practice/unit-3-review');
+    servedShell('ps1');
+    fakeDatabase({ 'practiceSets/ps1': { title: 'T', questionIds: ['q1'] }, 'questions/q1': Q1 });
+    const base = fetchMock.getMockImplementation();
+    fetchMock.mockImplementation(async (url) => (url.includes('practiceSetSlugIndex')
+      ? { ok: false, status: 503, json: async () => null }
+      : base(url)));
+
+    await initializePage();
+
+    expect(document.getElementById('content').textContent).toContain('Stem for right1');
+  });
+
+  it('reads a deleted Practice Set only once before showing "not found"', async () => {
+    window.history.pushState(null, '', '/practice/gone');
+    servedShell('ps-deleted');
+    fakeDatabase({ 'practiceSetSlugIndex/gone': 'ps-deleted' });
+
+    await initializePage();
+
+    expect(fetchedPaths()).toEqual(['practiceSetSlugIndex/gone', 'practiceSets/ps-deleted']);
+    expect(document.getElementById('content').textContent).toBe(PRACTICE_SET_NOT_FOUND);
+  });
+
   it('shows "Practice set not found" when the Slug was freed after the shell was cached', async () => {
     window.history.pushState(null, '', '/practice/unit-3-review');
     servedShell('ps1');
