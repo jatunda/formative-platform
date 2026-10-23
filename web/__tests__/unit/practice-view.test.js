@@ -503,6 +503,172 @@ describe('startPracticeSet (Saved Progress)', () => {
   });
 });
 
+describe('startPracticeSet (question numbers and Running Score)', () => {
+  let root;
+  const Q3 = question('right3', [{ text: 'right3' }, { text: 'wrong3' }]);
+  const SET = [{ id: 'q1', data: Q1 }, { id: 'q2', data: Q2 }, { id: 'q3', data: Q3 }];
+
+  beforeEach(() => {
+    document.body.innerHTML = '';
+    root = document.createElement('div');
+    document.body.appendChild(root);
+  });
+
+  function remount(questions, store) {
+    root.remove();
+    root = document.createElement('div');
+    document.body.appendChild(root);
+    startPracticeSet(root, questions, store);
+  }
+
+  function answer(optionIndex) {
+    radios(root)[optionIndex].click();
+    submitBtn(root).click();
+  }
+
+  const questionNumber = () => root.querySelector('.practice-question-number');
+  const runningScore = () => root.querySelector('.practice-running-score').textContent;
+
+  it('shows Question 1 of M on first load', () => {
+    startPracticeSet(root, SET);
+
+    expect(questionNumber().textContent).toBe('Question 1 of 3');
+  });
+
+  it('follows the viewed Question after Next and Back, not the Frontier', () => {
+    startPracticeSet(root, SET);
+    answer(0);
+    nextBtn(root).click();
+    expect(questionNumber().textContent).toBe('Question 2 of 3');
+
+    backBtn(root).click();
+    expect(questionNumber().textContent).toBe('Question 1 of 3');
+  });
+
+  it('shows the resumed Question\'s number after a refresh', () => {
+    const store = createInMemorySavedProgressStore();
+    startPracticeSet(root, SET, store);
+    answer(0);
+
+    remount(SET, store);
+
+    expect(questionNumber().textContent).toBe('Question 2 of 3');
+  });
+
+  it('counts only Questions still in the set', () => {
+    startPracticeSet(root, [...SET, { id: 'gone', data: null }]);
+
+    expect(questionNumber().textContent).toBe('Question 1 of 3');
+  });
+
+  it('shows no question number on the summary', () => {
+    startPracticeSet(root, SET);
+    for (let i = 0; i < SET.length; i += 1) {
+      answer(0);
+      nextBtn(root).click();
+    }
+
+    expect(root.textContent).toContain("You're done!");
+    expect(questionNumber().textContent).toBe('');
+    expect(root.textContent).not.toContain('Question 3 of 3');
+  });
+
+  it('reads - / - before any Question is finished', () => {
+    startPracticeSet(root, SET);
+
+    expect(runningScore()).toBe('- / -');
+  });
+
+  it('counts only first-try correct, the moment each Question is finished', () => {
+    startPracticeSet(root, SET);
+
+    answer(0); // first-try correct
+    expect(runningScore()).toBe('1 / 1 first try · 100%');
+
+    nextBtn(root).click();
+    answer(1); // wrong once: not finished, so not counted yet
+    expect(runningScore()).toBe('1 / 1 first try · 100%');
+    answer(0); // second-try correct
+    expect(runningScore()).toBe('1 / 2 first try · 50%');
+
+    nextBtn(root).click();
+    answer(1);
+    answer(1); // missed
+    // 1/3 = 33.3%: floored, like the summary, so it never overstates.
+    expect(runningScore()).toBe('1 / 3 first try · 33%');
+  });
+
+  it('floors the percentage rather than rounding it up', () => {
+    startPracticeSet(root, SET);
+    answer(0);
+    nextBtn(root).click();
+    answer(0);
+    nextBtn(root).click();
+    answer(1);
+    answer(0);
+
+    // 2/3 = 66.7%: rounding would claim 67%.
+    expect(runningScore()).toBe('2 / 3 first try · 66%');
+  });
+
+  it('is correct straight after resuming from Saved Progress', () => {
+    const store = createInMemorySavedProgressStore();
+    startPracticeSet(root, SET, store);
+    answer(0);
+    nextBtn(root).click();
+    answer(1);
+    answer(0);
+
+    remount(SET, store);
+
+    expect(runningScore()).toBe('1 / 2 first try · 50%');
+  });
+
+  it('ignores saved answers for Questions removed from the set', () => {
+    const store = createInMemorySavedProgressStore();
+    startPracticeSet(root, SET, store);
+    answer(1);
+    answer(1); // q1 missed
+    nextBtn(root).click();
+    answer(0); // q2 first-try correct
+
+    remount([SET[1], SET[2]], store);
+
+    expect(runningScore()).toBe('1 / 1 first try · 100%');
+    expect(questionNumber().textContent).toBe('Question 2 of 2');
+  });
+
+  it('goes back to - / - after a reset', () => {
+    startPracticeSet(root, SET);
+    for (let i = 0; i < SET.length; i += 1) {
+      answer(0);
+      nextBtn(root).click();
+    }
+
+    [...root.querySelectorAll('button')].find((b) => b.textContent === 'Reset answers & start over').click();
+
+    expect(runningScore()).toBe('- / -');
+    expect(questionNumber().textContent).toBe('Question 1 of 3');
+  });
+
+  it('updates for an answer made in another tab on a Question this tab isn\'t viewing', () => {
+    const storeA = createInMemorySavedProgressStore();
+    startPracticeSet(root, SET, storeA);
+    answer(0);
+    nextBtn(root).click();
+    backBtn(root).click(); // reviewing Question 1
+
+    const otherTab = document.createElement('div');
+    document.body.appendChild(otherTab);
+    startPracticeSet(otherTab, SET, createInMemorySavedProgressStore({ sharedWith: storeA }));
+    radios(otherTab)[0].click();
+    submitBtn(otherTab).click(); // other tab finishes Question 2
+
+    expect(questionNumber().textContent).toBe('Question 1 of 3');
+    expect(runningScore()).toBe('2 / 2 first try · 100%');
+  });
+});
+
 describe('startPracticeSet (tab sync)', () => {
   const Q3 = question('right3', [{ text: 'right3' }, { text: 'wrong3' }]);
   const SET = [{ id: 'q1', data: Q1 }, { id: 'q2', data: Q2 }, { id: 'q3', data: Q3 }];

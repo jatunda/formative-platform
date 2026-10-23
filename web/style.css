@@ -1613,10 +1613,38 @@ ol.lesson-list {
 /* Practice Set student delivery (practice-view.js) */
 .practice-nav-bar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--spacing-sm);
   margin-bottom: var(--spacing-md);
+}
+
+/* Back (and later a top-bar Next) side by side. */
+.practice-nav-buttons {
+  display: flex;
+  gap: var(--spacing-sm);
+}
+
+/* Question N of M + Running Score. Tabular figures plus reserved widths
+   (sized for the widest 2-digit values) keep the bar from shifting or
+   resizing as the numbers change, including from "- / -". */
+.practice-status {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.practice-question-number {
+  min-width: 17ch;
+}
+
+.practice-running-score {
+  min-width: 24ch;
+  text-align: right;
+  color: var(--text-secondary);
 }
 
 .practice-next-btn {
@@ -1714,5 +1742,18 @@ ol.lesson-list {
   /* Same fixed-width collision as above, for the lesson title button. */
   .lesson-main-btn {
     padding: 0.3rem;
+  }
+
+  /* Phones: the question number and Running Score drop to their own full
+     row below the nav buttons instead of squeezing beside them. */
+  .practice-status {
+    order: 1;
+    flex-basis: 100%;
+    justify-content: space-between;
+  }
+
+  .practice-question-number,
+  .practice-running-score {
+    min-width: 0;
   }
 }
