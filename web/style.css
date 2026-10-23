@@ -1696,6 +1696,35 @@ ol.lesson-list {
   opacity: 0.75;
 }
 
+/* The page frame (practice-view.js's drawFrame): the title line and the
+   question area keep their usual size while empty, so nothing moves when
+   the first Question or the summary fills them in. */
+#practiceSetTitle {
+  min-height: 1.2em;
+}
+
+.practice-question-area {
+  min-height: 22rem;
+}
+
+/* Added only once loading runs past ~1 s. */
+.practice-question-area-loading {
+  border-radius: var(--radius-lg);
+  animation: practice-loading-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes practice-loading-pulse {
+  0%, 100% { background-color: transparent; }
+  50% { background-color: var(--bg-secondary); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .practice-question-area-loading {
+    animation: none;
+    background-color: var(--bg-secondary);
+  }
+}
+
 .practice-grade-card {
   display: inline-block;
   text-align: center;

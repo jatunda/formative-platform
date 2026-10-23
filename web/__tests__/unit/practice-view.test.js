@@ -3,29 +3,11 @@ import { getSlugFromPath, tallyOutcomes, summarizeOutcomes, letterGradeFor, star
 import { PRACTICE_SET_NOT_FOUND } from '../../constants.js';
 import { createInMemorySavedProgressStore } from '../../saved-progress.js';
 
-vi.mock('https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js', () => ({
-  initializeApp: () => ({}),
-  getDatabase: () => ({}),
-  connectDatabaseEmulator: () => {},
-}));
-
-const mockResolvePracticeSetSlugToId = vi.fn();
-const mockGetPracticeSetFromDB = vi.fn();
-vi.mock('../../practice-set-database-utils.js', () => ({
-  resolvePracticeSetSlugToId: (...args) => mockResolvePracticeSetSlugToId(...args),
-  getPracticeSetFromDB: (...args) => mockGetPracticeSetFromDB(...args),
-}));
-
 const mockCelebrate = vi.fn();
 const mockPlayCorrectSound = vi.fn();
 vi.mock('../../celebration.js', () => ({
   celebrate: (...args) => mockCelebrate(...args),
   playCorrectSound: (...args) => mockPlayCorrectSound(...args),
-}));
-
-const mockGetQuestionFromDB = vi.fn();
-vi.mock('../../question-database-utils.js', () => ({
-  getQuestionFromDB: (...args) => mockGetQuestionFromDB(...args),
 }));
 
 function question(correctText, options) {
@@ -867,43 +849,220 @@ describe('startPracticeSet (tab sync)', () => {
 });
 
 describe('initializePage', () => {
+  // Fake database behind the REST API: routes each fetch by its path
+  // (e.g. "practiceSets/ps1"), whichever host it targets. Absent paths
+  // read as null, as the real REST API does.
+  let db;
+  let fetchMock;
+  const pathOf = (url) => decodeURIComponent(new URL(url).pathname.replace(/^\//, '').replace(/\.json$/, ''));
+  function fakeDatabase(data) {
+    db = data;
+    fetchMock = vi.fn(async (url) => ({ ok: true, json: async () => db[pathOf(url)] ?? null }));
+    vi.stubGlobal('fetch', fetchMock);
+  }
+  const fetchedPaths = () => fetchMock.mock.calls.map(([url]) => pathOf(url));
+
+  function servedShell(practiceSetId) {
+    document.body.innerHTML = '<h1 id="practiceSetTitle"></h1><div id="content"></div>';
+    if (practiceSetId) document.body.dataset.practiceSetId = practiceSetId;
+    else delete document.body.dataset.practiceSetId;
+  }
+
   afterEach(() => {
     localStorage.clear();
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+    servedShell();
   });
 
   beforeEach(() => {
     localStorage.clear();
-    document.body.innerHTML = '<h1 id="practiceSetTitle"></h1><div id="content"></div>';
-    mockResolvePracticeSetSlugToId.mockReset();
-    mockGetPracticeSetFromDB.mockReset();
-    mockGetQuestionFromDB.mockReset();
+    servedShell();
   });
 
-  it('fetches every referenced question in parallel and renders the first one', async () => {
+  it('reads the embedded Practice Set id, then every Question, and renders the first one', async () => {
     window.history.pushState(null, '', '/practice/unit-3-review');
-    mockResolvePracticeSetSlugToId.mockResolvedValue('ps1');
-    mockGetPracticeSetFromDB.mockResolvedValue({ title: 'Unit 3 Review', questionIds: ['q1', 'q2'] });
-    mockGetQuestionFromDB.mockImplementation(async (id) => (id === 'q1' ? Q1 : Q2));
+    servedShell('ps1');
+    fakeDatabase({
+      'practiceSets/ps1': { title: 'Unit 3 Review', questionIds: ['q1', 'q2'] },
+      'questions/q1': Q1,
+      'questions/q2': Q2,
+    });
 
     await initializePage();
 
-    expect(mockGetQuestionFromDB).toHaveBeenCalledWith('q1');
-    expect(mockGetQuestionFromDB).toHaveBeenCalledWith('q2');
+    expect(fetchedPaths()).toEqual(['practiceSets/ps1', 'questions/q1', 'questions/q2']);
     expect(document.getElementById('practiceSetTitle').textContent).toBe('Unit 3 Review');
+    expect(document.getElementById('content').textContent).toContain('Stem for right1');
+  });
+
+  // Every element's tag + classes in document order, to compare layouts.
+  const layoutOf = (el) => [...el.querySelectorAll('*')].map((node) => `${node.tagName}.${node.className}`);
+
+  it('draws the frame before any read answers, laid out like the loaded top bar', async () => {
+    window.history.pushState(null, '', '/practice/unit-3-review');
+    servedShell('ps1');
+    fakeDatabase({
+      'practiceSets/ps1': { title: 'Unit 3 Review', questionIds: ['q1'] },
+      'questions/q1': Q1,
+    });
+    const base = fetchMock.getMockImplementation();
+    let answer;
+    const gate = new Promise((resolve) => { answer = resolve; });
+    fetchMock.mockImplementation(async (url) => { await gate; return base(url); });
+
+    const loading = initializePage();
+    const content = document.getElementById('content');
+
+    expect(content.textContent).toContain('Question - of -');
+    expect(content.textContent).toContain('- / -');
+    expect(backBtn(content).disabled).toBe(true);
+    expect(content.querySelector('.practice-question-area')).not.toBeNull();
+    const frameNavLayout = layoutOf(content.querySelector('.practice-nav-bar'));
+
+    answer();
+    await loading;
+
+    expect(content.textContent).toContain('Stem for right1');
+    expect(layoutOf(content.querySelector('.practice-nav-bar'))).toEqual(frameNavLayout);
+    expect(content.querySelector('.practice-question-area')).not.toBeNull();
+  });
+
+  function gatedDatabase(data) {
+    fakeDatabase(data);
+    const base = fetchMock.getMockImplementation();
+    let answer;
+    const gate = new Promise((resolve) => { answer = resolve; });
+    fetchMock.mockImplementation(async (url) => { await gate; return base(url); });
+    return answer;
+  }
+  const pulsing = () => document.querySelector('#content .practice-question-area')
+    .classList.contains('practice-question-area-loading');
+
+  it('pulses the question area only once loading runs past about a second, and stops on render', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    window.history.pushState(null, '', '/practice/unit-3-review');
+    servedShell('ps1');
+    const answer = gatedDatabase({ 'practiceSets/ps1': { title: 'T', questionIds: ['q1'] }, 'questions/q1': Q1 });
+
+    const loading = initializePage();
+    vi.advanceTimersByTime(900);
+    expect(pulsing()).toBe(false);
+    vi.advanceTimersByTime(200);
+    expect(pulsing()).toBe(true);
+
+    answer();
+    await loading;
+
+    expect(document.getElementById('content').textContent).toContain('Stem for right1');
+    expect(pulsing()).toBe(false);
+  });
+
+  it('never pulses when loading finishes within a second', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    window.history.pushState(null, '', '/practice/unit-3-review');
+    servedShell('ps1');
+    fakeDatabase({ 'practiceSets/ps1': { title: 'T', questionIds: ['q1'] }, 'questions/q1': Q1 });
+
+    await initializePage();
+    vi.advanceTimersByTime(2000);
+
+    expect(pulsing()).toBe(false);
+  });
+
+  it('stops the pulse when the message replaces the frame', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    window.history.pushState(null, '', '/practice/empty');
+    servedShell('ps1');
+    const answer = gatedDatabase({ 'practiceSets/ps1': { title: 'Empty', questionIds: [] } });
+
+    const loading = initializePage();
+    vi.advanceTimersByTime(1100);
+    answer();
+    await loading;
+
+    expect(document.getElementById('content').textContent).toBe('This practice set has no questions yet.');
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('names the tab after the live Practice Set title', async () => {
+    document.title = 'Old Title From The Cached Shell';
+    window.history.pushState(null, '', '/practice/unit-3-review');
+    servedShell('ps1');
+    fakeDatabase({ 'practiceSets/ps1': { title: 'Unit 3 Review (renamed)', questionIds: ['q1'] }, 'questions/q1': Q1 });
+
+    await initializePage();
+
+    expect(document.title).toBe('Unit 3 Review (renamed)');
+  });
+
+  it('opens a returning student straight on their Frontier, never showing Question 1 first', async () => {
+    window.history.pushState(null, '', '/practice/unit-3-review');
+    fakeDatabase({
+      'practiceSets/ps1': { title: 'T', questionIds: ['q1', 'q2'] },
+      'questions/q1': Q1,
+      'questions/q2': Q2,
+    });
+    servedShell('ps1');
+    await initializePage();
+    radios(document.getElementById('content'))[0].click();
+    submitBtn(document.getElementById('content')).click();
+
+    servedShell('ps1');
+    const content = document.getElementById('content');
+    const seen = [];
+    const observer = new MutationObserver(() => seen.push(content.textContent));
+    observer.observe(content, { childList: true, subtree: true, characterData: true });
+    await initializePage();
+    observer.disconnect();
+
+    expect(content.textContent).toContain('Stem for right2');
+    expect(seen.some((text) => text.includes('Stem for right1'))).toBe(false);
+  });
+
+  it('requests every Question at once, without waiting for any of them', async () => {
+    window.history.pushState(null, '', '/practice/unit-3-review');
+    servedShell('ps1');
+    fakeDatabase({ 'practiceSets/ps1': { title: 'T', questionIds: ['q1', 'q2', 'q3'] } });
+    const base = fetchMock.getMockImplementation();
+    const neverAnswers = new Promise(() => {});
+    fetchMock.mockImplementation((url) => (pathOf(url).startsWith('questions/') ? neverAnswers : base(url)));
+
+    initializePage();
+    await vi.waitFor(() => expect(fetchedPaths()).toHaveLength(4));
+
+    expect(fetchedPaths()).toEqual(['practiceSets/ps1', 'questions/q1', 'questions/q2', 'questions/q3']);
+  });
+
+  it('resolves the ?slug= Slug first on the local dev page, then reads the same way', async () => {
+    window.history.pushState(null, '', '/practice-set-view.html?slug=unit-3-review');
+    fakeDatabase({
+      'practiceSetSlugIndex/unit-3-review': 'ps1',
+      'practiceSets/ps1': { title: 'Unit 3 Review', questionIds: ['q1', 'q2'] },
+      'questions/q1': Q1,
+      'questions/q2': Q2,
+    });
+
+    await initializePage();
+
+    expect(fetchedPaths()).toEqual(['practiceSetSlugIndex/unit-3-review', 'practiceSets/ps1', 'questions/q1', 'questions/q2']);
     expect(document.getElementById('content').textContent).toContain('Stem for right1');
   });
 
   it('saves progress in the browser, so reloading the page resumes on the Frontier', async () => {
     window.history.pushState(null, '', '/practice/unit-3-review');
-    mockResolvePracticeSetSlugToId.mockResolvedValue('ps1');
-    mockGetPracticeSetFromDB.mockResolvedValue({ title: 'Unit 3 Review', questionIds: ['q1', 'q2'] });
-    mockGetQuestionFromDB.mockImplementation(async (id) => (id === 'q1' ? Q1 : Q2));
+    fakeDatabase({
+      'practiceSets/ps1': { title: 'Unit 3 Review', questionIds: ['q1', 'q2'] },
+      'questions/q1': Q1,
+      'questions/q2': Q2,
+    });
+    servedShell('ps1');
     await initializePage();
     const content = document.getElementById('content');
     radios(content)[0].click();
     submitBtn(content).click();
 
-    document.body.innerHTML = '<h1 id="practiceSetTitle"></h1><div id="content"></div>';
+    servedShell('ps1');
     await initializePage();
 
     expect(document.getElementById('content').textContent).toContain('Stem for right2');
@@ -911,41 +1070,54 @@ describe('initializePage', () => {
 
   it('skips a referenced question that no longer exists', async () => {
     window.history.pushState(null, '', '/practice/unit-3-review');
-    mockResolvePracticeSetSlugToId.mockResolvedValue('ps1');
-    mockGetPracticeSetFromDB.mockResolvedValue({ title: 'T', questionIds: ['q1', 'deleted-id'] });
-    mockGetQuestionFromDB.mockImplementation(async (id) => (id === 'q1' ? Q1 : null));
+    servedShell('ps1');
+    fakeDatabase({ 'practiceSets/ps1': { title: 'T', questionIds: ['deleted-id', 'q1'] }, 'questions/q1': Q1 });
 
     await initializePage();
 
     expect(document.getElementById('content').textContent).toContain('Stem for right1');
+    expect(document.getElementById('content').textContent).toContain('Question 1 of 1');
   });
 
   it('shows a message when the practice set has no questions', async () => {
     window.history.pushState(null, '', '/practice/empty');
-    mockResolvePracticeSetSlugToId.mockResolvedValue('ps1');
-    mockGetPracticeSetFromDB.mockResolvedValue({ title: 'Empty', questionIds: [] });
+    servedShell('ps1');
+    fakeDatabase({ 'practiceSets/ps1': { title: 'Empty', questionIds: [] } });
 
     await initializePage();
 
-    expect(document.getElementById('content').textContent).toContain('no questions yet');
+    expect(document.getElementById('content').textContent).toBe('This practice set has no questions yet.');
   });
 
-  it('shows "Practice set not found" when the slug does not resolve', async () => {
-    window.history.pushState(null, '', '/practice/missing');
-    mockResolvePracticeSetSlugToId.mockResolvedValue(null);
+  it('treats an embedded id whose Practice Set is gone as an empty set, keeping the tab title', async () => {
+    document.title = 'Shell Title';
+    window.history.pushState(null, '', '/practice/gone');
+    servedShell('ps-deleted');
+    fakeDatabase({});
 
     await initializePage();
 
-    expect(mockGetPracticeSetFromDB).not.toHaveBeenCalled();
+    expect(document.getElementById('content').textContent).toBe('This practice set has no questions yet.');
+    expect(document.title).toBe('Shell Title');
+  });
+
+  it('shows "Practice set not found" when the ?slug= Slug does not resolve', async () => {
+    window.history.pushState(null, '', '/practice-set-view.html?slug=missing');
+    fakeDatabase({});
+
+    await initializePage();
+
+    expect(fetchedPaths()).toEqual(['practiceSetSlugIndex/missing']);
     expect(document.getElementById('content').textContent).toBe(PRACTICE_SET_NOT_FOUND);
   });
 
-  it('shows "Practice set not found" when the path has no slug at all', async () => {
+  it('shows "Practice set not found" without reading anything when the page names no Practice Set', async () => {
     window.history.pushState(null, '', '/practice/');
+    fakeDatabase({});
 
     await initializePage();
 
-    expect(mockResolvePracticeSetSlugToId).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
     expect(document.getElementById('content').textContent).toBe(PRACTICE_SET_NOT_FOUND);
   });
 });

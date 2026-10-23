@@ -38,7 +38,7 @@ function slugFromPath(path, pattern) {
 
 // The same client-rendered shell every content page uses, with the real
 // title injected for crawlers. Every interpolated value is HTML-escaped.
-function renderShell({ title, description, script, bodyData, bodyPrefix }) {
+function renderShell({ title, description, script, bodyData, headExtra, bodyPrefix }) {
   const safeTitle = escapeHtml(title);
   const safeDescription = escapeHtml(description);
   const bodyAttrs = Object.entries(bodyData)
@@ -55,7 +55,7 @@ function renderShell({ title, description, script, bodyData, bodyPrefix }) {
   <link rel="icon" type="image/x-icon" href="/favicon.ico">
   <link rel="stylesheet" href="/style.css">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-dark.min.css" rel="stylesheet">
-  <script type="module" src="${script}"></script>
+${headExtra}  <script type="module" src="${script}"></script>
 </head>
 <body${bodyAttrs}>${bodyPrefix}
   <div id="content">
@@ -72,7 +72,7 @@ function renderShell({ title, description, script, bodyData, bodyPrefix }) {
  * index -> title -> shell. Not found (no Slug, or Slug not in the index)
  * is a 404 that is never cached.
  */
-function previewHandler({ pathPattern, slugIndex, collection, notFoundTitle, untitled, script, bodyPrefix, idDataName }) {
+function previewHandler({ pathPattern, slugIndex, collection, notFoundTitle, untitled, script, frame, idDataName }) {
   /**
    * @param {string} path request path, e.g. "/practice/unit-3"
    * @param {FetchJson} fetchJson resolves a REST URL to its parsed JSON (null if absent)
@@ -85,16 +85,17 @@ function previewHandler({ pathPattern, slugIndex, collection, notFoundTitle, unt
       return {
         status: 404,
         headers: { "Cache-Control": NOT_FOUND_CACHE_CONTROL },
-        body: renderShell({ title: notFoundTitle, description: "", script, bodyData: {}, bodyPrefix }),
+        body: renderShell({ title: notFoundTitle, description: "", script, bodyData: {}, ...frame("") }),
       };
     }
     const stored = await fetchJson(restUrl(collection, id, "title"));
-    const title = typeof stored === "string" ? stored : untitled;
+    const storedTitle = typeof stored === "string" ? stored : "";
+    const title = storedTitle || untitled;
     const bodyData = idDataName ? { [idDataName]: id } : {};
     return {
       status: 200,
       headers: { "Cache-Control": FOUND_CACHE_CONTROL },
-      body: renderShell({ title, description: title, script, bodyData, bodyPrefix }),
+      body: renderShell({ title, description: title, script, bodyData, ...frame(storedTitle) }),
     };
   };
 }
@@ -106,13 +107,16 @@ const handlePageRequest = previewHandler({
   notFoundTitle: "Page not found",
   untitled: "Untitled Page",
   script: "/page-view.js",
-  bodyPrefix: "",
+  frame: () => ({ headExtra: "", bodyPrefix: "" }),
 });
 
 // Practice Sets resolve in their own namespace (see docs/adr/0011). The
 // Practice Set id rides on <body data-practice-set-id="...">, so the browser
 // reads document.body.dataset.practiceSetId and skips the Slug lookup
 // without parsing the title. It is absent on the "not found" shell.
+// The shell also carries the page frame's title (empty when not found or
+// untitled, matching what the browser then renders, so it never jumps) and
+// a preconnect to the database host the browser reads from next.
 const handlePracticeSetRequest = previewHandler({
   pathPattern: /\/practice\/([^/]+)\/?$/,
   slugIndex: "practiceSetSlugIndex",
@@ -120,7 +124,10 @@ const handlePracticeSetRequest = previewHandler({
   notFoundTitle: "Practice set not found",
   untitled: "Untitled Practice Set",
   script: "/practice-view.js",
-  bodyPrefix: '\n  <h1 id="practiceSetTitle"></h1>',
+  frame: (frameTitle) => ({
+    headExtra: `  <link rel="preconnect" href="${DATABASE_URL}" crossorigin>\n`,
+    bodyPrefix: `\n  <h1 id="practiceSetTitle">${escapeHtml(frameTitle)}</h1>`,
+  }),
   idDataName: "practice-set-id",
 });
 
