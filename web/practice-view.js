@@ -5,14 +5,8 @@
 // Per-Question state is kept as Saved Progress in browser storage
 // (saved-progress.js), never in the database (docs/adr/0012); the Frontier
 // is derived from it on demand.
-import { db } from './firebase-config.js';
-import { initializeDatabase } from './database-handle.js';
+import { readPath } from './database-rest.js';
 import { renderQuestionWidget } from './question-widget.js';
-import {
-  resolvePracticeSetSlugToId,
-  getPracticeSetFromDB
-} from './practice-set-database-utils.js';
-import { getQuestionFromDB } from './question-database-utils.js';
 import { PRACTICE_SET_NOT_FOUND } from './constants.js';
 import {
   createInMemorySavedProgressStore,
@@ -184,20 +178,12 @@ function sameState(a, b) {
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
-/**
- * Drive the Frontier navigation controller for one Practice Set.
- * @param {HTMLElement} rootEl - mounts its own nav bar + question container into this
- * @param {Array<{id: string, data: object}>} questions - in Practice Set order
- * @param {import('./saved-progress.js').SavedProgressStore} [store] - this
- * Practice Set's Saved Progress; defaults to in-memory (nothing survives a refresh)
- */
-export function startPracticeSet(rootEl, questions, store = createInMemorySavedProgressStore()) {
-  let progress = store.load();
-  const ordered = orderQuestions(questions, progress);
-  let viewingIndex = 0;
-  let currentWidget = null;
-
-  rootEl.innerHTML = '';
+// The page frame: the top bar (Back, the top-bar Next, Question N of M,
+// the Running Score, the keyboard hint), the question area, the green Next
+// and the toast, in their loading state. initializePage draws it before any
+// read and startPracticeSet redraws the same layout, so nothing shifts when
+// the data arrives.
+function drawFrame(rootEl) {
   const navBar = document.createElement('div');
   navBar.className = 'practice-nav-bar';
   const backBtn = document.createElement('button');
@@ -233,7 +219,10 @@ export function startPracticeSet(rootEl, questions, store = createInMemorySavedP
   keyboardHint.textContent = '↑↓ to choose · Enter to continue';
   navBar.appendChild(keyboardHint);
 
+  // At its usual height even while empty (style.css), so nothing below it
+  // moves when the first Question or the summary fills it in.
   const questionContainer = document.createElement('div');
+  questionContainer.className = 'practice-question-area';
 
   // The green Next: takes Submit's exact slot (the widget drops Submit once
   // the Question is finished, via callerOwnsNext) and only exists on screen
@@ -245,10 +234,38 @@ export function startPracticeSet(rootEl, questions, store = createInMemorySavedP
 
   const toast = createToast('practice-toast');
 
+  rootEl.innerHTML = '';
   rootEl.appendChild(navBar);
   rootEl.appendChild(questionContainer);
   rootEl.appendChild(nextBtn);
   rootEl.appendChild(toast.element);
+
+  backBtn.disabled = true;
+  topNextBtn.textContent = 'Next →';
+  topNextBtn.setAttribute('aria-disabled', 'true');
+  questionNumber.textContent = 'Question - of -';
+  runningScore.textContent = formatRunningScore({ firstTry: 0, secondTry: 0, missed: 0 });
+  nextBtn.hidden = true;
+
+  return { backBtn, topNextBtn, questionNumber, runningScore, questionContainer, nextBtn, toast };
+}
+
+/**
+ * Drive the Frontier navigation controller for one Practice Set.
+ * @param {HTMLElement} rootEl - mounts its own nav bar + question container into this
+ * @param {Array<{id: string, data: object}>} questions - in Practice Set order
+ * @param {import('./saved-progress.js').SavedProgressStore} [store] - this
+ * Practice Set's Saved Progress; defaults to in-memory (nothing survives a refresh)
+ */
+export function startPracticeSet(rootEl, questions, store = createInMemorySavedProgressStore()) {
+  let progress = store.load();
+  const ordered = orderQuestions(questions, progress);
+  let viewingIndex = 0;
+  let currentWidget = null;
+
+  const {
+    backBtn, topNextBtn, questionNumber, runningScore, questionContainer, nextBtn, toast,
+  } = drawFrame(rootEl);
 
   // Whether the viewed screen can move forward, from the Navigable step;
   // there's nowhere further from the summary.
@@ -369,42 +386,66 @@ export function startPracticeSet(rootEl, questions, store = createInMemorySavedP
   showQuestion(frontierIndexOf(ordered, progress));
 }
 
-export async function initializePage() {
-  initializeDatabase(db);
-
-  const contentEl = document.getElementById('content');
-  // The production /practice/<slug> path is served by the practiceSetSSR
-  // Cloud Function, never by this static file directly - the ?slug=
-  // fallback exists so this same practice-set-view.html can be opened
-  // directly for local dev/testing, where there's no server-side rewrite to
-  // produce a /practice/<slug> path at all (mirrors page-view.js).
+// The Practice Set id: embedded in the page by the practiceSetSSR shell
+// (<body data-practice-set-id>), else resolved from the Slug - the ?slug=
+// fallback exists so practice-set-view.html can be opened directly for
+// local dev/testing, where there's no server-side shell (mirrors
+// page-view.js). Null when neither names a Practice Set.
+async function findPracticeSetId(read) {
+  const embeddedId = document.body.dataset.practiceSetId;
+  if (embeddedId) return embeddedId;
   const slug = getSlugFromPath(window.location.pathname)
     || new URLSearchParams(window.location.search).get('slug');
+  if (!slug) return null;
+  const id = await read(['practiceSetSlugIndex', slug]);
+  return typeof id === 'string' ? id : null;
+}
 
-  if (!slug) {
-    contentEl.textContent = PRACTICE_SET_NOT_FOUND;
-    return;
+// A load this slow is worth acknowledging; a faster one shouldn't flicker.
+const LOADING_PULSE_DELAY_MS = 1000;
+
+export async function initializePage() {
+  const contentEl = document.getElementById('content');
+  // REST reads, not the Firebase SDK: delivery only reads once, so it skips
+  // the SDK download and the live connection.
+  const read = (segments) => readPath(segments, { fetch, hostname: window.location.hostname });
+
+  const { questionContainer } = drawFrame(contentEl);
+  const pulseTimer = setTimeout(() => {
+    questionContainer.classList.add('practice-question-area-loading');
+  }, LOADING_PULSE_DELAY_MS);
+  try {
+    await loadPracticeSet(contentEl, read);
+  } finally {
+    clearTimeout(pulseTimer);
   }
+}
 
-  const practiceSetId = await resolvePracticeSetSlugToId(slug);
+// Reads the Practice Set and its Questions, then renders it (or the
+// not-found / empty-set message) in place of the frame.
+async function loadPracticeSet(contentEl, read) {
+  const practiceSetId = await findPracticeSetId(read);
   if (!practiceSetId) {
     contentEl.textContent = PRACTICE_SET_NOT_FOUND;
     return;
   }
 
-  const practiceSet = await getPracticeSetFromDB(practiceSetId);
+  const practiceSet = await read(['practiceSets', practiceSetId]);
   const questionIds = (practiceSet && practiceSet.questionIds) || [];
 
   // Fetched up front, in parallel, rather than lazily per-question, so
   // Frontier Back/Forward navigation is instant with no loading flicker -
   // Practice Sets are expected to be small (see the implementation plan).
-  const questionData = await Promise.all(questionIds.map((id) => getQuestionFromDB(id)));
+  const questionData = await Promise.all(questionIds.map((id) => read(['questions', id])));
   const questions = questionIds
     .map((id, index) => ({ id, data: questionData[index] }))
     .filter((question) => question.data);
 
   const titleEl = document.getElementById('practiceSetTitle');
   if (titleEl) titleEl.textContent = practiceSet?.title || '';
+  // The shell's <title> can be a day old (CDN-cached); the tab follows a
+  // rename as soon as the student loads.
+  if (practiceSet?.title) document.title = practiceSet.title;
 
   if (questions.length === 0) {
     contentEl.textContent = 'This practice set has no questions yet.';

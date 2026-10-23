@@ -52,6 +52,29 @@ test("a /practice path with no Slug gets an uncached 404 without reading the dat
   assert.equal(res.headers["Cache-Control"], "no-store");
 });
 
+test("a Practice Set shell preconnects to the database host, so the browser's first read starts sooner", async () => {
+  const found = await handlePracticeSetRequest("/practice/unit-3", foundPracticeSet());
+  const notFound = await handlePracticeSetRequest("/practice/nope", foundPracticeSet());
+  for (const res of [found, notFound]) {
+    assert.match(res.body, /<link rel="preconnect" href="https:\/\/formative-platform-default-rtdb\.firebaseio\.com" crossorigin>/);
+  }
+});
+
+test("a found Practice Set's frame already shows its title, so nothing moves when the page loads", async () => {
+  const res = await handlePracticeSetRequest("/practice/unit-3", foundPracticeSet('a < b'));
+  assert.match(res.body, /<h1 id="practiceSetTitle">a &lt; b<\/h1>/);
+});
+
+test("the not-found Practice Set shell leaves the frame's title empty", async () => {
+  const res = await handlePracticeSetRequest("/practice/nope", foundPracticeSet());
+  assert.match(res.body, /<h1 id="practiceSetTitle"><\/h1>/);
+});
+
+test("a Page shell gets no Practice Set frame or database preconnect", async () => {
+  const res = await handlePageRequest("/p/loops", foundPage());
+  assert.doesNotMatch(res.body, /practiceSetTitle|preconnect/);
+});
+
 test("a Practice Set title with <, \" and & is HTML-escaped", async () => {
   const res = await handlePracticeSetRequest("/practice/unit-3", foundPracticeSet('a < b & "c"'));
   assert.match(res.body, /<title>a &lt; b &amp; &quot;c&quot;<\/title>/);

@@ -4,10 +4,11 @@
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-app.js";
 import { getDatabase, connectDatabaseEmulator } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js";
+import { DATABASE_URL } from "./database-rest.js";
 
 // Firebase configuration
 const FIREBASE_CONFIG = {
-	databaseURL: "https://formative-platform-default-rtdb.firebaseio.com/",
+	databaseURL: DATABASE_URL,
 };
 
 // Initialize Firebase app (singleton pattern - initializeApp is idempotent)
