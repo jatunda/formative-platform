@@ -364,25 +364,49 @@ describe('renderQuestionWidget', () => {
     expect(btn.disabled).toBe(true);
   });
 
-  describe('callerOwnsNext option (Practice Set delivery)', () => {
-    it('removes Submit once finished, leaving its slot to the caller-owned Next', () => {
-      renderQuestionWidget(container, QUESTION, { callerOwnsNext: true });
+  describe('nextButton option (Practice Set delivery)', () => {
+    function callerNext() {
+      const btn = document.createElement('button');
+      btn.className = 'caller-next';
+      return btn;
+    }
+
+    it("puts the caller's Next in Submit's slot once finished, removing Submit", () => {
+      const next = callerNext();
+      renderQuestionWidget(container, QUESTION, { nextButton: next });
       radios(container)[0].click();
       expect(submitBtn(container)).not.toBeNull();
+      expect(container.contains(next)).toBe(false);
 
       submitBtn(container).click();
 
       expect(submitBtn(container)).toBeNull();
+      expect(container.querySelector('.question-widget-options').nextElementSibling).toBe(next);
     });
 
-    it('shows no Submit when restoring an already-finished Question', () => {
+    it("shows the caller's Next, not Submit, when restoring an already-finished Question", () => {
+      const next = callerNext();
       renderQuestionWidget(container, QUESTION, {
-        callerOwnsNext: true,
+        nextButton: next,
         restoreState: { selectedIndex: 0, lastSubmittedWrongIndex: null, attemptCount: 0, finished: true, outcome: 'firstTry' },
       });
 
       expect(submitBtn(container)).toBeNull();
+      expect(container.querySelector('.question-widget-options').nextElementSibling).toBe(next);
     });
+  });
+
+  it('shows an Option with no Explanation as an empty Explanation instead of failing', () => {
+    const question = {
+      ...QUESTION,
+      options: QUESTION.options.map(({ explanation: _unused, ...option }) => option),
+    };
+    renderQuestionWidget(container, question);
+    const correctIndex = question.options.findIndex((o) => o.correct);
+    radios(container)[correctIndex].click();
+
+    expect(() => submitBtn(container).click()).not.toThrow();
+    expect(container.querySelector('.question-widget-explanation').textContent).toBe('');
   });
 
   it('ignores a change event on an option once finished (defensive no-op against synthetic events)', () => {
