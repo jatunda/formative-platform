@@ -80,15 +80,24 @@ export function summarizeOutcomes(tally) {
   };
 }
 
+// letterGradeFor compares the unrounded percent (see its doc comment), so
+// rounding to the nearest percent can display e.g. "70%" next to a D badge
+// for a 69.565% score. Floor instead: a shown first-try number then never
+// implies a bracket the raw score didn't actually reach.
+const floorPercent = (p) => `${Math.floor(p)}%`;
+
+// The Running Score (see CONTEXT.md): First-Try Correct out of the
+// Questions finished so far, from the same tally as the summary.
+function formatRunningScore(tally) {
+  const finished = tally.firstTry + tally.secondTry + tally.missed;
+  if (finished === 0) return '- / -';
+  return `${tally.firstTry} / ${finished} first try · ${floorPercent((tally.firstTry / finished) * 100)}`;
+}
+
 function renderSummary(containerEl, perQuestionState, onReset) {
   const tally = tallyOutcomes(perQuestionState);
   const stats = summarizeOutcomes(tally);
   const fmt = (p) => `${Math.round(p)}%`;
-  // letterGradeFor compares the unrounded percent (see its doc comment), so
-  // rounding this one to the nearest percent can display e.g. "70%" next to
-  // a D badge for a 69.565% score. Floor instead: the shown number then
-  // never implies a bracket the raw score didn't actually reach.
-  const fmtForGrade = (p) => `${Math.floor(p)}%`;
   containerEl.innerHTML = '';
 
   const heading = document.createElement('h2');
@@ -105,7 +114,7 @@ function renderSummary(containerEl, perQuestionState, onReset) {
   gradeLetter.textContent = stats.expectedGrade;
   const gradeNote = document.createElement('div');
   gradeNote.className = 'practice-grade-note';
-  gradeNote.textContent = `Based on your first-try accuracy (${fmtForGrade(stats.firstTryPercent)}), since a test only gives you one try.`;
+  gradeNote.textContent = `Based on your first-try accuracy (${floorPercent(stats.firstTryPercent)}), since a test only gives you one try.`;
   gradeCard.append(gradeLabel, gradeLetter, gradeNote);
   containerEl.appendChild(gradeCard);
 
@@ -192,7 +201,21 @@ export function startPracticeSet(rootEl, questions, store = createInMemorySavedP
   backBtn.type = 'button';
   backBtn.className = 'schedule-action-btn';
   backBtn.textContent = '← Back';
-  navBar.appendChild(backBtn);
+  // Grouped so a top-bar Next can sit beside Back, and so the status group
+  // wraps below the buttons as one unit on narrow screens.
+  const navButtons = document.createElement('div');
+  navButtons.className = 'practice-nav-buttons';
+  navButtons.appendChild(backBtn);
+  navBar.appendChild(navButtons);
+
+  const status = document.createElement('div');
+  status.className = 'practice-status';
+  const questionNumber = document.createElement('span');
+  questionNumber.className = 'practice-question-number';
+  const runningScore = document.createElement('span');
+  runningScore.className = 'practice-running-score';
+  status.append(questionNumber, runningScore);
+  navBar.appendChild(status);
 
   // Subtle reminder that the whole Practice Set - choosing an option,
   // submitting, and advancing - is doable without a mouse.
@@ -216,6 +239,14 @@ export function startPracticeSet(rootEl, questions, store = createInMemorySavedP
   rootEl.appendChild(nextBtn);
 
   function updateNavControls() {
+    // The viewed Question, counted in this student's order; blank on the
+    // summary, where there's no current Question.
+    questionNumber.textContent = viewingIndex < ordered.length
+      ? `Question ${viewingIndex + 1} of ${ordered.length}`
+      : '';
+    runningScore.textContent = formatRunningScore(
+      tallyOutcomes(ordered.map((question) => progress.questions[question.id] || null)),
+    );
     backBtn.disabled = !isNavigable(ordered, progress, viewingIndex - 1);
     const canAdvance = viewingIndex < ordered.length && isNavigable(ordered, progress, viewingIndex + 1);
     nextBtn.hidden = !canAdvance;
@@ -296,6 +327,10 @@ export function startPracticeSet(rootEl, questions, store = createInMemorySavedP
     const viewed = ordered[viewingIndex];
     if (viewed && !sameState(previous.questions[viewed.id], incoming.questions[viewed.id])) {
       showQuestion(viewingIndex);
+    } else {
+      // The Running Score (and Next) can change even when the viewed
+      // Question didn't.
+      updateNavControls();
     }
   });
 
