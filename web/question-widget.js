@@ -8,7 +8,7 @@
 // nothing further to show at all. Restoring a saved state (restoreState) is
 // silent: celebration and sound only ever follow a live submit, and a
 // finished Question takes no focus even with autoFocus.
-import { renderContentItems } from './content-renderer.js';
+import { renderContentItems, processInlineCode } from './content-renderer.js';
 import { celebrate, playCorrectSound } from './celebration.js';
 
 // Enter-to-submit is handled at the document level, not on containerEl:
@@ -161,7 +161,13 @@ export function renderQuestionWidget(containerEl, questionData, { restoreState, 
       });
 
       label.appendChild(input);
-      label.appendChild(document.createTextNode(option.text));
+      // The shared inline formatter HTML-escapes before adding code/bold/
+      // italic/link markup, so Option text can't inject HTML. The span sits
+      // inside the <label>, so clicking formatted text still picks the radio.
+      const text = document.createElement("span");
+      text.className = "question-widget-option-text";
+      text.innerHTML = processInlineCode(option.text);
+      label.appendChild(text);
       row.appendChild(label);
 
       const isRevealedCorrect = state.finished && option.correct;
@@ -172,7 +178,7 @@ export function renderQuestionWidget(containerEl, questionData, { restoreState, 
         row.classList.add(isRevealedCorrect ? "question-widget-option-correct" : "question-widget-option-wrong");
         const explanation = document.createElement("p");
         explanation.className = "question-widget-explanation";
-        explanation.textContent = option.explanation;
+        explanation.innerHTML = processInlineCode(option.explanation);
         row.appendChild(explanation);
       } else if (isMissedWrongPick) {
         row.classList.add("question-widget-option-wrong");

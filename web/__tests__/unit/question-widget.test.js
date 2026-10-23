@@ -440,6 +440,85 @@ describe('renderQuestionWidget', () => {
     });
   });
 
+  describe('inline formatting in Options and Explanations', () => {
+    const STYLED = {
+      stem: [{ type: 'text', value: 'Which line prints hi?' }],
+      options: [
+        {
+          text: 'Use `print("hi")`, **bold**, *italic*, [docs](https://example.com)',
+          correct: true,
+          explanation: 'Right: `print` writes **output**, *see* [docs](https://example.com).',
+          mistakeCategory: null,
+        },
+        {
+          text: '`x < y && y > "z"`',
+          correct: false,
+          explanation: 'No: `echo` is **shell**, *not* [Python](https://python.org).',
+          mistakeCategory: 'misconception',
+        },
+      ],
+    };
+
+    function optionLabel(index) {
+      return container.querySelectorAll('.question-widget-option label')[index];
+    }
+
+    it('renders inline code, bold, italic and a link in an Option', () => {
+      renderQuestionWidget(container, STYLED);
+      const label = optionLabel(0);
+
+      expect(label.querySelector('code').textContent).toBe('print("hi")');
+      expect(label.querySelector('strong').textContent).toBe('bold');
+      expect(label.querySelector('em').textContent).toBe('italic');
+      const link = label.querySelector('a');
+      expect(link.textContent).toBe('docs');
+      expect(link.getAttribute('href')).toBe('https://example.com');
+      expect(label.textContent).not.toContain('`');
+      expect(label.textContent).not.toContain('**');
+    });
+
+    it('keeps <, >, & and " in Option text escaped, as literal characters', () => {
+      renderQuestionWidget(container, STYLED);
+      const code = optionLabel(1).querySelector('code');
+
+      expect(code.textContent).toBe('x < y && y > "z"');
+      expect(code.children).toHaveLength(0);
+    });
+
+    it('still selects a formatted Option by clicking its label text', () => {
+      renderQuestionWidget(container, STYLED);
+
+      optionLabel(0).querySelector('strong').click();
+
+      expect(radios(container)[0].checked).toBe(true);
+      expect(submitBtn(container).disabled).toBe(false);
+    });
+
+    it('formats a mid-retry wrong Explanation', () => {
+      renderQuestionWidget(container, STYLED);
+      radios(container)[1].click();
+      submitBtn(container).click();
+      const explanation = container.querySelector('.question-widget-explanation');
+
+      expect(explanation.querySelector('code').textContent).toBe('echo');
+      expect(explanation.querySelector('strong').textContent).toBe('shell');
+      expect(explanation.querySelector('em').textContent).toBe('not');
+      expect(explanation.querySelector('a').getAttribute('href')).toBe('https://python.org');
+    });
+
+    it('formats the revealed correct Explanation', () => {
+      renderQuestionWidget(container, STYLED);
+      radios(container)[0].click();
+      submitBtn(container).click();
+      const explanation = container.querySelector('.question-widget-explanation');
+
+      expect(explanation.querySelector('code').textContent).toBe('print');
+      expect(explanation.querySelector('strong').textContent).toBe('output');
+      expect(explanation.querySelector('em').textContent).toBe('see');
+      expect(explanation.querySelector('a').textContent).toBe('docs');
+    });
+  });
+
   describe('destroy', () => {
     it('clears the container and stops responding to further input', () => {
       const widget = renderQuestionWidget(container, QUESTION);
