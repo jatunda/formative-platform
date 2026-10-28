@@ -127,6 +127,10 @@ export function renderQuestionWidget(containerEl, questionData, { restoreState, 
     submit();
   }
 
+  function radios() {
+    return containerEl.querySelectorAll('input[type="radio"]');
+  }
+
   function markActive() {
     activeWidgetId = widgetId;
   }
@@ -145,10 +149,15 @@ export function renderQuestionWidget(containerEl, questionData, { restoreState, 
 
     const optionsEl = document.createElement("div");
     optionsEl.className = "question-widget-options";
+    // Drives the pointer cursor and hover highlight in style.css.
+    if (!state.finished) optionsEl.classList.add("question-widget-options-answering");
 
     questionData.options.forEach((option, index) => {
       const row = document.createElement("div");
       row.className = "question-widget-option";
+      // Only while answering: once finished, the green/red feedback is the
+      // whole story. style.css also lets red beat this blue mid-retry.
+      if (!state.finished && state.selectedIndex === index) row.classList.add("question-widget-option-selected");
 
       const label = document.createElement("label");
       const input = document.createElement("input");
@@ -170,6 +179,17 @@ export function renderQuestionWidget(containerEl, questionData, { restoreState, 
       text.innerHTML = processInlineCode(option.text);
       label.appendChild(text);
       row.appendChild(label);
+      // The whole box is the click target, not just the <label>: padding
+      // and a showing Explanation select too. Clicks inside the label are
+      // left to the browser (it already checks the radio), and a link in an
+      // Explanation keeps doing only its own job.
+      row.addEventListener("click", (event) => {
+        const target = /** @type {Element} */ (event.target);
+        if (state.finished || label.contains(target) || target.closest("a")) return;
+        markActive();
+        selectOption(index);
+        radios()[index].focus();
+      });
 
       const isRevealedCorrect = state.finished && option.correct;
       const isMidRetryWrong = !state.finished && state.lastSubmittedWrongIndex === index;
@@ -198,8 +218,7 @@ export function renderQuestionWidget(containerEl, questionData, { restoreState, 
     containerEl.appendChild(state.finished && nextButton ? nextButton : renderSubmit());
 
     if (hadFocus) {
-      const radios = containerEl.querySelectorAll('input[type="radio"]');
-      const toFocus = radios[state.selectedIndex];
+      const toFocus = radios()[state.selectedIndex];
       if (toFocus && !toFocus.disabled) toFocus.focus();
     }
   }
@@ -229,8 +248,7 @@ export function renderQuestionWidget(containerEl, questionData, { restoreState, 
   // behavior then takes over - arrow keys move AND select among options
   // sharing radioName. Skipped once finished (nothing left to focus into).
   if (autoFocus && !state.finished) {
-    const radios = containerEl.querySelectorAll('input[type="radio"]');
-    const toFocus = radios[state.selectedIndex] || radios[0];
+    const toFocus = radios()[state.selectedIndex] || radios()[0];
     if (toFocus) toFocus.focus({ preventScroll: true });
   }
 
