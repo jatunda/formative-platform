@@ -29,9 +29,13 @@ jobs:
       working-directory: ./web
       run: npm ci
 
-    - name: Set up AI config (gitignored, not committed - tests only need the placeholder shape)
+    - name: Lint
       working-directory: ./web
-      run: test -f ai-config.js || cp ai-config.template.js ai-config.js
+      run: npm run lint
+
+    - name: Typecheck
+      working-directory: ./web
+      run: npm run typecheck
 
     - name: Run tests
       working-directory: ./web
@@ -48,3 +52,24 @@ jobs:
         path: web/coverage/
         retention-days: 7
 
+  functions:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v7
+
+    - name: Setup Node.js 22
+      uses: actions/setup-node@v7
+      with:
+        node-version: 22.x
+        cache: 'npm'
+        cache-dependency-path: functions/package-lock.json
+
+    - name: Install dependencies
+      working-directory: ./functions
+      run: npm ci
+
+    - name: Run link-preview function tests
+      working-directory: ./functions
+      run: npm test
