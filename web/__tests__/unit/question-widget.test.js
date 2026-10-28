@@ -655,6 +655,165 @@ describe('renderQuestionWidget', () => {
     });
   });
 
+  describe('"Why is this wrong?" after finishing', () => {
+    function boxes(c) {
+      return [...c.querySelectorAll('.question-widget-option')];
+    }
+    function toggleIn(box) {
+      return box.querySelector('.question-widget-why-toggle');
+    }
+    function explanationIn(box) {
+      return box.querySelector('.question-widget-explanation');
+    }
+    function finishFirstTry() {
+      radios(container)[0].click();
+      submitBtn(container).click();
+    }
+
+    it('shows a closed toggle on every wrong Option once finished, and none on the correct one', () => {
+      renderQuestionWidget(container, QUESTION);
+      finishFirstTry();
+
+      const [correct, wrong1, wrong2] = boxes(container);
+      expect(toggleIn(correct)).toBeNull();
+      for (const box of [wrong1, wrong2]) {
+        expect(toggleIn(box).textContent).toContain('Why is this wrong?');
+        expect(toggleIn(box).getAttribute('aria-expanded')).toBe('false');
+        expect(toggleIn(box).textContent).toContain('▸');
+        expect(explanationIn(box)).toBeNull();
+      }
+      expect(explanationIn(correct).textContent).toBe('Correct, 2 + 2 is 4.');
+    });
+
+    it('shows no toggles while still answering, even mid-retry', () => {
+      renderQuestionWidget(container, QUESTION);
+      expect(container.querySelector('.question-widget-why-toggle')).toBeNull();
+
+      radios(container)[1].click();
+      submitBtn(container).click();
+
+      expect(container.querySelector('.question-widget-why-toggle')).toBeNull();
+      expect(container.textContent).toContain('Off by one.');
+    });
+
+    it("gives the student's own wrong picks a toggle too (second-try and missed)", () => {
+      renderQuestionWidget(container, QUESTION);
+      radios(container)[1].click();
+      submitBtn(container).click();
+      radios(container)[0].click();
+      submitBtn(container).click(); // secondTry
+
+      expect(toggleIn(boxes(container)[1])).not.toBeNull();
+      expect(explanationIn(boxes(container)[1])).toBeNull(); // closed again once finished
+
+      container.innerHTML = '';
+      renderQuestionWidget(container, QUESTION);
+      radios(container)[1].click();
+      submitBtn(container).click();
+      radios(container)[2].click();
+      submitBtn(container).click(); // missed
+
+      const ownPick = boxes(container)[2];
+      expect(toggleIn(ownPick)).not.toBeNull();
+      expect(ownPick.classList.contains('question-widget-option-wrong')).toBe(true); // stays red when closed
+    });
+
+    it('opens and closes an Explanation with its toggle', () => {
+      renderQuestionWidget(container, QUESTION);
+      finishFirstTry();
+
+      toggleIn(boxes(container)[1]).click();
+      const box = boxes(container)[1];
+      expect(explanationIn(box).textContent).toBe('Off by one.');
+      expect(toggleIn(box).getAttribute('aria-expanded')).toBe('true');
+      expect(toggleIn(box).textContent).toContain('▾');
+      expect(toggleIn(box).textContent).toContain('Why is this wrong?');
+      expect(document.activeElement).toBe(toggleIn(box)); // focus survives the redraw
+
+      toggleIn(boxes(container)[1]).click();
+      expect(explanationIn(boxes(container)[1])).toBeNull();
+      expect(toggleIn(boxes(container)[1]).getAttribute('aria-expanded')).toBe('false');
+    });
+
+    it('opens and closes an Explanation by clicking anywhere on the finished box', () => {
+      renderQuestionWidget(container, QUESTION);
+      finishFirstTry();
+
+      boxes(container)[2].click();
+      expect(explanationIn(boxes(container)[2]).textContent).toBe('That is concatenation, not addition.');
+
+      boxes(container)[2].querySelector('.question-widget-option-text').click();
+      expect(explanationIn(boxes(container)[2])).toBeNull();
+
+      boxes(container)[2].click();
+      explanationIn(boxes(container)[2]).click();
+      expect(explanationIn(boxes(container)[2])).toBeNull();
+    });
+
+    it('leaves a click on a link inside an open Explanation to the link', () => {
+      const question = {
+        stem: QUESTION.stem,
+        options: [QUESTION.options[0], { ...QUESTION.options[1], explanation: 'See [docs](https://example.com).' }],
+      };
+      renderQuestionWidget(container, question);
+      finishFirstTry();
+      boxes(container)[1].click();
+
+      explanationIn(boxes(container)[1]).querySelector('a').dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+
+      expect(explanationIn(boxes(container)[1])).not.toBeNull();
+    });
+
+    it('does nothing when the correct Option box is clicked', () => {
+      renderQuestionWidget(container, QUESTION);
+      finishFirstTry();
+
+      boxes(container)[0].click();
+
+      expect(explanationIn(boxes(container)[0]).textContent).toBe('Correct, 2 + 2 is 4.');
+      expect(container.querySelectorAll('.question-widget-explanation')).toHaveLength(1);
+    });
+
+    it('keeps several Explanations open at once', () => {
+      renderQuestionWidget(container, QUESTION);
+      finishFirstTry();
+
+      toggleIn(boxes(container)[1]).click();
+      toggleIn(boxes(container)[2]).click();
+
+      expect(explanationIn(boxes(container)[1])).not.toBeNull();
+      expect(explanationIn(boxes(container)[2])).not.toBeNull();
+    });
+
+    it('marks only boxes with a toggle as clickable (drives the pointer cursor and hover)', () => {
+      renderQuestionWidget(container, QUESTION);
+      const toggleable = () => boxes(container).map((b) => b.classList.contains('question-widget-option-toggleable'));
+      expect(toggleable()).toEqual([false, false, false]);
+
+      finishFirstTry();
+
+      expect(toggleable()).toEqual([false, true, true]);
+    });
+
+    it('keeps opened Explanations out of the saved state, and starts closed when redrawn', () => {
+      const states = [];
+      const widget = renderQuestionWidget(container, QUESTION, { onStateChange: (s) => states.push(s) });
+      finishFirstTry();
+      const saved = widget.getState();
+      const changesBefore = states.length;
+
+      toggleIn(boxes(container)[1]).click();
+
+      expect(widget.getState()).toEqual(saved);
+      expect(states).toHaveLength(changesBefore);
+
+      widget.destroy();
+      renderQuestionWidget(container, QUESTION, { restoreState: saved });
+      expect(toggleIn(boxes(container)[1]).getAttribute('aria-expanded')).toBe('false');
+      expect(explanationIn(boxes(container)[1])).toBeNull();
+    });
+  });
+
   describe('destroy', () => {
     it('clears the container and stops responding to further input', () => {
       const widget = renderQuestionWidget(container, QUESTION);

@@ -897,6 +897,24 @@ describe('startPracticeSet (tab sync)', () => {
     expect(document.activeElement).toBe(elsewhere);
   });
 
+  // Another tab can't change a finished Question short of a reset (which
+  // leaves no toggles), so Back/Next is the redraw that matters here.
+  describe('"Why is this wrong?" starts closed on every redraw', () => {
+    const openWhy = (tab) => tab.querySelector('.question-widget-why-toggle[aria-expanded="true"]');
+
+    it('after Next and Back', () => {
+      answer(tabA, 0);
+      tabA.querySelector('.question-widget-why-toggle').click();
+      expect(openWhy(tabA)).not.toBeNull();
+
+      nextBtn(tabA).click();
+      backBtn(tabA).click();
+
+      expect(tabA.querySelector('.question-widget-why-toggle')).not.toBeNull();
+      expect(openWhy(tabA)).toBeNull();
+    });
+  });
+
   it('a reset in one tab sends the other back to Question 1 with nothing answered', () => {
     for (let i = 0; i < SET.length; i += 1) {
       answer(tabA, 0);
