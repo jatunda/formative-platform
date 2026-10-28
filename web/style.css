@@ -417,6 +417,12 @@ textarea:focus-visible {
   overflow-wrap: normal;
 }
 
+/* Question editor's text box: full content width, like #dslInput. */
+#questionDslInput {
+  width: 100%;
+  box-sizing: border-box;
+}
+
 #dslInput:focus,
 textarea:focus {
   outline: none;
