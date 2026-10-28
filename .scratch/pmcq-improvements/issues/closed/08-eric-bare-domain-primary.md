@@ -4,7 +4,7 @@
 
 **Blocked by:** None (can be done any time; independent of every code ticket)
 
-**Status:** ready-for-agent
+**Status:** closed
 
 Steps (console labels may differ slightly):
 
@@ -19,6 +19,10 @@ Steps (console labels may differ slightly):
    ```
 6. From now on, share `mrhsieh.app/...` links. Old `www.` links keep working through the redirect.
 
-- [ ] `https://mrhsieh.app/` returns 200 directly.
-- [ ] `https://www.mrhsieh.app/...` redirects to the same path on `https://mrhsieh.app/`.
-- [ ] A Practice Set link and a `/p/` Page link both load on the bare domain.
+- [x] `https://mrhsieh.app/` returns 200 directly.
+- [x] `https://www.mrhsieh.app/...` redirects to the same path on `https://mrhsieh.app/`.
+- [x] A Practice Set link and a `/p/` Page link both load on the bare domain.
+
+## Comments
+
+Done by Eric (reported 2026-10-27): `mrhsieh.app` serves the site directly and `www.` redirects to it.

@@ -4,7 +4,7 @@
 
 **Blocked by:** 06 (slim preview function), 07 (fast load path)
 
-**Status:** ready-for-agent
+**Status:** closed
 
 Steps:
 
@@ -23,9 +23,22 @@ Steps:
 5. Record the numbers under **Comments** below.
 6. If cold run 1 is still over ~1 s: ask Claude to open the Cloudflare Worker follow-up (new ticket + ADR). If it's under: the always-on and Worker options stay closed.
 
-- [ ] Deployed. Found pages return a day-long cache header, and "not found" returns 404 with no caching.
-- [ ] Cold and warm timings recorded below.
+- [x] Deployed. Found pages return a day-long cache header, and "not found" returns 404 with no caching.
+- [x] Cold and warm timings recorded below.
 - [ ] Decision made on the Worker follow-up.
-- [ ] An edit shows up on a normal refresh.
+- [x] An edit shows up on a normal refresh.
 
 ## Comments
+
+Deployed and timed by Eric (reported 2026-10-27). Headers and the edit-on-refresh check passed.
+
+```
+practice run 1: 404 first-byte 1.884749s   (cold)
+practice run 2: 404 first-byte 0.330398s
+practice run 3: 404 first-byte 0.176749s
+p run 1: 404 first-byte 2.657357s          (cold)
+p run 2: 404 first-byte 0.175190s
+p run 3: 404 first-byte 0.155400s
+```
+
+Compared with the 2026-10-22 baseline: the `/practice` cold start went from ~2.3 s to ~1.9 s, and the `/p` cold start stayed at ~2.7 s. Warm requests are unchanged at ~0.16-0.18 s. Both cold starts are still over the ~1 s line, so by step 6 the follow-up is open. Eric hasn't yet picked between a warm instance, a plain Cloud Run service, and the Cloudflare Worker, so the "Decision made" box stays unticked. The day-long CDN cache already means far fewer requests reach a cold function.
