@@ -596,7 +596,7 @@ describe('renderQuestionWidget', () => {
         stem: QUESTION.stem,
         options: [
           QUESTION.options[0],
-          { ...QUESTION.options[1], explanation: 'See [docs](https://example.com).' },
+          { ...QUESTION.options[1], explanation: 'See [docs](#docs).' },
         ],
       };
       const widget = renderQuestionWidget(container, question);
@@ -778,7 +778,7 @@ describe('renderQuestionWidget', () => {
     it('leaves a click on a link inside an open Explanation to the link', () => {
       const question = {
         stem: QUESTION.stem,
-        options: [QUESTION.options[0], { ...QUESTION.options[1], explanation: 'See [docs](https://example.com).' }],
+        options: [QUESTION.options[0], { ...QUESTION.options[1], explanation: 'See [docs](#docs).' }],
       };
       renderQuestionWidget(container, question);
       finishFirstTry();
