@@ -564,6 +564,97 @@ describe('renderQuestionWidget', () => {
     });
   });
 
+  describe('whole Option box selects', () => {
+    function boxes(c) {
+      return [...c.querySelectorAll('.question-widget-option')];
+    }
+
+    it('selects an Option when its box is clicked outside the label, and focuses its radio', () => {
+      const widget = renderQuestionWidget(container, QUESTION);
+
+      boxes(container)[2].click();
+
+      expect(widget.getState().selectedIndex).toBe(2);
+      expect(radios(container)[2].checked).toBe(true);
+      expect(document.activeElement).toBe(radios(container)[2]);
+    });
+
+    it('selects an Option when its showing Explanation is clicked', () => {
+      const widget = renderQuestionWidget(container, QUESTION);
+      radios(container)[1].click();
+      submitBtn(container).click(); // wrong: "Off by one." shows on Option 1
+      radios(container)[2].click(); // compare against another Option
+
+      container.querySelector('.question-widget-explanation').click();
+
+      expect(widget.getState().selectedIndex).toBe(1);
+      expect(document.activeElement).toBe(radios(container)[1]);
+    });
+
+    it('leaves a click on a link inside an Explanation to the link', () => {
+      const question = {
+        stem: QUESTION.stem,
+        options: [
+          QUESTION.options[0],
+          { ...QUESTION.options[1], explanation: 'See [docs](https://example.com).' },
+        ],
+      };
+      const widget = renderQuestionWidget(container, question);
+      radios(container)[1].click();
+      submitBtn(container).click();
+      radios(container)[0].click();
+
+      container.querySelector('.question-widget-explanation a').dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+
+      expect(widget.getState().selectedIndex).toBe(0);
+    });
+
+    it('selects once (no double state change) when the label itself is clicked', () => {
+      const states = [];
+      renderQuestionWidget(container, QUESTION, { onStateChange: (s) => states.push(s) });
+
+      container.querySelectorAll('.question-widget-option-text')[1].click();
+
+      expect(states).toHaveLength(1);
+      expect(states[0].selectedIndex).toBe(1);
+    });
+
+    it('does not change the selection once the Question is finished', () => {
+      const widget = renderQuestionWidget(container, QUESTION);
+      radios(container)[0].click();
+      submitBtn(container).click();
+      const before = widget.getState();
+
+      boxes(container)[2].click();
+      container.querySelector('.question-widget-explanation').click();
+
+      expect(widget.getState()).toEqual(before);
+    });
+
+    it('marks the selected Option box, following the selection', () => {
+      renderQuestionWidget(container, QUESTION);
+      const selected = () => boxes(container).map((b) => b.classList.contains('question-widget-option-selected'));
+      expect(selected()).toEqual([false, false, false]);
+
+      boxes(container)[1].click();
+      expect(selected()).toEqual([false, true, false]);
+
+      radios(container)[2].click();
+      expect(selected()).toEqual([false, false, true]);
+    });
+
+    it('marks the widget as answering until finished (drives the pointer cursor and hover)', () => {
+      renderQuestionWidget(container, QUESTION);
+      const options = () => container.querySelector('.question-widget-options');
+      expect(options().classList.contains('question-widget-options-answering')).toBe(true);
+
+      radios(container)[0].click();
+      submitBtn(container).click();
+
+      expect(options().classList.contains('question-widget-options-answering')).toBe(false);
+    });
+  });
+
   describe('destroy', () => {
     it('clears the container and stops responding to further input', () => {
       const widget = renderQuestionWidget(container, QUESTION);
