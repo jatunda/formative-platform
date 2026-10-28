@@ -18,6 +18,6 @@
 
 ## Comments
 
-- Widget state gains `wrongPicks: number[]`, every submitted wrong Option in order. It drives both the red outline and the ✗ on a finished Question, so a Second-Try Correct's first wrong pick and both of a Missed Question's picks stay red. Saved Progress accepts it (version unchanged) and drops entries whose `wrongPicks` isn't a list of Option indexes. The widget drops restored indexes past the Option count.
-- Older saved entries without `wrongPicks` are kept. Their earlier wrong picks are unknown, so only a Missed Question's final pick gets red and a ✗, as before.
+- Widget state gains `wrongAttempts: number[]`, the Option index of every wrong Attempt in order. It drives both the red outline and the ✗ on a finished Question, so a Second-Try Correct's first wrong Attempt and both of a Missed Question's wrong Attempts stay red. Saved Progress accepts it (version unchanged) and drops entries whose `wrongAttempts` isn't a list of Option indexes. The widget drops restored indexes past the Option count.
+- Older saved entries without `wrongAttempts` are kept. The widget seeds the field once on restore: from `lastSubmittedWrongIndex` (a mid-retry entry's first wrong Attempt), plus a Missed Question's final `selectedIndex`. A mid-retry entry finished later therefore marks all its wrong Attempts; a finished Second-Try Correct's first wrong Attempt stays unknown.
 - Each mark is a `span.question-widget-mark` inside the `<label>`: the symbol is `aria-hidden`, and the text sits in a new `.visually-hidden` utility. Every box has wider right padding, and the mark is absolutely positioned in that space.
