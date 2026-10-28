@@ -65,7 +65,7 @@ _Avoid_: MCQ, quiz question — "Question" is the canonical noun; the multiple-c
 One selectable choice within a Question. Exactly one Option per Question is correct. Every Option, correct or not, carries its own Explanation; incorrect Options additionally carry a Mistake Category.
 
 **Explanation**:
-The text shown after a student picks a given Option, specific to that Option rather than the Question as a whole — a Question with four Options has four Explanations, not one. Explains why that particular choice is right, or why it's wrong.
+Text specific to one Option rather than the Question as a whole — a Question with four Options has four Explanations, not one. Explains why that particular choice is right, or why it's wrong. While a student is still answering, they see only the Explanation for the Option they just got wrong. Once the Question is finished, the correct Option's Explanation shows, and the student can open any incorrect Option's Explanation on request.
 
 **Mistake Category**:
 A short label on an incorrect Option classifying the kind of error it represents (e.g. calculation error, misconception, skill gap), recorded at authoring time alongside that Option's Explanation. Not used anywhere in the delivery flow today — it exists so a future per-student breakdown ("what kind of mistakes is this student making") doesn't require retroactively re-editing every Question.
