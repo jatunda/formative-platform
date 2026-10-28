@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { expectConsoleErrors } from '../helpers/quiet-console.js';
 import {
   getShiftMagnitude,
   initializeBulkShiftControl,
@@ -174,6 +175,7 @@ describe('lesson-planning', () => {
     });
 
     it('shows an error notification if the shift fails', async () => {
+      expectConsoleErrors();
       mockData['classes'] = { csa: { name: 'CS A', displayOrder: 1 } };
       const { getClassDateOffset } = await import('../../date-utils.js');
       const { showNotification } = await import('../../notification-utils.js');
@@ -210,6 +212,7 @@ describe('lesson-planning', () => {
     });
 
     it('shows an error state if loading classes fails', async () => {
+      expectConsoleErrors();
       document.body.innerHTML = '<div id="classPanesContainer"></div>';
       const { showErrorState } = await import('../../error-ui-utils.js');
       fetchClassesError = new Error('network down');
@@ -317,6 +320,7 @@ describe('lesson-planning', () => {
     });
 
     it('onApply shows an error notification and rethrows on failure, without reloading', async () => {
+      expectConsoleErrors();
       mockGetFullSchedule.mockResolvedValue({});
       const containerEl = document.createElement('div');
       const { setClassDateOffset } = await import('../../date-utils.js');

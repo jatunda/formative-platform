@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { expectConsoleErrors } from '../helpers/quiet-console.js';
 import { resolveDayIndex, fetchPages, loadContent, initializePage } from '../../view.js';
 import { NO_CONTENT_FOR_TODAY } from '../../constants.js';
 
@@ -167,6 +168,7 @@ describe('view', () => {
     });
 
     it('shows the generic error state if the load itself rejects', async () => {
+      expectConsoleErrors();
       window.history.pushState(null, '', '?class=class1&day=3');
       mockData['schedule/class1/3'] = new Error('network down');
       const { showErrorState } = await import('../../error-ui-utils.js');

@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { expectConsoleErrors } from '../helpers/quiet-console.js';
 import {
   setupLessonDropHandlers,
   makeDeleteDayHandler,
@@ -219,6 +220,7 @@ describe('schedule-day-view', () => {
     });
 
     it('notifies and does not reload if deleteDayAt fails', async () => {
+      expectConsoleErrors();
       mockDeleteDayAt.mockRejectedValue(new Error('boom'));
       const handler = makeDeleteDayHandler('class1', onReload);
 
@@ -241,6 +243,7 @@ describe('schedule-day-view', () => {
     });
 
     it('notifies and does not reload if insertDayAt fails', async () => {
+      expectConsoleErrors();
       mockInsertDayAt.mockRejectedValue(new Error('boom'));
       const handler = makeInsertDayHandler('class1', 5, onReload);
 

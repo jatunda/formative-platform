@@ -1,6 +1,7 @@
 {
-  // Type-checks plain JS from its JSDoc, no build step. Only files that opt in
-  // with a `// @ts-check` first line are checked; add it as modules are ready.
+  // Type-checks plain JS from its JSDoc, no build step. Every JS file is
+  // included, but with checkJs off only files whose first line is
+  // `// @ts-check` are checked, so that header alone opts a module in.
   "compilerOptions": {
     "allowJs": true,
     "checkJs": false,
@@ -13,5 +14,6 @@
     "strict": false,
     "strictNullChecks": true
   },
-  "include": ["robotics/**/*.js", "slug-index.js", "backlinks.js", "database-handle.js", "lesson-store.js", "unique-key.js", "realtime-store.js", "schedule-lessons.js", "database-rest.js", "saved-progress.js", "toast.js", "firebase-database.d.ts"]
+  "include": ["**/*.js", "firebase-database.d.ts"],
+  "exclude": ["node_modules", "coverage", "dist", "__tests__"]
 }
