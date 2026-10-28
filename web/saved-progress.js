@@ -12,7 +12,12 @@
  *   attemptCount: number,
  *   finished: boolean,
  *   outcome: "firstTry"|"secondTry"|"missed"|null,
+ *   wrongPicks?: number[],
  * }} QuestionState
+ *
+ * `wrongPicks` lists every wrong Option the student submitted, in order.
+ * Entries saved before it existed lack it; they stay valid, and the widget
+ * treats their earlier wrong picks as unknown.
  *
  * Keyed by Question id, never by position, so editing a Practice Set's list
  * leaves the Questions still in it intact. `version` lets a later shape (e.g.
@@ -53,6 +58,11 @@ function isOptionIndexOrNull(value) {
   return value === null || (Number.isInteger(value) && /** @type {number} */ (value) >= 0);
 }
 
+/** @param {unknown} value */
+function isOptionIndexList(value) {
+  return Array.isArray(value) && value.every((index) => index !== null && isOptionIndexOrNull(index));
+}
+
 /**
  * Whether a stored entry is safe to hand the question widget as restoreState.
  * @param {any} state
@@ -64,7 +74,8 @@ function isQuestionState(state) {
     && isOptionIndexOrNull(state.lastSubmittedWrongIndex)
     && Number.isInteger(state.attemptCount)
     && typeof state.finished === 'boolean'
-    && OUTCOMES.has(state.outcome);
+    && OUTCOMES.has(state.outcome)
+    && (state.wrongPicks === undefined || isOptionIndexList(state.wrongPicks));
 }
 
 /**

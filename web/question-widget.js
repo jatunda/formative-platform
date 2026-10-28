@@ -58,6 +58,10 @@ export function renderQuestionWidget(containerEl, questionData, { restoreState, 
       attemptCount: 0,
       finished: false,
       outcome: null,
+      // Every wrong Option the student submitted, in order: red with a ✗
+      // once finished. A state saved before this existed lacks it, so those
+      // earlier wrong picks are unknown (see wrongPickIndexes()).
+      wrongPicks: [],
     };
   // Wrong Options whose "Why is this wrong?" Explanation is open, once
   // finished. Lives in this widget instance only - never in getState() or
@@ -69,6 +73,15 @@ export function renderQuestionWidget(containerEl, questionData, { restoreState, 
   const optionCount = questionData.options.length;
   if (state.selectedIndex !== null && state.selectedIndex >= optionCount) state.selectedIndex = null;
   if (state.lastSubmittedWrongIndex !== null && state.lastSubmittedWrongIndex >= optionCount) state.lastSubmittedWrongIndex = null;
+  if (state.wrongPicks) state.wrongPicks = state.wrongPicks.filter((index) => index < optionCount);
+
+  // The Options to outline red with a ✗ once finished. Without a recorded
+  // list (an older saved state), only a Missed Question's final pick is
+  // known to be wrong.
+  function wrongPickIndexes() {
+    if (state.wrongPicks) return state.wrongPicks;
+    return state.outcome === "missed" ? [state.selectedIndex] : [];
+  }
 
   // Fired on every state change (a pick, not just a submit), so a caller
   // saving progress keeps a half-done Question across a refresh. Runs before
@@ -105,6 +118,7 @@ export function renderQuestionWidget(containerEl, questionData, { restoreState, 
     }
 
     state.attemptCount += 1;
+    if (state.wrongPicks) state.wrongPicks = [...state.wrongPicks, state.selectedIndex];
     if (state.attemptCount >= 2) {
       // Per CONTEXT.md's Attempt entry: the 2nd wrong Attempt auto-reveals
       // the correct Option and ends the question - it does not also show
@@ -199,7 +213,7 @@ export function renderQuestionWidget(containerEl, questionData, { restoreState, 
 
       const isRevealedCorrect = state.finished && option.correct;
       const isMidRetryWrong = !state.finished && state.lastSubmittedWrongIndex === index;
-      const isMissedWrongPick = state.finished && state.outcome === "missed" && index === state.selectedIndex && !option.correct;
+      const isFinishedWrongPick = state.finished && !option.correct && wrongPickIndexes().includes(index);
       // Once finished, every wrong Option (the student's own picks too) gets
       // a closed "Why is this wrong?" toggle; while answering there are
       // none, so the answer isn't given away.
@@ -226,10 +240,12 @@ export function renderQuestionWidget(containerEl, questionData, { restoreState, 
         radios()[index].focus();
       });
 
-      if (isRevealedCorrect || isMidRetryWrong) {
-        row.classList.add(isRevealedCorrect ? "question-widget-option-correct" : "question-widget-option-wrong");
-      } else if (isMissedWrongPick) {
+      if (isRevealedCorrect) {
+        row.classList.add("question-widget-option-correct");
+        label.appendChild(renderMark("✓", "Correct answer"));
+      } else if (isMidRetryWrong || isFinishedWrongPick) {
         row.classList.add("question-widget-option-wrong");
+        label.appendChild(renderMark("✗", "Your answer, incorrect"));
       }
 
       if (hasWhyToggle) {
@@ -271,6 +287,24 @@ export function renderQuestionWidget(containerEl, questionData, { restoreState, 
       const toFocus = radios()[state.selectedIndex];
       if (toFocus && !toFocus.disabled) toFocus.focus();
     }
+  }
+
+  // A ✓ / ✗ at the right end of an Option box, so correct and wrong don't
+  // rely on color alone. It sits in the space every box reserves for it
+  // (style.css), so the answer text never moves when it appears. Inside the
+  // <label>, so a screen reader hears it with the Option's text.
+  function renderMark(symbol, screenReaderText) {
+    const mark = document.createElement("span");
+    mark.className = "question-widget-mark";
+    const symbolEl = document.createElement("span");
+    symbolEl.className = "question-widget-mark-symbol";
+    symbolEl.setAttribute("aria-hidden", "true");
+    symbolEl.textContent = symbol;
+    const srText = document.createElement("span");
+    srText.className = "visually-hidden";
+    srText.textContent = screenReaderText;
+    mark.append(symbolEl, srText);
+    return mark;
   }
 
   function renderSubmit() {
