@@ -59,6 +59,11 @@ export function renderQuestionWidget(containerEl, questionData, { restoreState, 
       finished: false,
       outcome: null,
     };
+  // Wrong Options whose "Why is this wrong?" Explanation is open, once
+  // finished. Lives in this widget instance only - never in getState() or
+  // Saved Progress - so every redraw (Back/Next, refresh, another tab's
+  // change) starts with all of them closed.
+  const openWhyIndexes = new Set();
   // A saved state can outlive an edit that removed Options; an index past
   // the end would make submit() read a missing Option.
   const optionCount = questionData.options.length;
@@ -127,6 +132,17 @@ export function renderQuestionWidget(containerEl, questionData, { restoreState, 
     submit();
   }
 
+  function toggleWhy(index) {
+    if (openWhyIndexes.has(index)) openWhyIndexes.delete(index);
+    else openWhyIndexes.add(index);
+    render();
+    // The redraw replaced the toggle; keep keyboard users on it.
+    whyToggles[index].focus();
+  }
+
+  /** @type {HTMLButtonElement[]} filled by render(), indexed by Option */
+  let whyToggles = [];
+
   function radios() {
     return containerEl.querySelectorAll('input[type="radio"]');
   }
@@ -141,6 +157,7 @@ export function renderQuestionWidget(containerEl, questionData, { restoreState, 
     // keeps arrow-key option switching working between renders.
     const hadFocus = containerEl.contains(document.activeElement);
     containerEl.innerHTML = "";
+    whyToggles = [];
 
     const stemEl = document.createElement("div");
     stemEl.className = "question-widget-stem";
@@ -179,30 +196,63 @@ export function renderQuestionWidget(containerEl, questionData, { restoreState, 
       text.innerHTML = processInlineCode(option.text);
       label.appendChild(text);
       row.appendChild(label);
-      // The whole box is the click target, not just the <label>: padding
-      // and a showing Explanation select too. Clicks inside the label are
-      // left to the browser (it already checks the radio), and a link in an
-      // Explanation keeps doing only its own job.
+
+      const isRevealedCorrect = state.finished && option.correct;
+      const isMidRetryWrong = !state.finished && state.lastSubmittedWrongIndex === index;
+      const isMissedWrongPick = state.finished && state.outcome === "missed" && index === state.selectedIndex && !option.correct;
+      // Once finished, every wrong Option (the student's own picks too) gets
+      // a closed "Why is this wrong?" toggle; while answering there are
+      // none, so the answer isn't given away.
+      const hasWhyToggle = state.finished && !option.correct;
+      const isWhyOpen = hasWhyToggle && openWhyIndexes.has(index);
+
+      // The whole box is the click target, not just the <label>. While
+      // answering it selects: padding and a showing Explanation select too,
+      // and clicks inside the label are left to the browser (it already
+      // checks the radio). Once finished, a wrong Option's box (toggle
+      // included - its click bubbles here) opens or closes its Explanation.
+      // Either way a link in an Explanation keeps doing only its own job.
       row.addEventListener("click", (event) => {
         const target = /** @type {Element} */ (event.target);
-        if (state.finished || label.contains(target) || target.closest("a")) return;
+        if (target.closest("a")) return;
+        if (hasWhyToggle) {
+          markActive();
+          toggleWhy(index);
+          return;
+        }
+        if (state.finished || label.contains(target)) return;
         markActive();
         selectOption(index);
         radios()[index].focus();
       });
 
-      const isRevealedCorrect = state.finished && option.correct;
-      const isMidRetryWrong = !state.finished && state.lastSubmittedWrongIndex === index;
-      const isMissedWrongPick = state.finished && state.outcome === "missed" && index === state.selectedIndex && !option.correct;
-
       if (isRevealedCorrect || isMidRetryWrong) {
         row.classList.add(isRevealedCorrect ? "question-widget-option-correct" : "question-widget-option-wrong");
+      } else if (isMissedWrongPick) {
+        row.classList.add("question-widget-option-wrong");
+      }
+
+      if (hasWhyToggle) {
+        // Drives the pointer cursor and hover highlight in style.css.
+        row.classList.add("question-widget-option-toggleable");
+        const toggle = document.createElement("button");
+        toggle.type = "button";
+        toggle.className = "question-widget-why-toggle";
+        toggle.setAttribute("aria-expanded", String(isWhyOpen));
+        const arrow = document.createElement("span");
+        arrow.className = "question-widget-why-arrow";
+        arrow.setAttribute("aria-hidden", "true");
+        arrow.textContent = isWhyOpen ? "▾" : "▸";
+        toggle.append(arrow, " Why is this wrong?");
+        whyToggles[index] = toggle;
+        row.appendChild(toggle);
+      }
+
+      if (isRevealedCorrect || isMidRetryWrong || isWhyOpen) {
         const explanation = document.createElement("p");
         explanation.className = "question-widget-explanation";
         explanation.innerHTML = processInlineCode(option.explanation || '');
         row.appendChild(explanation);
-      } else if (isMissedWrongPick) {
-        row.classList.add("question-widget-option-wrong");
       }
 
       optionsEl.appendChild(row);

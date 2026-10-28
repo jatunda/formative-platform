@@ -1533,6 +1533,40 @@ ol.lesson-list {
   background-color: var(--accent-blue-hover);
 }
 
+/* Finished wrong Options: the box opens/closes "Why is this wrong?". The
+   student's own red-outlined pick keeps its border; only the fill lightens. */
+.question-widget-option-toggleable,
+.question-widget-option-toggleable label {
+  cursor: pointer;
+}
+
+.question-widget-option-toggleable:not(.question-widget-option-wrong):hover {
+  border-color: var(--text-secondary);
+  background-color: var(--accent-blue-hover);
+}
+
+.question-widget-option-toggleable.question-widget-option-wrong:hover {
+  background-color: color-mix(in srgb, var(--error-red) 20%, transparent);
+}
+
+.question-widget-why-toggle {
+  display: block;
+  width: auto;
+  margin: var(--spacing-xs) 0 0;
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--accent-blue);
+  font: inherit;
+  font-size: 0.9em;
+  cursor: pointer;
+}
+
+.question-widget-why-toggle:hover {
+  background: none;
+  text-decoration: underline;
+}
+
 .question-widget-option-selected {
   border-color: var(--accent-blue);
   background-color: color-mix(in srgb, var(--accent-blue) 15%, transparent);
