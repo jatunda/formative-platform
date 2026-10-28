@@ -37,8 +37,8 @@ Conclusion: of the ~1.9–2.7 s cold start, loading our code accounts for a few 
 
 ## Routes still open (cheapest first)
 
-1. **Bundle the function with esbuild.** Measured locally: load time ~370 ms → ~105 ms, a 1.8 MB single file. The bundled exports carry identical deploy metadata (`__endpoint`), so `firebase deploy` should treat them the same.
-   - Work: add `esbuild` as a dev dependency in `functions/`, a `build` script, point `main` at the bundle, add a `predeploy` build step to `firebase.json`'s `functions` block, and gitignore the bundle. About half an hour.
+1. **Bundle the function with esbuild.** *Built 2026-10-27; the cloud cold start hasn't been measured yet. Re-run the loop below after the next deploy and record the result here.* Measured locally: load time ~370 ms → ~105 ms, a 1.8 MB single file. The bundled exports carry identical deploy metadata (`__endpoint`), so `firebase deploy` should treat them the same.
+   - Work: add `esbuild` as a dev dependency in `functions/`, a `bundle` script (deliberately not named `build`, so Google's Cloud Build doesn't try to run it), point `main` at the bundle, add a `predeploy` build step to `firebase.json`'s `functions` block, and gitignore the bundle. About half an hour.
    - Expected saving: probably ~0.3–0.8 s off a cold start. This is an estimate scaled from local timings; it hasn't been measured in the cloud. On its own it won't get under 1 s.
 2. **Startup CPU boost.** 2nd-gen functions run as Cloud Run services, and Cloud Run can give extra CPU only while an instance starts. Unverified:
    - whether it's already on (Google Cloud console → Cloud Run → service `pagessr` / `practicesetssr` → Edit → "Startup CPU boost");

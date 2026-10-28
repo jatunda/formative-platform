@@ -19,3 +19,5 @@ The function is also slimmed to plain REST reads instead of `firebase-admin`, to
 ## Update (2026-10-27): slimmed function measured; ~2 s cold start accepted for now
 
 After the slimmed function deployed, cold starts measured ~1.9 s (`/practice`) and ~2.7 s (`/p`), still over the ~1 s line set above. Our code no longer uses `firebase-admin`, but `firebase-functions` still loads it at startup, so most of the cold start is Google starting the container and Node, not our code. Because the shell is now CDN-cached for a day, students rarely pay a cold start, so we accepted it rather than move to a Cloudflare Worker now. What was measured, which options were ruled out, and the remaining options (bundling, a merged function with a warm instance, the Worker) are in `.scratch/preview-function-cold-start/notes.md`.
+
+Later the same day, the function was bundled with esbuild (`functions/bundle.js`, run by the `firebase.json` predeploy hook), the first and cheapest of those remaining options. Locally that cut loading from ~370 ms to ~105 ms. Its effect on the cloud cold start is still to be measured after the next deploy.

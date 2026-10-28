@@ -34,7 +34,7 @@ cd functions
 npm test
 ```
 
-It must exit clean. Request handling lives in `functions/preview-handler.js` as pure functions tested with an injected fake fetch; keep `index.js` a thin Cloud Functions adapter. Never deploy as part of a change.
+It must exit clean. Request handling lives in `functions/preview-handler.js` as pure functions tested with an injected fake fetch; keep `index.js` a thin Cloud Functions adapter. What deploys is the esbuild bundle of `index.js` (`functions/bundle.js` → `functions/dist/index.js`, built by the `firebase.json` predeploy hook); `test/bundle.test.js` builds it and checks it answers like the source. Never deploy as part of a change.
 
 ## Agent skills
 

@@ -63,6 +63,8 @@ Note: `>>>` and `<<<` inside code blocks are treated as literal text, not collap
 1. run `npm run build` to run the build script
 1. in root, `firebase deploy`
 
+`firebase deploy` bundles the link-preview function first (`functions/bundle.js`, which writes `functions/dist/index.js`). The Functions emulator runs that bundle, not the source, so run `npm --prefix functions run bundle` before starting it, and again after editing anything in `functions/`. Otherwise it keeps serving the old code.
+
 ## Testing
 
 The project uses [Vitest](https://vitest.dev/) for unit testing. Tests are located in the `web/__tests__/` directory.
