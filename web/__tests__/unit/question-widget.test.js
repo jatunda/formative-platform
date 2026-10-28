@@ -338,8 +338,8 @@ describe('renderQuestionWidget', () => {
       submitBtn(container).click();
 
       expect(changes).toEqual([
-        { selectedIndex: 1, lastSubmittedWrongIndex: null, attemptCount: 0, finished: false, outcome: null },
-        { selectedIndex: 1, lastSubmittedWrongIndex: 1, attemptCount: 1, finished: false, outcome: null },
+        { selectedIndex: 1, lastSubmittedWrongIndex: null, attemptCount: 0, finished: false, outcome: null, wrongPicks: [] },
+        { selectedIndex: 1, lastSubmittedWrongIndex: 1, attemptCount: 1, finished: false, outcome: null, wrongPicks: [1] },
       ]);
     });
 
@@ -811,6 +811,145 @@ describe('renderQuestionWidget', () => {
       renderQuestionWidget(container, QUESTION, { restoreState: saved });
       expect(toggleIn(boxes(container)[1]).getAttribute('aria-expanded')).toBe('false');
       expect(explanationIn(boxes(container)[1])).toBeNull();
+    });
+  });
+
+  describe("the student's wrong picks", () => {
+    function boxes(c) {
+      return [...c.querySelectorAll('.question-widget-option')];
+    }
+    function isRed(box) {
+      return box.classList.contains('question-widget-option-wrong');
+    }
+    function pickAndSubmit(index) {
+      radios(container)[index].click();
+      submitBtn(container).click();
+    }
+
+    it('records every submitted wrong pick in the state', () => {
+      const widget = renderQuestionWidget(container, QUESTION);
+      expect(widget.getState().wrongPicks).toEqual([]);
+
+      pickAndSubmit(1);
+      expect(widget.getState().wrongPicks).toEqual([1]);
+
+      pickAndSubmit(2);
+      expect(widget.getState().wrongPicks).toEqual([1, 2]);
+    });
+
+    it('keeps the first wrong pick outlined red on a Second-Try Correct', () => {
+      renderQuestionWidget(container, QUESTION);
+      pickAndSubmit(1);
+      pickAndSubmit(0);
+
+      expect(boxes(container).map(isRed)).toEqual([false, true, false]);
+    });
+
+    it('keeps both wrong picks outlined red on a Missed Question', () => {
+      renderQuestionWidget(container, QUESTION);
+      pickAndSubmit(1);
+      pickAndSubmit(2);
+
+      expect(boxes(container).map(isRed)).toEqual([false, true, true]);
+    });
+
+    it('keeps the wrong picks red when a finished Question is restored', () => {
+      const restoreState = { selectedIndex: 0, lastSubmittedWrongIndex: null, attemptCount: 1, finished: true, outcome: 'secondTry', wrongPicks: [2] };
+      renderQuestionWidget(container, QUESTION, { restoreState });
+
+      expect(boxes(container).map(isRed)).toEqual([false, false, true]);
+    });
+
+    it('falls back to only the final pick on a Missed Question saved before wrong picks were recorded', () => {
+      const restoreState = { selectedIndex: 2, lastSubmittedWrongIndex: null, attemptCount: 2, finished: true, outcome: 'missed' };
+      const widget = renderQuestionWidget(container, QUESTION, { restoreState });
+
+      expect(boxes(container).map(isRed)).toEqual([false, false, true]);
+      expect(widget.getState().wrongPicks).toBeUndefined();
+    });
+
+    it('drops saved wrong picks that no longer point at an Option (the Question was edited)', () => {
+      const restoreState = { selectedIndex: 0, lastSubmittedWrongIndex: null, attemptCount: 1, finished: true, outcome: 'secondTry', wrongPicks: [7, 1] };
+      const widget = renderQuestionWidget(container, QUESTION, { restoreState });
+
+      expect(widget.getState().wrongPicks).toEqual([1]);
+      expect(boxes(container).map(isRed)).toEqual([false, true, false]);
+    });
+  });
+
+  describe('✓ / ✗ marks', () => {
+    // One entry per Option box: '✓', '✗', or '' for no mark.
+    function marks(c) {
+      return [...c.querySelectorAll('.question-widget-option')].map((box) => {
+        const symbol = box.querySelector('.question-widget-mark-symbol');
+        return symbol ? symbol.textContent : '';
+      });
+    }
+    function pickAndSubmit(index) {
+      radios(container)[index].click();
+      submitBtn(container).click();
+    }
+
+    it('shows no marks before any submit, even with an Option picked', () => {
+      renderQuestionWidget(container, QUESTION);
+      expect(marks(container)).toEqual(['', '', '']);
+
+      radios(container)[1].click();
+      expect(marks(container)).toEqual(['', '', '']);
+    });
+
+    it('marks the mid-retry wrong pick with a ✗, and nothing else yet', () => {
+      renderQuestionWidget(container, QUESTION);
+      pickAndSubmit(1);
+      expect(marks(container)).toEqual(['', '✗', '']);
+
+      radios(container)[2].click(); // comparing another Option keeps the ✗ on the submitted one
+      expect(marks(container)).toEqual(['', '✗', '']);
+    });
+
+    it('marks only the correct Option on a First-Try Correct', () => {
+      renderQuestionWidget(container, QUESTION);
+      pickAndSubmit(0);
+      expect(marks(container)).toEqual(['✓', '', '']);
+    });
+
+    it('marks the correct Option and the first wrong pick on a Second-Try Correct', () => {
+      renderQuestionWidget(container, QUESTION);
+      pickAndSubmit(2);
+      pickAndSubmit(0);
+      expect(marks(container)).toEqual(['✓', '', '✗']);
+    });
+
+    it('marks the correct Option and both wrong picks on a Missed Question', () => {
+      renderQuestionWidget(container, QUESTION);
+      pickAndSubmit(1);
+      pickAndSubmit(2);
+      expect(marks(container)).toEqual(['✓', '✗', '✗']);
+    });
+
+    it('marks only the final wrong pick on a Missed Question saved before wrong picks were recorded', () => {
+      const restoreState = { selectedIndex: 2, lastSubmittedWrongIndex: null, attemptCount: 2, finished: true, outcome: 'missed' };
+      renderQuestionWidget(container, QUESTION, { restoreState });
+      expect(marks(container)).toEqual(['✓', '', '✗']);
+    });
+
+    it('gives each mark screen-reader text and hides the symbol from screen readers', () => {
+      renderQuestionWidget(container, QUESTION);
+      pickAndSubmit(1);
+      pickAndSubmit(0);
+
+      const [correct, wrong] = container.querySelectorAll('.question-widget-mark');
+      expect(correct.querySelector('.question-widget-mark-symbol').getAttribute('aria-hidden')).toBe('true');
+      expect(correct.querySelector('.visually-hidden').textContent).toBe('Correct answer');
+      expect(wrong.querySelector('.question-widget-mark-symbol').getAttribute('aria-hidden')).toBe('true');
+      expect(wrong.querySelector('.visually-hidden').textContent).toBe('Your answer, incorrect');
+    });
+
+    it("keeps the radio on the student's final pick", () => {
+      renderQuestionWidget(container, QUESTION);
+      pickAndSubmit(1);
+      pickAndSubmit(2);
+      expect(radios(container).map((r) => r.checked)).toEqual([false, false, true]);
     });
   });
 
