@@ -27,4 +27,4 @@
 - Open/closed state is a Set inside the widget instance (never in getState()/Saved Progress), so every remount starts closed. Another tab can't change a finished Question short of a reset, so Back/Next is the controller-level redraw covered in practice-view.test.js.
 - Row structure: label, then (finished wrong Options) button.question-widget-why-toggle[aria-expanded] with span.question-widget-why-arrow, then the optional p.question-widget-explanation. Toggleable boxes carry .question-widget-option-toggleable.
 - A Second-Try Correct's first wrong pick isn't in the saved state, so only a Missed Question's last pick stays outlined red (unchanged from before).
-- Closed in ticket 04: the widget now records every wrong pick (`wrongPicks`), so the student's own wrong picks stay outlined red on a Second-Try Correct and a Missed Question.
+- Closed in ticket 04: the widget now records every wrong pick (`wrongAttempts`), so the student's own wrong picks stay outlined red on a Second-Try Correct and a Missed Question.

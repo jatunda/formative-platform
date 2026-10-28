@@ -1321,6 +1321,19 @@ ol.lesson-list {
   100% { background-position: -200% 0; }
 }
 
+/* Read by screen readers, not shown. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 /* ========================================
    Error Display
    ======================================== */
@@ -1514,37 +1527,37 @@ ol.lesson-list {
 
 /* The whole box is the click target (question-widget.js). Every state keeps
    a 2px border so switching states never shifts the text. Rule order is the
-   precedence: selected blue, then green/red feedback, which always wins. */
+   precedence: selected blue, then green/red feedback, which always wins.
+   The wider right padding reserves the ✓ / ✗ mark's space from the start,
+   so long Option text wraps the same before and after a mark appears; the
+   mark and the celebration's confetti are positioned against this box. */
 .question-widget-option {
+  position: relative;
   border: 2px solid var(--border-color);
   border-radius: var(--radius-md);
   padding: var(--spacing-md);
+  padding-right: calc(var(--spacing-md) + 1.75em);
   margin-bottom: var(--spacing-sm);
   transition: background-color var(--transition-fast), border-color var(--transition-fast);
 }
 
+/* Clickable boxes: any box while answering, and once finished, a wrong
+   Option's box, which opens/closes "Why is this wrong?". */
 .question-widget-options-answering .question-widget-option,
-.question-widget-options-answering .question-widget-option label {
-  cursor: pointer;
-}
-
-.question-widget-options-answering .question-widget-option:not(.question-widget-option-selected):not(.question-widget-option-wrong):hover {
-  border-color: var(--text-secondary);
-  background-color: var(--accent-blue-hover);
-}
-
-/* Finished wrong Options: the box opens/closes "Why is this wrong?". The
-   student's own red-outlined pick keeps its border; only the fill lightens. */
+.question-widget-options-answering .question-widget-option label,
 .question-widget-option-toggleable,
 .question-widget-option-toggleable label {
   cursor: pointer;
 }
 
+.question-widget-options-answering .question-widget-option:not(.question-widget-option-selected):not(.question-widget-option-wrong):hover,
 .question-widget-option-toggleable:not(.question-widget-option-wrong):hover {
   border-color: var(--text-secondary);
   background-color: var(--accent-blue-hover);
 }
 
+/* The student's own red-outlined wrong Attempt keeps its border once
+   finished; only the fill lightens. */
 .question-widget-option-toggleable.question-widget-option-wrong:hover {
   background-color: color-mix(in srgb, var(--error-red) 20%, transparent);
 }
@@ -1593,14 +1606,8 @@ ol.lesson-list {
   color: var(--text-secondary);
 }
 
-/* ✓ / ✗ marks (question-widget.js): every box reserves the right-end space
-   from the start (wider right padding), so long Option text wraps the same
-   before and after a mark appears. The mark sits absolutely in that space,
-   against the box's position: relative (see the celebration rule below). */
-.question-widget-option {
-  padding-right: calc(var(--spacing-md) + 1.75em);
-}
-
+/* ✓ / ✗ marks (question-widget.js): absolutely positioned in the right-end
+   space every .question-widget-option reserves. */
 .question-widget-mark {
   position: absolute;
   top: var(--spacing-md);
@@ -1617,19 +1624,6 @@ ol.lesson-list {
 
 .question-widget-option-wrong .question-widget-mark {
   color: var(--error-red);
-}
-
-/* Read by screen readers, not shown. */
-.visually-hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
 }
 
 /* Primary action button: Submit (question-widget.js) and Next
@@ -1672,10 +1666,6 @@ ol.lesson-list {
 }
 
 /* Correct-answer celebration (celebration.js) */
-.question-widget-option {
-  position: relative;
-}
-
 .question-widget-celebrate {
   animation: question-widget-pop 0.45s ease-out;
 }

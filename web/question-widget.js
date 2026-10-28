@@ -30,6 +30,14 @@ function isTypingOrActivating(target) {
   return target.tagName === 'INPUT' && target.type !== 'radio';
 }
 
+// The wrong Attempts a state saved without wrongAttempts can still vouch
+// for, in order.
+function legacyWrongAttempts({ lastSubmittedWrongIndex, outcome, selectedIndex }) {
+  const known = lastSubmittedWrongIndex === null ? [] : [lastSubmittedWrongIndex];
+  if (outcome === "missed" && !known.includes(selectedIndex)) known.push(selectedIndex);
+  return known;
+}
+
 /**
  * Mount an interactive Question into containerEl.
  * @param {HTMLElement} containerEl
@@ -52,36 +60,30 @@ export function renderQuestionWidget(containerEl, questionData, { restoreState, 
       // (before the question is finished). Distinct from selectedIndex and
       // deliberately sticky: picking a *different* option afterward, to
       // compare it, doesn't clear this - the Explanation for the
-      // already-submitted wrong pick stays up until an actual resubmission
+      // already-submitted wrong Attempt stays up until an actual resubmission
       // (submit()) replaces or clears it.
       lastSubmittedWrongIndex: null,
       attemptCount: 0,
       finished: false,
       outcome: null,
-      // Every wrong Option the student submitted, in order: red with a ✗
-      // once finished. A state saved before this existed lacks it, so those
-      // earlier wrong picks are unknown (see wrongPickIndexes()).
-      wrongPicks: [],
+      // The Option index of every wrong Attempt, in order: red with a ✗
+      // once finished. A state saved before this existed is seeded below.
+      wrongAttempts: [],
     };
   // Wrong Options whose "Why is this wrong?" Explanation is open, once
   // finished. Lives in this widget instance only - never in getState() or
   // Saved Progress - so every redraw (Back/Next, refresh, another tab's
   // change) starts with all of them closed.
   const openWhyIndexes = new Set();
+  // A state saved before wrongAttempts existed still knows some of them: a
+  // mid-retry entry's first wrong Attempt, and a Missed Question's final one.
+  if (!state.wrongAttempts) state.wrongAttempts = legacyWrongAttempts(state);
   // A saved state can outlive an edit that removed Options; an index past
   // the end would make submit() read a missing Option.
   const optionCount = questionData.options.length;
   if (state.selectedIndex !== null && state.selectedIndex >= optionCount) state.selectedIndex = null;
   if (state.lastSubmittedWrongIndex !== null && state.lastSubmittedWrongIndex >= optionCount) state.lastSubmittedWrongIndex = null;
-  if (state.wrongPicks) state.wrongPicks = state.wrongPicks.filter((index) => index < optionCount);
-
-  // The Options to outline red with a ✗ once finished. Without a recorded
-  // list (an older saved state), only a Missed Question's final pick is
-  // known to be wrong.
-  function wrongPickIndexes() {
-    if (state.wrongPicks) return state.wrongPicks;
-    return state.outcome === "missed" ? [state.selectedIndex] : [];
-  }
+  state.wrongAttempts = state.wrongAttempts.filter((index) => index < optionCount);
 
   // Fired on every state change (a pick, not just a submit), so a caller
   // saving progress keeps a half-done Question across a refresh. Runs before
@@ -118,11 +120,11 @@ export function renderQuestionWidget(containerEl, questionData, { restoreState, 
     }
 
     state.attemptCount += 1;
-    if (state.wrongPicks) state.wrongPicks = [...state.wrongPicks, state.selectedIndex];
+    state.wrongAttempts = [...state.wrongAttempts, state.selectedIndex];
     if (state.attemptCount >= 2) {
       // Per CONTEXT.md's Attempt entry: the 2nd wrong Attempt auto-reveals
       // the correct Option and ends the question - it does not also show
-      // this 2nd wrong pick's own Explanation first.
+      // this 2nd wrong Attempt's own Explanation first.
       state.finished = true;
       state.outcome = "missed";
       state.lastSubmittedWrongIndex = null;
@@ -146,16 +148,19 @@ export function renderQuestionWidget(containerEl, questionData, { restoreState, 
     submit();
   }
 
+  /** @type {HTMLButtonElement[]} filled by render(), indexed by Option */
+  let whyToggles = [];
+
   function toggleWhy(index) {
+    // Only a keyboard activation leaves focus on the toggle; a mouse click
+    // elsewhere on the box shouldn't pull focus to it.
+    const toggleHadFocus = document.activeElement === whyToggles[index];
     if (openWhyIndexes.has(index)) openWhyIndexes.delete(index);
     else openWhyIndexes.add(index);
     render();
     // The redraw replaced the toggle; keep keyboard users on it.
-    whyToggles[index].focus();
+    if (toggleHadFocus) whyToggles[index].focus();
   }
-
-  /** @type {HTMLButtonElement[]} filled by render(), indexed by Option */
-  let whyToggles = [];
 
   function radios() {
     return containerEl.querySelectorAll('input[type="radio"]');
@@ -180,7 +185,8 @@ export function renderQuestionWidget(containerEl, questionData, { restoreState, 
 
     const optionsEl = document.createElement("div");
     optionsEl.className = "question-widget-options";
-    // Drives the pointer cursor and hover highlight in style.css.
+    // Drives the pointer cursor and hover highlight in style.css (as
+    // -option-toggleable does for a finished wrong Option).
     if (!state.finished) optionsEl.classList.add("question-widget-options-answering");
 
     questionData.options.forEach((option, index) => {
@@ -213,10 +219,10 @@ export function renderQuestionWidget(containerEl, questionData, { restoreState, 
 
       const isRevealedCorrect = state.finished && option.correct;
       const isMidRetryWrong = !state.finished && state.lastSubmittedWrongIndex === index;
-      const isFinishedWrongPick = state.finished && !option.correct && wrongPickIndexes().includes(index);
-      // Once finished, every wrong Option (the student's own picks too) gets
-      // a closed "Why is this wrong?" toggle; while answering there are
-      // none, so the answer isn't given away.
+      const isFinishedWrongAttempt = state.finished && !option.correct && state.wrongAttempts.includes(index);
+      // Once finished, every wrong Option (the student's own wrong Attempts
+      // too) gets a closed "Why is this wrong?" toggle; while answering
+      // there are none, so the answer isn't given away.
       const hasWhyToggle = state.finished && !option.correct;
       const isWhyOpen = hasWhyToggle && openWhyIndexes.has(index);
 
@@ -243,13 +249,12 @@ export function renderQuestionWidget(containerEl, questionData, { restoreState, 
       if (isRevealedCorrect) {
         row.classList.add("question-widget-option-correct");
         label.appendChild(renderMark("✓", "Correct answer"));
-      } else if (isMidRetryWrong || isFinishedWrongPick) {
+      } else if (isMidRetryWrong || isFinishedWrongAttempt) {
         row.classList.add("question-widget-option-wrong");
         label.appendChild(renderMark("✗", "Your answer, incorrect"));
       }
 
       if (hasWhyToggle) {
-        // Drives the pointer cursor and hover highlight in style.css.
         row.classList.add("question-widget-option-toggleable");
         const toggle = document.createElement("button");
         toggle.type = "button";

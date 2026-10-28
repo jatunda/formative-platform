@@ -134,7 +134,7 @@ describe('renderQuestionWidget', () => {
       expect(container.textContent).not.toContain('That is concatenation, not addition.');
     });
 
-    it('marks the last wrong pick visually wrong alongside the revealed correct answer', () => {
+    it('marks the last wrong Attempt visually wrong alongside the revealed correct answer', () => {
       renderQuestionWidget(container, QUESTION);
 
       radios(container)[1].click();
@@ -338,8 +338,8 @@ describe('renderQuestionWidget', () => {
       submitBtn(container).click();
 
       expect(changes).toEqual([
-        { selectedIndex: 1, lastSubmittedWrongIndex: null, attemptCount: 0, finished: false, outcome: null, wrongPicks: [] },
-        { selectedIndex: 1, lastSubmittedWrongIndex: 1, attemptCount: 1, finished: false, outcome: null, wrongPicks: [1] },
+        { selectedIndex: 1, lastSubmittedWrongIndex: null, attemptCount: 0, finished: false, outcome: null, wrongAttempts: [] },
+        { selectedIndex: 1, lastSubmittedWrongIndex: 1, attemptCount: 1, finished: false, outcome: null, wrongAttempts: [1] },
       ]);
     });
 
@@ -696,7 +696,7 @@ describe('renderQuestionWidget', () => {
       expect(container.textContent).toContain('Off by one.');
     });
 
-    it("gives the student's own wrong picks a toggle too (second-try and missed)", () => {
+    it("gives the student's own wrong Attempts a toggle too (second-try and missed)", () => {
       renderQuestionWidget(container, QUESTION);
       radios(container)[1].click();
       submitBtn(container).click();
@@ -728,11 +728,36 @@ describe('renderQuestionWidget', () => {
       expect(toggleIn(box).getAttribute('aria-expanded')).toBe('true');
       expect(toggleIn(box).textContent).toContain('▾');
       expect(toggleIn(box).textContent).toContain('Why is this wrong?');
-      expect(document.activeElement).toBe(toggleIn(box)); // focus survives the redraw
 
       toggleIn(boxes(container)[1]).click();
       expect(explanationIn(boxes(container)[1])).toBeNull();
       expect(toggleIn(boxes(container)[1]).getAttribute('aria-expanded')).toBe('false');
+    });
+
+    it('keeps keyboard focus on a toggle activated from the keyboard', () => {
+      renderQuestionWidget(container, QUESTION);
+      finishFirstTry();
+
+      toggleIn(boxes(container)[1]).focus();
+      toggleIn(boxes(container)[1]).click(); // Enter/Space on a focused button fires click
+
+      expect(document.activeElement).toBe(toggleIn(boxes(container)[1]));
+    });
+
+    it('leaves focus alone when a finished box is clicked with the mouse', () => {
+      const elsewhere = document.createElement('button');
+      document.body.appendChild(elsewhere);
+      renderQuestionWidget(container, QUESTION);
+      finishFirstTry();
+      elsewhere.focus();
+
+      boxes(container)[1].click();
+      expect(explanationIn(boxes(container)[1])).not.toBeNull();
+      expect(document.activeElement).toBe(elsewhere);
+
+      boxes(container)[2].querySelector('.question-widget-option-text').click();
+      expect(document.activeElement).toBe(elsewhere);
+      elsewhere.remove();
     });
 
     it('opens and closes an Explanation by clicking anywhere on the finished box', () => {
@@ -814,7 +839,7 @@ describe('renderQuestionWidget', () => {
     });
   });
 
-  describe("the student's wrong picks", () => {
+  describe("the student's wrong Attempts", () => {
     function boxes(c) {
       return [...c.querySelectorAll('.question-widget-option')];
     }
@@ -826,18 +851,18 @@ describe('renderQuestionWidget', () => {
       submitBtn(container).click();
     }
 
-    it('records every submitted wrong pick in the state', () => {
+    it('records every wrong Attempt in the state', () => {
       const widget = renderQuestionWidget(container, QUESTION);
-      expect(widget.getState().wrongPicks).toEqual([]);
+      expect(widget.getState().wrongAttempts).toEqual([]);
 
       pickAndSubmit(1);
-      expect(widget.getState().wrongPicks).toEqual([1]);
+      expect(widget.getState().wrongAttempts).toEqual([1]);
 
       pickAndSubmit(2);
-      expect(widget.getState().wrongPicks).toEqual([1, 2]);
+      expect(widget.getState().wrongAttempts).toEqual([1, 2]);
     });
 
-    it('keeps the first wrong pick outlined red on a Second-Try Correct', () => {
+    it('keeps the first wrong Attempt outlined red on a Second-Try Correct', () => {
       renderQuestionWidget(container, QUESTION);
       pickAndSubmit(1);
       pickAndSubmit(0);
@@ -845,7 +870,7 @@ describe('renderQuestionWidget', () => {
       expect(boxes(container).map(isRed)).toEqual([false, true, false]);
     });
 
-    it('keeps both wrong picks outlined red on a Missed Question', () => {
+    it('keeps both wrong Attempts outlined red on a Missed Question', () => {
       renderQuestionWidget(container, QUESTION);
       pickAndSubmit(1);
       pickAndSubmit(2);
@@ -853,26 +878,48 @@ describe('renderQuestionWidget', () => {
       expect(boxes(container).map(isRed)).toEqual([false, true, true]);
     });
 
-    it('keeps the wrong picks red when a finished Question is restored', () => {
-      const restoreState = { selectedIndex: 0, lastSubmittedWrongIndex: null, attemptCount: 1, finished: true, outcome: 'secondTry', wrongPicks: [2] };
+    it('keeps the wrong Attempts red when a finished Question is restored', () => {
+      const restoreState = { selectedIndex: 0, lastSubmittedWrongIndex: null, attemptCount: 1, finished: true, outcome: 'secondTry', wrongAttempts: [2] };
       renderQuestionWidget(container, QUESTION, { restoreState });
 
       expect(boxes(container).map(isRed)).toEqual([false, false, true]);
     });
 
-    it('falls back to only the final pick on a Missed Question saved before wrong picks were recorded', () => {
+    it('falls back to only the final Attempt on a Missed Question saved before wrong Attempts were recorded', () => {
       const restoreState = { selectedIndex: 2, lastSubmittedWrongIndex: null, attemptCount: 2, finished: true, outcome: 'missed' };
       const widget = renderQuestionWidget(container, QUESTION, { restoreState });
 
       expect(boxes(container).map(isRed)).toEqual([false, false, true]);
-      expect(widget.getState().wrongPicks).toBeUndefined();
+      expect(widget.getState().wrongAttempts).toEqual([2]);
     });
 
-    it('drops saved wrong picks that no longer point at an Option (the Question was edited)', () => {
-      const restoreState = { selectedIndex: 0, lastSubmittedWrongIndex: null, attemptCount: 1, finished: true, outcome: 'secondTry', wrongPicks: [7, 1] };
+    it('keeps every wrong Attempt red when a mid-retry Question saved before wrong Attempts were recorded is then finished', () => {
+      const restoreState = { selectedIndex: 1, lastSubmittedWrongIndex: 1, attemptCount: 1, finished: false, outcome: null };
+      const widget = renderQuestionWidget(container, QUESTION, { restoreState });
+      pickAndSubmit(0);
+      expect(widget.getState().outcome).toBe('secondTry');
+      expect(boxes(container).map(isRed)).toEqual([false, true, false]);
+      expect(widget.getState().wrongAttempts).toEqual([1]);
+
+      widget.destroy();
+      const missedWidget = renderQuestionWidget(container, QUESTION, { restoreState });
+      pickAndSubmit(2);
+      expect(missedWidget.getState().outcome).toBe('missed');
+      expect(boxes(container).map(isRed)).toEqual([false, true, true]);
+      expect(missedWidget.getState().wrongAttempts).toEqual([1, 2]);
+    });
+
+    it("doesn't list a Missed Question's final Attempt twice when restoring an older entry", () => {
+      const restoreState = { selectedIndex: 1, lastSubmittedWrongIndex: 1, attemptCount: 2, finished: true, outcome: 'missed' };
+      const widget = renderQuestionWidget(container, QUESTION, { restoreState });
+      expect(widget.getState().wrongAttempts).toEqual([1]);
+    });
+
+    it('drops saved wrong Attempts that no longer point at an Option (the Question was edited)', () => {
+      const restoreState = { selectedIndex: 0, lastSubmittedWrongIndex: null, attemptCount: 1, finished: true, outcome: 'secondTry', wrongAttempts: [7, 1] };
       const widget = renderQuestionWidget(container, QUESTION, { restoreState });
 
-      expect(widget.getState().wrongPicks).toEqual([1]);
+      expect(widget.getState().wrongAttempts).toEqual([1]);
       expect(boxes(container).map(isRed)).toEqual([false, true, false]);
     });
   });
@@ -898,7 +945,7 @@ describe('renderQuestionWidget', () => {
       expect(marks(container)).toEqual(['', '', '']);
     });
 
-    it('marks the mid-retry wrong pick with a ✗, and nothing else yet', () => {
+    it('marks the mid-retry wrong Attempt with a ✗, and nothing else yet', () => {
       renderQuestionWidget(container, QUESTION);
       pickAndSubmit(1);
       expect(marks(container)).toEqual(['', '✗', '']);
@@ -913,24 +960,36 @@ describe('renderQuestionWidget', () => {
       expect(marks(container)).toEqual(['✓', '', '']);
     });
 
-    it('marks the correct Option and the first wrong pick on a Second-Try Correct', () => {
+    it('marks the correct Option and the first wrong Attempt on a Second-Try Correct', () => {
       renderQuestionWidget(container, QUESTION);
       pickAndSubmit(2);
       pickAndSubmit(0);
       expect(marks(container)).toEqual(['✓', '', '✗']);
     });
 
-    it('marks the correct Option and both wrong picks on a Missed Question', () => {
+    it('marks the correct Option and both wrong Attempts on a Missed Question', () => {
       renderQuestionWidget(container, QUESTION);
       pickAndSubmit(1);
       pickAndSubmit(2);
       expect(marks(container)).toEqual(['✓', '✗', '✗']);
     });
 
-    it('marks only the final wrong pick on a Missed Question saved before wrong picks were recorded', () => {
+    it('marks only the final wrong Attempt on a Missed Question saved before wrong Attempts were recorded', () => {
       const restoreState = { selectedIndex: 2, lastSubmittedWrongIndex: null, attemptCount: 2, finished: true, outcome: 'missed' };
       renderQuestionWidget(container, QUESTION, { restoreState });
       expect(marks(container)).toEqual(['✓', '', '✗']);
+    });
+
+    it('marks every wrong Attempt when a mid-retry Question saved before wrong Attempts were recorded is then finished', () => {
+      const restoreState = { selectedIndex: 1, lastSubmittedWrongIndex: 1, attemptCount: 1, finished: false, outcome: null };
+      const widget = renderQuestionWidget(container, QUESTION, { restoreState });
+      pickAndSubmit(0);
+      expect(marks(container)).toEqual(['✓', '✗', '']);
+
+      widget.destroy();
+      renderQuestionWidget(container, QUESTION, { restoreState });
+      pickAndSubmit(2);
+      expect(marks(container)).toEqual(['✓', '✗', '✗']);
     });
 
     it('gives each mark screen-reader text and hides the symbol from screen readers', () => {
