@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { expectConsoleErrors } from '../helpers/quiet-console.js';
 import {
   showLessonSearchPopup,
   getCachedTitle,
@@ -148,6 +149,7 @@ describe('lesson-search', () => {
     });
 
     it('should handle no lessons found', async () => {
+      expectConsoleErrors();
       mockData.content = {};
       
       await showLessonSearchPopup({ onSelect: vi.fn() });

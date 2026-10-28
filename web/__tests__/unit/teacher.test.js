@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { expectConsoleErrors } from '../helpers/quiet-console.js';
 import {
   debounce,
   isFirstVisitInAWhile,
@@ -220,6 +221,7 @@ describe('teacher', () => {
     });
 
     it('shows an error notification and rethrows on failure', async () => {
+      expectConsoleErrors();
       const { setClassDateOffset } = await import('../../date-utils.js');
       const { showNotification } = await import('../../notification-utils.js');
       setClassDateOffset.mockRejectedValueOnce(new Error('boom'));
@@ -366,6 +368,7 @@ describe('teacher', () => {
     });
 
     it('shows the schedule error state if loading fails', async () => {
+      expectConsoleErrors();
       scheduleFixture();
       const { getClassDateOffset } = await import('../../date-utils.js');
       const { showErrorState } = await import('../../error-ui-utils.js');
@@ -406,6 +409,7 @@ describe('teacher', () => {
     });
 
     it('shows the schedule error state if initialization fails', async () => {
+      expectConsoleErrors();
       scheduleFixture();
       // No 'classes' data at all - snap.val() is null, Object.entries(null) throws
       const { showErrorState } = await import('../../error-ui-utils.js');

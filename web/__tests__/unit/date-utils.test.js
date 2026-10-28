@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { expectConsoleErrors } from '../helpers/quiet-console.js';
 import {
   getClassDateOffset,
   setClassDateOffset,
@@ -45,6 +46,7 @@ describe('date-utils', () => {
     });
 
     it('should return 0 and swallow the error if the underlying read fails', async () => {
+      expectConsoleErrors();
       mockGetClassDateOffset.mockRejectedValueOnce(new Error('boom'));
       const offset = await getClassDateOffset('testClass');
       expect(offset).toBe(0);

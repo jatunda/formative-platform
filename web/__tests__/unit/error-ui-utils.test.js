@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { expectConsoleErrors } from '../helpers/quiet-console.js';
 import { showErrorState, showSlowConnectionMessage, withConnectionTimeout } from '../../error-ui-utils.js';
 
 describe('error-ui-utils', () => {
@@ -86,6 +87,7 @@ describe('error-ui-utils', () => {
   });
 
   it('should handle missing container gracefully', () => {
+    expectConsoleErrors();
     // Should not throw
     expect(() => {
       showErrorState({ container: 'nonexistent-id' });

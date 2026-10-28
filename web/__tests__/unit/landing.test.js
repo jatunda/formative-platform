@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { expectConsoleErrors } from '../helpers/quiet-console.js';
 import { getClassesWithTodaySchedule, renderClassList, loadAndRenderClasses, loadWithErrorHandling } from '../../landing.js';
 
 vi.mock('../../date-utils.js', () => ({
@@ -55,15 +56,18 @@ describe('landing', () => {
     });
 
     it('returns an empty list when the classes node does not exist', async () => {
+      expectConsoleErrors();
       expect(await getClassesWithTodaySchedule()).toEqual([]);
     });
 
     it('returns an empty list when there are no classes', async () => {
+      expectConsoleErrors();
       mockData['classes'] = {};
       expect(await getClassesWithTodaySchedule()).toEqual([]);
     });
 
     it("defaults a Class's Day Index to 0 if computing it throws", async () => {
+      expectConsoleErrors();
       mockData['classes'] = { broken: { name: 'Broken Class', displayOrder: 1 } };
       const { getTodayDayIndex } = await import('../../date-utils.js');
       getTodayDayIndex.mockImplementationOnce(async () => {
@@ -138,6 +142,7 @@ describe('landing', () => {
     });
 
     it('works without a loading state element', async () => {
+      expectConsoleErrors();
       mockData['classes'] = {};
       const container = document.createElement('div');
 
@@ -162,6 +167,7 @@ describe('landing', () => {
     });
 
     it("wires onSlow to swap the loading state's caption to a Wi-Fi-specific message", async () => {
+      expectConsoleErrors();
       mockData['classes'] = {};
       // Captured before the load runs: a successful load's renderClassList
       // wipes #class-list's innerHTML, which detaches this nested element
@@ -176,6 +182,7 @@ describe('landing', () => {
     });
 
     it('wires onTimeout to show an error state with a Wi-Fi-specific message, without throwing past loadWithErrorHandling', async () => {
+      expectConsoleErrors();
       mockData['classes'] = {};
       const { showErrorState } = await import('../../error-ui-utils.js');
 
@@ -190,6 +197,7 @@ describe('landing', () => {
     });
 
     it('shows the generic error state if the load itself rejects', async () => {
+      expectConsoleErrors();
       mockData['classes'] = new Error('network down');
       const { showErrorState } = await import('../../error-ui-utils.js');
 

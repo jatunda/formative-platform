@@ -34,7 +34,9 @@ export default defineConfig({
     // Coverage configuration
     coverage: {
       provider: 'v8',
-      reporter: ['text', 'json', 'html'],
+      // Wide enough that long file names aren't cut to "...name.js", so a
+      // search for a file name finds its row.
+      reporter: [['text', { maxCols: 200 }], 'json', 'html'],
       exclude: [
         'node_modules/',
         'dist/',

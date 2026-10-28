@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { expectConsoleErrors } from '../helpers/quiet-console.js';
 import {
   getQueryParams,
   updatePreview,
@@ -376,6 +377,7 @@ describe('editor', () => {
     });
 
     it('returns null and notifies on a save failure', async () => {
+      expectConsoleErrors();
       mockParseDSL.mockReturnValue({ title: 'Original', blocks: [{}] });
       lessons = createLessonStore({ ...mockStorePort(db), update: async () => { throw new Error('write failed'); } });
       const { showNotification } = await import('../../notification-utils.js');
@@ -498,6 +500,7 @@ describe('editor', () => {
     });
 
     it('does not delete, and notifies, when the Schedules cannot be checked', async () => {
+      expectConsoleErrors();
       const { showNotification } = await import('../../notification-utils.js');
       const port = mockStorePort(db);
       lessons = createLessonStore({
@@ -517,6 +520,7 @@ describe('editor', () => {
     });
 
     it('notifies and reports failure when the delete itself fails', async () => {
+      expectConsoleErrors();
       const { showNotification } = await import('../../notification-utils.js');
       lessons = createLessonStore({ ...mockStorePort(db), update: async () => { throw new Error('write failed'); } });
 
