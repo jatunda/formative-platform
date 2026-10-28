@@ -30,6 +30,14 @@ function isTypingOrActivating(target) {
   return target.tagName === 'INPUT' && target.type !== 'radio';
 }
 
+// The wrong Attempts a state saved without wrongAttempts can still vouch
+// for, in order.
+function legacyWrongAttempts({ lastSubmittedWrongIndex, outcome, selectedIndex }) {
+  const known = lastSubmittedWrongIndex === null ? [] : [lastSubmittedWrongIndex];
+  if (outcome === "missed" && !known.includes(selectedIndex)) known.push(selectedIndex);
+  return known;
+}
+
 /**
  * Mount an interactive Question into containerEl.
  * @param {HTMLElement} containerEl
@@ -52,18 +60,30 @@ export function renderQuestionWidget(containerEl, questionData, { restoreState, 
       // (before the question is finished). Distinct from selectedIndex and
       // deliberately sticky: picking a *different* option afterward, to
       // compare it, doesn't clear this - the Explanation for the
-      // already-submitted wrong pick stays up until an actual resubmission
+      // already-submitted wrong Attempt stays up until an actual resubmission
       // (submit()) replaces or clears it.
       lastSubmittedWrongIndex: null,
       attemptCount: 0,
       finished: false,
       outcome: null,
+      // The Option index of every wrong Attempt, in order: red with a ✗
+      // once finished. A state saved before this existed is seeded below.
+      wrongAttempts: [],
     };
+  // Wrong Options whose "Why is this wrong?" Explanation is open, once
+  // finished. Lives in this widget instance only - never in getState() or
+  // Saved Progress - so every redraw (Back/Next, refresh, another tab's
+  // change) starts with all of them closed.
+  const openWhyIndexes = new Set();
+  // A state saved before wrongAttempts existed still knows some of them: a
+  // mid-retry entry's first wrong Attempt, and a Missed Question's final one.
+  if (!state.wrongAttempts) state.wrongAttempts = legacyWrongAttempts(state);
   // A saved state can outlive an edit that removed Options; an index past
   // the end would make submit() read a missing Option.
   const optionCount = questionData.options.length;
   if (state.selectedIndex !== null && state.selectedIndex >= optionCount) state.selectedIndex = null;
   if (state.lastSubmittedWrongIndex !== null && state.lastSubmittedWrongIndex >= optionCount) state.lastSubmittedWrongIndex = null;
+  state.wrongAttempts = state.wrongAttempts.filter((index) => index < optionCount);
 
   // Fired on every state change (a pick, not just a submit), so a caller
   // saving progress keeps a half-done Question across a refresh. Runs before
@@ -100,10 +120,11 @@ export function renderQuestionWidget(containerEl, questionData, { restoreState, 
     }
 
     state.attemptCount += 1;
+    state.wrongAttempts = [...state.wrongAttempts, state.selectedIndex];
     if (state.attemptCount >= 2) {
       // Per CONTEXT.md's Attempt entry: the 2nd wrong Attempt auto-reveals
       // the correct Option and ends the question - it does not also show
-      // this 2nd wrong pick's own Explanation first.
+      // this 2nd wrong Attempt's own Explanation first.
       state.finished = true;
       state.outcome = "missed";
       state.lastSubmittedWrongIndex = null;
@@ -127,6 +148,24 @@ export function renderQuestionWidget(containerEl, questionData, { restoreState, 
     submit();
   }
 
+  /** @type {HTMLButtonElement[]} filled by render(), indexed by Option */
+  let whyToggles = [];
+
+  function toggleWhy(index) {
+    // Only a keyboard activation leaves focus on the toggle; a mouse click
+    // elsewhere on the box shouldn't pull focus to it.
+    const toggleHadFocus = document.activeElement === whyToggles[index];
+    if (openWhyIndexes.has(index)) openWhyIndexes.delete(index);
+    else openWhyIndexes.add(index);
+    render();
+    // The redraw replaced the toggle; keep keyboard users on it.
+    if (toggleHadFocus) whyToggles[index].focus();
+  }
+
+  function radios() {
+    return containerEl.querySelectorAll('input[type="radio"]');
+  }
+
   function markActive() {
     activeWidgetId = widgetId;
   }
@@ -137,6 +176,7 @@ export function renderQuestionWidget(containerEl, questionData, { restoreState, 
     // keeps arrow-key option switching working between renders.
     const hadFocus = containerEl.contains(document.activeElement);
     containerEl.innerHTML = "";
+    whyToggles = [];
 
     const stemEl = document.createElement("div");
     stemEl.className = "question-widget-stem";
@@ -145,10 +185,16 @@ export function renderQuestionWidget(containerEl, questionData, { restoreState, 
 
     const optionsEl = document.createElement("div");
     optionsEl.className = "question-widget-options";
+    // Drives the pointer cursor and hover highlight in style.css (as
+    // -option-toggleable does for a finished wrong Option).
+    if (!state.finished) optionsEl.classList.add("question-widget-options-answering");
 
     questionData.options.forEach((option, index) => {
       const row = document.createElement("div");
       row.className = "question-widget-option";
+      // Only while answering: once finished, the green/red feedback is the
+      // whole story. style.css also lets red beat this blue mid-retry.
+      if (!state.finished && state.selectedIndex === index) row.classList.add("question-widget-option-selected");
 
       const label = document.createElement("label");
       const input = document.createElement("input");
@@ -173,16 +219,61 @@ export function renderQuestionWidget(containerEl, questionData, { restoreState, 
 
       const isRevealedCorrect = state.finished && option.correct;
       const isMidRetryWrong = !state.finished && state.lastSubmittedWrongIndex === index;
-      const isMissedWrongPick = state.finished && state.outcome === "missed" && index === state.selectedIndex && !option.correct;
+      const isFinishedWrongAttempt = state.finished && !option.correct && state.wrongAttempts.includes(index);
+      // Once finished, every wrong Option (the student's own wrong Attempts
+      // too) gets a closed "Why is this wrong?" toggle; while answering
+      // there are none, so the answer isn't given away.
+      const hasWhyToggle = state.finished && !option.correct;
+      const isWhyOpen = hasWhyToggle && openWhyIndexes.has(index);
 
-      if (isRevealedCorrect || isMidRetryWrong) {
-        row.classList.add(isRevealedCorrect ? "question-widget-option-correct" : "question-widget-option-wrong");
+      // The whole box is the click target, not just the <label>. While
+      // answering it selects: padding and a showing Explanation select too,
+      // and clicks inside the label are left to the browser (it already
+      // checks the radio). Once finished, a wrong Option's box (toggle
+      // included - its click bubbles here) opens or closes its Explanation.
+      // Either way a link in an Explanation keeps doing only its own job.
+      row.addEventListener("click", (event) => {
+        const target = /** @type {Element} */ (event.target);
+        if (target.closest("a")) return;
+        if (hasWhyToggle) {
+          markActive();
+          toggleWhy(index);
+          return;
+        }
+        if (state.finished || label.contains(target)) return;
+        markActive();
+        selectOption(index);
+        radios()[index].focus();
+      });
+
+      if (isRevealedCorrect) {
+        row.classList.add("question-widget-option-correct");
+        label.appendChild(renderMark("✓", "Correct answer"));
+      } else if (isMidRetryWrong || isFinishedWrongAttempt) {
+        row.classList.add("question-widget-option-wrong");
+        label.appendChild(renderMark("✗", "Your answer, incorrect"));
+      }
+
+      if (hasWhyToggle) {
+        row.classList.add("question-widget-option-toggleable");
+        const toggle = document.createElement("button");
+        toggle.type = "button";
+        toggle.className = "question-widget-why-toggle";
+        toggle.setAttribute("aria-expanded", String(isWhyOpen));
+        const arrow = document.createElement("span");
+        arrow.className = "question-widget-why-arrow";
+        arrow.setAttribute("aria-hidden", "true");
+        arrow.textContent = isWhyOpen ? "▾" : "▸";
+        toggle.append(arrow, " Why is this wrong?");
+        whyToggles[index] = toggle;
+        row.appendChild(toggle);
+      }
+
+      if (isRevealedCorrect || isMidRetryWrong || isWhyOpen) {
         const explanation = document.createElement("p");
         explanation.className = "question-widget-explanation";
         explanation.innerHTML = processInlineCode(option.explanation || '');
         row.appendChild(explanation);
-      } else if (isMissedWrongPick) {
-        row.classList.add("question-widget-option-wrong");
       }
 
       optionsEl.appendChild(row);
@@ -198,10 +289,27 @@ export function renderQuestionWidget(containerEl, questionData, { restoreState, 
     containerEl.appendChild(state.finished && nextButton ? nextButton : renderSubmit());
 
     if (hadFocus) {
-      const radios = containerEl.querySelectorAll('input[type="radio"]');
-      const toFocus = radios[state.selectedIndex];
+      const toFocus = radios()[state.selectedIndex];
       if (toFocus && !toFocus.disabled) toFocus.focus();
     }
+  }
+
+  // A ✓ / ✗ at the right end of an Option box, so correct and wrong don't
+  // rely on color alone. It sits in the space every box reserves for it
+  // (style.css), so the answer text never moves when it appears. Inside the
+  // <label>, so a screen reader hears it with the Option's text.
+  function renderMark(symbol, screenReaderText) {
+    const mark = document.createElement("span");
+    mark.className = "question-widget-mark";
+    const symbolEl = document.createElement("span");
+    symbolEl.className = "question-widget-mark-symbol";
+    symbolEl.setAttribute("aria-hidden", "true");
+    symbolEl.textContent = symbol;
+    const srText = document.createElement("span");
+    srText.className = "visually-hidden";
+    srText.textContent = screenReaderText;
+    mark.append(symbolEl, srText);
+    return mark;
   }
 
   function renderSubmit() {
@@ -229,8 +337,7 @@ export function renderQuestionWidget(containerEl, questionData, { restoreState, 
   // behavior then takes over - arrow keys move AND select among options
   // sharing radioName. Skipped once finished (nothing left to focus into).
   if (autoFocus && !state.finished) {
-    const radios = containerEl.querySelectorAll('input[type="radio"]');
-    const toFocus = radios[state.selectedIndex] || radios[0];
+    const toFocus = radios()[state.selectedIndex] || radios()[0];
     if (toFocus) toFocus.focus({ preventScroll: true });
   }
 

@@ -80,6 +80,36 @@ describe('createLocalStorageSavedProgressStore isolation, clear, and fallbacks',
     expect(createLocalStorageSavedProgressStore('ps1').load().questions).toEqual({ q1: FINISHED });
   });
 
+  it("keeps every wrong Attempt a student submitted, and older entries saved before wrong Attempts were recorded", () => {
+    const secondTry = { ...FINISHED, attemptCount: 1, outcome: 'secondTry', wrongAttempts: [2] };
+    const missed = { selectedIndex: 2, lastSubmittedWrongIndex: null, attemptCount: 2, finished: true, outcome: 'missed', wrongAttempts: [1, 2] };
+    const store = createLocalStorageSavedProgressStore('ps1');
+    store.record('q1', secondTry);
+    store.record('q2', missed);
+    store.record('old', MID_RETRY);
+
+    expect(createLocalStorageSavedProgressStore('ps1').load().questions).toEqual({ q1: secondTry, q2: missed, old: MID_RETRY });
+  });
+
+  it('drops an entry whose wrong Attempts are not a list of Option indexes', () => {
+    const store = createLocalStorageSavedProgressStore('ps1');
+    store.record('q1', FINISHED);
+    localStorage.setItem(localStorage.key(0), JSON.stringify({
+      version: 1,
+      questions: {
+        q1: FINISHED,
+        notAList: { ...MID_RETRY, wrongAttempts: 1 },
+        nullList: { ...MID_RETRY, wrongAttempts: null },
+        negative: { ...MID_RETRY, wrongAttempts: [-1] },
+        fractional: { ...MID_RETRY, wrongAttempts: [0.5] },
+        text: { ...MID_RETRY, wrongAttempts: ['1'] },
+        nullIndex: { ...MID_RETRY, wrongAttempts: [null] },
+      },
+    }));
+
+    expect(createLocalStorageSavedProgressStore('ps1').load().questions).toEqual({ q1: FINISHED });
+  });
+
   it('ignores a stored entry from an unknown version', () => {
     const store = createLocalStorageSavedProgressStore('ps1');
     store.record('q1', FINISHED);

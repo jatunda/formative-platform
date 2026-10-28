@@ -134,7 +134,7 @@ describe('renderQuestionWidget', () => {
       expect(container.textContent).not.toContain('That is concatenation, not addition.');
     });
 
-    it('marks the last wrong pick visually wrong alongside the revealed correct answer', () => {
+    it('marks the last wrong Attempt visually wrong alongside the revealed correct answer', () => {
       renderQuestionWidget(container, QUESTION);
 
       radios(container)[1].click();
@@ -338,8 +338,8 @@ describe('renderQuestionWidget', () => {
       submitBtn(container).click();
 
       expect(changes).toEqual([
-        { selectedIndex: 1, lastSubmittedWrongIndex: null, attemptCount: 0, finished: false, outcome: null },
-        { selectedIndex: 1, lastSubmittedWrongIndex: 1, attemptCount: 1, finished: false, outcome: null },
+        { selectedIndex: 1, lastSubmittedWrongIndex: null, attemptCount: 0, finished: false, outcome: null, wrongAttempts: [] },
+        { selectedIndex: 1, lastSubmittedWrongIndex: 1, attemptCount: 1, finished: false, outcome: null, wrongAttempts: [1] },
       ]);
     });
 
@@ -561,6 +561,454 @@ describe('renderQuestionWidget', () => {
       expect(explanation.querySelector('strong').textContent).toBe('output');
       expect(explanation.querySelector('em').textContent).toBe('see');
       expect(explanation.querySelector('a').textContent).toBe('docs');
+    });
+  });
+
+  describe('whole Option box selects', () => {
+    function boxes(c) {
+      return [...c.querySelectorAll('.question-widget-option')];
+    }
+
+    it('selects an Option when its box is clicked outside the label, and focuses its radio', () => {
+      const widget = renderQuestionWidget(container, QUESTION);
+
+      boxes(container)[2].click();
+
+      expect(widget.getState().selectedIndex).toBe(2);
+      expect(radios(container)[2].checked).toBe(true);
+      expect(document.activeElement).toBe(radios(container)[2]);
+    });
+
+    it('selects an Option when its showing Explanation is clicked', () => {
+      const widget = renderQuestionWidget(container, QUESTION);
+      radios(container)[1].click();
+      submitBtn(container).click(); // wrong: "Off by one." shows on Option 1
+      radios(container)[2].click(); // compare against another Option
+
+      container.querySelector('.question-widget-explanation').click();
+
+      expect(widget.getState().selectedIndex).toBe(1);
+      expect(document.activeElement).toBe(radios(container)[1]);
+    });
+
+    it('leaves a click on a link inside an Explanation to the link', () => {
+      const question = {
+        stem: QUESTION.stem,
+        options: [
+          QUESTION.options[0],
+          { ...QUESTION.options[1], explanation: 'See [docs](https://example.com).' },
+        ],
+      };
+      const widget = renderQuestionWidget(container, question);
+      radios(container)[1].click();
+      submitBtn(container).click();
+      radios(container)[0].click();
+
+      container.querySelector('.question-widget-explanation a').dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+
+      expect(widget.getState().selectedIndex).toBe(0);
+    });
+
+    it('selects once (no double state change) when the label itself is clicked', () => {
+      const states = [];
+      renderQuestionWidget(container, QUESTION, { onStateChange: (s) => states.push(s) });
+
+      container.querySelectorAll('.question-widget-option-text')[1].click();
+
+      expect(states).toHaveLength(1);
+      expect(states[0].selectedIndex).toBe(1);
+    });
+
+    it('does not change the selection once the Question is finished', () => {
+      const widget = renderQuestionWidget(container, QUESTION);
+      radios(container)[0].click();
+      submitBtn(container).click();
+      const before = widget.getState();
+
+      boxes(container)[2].click();
+      container.querySelector('.question-widget-explanation').click();
+
+      expect(widget.getState()).toEqual(before);
+    });
+
+    it('marks the selected Option box, following the selection', () => {
+      renderQuestionWidget(container, QUESTION);
+      const selected = () => boxes(container).map((b) => b.classList.contains('question-widget-option-selected'));
+      expect(selected()).toEqual([false, false, false]);
+
+      boxes(container)[1].click();
+      expect(selected()).toEqual([false, true, false]);
+
+      radios(container)[2].click();
+      expect(selected()).toEqual([false, false, true]);
+    });
+
+    it('marks the widget as answering until finished (drives the pointer cursor and hover)', () => {
+      renderQuestionWidget(container, QUESTION);
+      const options = () => container.querySelector('.question-widget-options');
+      expect(options().classList.contains('question-widget-options-answering')).toBe(true);
+
+      radios(container)[0].click();
+      submitBtn(container).click();
+
+      expect(options().classList.contains('question-widget-options-answering')).toBe(false);
+    });
+  });
+
+  describe('"Why is this wrong?" after finishing', () => {
+    function boxes(c) {
+      return [...c.querySelectorAll('.question-widget-option')];
+    }
+    function toggleIn(box) {
+      return box.querySelector('.question-widget-why-toggle');
+    }
+    function explanationIn(box) {
+      return box.querySelector('.question-widget-explanation');
+    }
+    function finishFirstTry() {
+      radios(container)[0].click();
+      submitBtn(container).click();
+    }
+
+    it('shows a closed toggle on every wrong Option once finished, and none on the correct one', () => {
+      renderQuestionWidget(container, QUESTION);
+      finishFirstTry();
+
+      const [correct, wrong1, wrong2] = boxes(container);
+      expect(toggleIn(correct)).toBeNull();
+      for (const box of [wrong1, wrong2]) {
+        expect(toggleIn(box).textContent).toContain('Why is this wrong?');
+        expect(toggleIn(box).getAttribute('aria-expanded')).toBe('false');
+        expect(toggleIn(box).textContent).toContain('▸');
+        expect(explanationIn(box)).toBeNull();
+      }
+      expect(explanationIn(correct).textContent).toBe('Correct, 2 + 2 is 4.');
+    });
+
+    it('shows no toggles while still answering, even mid-retry', () => {
+      renderQuestionWidget(container, QUESTION);
+      expect(container.querySelector('.question-widget-why-toggle')).toBeNull();
+
+      radios(container)[1].click();
+      submitBtn(container).click();
+
+      expect(container.querySelector('.question-widget-why-toggle')).toBeNull();
+      expect(container.textContent).toContain('Off by one.');
+    });
+
+    it("gives the student's own wrong Attempts a toggle too (second-try and missed)", () => {
+      renderQuestionWidget(container, QUESTION);
+      radios(container)[1].click();
+      submitBtn(container).click();
+      radios(container)[0].click();
+      submitBtn(container).click(); // secondTry
+
+      expect(toggleIn(boxes(container)[1])).not.toBeNull();
+      expect(explanationIn(boxes(container)[1])).toBeNull(); // closed again once finished
+
+      container.innerHTML = '';
+      renderQuestionWidget(container, QUESTION);
+      radios(container)[1].click();
+      submitBtn(container).click();
+      radios(container)[2].click();
+      submitBtn(container).click(); // missed
+
+      const ownPick = boxes(container)[2];
+      expect(toggleIn(ownPick)).not.toBeNull();
+      expect(ownPick.classList.contains('question-widget-option-wrong')).toBe(true); // stays red when closed
+    });
+
+    it('opens and closes an Explanation with its toggle', () => {
+      renderQuestionWidget(container, QUESTION);
+      finishFirstTry();
+
+      toggleIn(boxes(container)[1]).click();
+      const box = boxes(container)[1];
+      expect(explanationIn(box).textContent).toBe('Off by one.');
+      expect(toggleIn(box).getAttribute('aria-expanded')).toBe('true');
+      expect(toggleIn(box).textContent).toContain('▾');
+      expect(toggleIn(box).textContent).toContain('Why is this wrong?');
+
+      toggleIn(boxes(container)[1]).click();
+      expect(explanationIn(boxes(container)[1])).toBeNull();
+      expect(toggleIn(boxes(container)[1]).getAttribute('aria-expanded')).toBe('false');
+    });
+
+    it('keeps keyboard focus on a toggle activated from the keyboard', () => {
+      renderQuestionWidget(container, QUESTION);
+      finishFirstTry();
+
+      toggleIn(boxes(container)[1]).focus();
+      toggleIn(boxes(container)[1]).click(); // Enter/Space on a focused button fires click
+
+      expect(document.activeElement).toBe(toggleIn(boxes(container)[1]));
+    });
+
+    it('leaves focus alone when a finished box is clicked with the mouse', () => {
+      const elsewhere = document.createElement('button');
+      document.body.appendChild(elsewhere);
+      renderQuestionWidget(container, QUESTION);
+      finishFirstTry();
+      elsewhere.focus();
+
+      boxes(container)[1].click();
+      expect(explanationIn(boxes(container)[1])).not.toBeNull();
+      expect(document.activeElement).toBe(elsewhere);
+
+      boxes(container)[2].querySelector('.question-widget-option-text').click();
+      expect(document.activeElement).toBe(elsewhere);
+      elsewhere.remove();
+    });
+
+    it('opens and closes an Explanation by clicking anywhere on the finished box', () => {
+      renderQuestionWidget(container, QUESTION);
+      finishFirstTry();
+
+      boxes(container)[2].click();
+      expect(explanationIn(boxes(container)[2]).textContent).toBe('That is concatenation, not addition.');
+
+      boxes(container)[2].querySelector('.question-widget-option-text').click();
+      expect(explanationIn(boxes(container)[2])).toBeNull();
+
+      boxes(container)[2].click();
+      explanationIn(boxes(container)[2]).click();
+      expect(explanationIn(boxes(container)[2])).toBeNull();
+    });
+
+    it('leaves a click on a link inside an open Explanation to the link', () => {
+      const question = {
+        stem: QUESTION.stem,
+        options: [QUESTION.options[0], { ...QUESTION.options[1], explanation: 'See [docs](https://example.com).' }],
+      };
+      renderQuestionWidget(container, question);
+      finishFirstTry();
+      boxes(container)[1].click();
+
+      explanationIn(boxes(container)[1]).querySelector('a').dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+
+      expect(explanationIn(boxes(container)[1])).not.toBeNull();
+    });
+
+    it('does nothing when the correct Option box is clicked', () => {
+      renderQuestionWidget(container, QUESTION);
+      finishFirstTry();
+
+      boxes(container)[0].click();
+
+      expect(explanationIn(boxes(container)[0]).textContent).toBe('Correct, 2 + 2 is 4.');
+      expect(container.querySelectorAll('.question-widget-explanation')).toHaveLength(1);
+    });
+
+    it('keeps several Explanations open at once', () => {
+      renderQuestionWidget(container, QUESTION);
+      finishFirstTry();
+
+      toggleIn(boxes(container)[1]).click();
+      toggleIn(boxes(container)[2]).click();
+
+      expect(explanationIn(boxes(container)[1])).not.toBeNull();
+      expect(explanationIn(boxes(container)[2])).not.toBeNull();
+    });
+
+    it('marks only boxes with a toggle as clickable (drives the pointer cursor and hover)', () => {
+      renderQuestionWidget(container, QUESTION);
+      const toggleable = () => boxes(container).map((b) => b.classList.contains('question-widget-option-toggleable'));
+      expect(toggleable()).toEqual([false, false, false]);
+
+      finishFirstTry();
+
+      expect(toggleable()).toEqual([false, true, true]);
+    });
+
+    it('keeps opened Explanations out of the saved state, and starts closed when redrawn', () => {
+      const states = [];
+      const widget = renderQuestionWidget(container, QUESTION, { onStateChange: (s) => states.push(s) });
+      finishFirstTry();
+      const saved = widget.getState();
+      const changesBefore = states.length;
+
+      toggleIn(boxes(container)[1]).click();
+
+      expect(widget.getState()).toEqual(saved);
+      expect(states).toHaveLength(changesBefore);
+
+      widget.destroy();
+      renderQuestionWidget(container, QUESTION, { restoreState: saved });
+      expect(toggleIn(boxes(container)[1]).getAttribute('aria-expanded')).toBe('false');
+      expect(explanationIn(boxes(container)[1])).toBeNull();
+    });
+  });
+
+  describe("the student's wrong Attempts", () => {
+    function boxes(c) {
+      return [...c.querySelectorAll('.question-widget-option')];
+    }
+    function isRed(box) {
+      return box.classList.contains('question-widget-option-wrong');
+    }
+    function pickAndSubmit(index) {
+      radios(container)[index].click();
+      submitBtn(container).click();
+    }
+
+    it('records every wrong Attempt in the state', () => {
+      const widget = renderQuestionWidget(container, QUESTION);
+      expect(widget.getState().wrongAttempts).toEqual([]);
+
+      pickAndSubmit(1);
+      expect(widget.getState().wrongAttempts).toEqual([1]);
+
+      pickAndSubmit(2);
+      expect(widget.getState().wrongAttempts).toEqual([1, 2]);
+    });
+
+    it('keeps the first wrong Attempt outlined red on a Second-Try Correct', () => {
+      renderQuestionWidget(container, QUESTION);
+      pickAndSubmit(1);
+      pickAndSubmit(0);
+
+      expect(boxes(container).map(isRed)).toEqual([false, true, false]);
+    });
+
+    it('keeps both wrong Attempts outlined red on a Missed Question', () => {
+      renderQuestionWidget(container, QUESTION);
+      pickAndSubmit(1);
+      pickAndSubmit(2);
+
+      expect(boxes(container).map(isRed)).toEqual([false, true, true]);
+    });
+
+    it('keeps the wrong Attempts red when a finished Question is restored', () => {
+      const restoreState = { selectedIndex: 0, lastSubmittedWrongIndex: null, attemptCount: 1, finished: true, outcome: 'secondTry', wrongAttempts: [2] };
+      renderQuestionWidget(container, QUESTION, { restoreState });
+
+      expect(boxes(container).map(isRed)).toEqual([false, false, true]);
+    });
+
+    it('falls back to only the final Attempt on a Missed Question saved before wrong Attempts were recorded', () => {
+      const restoreState = { selectedIndex: 2, lastSubmittedWrongIndex: null, attemptCount: 2, finished: true, outcome: 'missed' };
+      const widget = renderQuestionWidget(container, QUESTION, { restoreState });
+
+      expect(boxes(container).map(isRed)).toEqual([false, false, true]);
+      expect(widget.getState().wrongAttempts).toEqual([2]);
+    });
+
+    it('keeps every wrong Attempt red when a mid-retry Question saved before wrong Attempts were recorded is then finished', () => {
+      const restoreState = { selectedIndex: 1, lastSubmittedWrongIndex: 1, attemptCount: 1, finished: false, outcome: null };
+      const widget = renderQuestionWidget(container, QUESTION, { restoreState });
+      pickAndSubmit(0);
+      expect(widget.getState().outcome).toBe('secondTry');
+      expect(boxes(container).map(isRed)).toEqual([false, true, false]);
+      expect(widget.getState().wrongAttempts).toEqual([1]);
+
+      widget.destroy();
+      const missedWidget = renderQuestionWidget(container, QUESTION, { restoreState });
+      pickAndSubmit(2);
+      expect(missedWidget.getState().outcome).toBe('missed');
+      expect(boxes(container).map(isRed)).toEqual([false, true, true]);
+      expect(missedWidget.getState().wrongAttempts).toEqual([1, 2]);
+    });
+
+    it("doesn't list a Missed Question's final Attempt twice when restoring an older entry", () => {
+      const restoreState = { selectedIndex: 1, lastSubmittedWrongIndex: 1, attemptCount: 2, finished: true, outcome: 'missed' };
+      const widget = renderQuestionWidget(container, QUESTION, { restoreState });
+      expect(widget.getState().wrongAttempts).toEqual([1]);
+    });
+
+    it('drops saved wrong Attempts that no longer point at an Option (the Question was edited)', () => {
+      const restoreState = { selectedIndex: 0, lastSubmittedWrongIndex: null, attemptCount: 1, finished: true, outcome: 'secondTry', wrongAttempts: [7, 1] };
+      const widget = renderQuestionWidget(container, QUESTION, { restoreState });
+
+      expect(widget.getState().wrongAttempts).toEqual([1]);
+      expect(boxes(container).map(isRed)).toEqual([false, true, false]);
+    });
+  });
+
+  describe('✓ / ✗ marks', () => {
+    // One entry per Option box: '✓', '✗', or '' for no mark.
+    function marks(c) {
+      return [...c.querySelectorAll('.question-widget-option')].map((box) => {
+        const symbol = box.querySelector('.question-widget-mark-symbol');
+        return symbol ? symbol.textContent : '';
+      });
+    }
+    function pickAndSubmit(index) {
+      radios(container)[index].click();
+      submitBtn(container).click();
+    }
+
+    it('shows no marks before any submit, even with an Option picked', () => {
+      renderQuestionWidget(container, QUESTION);
+      expect(marks(container)).toEqual(['', '', '']);
+
+      radios(container)[1].click();
+      expect(marks(container)).toEqual(['', '', '']);
+    });
+
+    it('marks the mid-retry wrong Attempt with a ✗, and nothing else yet', () => {
+      renderQuestionWidget(container, QUESTION);
+      pickAndSubmit(1);
+      expect(marks(container)).toEqual(['', '✗', '']);
+
+      radios(container)[2].click(); // comparing another Option keeps the ✗ on the submitted one
+      expect(marks(container)).toEqual(['', '✗', '']);
+    });
+
+    it('marks only the correct Option on a First-Try Correct', () => {
+      renderQuestionWidget(container, QUESTION);
+      pickAndSubmit(0);
+      expect(marks(container)).toEqual(['✓', '', '']);
+    });
+
+    it('marks the correct Option and the first wrong Attempt on a Second-Try Correct', () => {
+      renderQuestionWidget(container, QUESTION);
+      pickAndSubmit(2);
+      pickAndSubmit(0);
+      expect(marks(container)).toEqual(['✓', '', '✗']);
+    });
+
+    it('marks the correct Option and both wrong Attempts on a Missed Question', () => {
+      renderQuestionWidget(container, QUESTION);
+      pickAndSubmit(1);
+      pickAndSubmit(2);
+      expect(marks(container)).toEqual(['✓', '✗', '✗']);
+    });
+
+    it('marks only the final wrong Attempt on a Missed Question saved before wrong Attempts were recorded', () => {
+      const restoreState = { selectedIndex: 2, lastSubmittedWrongIndex: null, attemptCount: 2, finished: true, outcome: 'missed' };
+      renderQuestionWidget(container, QUESTION, { restoreState });
+      expect(marks(container)).toEqual(['✓', '', '✗']);
+    });
+
+    it('marks every wrong Attempt when a mid-retry Question saved before wrong Attempts were recorded is then finished', () => {
+      const restoreState = { selectedIndex: 1, lastSubmittedWrongIndex: 1, attemptCount: 1, finished: false, outcome: null };
+      const widget = renderQuestionWidget(container, QUESTION, { restoreState });
+      pickAndSubmit(0);
+      expect(marks(container)).toEqual(['✓', '✗', '']);
+
+      widget.destroy();
+      renderQuestionWidget(container, QUESTION, { restoreState });
+      pickAndSubmit(2);
+      expect(marks(container)).toEqual(['✓', '✗', '✗']);
+    });
+
+    it('gives each mark screen-reader text and hides the symbol from screen readers', () => {
+      renderQuestionWidget(container, QUESTION);
+      pickAndSubmit(1);
+      pickAndSubmit(0);
+
+      const [correct, wrong] = container.querySelectorAll('.question-widget-mark');
+      expect(correct.querySelector('.question-widget-mark-symbol').getAttribute('aria-hidden')).toBe('true');
+      expect(correct.querySelector('.visually-hidden').textContent).toBe('Correct answer');
+      expect(wrong.querySelector('.question-widget-mark-symbol').getAttribute('aria-hidden')).toBe('true');
+      expect(wrong.querySelector('.visually-hidden').textContent).toBe('Your answer, incorrect');
+    });
+
+    it("keeps the radio on the student's final pick", () => {
+      renderQuestionWidget(container, QUESTION);
+      pickAndSubmit(1);
+      pickAndSubmit(2);
+      expect(radios(container).map((r) => r.checked)).toEqual([false, false, true]);
     });
   });
 

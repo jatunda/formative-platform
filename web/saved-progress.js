@@ -12,7 +12,12 @@
  *   attemptCount: number,
  *   finished: boolean,
  *   outcome: "firstTry"|"secondTry"|"missed"|null,
+ *   wrongAttempts?: number[],
  * }} QuestionState
+ *
+ * `wrongAttempts` holds the Option index of every wrong Attempt, in order.
+ * Entries saved before it existed lack it; they stay valid, and the widget
+ * seeds it on restore from what they do record.
  *
  * Keyed by Question id, never by position, so editing a Practice Set's list
  * leaves the Questions still in it intact. `version` lets a later shape (e.g.
@@ -49,8 +54,18 @@ function copyProgress(progress) {
 const OUTCOMES = new Set(['firstTry', 'secondTry', 'missed', null]);
 
 /** @param {unknown} value */
+function isOptionIndex(value) {
+  return Number.isInteger(value) && /** @type {number} */ (value) >= 0;
+}
+
+/** @param {unknown} value */
 function isOptionIndexOrNull(value) {
-  return value === null || (Number.isInteger(value) && /** @type {number} */ (value) >= 0);
+  return value === null || isOptionIndex(value);
+}
+
+/** @param {unknown} value */
+function isOptionIndexList(value) {
+  return Array.isArray(value) && value.every(isOptionIndex);
 }
 
 /**
@@ -64,7 +79,8 @@ function isQuestionState(state) {
     && isOptionIndexOrNull(state.lastSubmittedWrongIndex)
     && Number.isInteger(state.attemptCount)
     && typeof state.finished === 'boolean'
-    && OUTCOMES.has(state.outcome);
+    && OUTCOMES.has(state.outcome)
+    && (state.wrongAttempts === undefined || isOptionIndexList(state.wrongAttempts));
 }
 
 /**
