@@ -103,7 +103,7 @@ function parseSettings(saved) {
  *   `save` never throws: if storage is full or blocked the change just isn't kept.
  */
 export function createSettingsStore(storage) {
-  const adapter = createStorageAdapter(SETTINGS_KEY, storage);
+  const adapter = createStorageAdapter(SETTINGS_KEY, storage, { quiet: true });
   return {
     load: () => parseSettings(adapter.load()),
     save(settings) {

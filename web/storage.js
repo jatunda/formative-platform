@@ -8,17 +8,29 @@
 /**
  * @param {string} key - the key to persist under
  * @param {StorageLike} [storage] - defaults to localStorage
+ * @param {{ quiet?: boolean }} [options] - `quiet`: a storage that can't be
+ *   read loads as nothing saved, instead of throwing
  * @returns {{load: () => any, save: (value: any) => void}}
- *   `load` returns null when nothing is saved, the data is corrupt, or the
- *   storage can't be read; `save` writes the value as JSON (and lets a
- *   storage error, e.g. quota, propagate to the caller).
+ *   `load` returns null when nothing is saved or the data is corrupt; `save`
+ *   writes the value as JSON. Storage errors (blocked, quota) propagate to
+ *   the caller unless `quiet` says otherwise.
  */
-export function createStorageAdapter(key, storage = localStorage) {
+export function createStorageAdapter(key, storage = localStorage, { quiet = false } = {}) {
+  /** @returns {string | null} */
+  function read() {
+    if (!quiet) return storage.getItem(key);
+    try {
+      return storage.getItem(key);
+    } catch {
+      return null;
+    }
+  }
   return {
     load() {
+      const raw = read();
+      if (raw === null) return null;
       try {
-        const raw = storage.getItem(key);
-        return raw === null ? null : JSON.parse(raw);
+        return JSON.parse(raw);
       } catch {
         return null;
       }
