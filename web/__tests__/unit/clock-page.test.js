@@ -31,21 +31,21 @@ describe('School Clock page', () => {
 
   it('shows the Day Label, the current Period, its times, and time left and elapsed', () => {
     // Tue 2026-10-27 is an All Day.
-    const real = fakeRealClock(new Date(2026, 9, 27, 10, 12, 0));
+    const real = fakeRealClock(new Date(2026, 9, 27, 10, 32, 0));
     app = initClockApp({ realNow: real.now });
 
     const text = pageText();
     expect(text).toContain('All Day');
     expect(text).toContain('Period 3');
-    expect(text).toContain('10:05 AM – 10:55 AM');
+    expect(text).toContain('10:30 AM – 11:15 AM');
     expect(text).toContain('43:00 left');
-    expect(text).toContain('7:00 elapsed');
-    expect(text).toContain('10:12:00 AM');
+    expect(text).toContain('2:00 elapsed');
+    expect(text).toContain('10:32:00 AM');
     expect(text).not.toContain('Simulated time');
   });
 
   it('ticks every second, recomputing from the clock rather than counting ticks', () => {
-    const real = fakeRealClock(new Date(2026, 9, 27, 10, 12, 0));
+    const real = fakeRealClock(new Date(2026, 9, 27, 10, 32, 0));
     app = initClockApp({ realNow: real.now });
 
     real.advance(1000);
@@ -58,13 +58,13 @@ describe('School Clock page', () => {
   });
 
   it('counts down a Passing Period and says what is up next', () => {
-    const real = fakeRealClock(new Date(2026, 9, 27, 10, 2, 20));
+    const real = fakeRealClock(new Date(2026, 9, 27, 10, 27, 20));
     app = initClockApp({ realNow: real.now });
 
     const text = pageText();
     expect(text).toContain('Passing Period');
     expect(text).toContain('2:40 left');
-    expect(text).toContain('Up next: Period 3 at 10:05 AM');
+    expect(text).toContain('Up next: Period 3 at 10:30 AM');
   });
 
   it('says it is after school, and for how long', () => {
@@ -79,12 +79,12 @@ describe('School Clock page', () => {
   });
 
   it('says it is before school, and when the first Segment starts', () => {
-    const real = fakeRealClock(new Date(2026, 9, 27, 7, 30, 0));
+    const real = fakeRealClock(new Date(2026, 9, 27, 8, 0, 0));
     app = initClockApp({ realNow: real.now });
 
     const text = pageText();
     expect(text).toContain('Before school');
-    expect(text).toContain('Up next: Period 1 at 8:00 AM');
+    expect(text).toContain('Up next: Period 1 at 8:30 AM');
     expect(text).toContain('30:00 until school starts');
   });
 
@@ -104,28 +104,28 @@ describe('School Clock page', () => {
   describe('simulated time', () => {
     it('starts at ?at=, shows a banner with the spoofed time, and ticks from there', () => {
       const real = fakeRealClock(new Date(2026, 9, 28, 20, 0, 0));
-      app = initClockApp({ realNow: real.now, search: '?at=2026-10-27T10:12' });
+      app = initClockApp({ realNow: real.now, search: '?at=2026-10-27T10:32' });
 
-      expect(pageText()).toContain('Simulated time: Tue, Oct 27, 2026, 10:12:00 AM');
+      expect(pageText()).toContain('Simulated time: Tue, Oct 27, 2026, 10:32:00 AM');
       expect(pageText()).toContain('Period 3');
       expect(pageText()).toContain('43:00 left');
 
       real.advance(1000);
-      expect(pageText()).toContain('Simulated time: Tue, Oct 27, 2026, 10:12:01 AM');
+      expect(pageText()).toContain('Simulated time: Tue, Oct 27, 2026, 10:32:01 AM');
       expect(pageText()).toContain('42:59 left');
     });
 
     it('advances at &speed= times real time', () => {
       const real = fakeRealClock(new Date(2026, 9, 28, 20, 0, 0));
-      app = initClockApp({ realNow: real.now, search: '?at=2026-10-27T10:12&speed=60' });
+      app = initClockApp({ realNow: real.now, search: '?at=2026-10-27T10:32&speed=60' });
 
       real.advance(3000);
-      expect(pageText()).toContain('10:15:00 AM');
+      expect(pageText()).toContain('10:35:00 AM');
       expect(pageText()).toContain('40:00 left');
     });
 
     it('ignores an invalid ?at= and shows real time with no banner', () => {
-      const real = fakeRealClock(new Date(2026, 9, 27, 10, 12, 0));
+      const real = fakeRealClock(new Date(2026, 9, 27, 10, 32, 0));
       app = initClockApp({ realNow: real.now, search: '?at=whenever&speed=60' });
 
       expect(pageText()).not.toContain('Simulated time');
@@ -136,7 +136,7 @@ describe('School Clock page', () => {
   });
 
   it('stops ticking when destroyed, and a second init replaces the first', () => {
-    const real = fakeRealClock(new Date(2026, 9, 27, 10, 12, 0));
+    const real = fakeRealClock(new Date(2026, 9, 27, 10, 32, 0));
     const first = initClockApp({ realNow: real.now });
     app = initClockApp({ realNow: real.now });
     first.destroy();
@@ -146,7 +146,7 @@ describe('School Clock page', () => {
   });
 
   it('starts itself on the real page, where the mount exists when the script loads', async () => {
-    vi.setSystemTime(new Date(2026, 9, 27, 10, 12, 0));
+    vi.setSystemTime(new Date(2026, 9, 27, 10, 32, 0));
     vi.resetModules();
     const fresh = await import('../../clock/clock.js');
 

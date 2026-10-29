@@ -16,7 +16,7 @@
 /**
  * @typedef {{
  *   dayLabel: string | null,
- *   state: 'segment' | 'passing' | 'beforeSchool' | 'afterSchool' | 'dayOff' | 'unknown',
+ *   state: 'segment' | 'passing' | 'beforeSchool' | 'afterSchool' | 'dayOff' | 'experienceWeek' | 'unknown',
  *   current: TimedSegment | null,
  *   passing: { start: Date, end: Date } | null,
  *   upNext: TimedSegment | null,
@@ -29,6 +29,10 @@
  * - `beforeSchool`: `upNext` is the first Segment; time left counts down to it.
  * - `afterSchool`: time elapsed counts from the last Segment's end.
  * - `dayOff`: not a School Day; `dayLabel` says why (e.g. "Weekend").
+ * - `experienceWeek`: in session for this Division, but with no Segments.
+ *
+ * A Calendar Exception for the moment's Division wins over one for both
+ * Divisions, which wins over the Weekday Default.
  * - `unknown`: nothing is known about this date's Segments; just tell time.
  */
 
@@ -67,9 +71,19 @@ export function describeMoment(now, schoolYears, { division = 'HS' } = {}) {
   const date = isoDate(now);
   const year = schoolYears.find((y) => y.start <= date && date <= y.end);
   if (!year) return { dayLabel: null, state: 'unknown', ...NOTHING };
+  const forDate = year.calendarExceptions.filter((e) => e.date === date);
+  const exception =
+    forDate.find((e) => e.division === division) ?? forDate.find((e) => e.division === undefined);
+  if (exception?.kind === 'dayOff') return { dayLabel: exception.dayLabel, state: 'dayOff', ...NOTHING };
+  if (exception?.kind === 'experienceWeek') {
+    return { dayLabel: 'HS Experience Week', state: 'experienceWeek', ...NOTHING };
+  }
   const weekday = now.getDay();
-  if (weekday === 0 || weekday === 6) return { dayLabel: 'Weekend', state: 'dayOff', ...NOTHING };
-  const bellSchedule = year.bellSchedules[year.weekdayDefaults[/** @type {1 | 2 | 3 | 4 | 5} */ (weekday)]];
+  let key;
+  if (exception) key = exception.bellSchedule;
+  else if (weekday === 0 || weekday === 6) return { dayLabel: 'Weekend', state: 'dayOff', ...NOTHING };
+  else key = year.weekdayDefaults[/** @type {1 | 2 | 3 | 4 | 5} */ (weekday)];
+  const bellSchedule = year.bellSchedules[key];
   if (!bellSchedule) return { dayLabel: null, state: 'unknown', ...NOTHING };
   const plan = bellSchedule.byDivision?.[division] ?? bellSchedule.segments;
   const segments = plan.map((s) => ({
