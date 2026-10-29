@@ -26,12 +26,12 @@ describe('School Clock classroom timer', () => {
   let player;
 
   /** Open (or reload) the page on an HS device, on the same storage. */
-  function open({ sound = {} } = {}) {
+  function open({ sound = {}, search = '' } = {}) {
     app?.destroy();
     player = createFakeSoundPlayer(sound);
     app = initClockApp({
       realNow: () => t, storage, tabStorage: createFakeStorage(), soundPlayer: player,
-      prefersReducedMotion: () => false,
+      prefersReducedMotion: () => false, search,
     });
   }
   /** Time passes and the page ticks as usual. */
@@ -173,6 +173,50 @@ describe('School Clock classroom timer', () => {
       expect(saved(storage).timerEndsAt).toBeNull();
       advance(SEC);
       expect(ringing().hidden).toBe(true);
+    });
+  });
+
+  describe('in simulated time (affects only that tab)', () => {
+    // Simulated Tue 2026-10-27 13:00, while the real clock says 10:40.
+    const SIMULATED = '?at=2026-10-27T13:00';
+
+    it('runs, pauses and rings in memory only, never saving the timer; quick picks still save', () => {
+      open({ search: SIMULATED });
+      typeDuration('3');
+      expect(timerText()).toContain('3:00 left');
+      expect(saved(storage)).toMatchObject({ timerEndsAt: null, timerPausedMs: null, recentDurations: [3 * MIN] });
+
+      advance(MIN);
+      timerButton('Pause').click();
+      expect(timerText()).toContain('Paused · 2:00 left');
+      expect(saved(storage)).toMatchObject({ timerEndsAt: null, timerPausedMs: null });
+
+      timerButton('Resume').click();
+      advance(2 * MIN + SEC);
+      expect(ringing().textContent).toContain('Ringing: Timer');
+      expect(saved(storage)).toMatchObject({ timerEndsAt: null, timerPausedMs: null });
+
+      open();
+      expect(timerText()).not.toContain('left');
+    });
+
+    it('neither loads nor clears a real timer saved by another tab', () => {
+      // A real timer ending at 10:45 — already in the past for the simulated 13:00 clock.
+      storage = createFakeStorage({
+        [SETTINGS_KEY]: JSON.stringify({ division: 'HS', timerEndsAt: START + 5 * MIN }),
+      });
+      open({ search: SIMULATED });
+      expect(timerText()).not.toContain('left');
+      advance(2 * SEC);
+      expect(ringing().hidden).toBe(true);
+      timerButton('1 min').click();
+      advance(MIN + SEC);
+      expect(ringing().textContent).toContain('Ringing: Timer');
+      expect(saved(storage).timerEndsAt).toBe(START + 5 * MIN);
+
+      t = START;
+      open();
+      expect(timerText()).toContain('5:00 left');
     });
   });
 

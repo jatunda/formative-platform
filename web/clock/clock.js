@@ -229,6 +229,14 @@ export function initClockApp({
   const store = createSettingsStore(storage);
   let settings = store.load();
   let lastTick = new Date(clock.now());
+  // Simulated time affects only this tab: its timer lives in memory, and the
+  // real timer saved by other tabs is neither loaded, cleared nor overwritten.
+  const savedTimer = { timerEndsAt: settings.timerEndsAt, timerPausedMs: settings.timerPausedMs };
+  if (clock.simulated) settings = { ...settings, ...cancelTimer() };
+  /** Save the settings (in simulated time, with the real timer as it was saved). */
+  function saveSettings() {
+    store.save(clock.simulated ? { ...settings, ...savedTimer } : settings);
+  }
   // A timer that ended while the page was closed is simply gone: it doesn't ring late.
   settleSavedTimer(lastTick);
 
@@ -236,7 +244,7 @@ export function initClockApp({
   function settleSavedTimer(now) {
     if (settleTimer(settings, now.getTime()) === settings) return;
     settings = { ...settings, ...cancelTimer() };
-    store.save(settings);
+    saveSettings();
   }
 
   // This tab's Readouts: its own saved layout, else the last used one; with
@@ -255,7 +263,7 @@ export function initClockApp({
   /** @param {Partial<import('./clock-settings.js').ClockSettings>} change */
   function updateSettings(change) {
     settings = { ...settings, ...change };
-    store.save(settings);
+    saveSettings();
     soundPlayer.setVolume(settings.volume);
     const now = new Date(clock.now());
     scheduleSounds(now);
@@ -486,7 +494,7 @@ export function initClockApp({
       const alarms = alarmsAfterRinging(settings.alarms, rang, { simulated: clock.simulated });
       if (alarms !== settings.alarms) {
         settings = { ...settings, alarms };
-        store.save(settings);
+        saveSettings();
       }
       settleSavedTimer(now);
     }
