@@ -10,9 +10,13 @@
 
 /** @typedef {import('./clock-settings.js').SoundName} SoundName */
 
+/** Every voice's name for people, in the order the page lists them. */
+/** @type {Readonly<Record<SoundName, string>>} */
+export const SOUND_NAMES = Object.freeze({ chime: 'Chime', schoolBell: 'School bell', beep: 'Beep', buzzer: 'Buzzer' });
+
 /** Every voice, in the order the page lists them. */
-/** @type {SoundName[]} */
-export const SOUNDS = ['chime', 'schoolBell', 'beep', 'buzzer'];
+/** @type {readonly SoundName[]} */
+export const SOUNDS = Object.freeze(/** @type {SoundName[]} */ (Object.keys(SOUND_NAMES)));
 
 /** How long a Bell (or a preview) plays, in seconds. */
 export const BELL_SECONDS = 3;

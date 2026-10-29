@@ -18,7 +18,8 @@ const MINUTE = 60 * SECOND;
 export const MAX_DURATION_MS = 24 * 60 * MINUTE;
 /** The one-tap timers, in minutes. */
 export const PRESET_MINUTES = Object.freeze([1, 2, 5, 10]);
-const QUICK_PICKS = 3;
+/** How many recent custom durations are kept as quick picks. */
+export const QUICK_PICKS = 3;
 
 /**
  * The quick picks after a custom duration is used: it moves to the front and

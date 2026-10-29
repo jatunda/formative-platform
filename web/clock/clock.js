@@ -20,7 +20,7 @@ import { addReadout, createLayoutStore, cycleReadout, newLayout, removeReadout }
 import { readoutText, readoutValue } from './readouts.js';
 import { SCHOOL_YEARS } from './school-years.js';
 import { createWakeLockKeeper, detectCapabilities } from './screen.js';
-import { BELL_SECONDS, ALARM_MAX_SECONDS, SOUNDS, createSoundPlayer } from './sound.js';
+import { BELL_SECONDS, ALARM_MAX_SECONDS, SOUNDS, SOUND_NAMES, createSoundPlayer } from './sound.js';
 import {
   PRESET_MINUTES, cancelTimer, durationLabel, parseDuration, pauseTimer, rememberDuration, resumeTimer,
   settleTimer, startTimer, timerStatus,
@@ -130,8 +130,6 @@ function displayLines(now, moment, simulated, text) {
   }
   return lines;
 }
-
-const SOUND_NAMES = { chime: 'Chime', schoolBell: 'School bell', beep: 'Beep', buzzer: 'Buzzer' };
 
 /** @param {import('./clock-settings.js').PeriodAnchor} anchor */
 function anchorText(anchor) {

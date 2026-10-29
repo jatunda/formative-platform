@@ -5,6 +5,8 @@
 // Alarm), so a bad save never stops the clock. Nothing here listens for
 // cross-tab storage events: open tabs never change each other.
 import { createStorageAdapter } from '../storage.js';
+import { SOUNDS } from './sound.js';
+import { QUICK_PICKS } from './timer.js';
 
 /** @typedef {import('./clock-settings.js').ClockSettings} ClockSettings */
 /** @typedef {import('./clock-settings.js').Alarm} Alarm */
@@ -26,14 +28,10 @@ export const DEFAULT_SETTINGS = Object.freeze(/** @type {ClockSettings} */ ({
   recentDurations: [],
 }));
 
-/** How many recent custom durations are kept as quick picks. */
-const QUICK_PICKS = 3;
-const SOUNDS = ['chime', 'schoolBell', 'beep', 'buzzer'];
-
 /** @param {unknown} v @returns {v is Record<string, any>} */
 const isObject = (v) => typeof v === 'object' && v !== null && !Array.isArray(v);
 /** @param {unknown} v */
-const isSound = (v) => SOUNDS.includes(/** @type {string} */ (v));
+const isSound = (v) => SOUNDS.includes(/** @type {import('./clock-settings.js').SoundName} */ (v));
 /** @param {unknown} v */
 const isStringList = (v) => Array.isArray(v) && v.every((s) => typeof s === 'string');
 /** @param {unknown} v @returns {v is number} */
