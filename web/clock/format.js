@@ -37,6 +37,27 @@ export function formatDuration(ms) {
 }
 
 /**
+ * A countdown that may run for days: like formatDuration under a day, then
+ * whole days and hours, e.g. "2d 14h" (rounded down).
+ * @param {number} ms
+ * @returns {string}
+ */
+export function formatLongDuration(ms) {
+  const totalHours = Math.floor(ms / 3600000);
+  if (totalHours < 24) return formatDuration(ms);
+  return `${Math.floor(totalHours / 24)}d ${totalHours % 24}h`;
+}
+
+/**
+ * A date without the year, e.g. "Mon, Nov 30".
+ * @param {Date} date
+ * @returns {string}
+ */
+export function formatShortDate(date) {
+  return `${WEEKDAYS[date.getDay()]}, ${MONTHS[date.getMonth()]} ${date.getDate()}`;
+}
+
+/**
  * A date, e.g. "Wed, Jan 20, 2027".
  * @param {Date} date
  * @returns {string}
