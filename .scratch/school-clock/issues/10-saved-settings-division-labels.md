@@ -14,17 +14,17 @@ Spec: `.scratch/school-clock/spec.md` (Implementation Decisions: device storage;
 
 **Blocked by:** 09 (for the Alarm and Bells setting shapes)
 
-**Status:** ready-for-agent
+**Status:** closed
 
-- [ ] The shared storage adapter exists, Robotics uses it, and every Robotics test still passes unchanged (or with only import-path updates)
-- [ ] Clock settings are stored under versioned keys. Missing or corrupt data falls back to defaults without throwing
-- [ ] Division: asked on first visit (no saved value), switchable afterwards, and the page uses the chosen Division's Bell Schedules and exceptions
-- [ ] Period Labels appear wherever the page names that Period (current Segment, up next, next-rings list)
-- [ ] Alarms, Bells on/off, sound choices and volume round-trip through storage
-- [ ] **24-hour time:** a toggle (default off) saved per device. When on, every clock time on the page (current time, Segment start/end, Next School Day "starts at", next-rings list) shows in 24-hour format through one shared formatter; durations and countdowns are unchanged. Tests cover both formats, including midnight and noon
-- [ ] Nothing listens for cross-tab storage events
-- [ ] Tests use fake storage: first-visit prompt, Division switch, labels shown, corrupt-data fallback
-- [ ] `npm run lint`, `npm run typecheck`, `npm run test:coverage` in `web/` pass
+- [x] The shared storage adapter exists, Robotics uses it, and every Robotics test still passes unchanged (or with only import-path updates)
+- [x] Clock settings are stored under versioned keys. Missing or corrupt data falls back to defaults without throwing
+- [x] Division: asked on first visit (no saved value), switchable afterwards, and the page uses the chosen Division's Bell Schedules and exceptions
+- [x] Period Labels appear wherever the page names that Period (current Segment, up next, next-rings list)
+- [x] Alarms, Bells on/off, sound choices and volume round-trip through storage
+- [x] **24-hour time:** a toggle (default off) saved per device. When on, every clock time on the page (current time, Segment start/end, Next School Day "starts at", next-rings list) shows in 24-hour format through one shared formatter; durations and countdowns are unchanged. Tests cover both formats, including midnight and noon
+- [x] Nothing listens for cross-tab storage events
+- [x] Tests use fake storage: first-visit prompt, Division switch, labels shown, corrupt-data fallback
+- [x] `npm run lint`, `npm run typecheck`, `npm run test:coverage` in `web/` pass
 
 ## Comments
 
