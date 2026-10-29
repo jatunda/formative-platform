@@ -5,7 +5,7 @@
 // throttled or sleeping tab is right the moment it ticks again.
 import { describeMoment } from './clock-model.js';
 import { createClockSource } from './clock-source.js';
-import { formatClockTime, formatDate, formatDuration } from './format.js';
+import { formatClockTime, formatDate, formatDuration, formatLongDuration, formatShortDate } from './format.js';
 import { SCHOOL_YEARS } from './school-years.js';
 
 const TICK_MS = 1000;
@@ -24,7 +24,8 @@ function displayLines(now, moment, simulated) {
     lines.push(['p', `Simulated time: ${formatDate(now)}, ${formatClockTime(now, { seconds: true })}`]);
   }
   lines.push(['p', formatClockTime(now, { seconds: true })]);
-  if (moment.dayLabel) lines.push(['h1', moment.dayLabel]);
+  if (moment.state === 'summer') lines.push(['h1', `Day ${moment.summerDay} of Summer`]);
+  else if (moment.dayLabel) lines.push(['h1', moment.dayLabel]);
 
   const upNext = (segment) => ['p', `Up next: ${segment.name} at ${formatClockTime(segment.start)}`];
   switch (moment.state) {
@@ -53,13 +54,20 @@ function displayLines(now, moment, simulated) {
     case 'afterSchool':
       lines.push(
         ['h2', 'After school'],
-        ['p', `School ended at ${formatClockTime(new Date(now.getTime() - moment.timeElapsedMs))}`],
-        ['p', `${formatDuration(moment.timeElapsedMs)} since school ended`],
+        ['p', `School ended at ${formatClockTime(moment.schoolEndedAt)}`],
       );
       break;
-    case 'dayOff':
-      lines.push(['p', 'No school today']);
-      break;
+  }
+
+  // Off-Hours: when school is back (before school, "Up next" already says),
+  // and how long since it ended.
+  if (moment.nextSchoolDay && moment.state !== 'beforeSchool') {
+    const lead = moment.state === 'summer' ? 'First day' : 'Next school day';
+    const start = formatShortDate(moment.nextSchoolDay.firstSegment.start);
+    lines.push(['p', `${lead}: ${start} · starts in ${formatLongDuration(moment.untilNextSchoolDayMs)}`]);
+  }
+  if (moment.schoolEndedAt) {
+    lines.push(['p', `${formatLongDuration(moment.sinceSchoolEndedMs)} since school ended`]);
   }
   return lines;
 }

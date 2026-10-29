@@ -217,11 +217,20 @@ describe('2026–27 calendar', () => {
       .sort();
     expect(actual).toEqual(expected);
     for (const division of ['MS', 'HS']) {
-      for (const [date, label] of expected) {
+      // "Done!" (5/28) falls after the last School Day, so the clock calls it Summer.
+      for (const [date, label] of expected.filter(([date]) => date !== '2027-05-28')) {
         const [y, m, d] = date.split('-').map(Number);
         const moment = describeMoment(new Date(y, m - 1, d, 10, 0), SCHOOL_YEARS, { division });
         expect([date, moment.state, moment.dayLabel]).toEqual([date, 'dayOff', label]);
       }
+    }
+  });
+
+  it('starts Summer when the last Finals block of Thu 5/27/27 ends, so "Done!" is Day 2 of Summer', () => {
+    for (const division of ['MS', 'HS']) {
+      expect(describeMoment(new Date(2027, 4, 27, 11, 29), SCHOOL_YEARS, { division }).state).toBe('segment');
+      expect(describeMoment(new Date(2027, 4, 27, 11, 30), SCHOOL_YEARS, { division }).summerDay).toBe(1);
+      expect(describeMoment(new Date(2027, 4, 28, 10, 0), SCHOOL_YEARS, { division }).summerDay).toBe(2);
     }
   });
 
