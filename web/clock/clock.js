@@ -470,7 +470,6 @@ export function initClockApp({
    * @param {ReturnType<typeof textFor>} text
    */
   function renderMini(now, moment, bigReadout, text) {
-    if (!mini.isOpen()) return;
     mini.show({
       readout: bigReadout ?? text.time(now, { seconds: true }),
       status: moment ? (statusHeading(moment, text) ?? dayHeading(moment) ?? '') : '',

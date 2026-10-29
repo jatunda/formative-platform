@@ -12,7 +12,7 @@ const MINI_PLAYER_SIZE = { width: 320, height: 200 };
  *   onOpen: () => void, onDismiss: () => void }} options
  *   `onOpen` runs once a window has opened (the page fills it in); `onDismiss`
  *   when its Dismiss button is pressed.
- * @returns {{ button: HTMLElement, isOpen: () => boolean,
+ * @returns {{ button: HTMLElement,
  *   show: (lines: { readout: string, status: string, upNext: string }) => void,
  *   showRinging: (what: string | null) => void, close: () => void }}
  *   `button` opens and closes it (hidden where the browser has no
@@ -75,7 +75,6 @@ export function createMiniPlayer({ pictureInPicture, onOpen, onDismiss }) {
 
   return {
     button,
-    isOpen: () => mini !== null,
     show({ readout, status, upNext }) {
       if (!mini) return;
       mini.readout.textContent = readout;
