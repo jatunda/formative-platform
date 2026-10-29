@@ -14,14 +14,18 @@ Spec: `.scratch/school-clock/spec.md` (user stories 42–47, 64). Vocabulary: `w
 
 **Blocked by:** 12
 
-**Status:** ready-for-agent
+**Status:** closed
 
-- [ ] Timer logic is a pure module: a running timer is stored as an end time; a paused timer is stored as its remaining time; remaining time is always computed from the current time
-- [ ] Presets, custom entry (with sensible validation), pause, resume and cancel
-- [ ] The last 3 distinct custom durations are kept as quick picks, most recent first
-- [ ] A running or paused timer survives a reload (saved settings)
-- [ ] The timer's end comes back from the "rings in a window" query and rings through the sound engine
-- [ ] Tests with a fake clock and storage: start → reload → still counting; pause/resume arithmetic; quick-pick order; ring at end
-- [ ] `npm run lint`, `npm run typecheck`, `npm run test:coverage` in `web/` pass
+- [x] Timer logic is a pure module: a running timer is stored as an end time; a paused timer is stored as its remaining time; remaining time is always computed from the current time
+- [x] Presets, custom entry (with sensible validation), pause, resume and cancel
+- [x] The last 3 distinct custom durations are kept as quick picks, most recent first
+- [x] A running or paused timer survives a reload (saved settings)
+- [x] The timer's end comes back from the "rings in a window" query and rings through the sound engine
+- [x] Tests with a fake clock and storage: start → reload → still counting; pause/resume arithmetic; quick-pick order; ring at end
+- [x] `npm run lint`, `npm run typecheck`, `npm run test:coverage` in `web/` pass
 
 ## Comments
+
+## Comments
+
+- Typed input: minutes ('7', '1.5'), m:ss, h:mm:ss; 1 s to 24 h. Starting replaces a running timer. A timer that ended while closed is cleared without ringing. Presets aren't added to quick picks. In simulated time the timer is memory-only and never touches the saved real timer.
