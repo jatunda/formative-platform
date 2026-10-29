@@ -8,7 +8,7 @@ Spec: `.scratch/school-clock/spec.md`. Design reference: `.scratch/school-clock/
 
 **Status:** open
 
-- [ ] Run the real page locally and drive it with Playwright at every checklist size, with the clock faked to land on each state (in a Period, Passing Period, Break, Assembly, before and after school, a day off, Experience Week, Summer, ringing)
+- [ ] Run the real page locally and drive it with Playwright at every checklist size, with the clock spoofed through the page's `?at=` / `&speed=` parameters (ticket 06) to land on each state (in a Period, Passing Period, Break, Assembly, before and after school, a day off, Experience Week, Summer, ringing)
 - [ ] Compare each screenshot to the design reference; fix visual drift
 - [ ] Passes the full self-review checklist in `01-design-mockups.md`, including an automated accessibility scan with no violations
 - [ ] Keyboard-only: every action (cycle a Readout, add a Readout, open settings, start the timer, dismiss a ring, toggle Bells) works with Tab/Enter/Space/Escape, and focus is never lost

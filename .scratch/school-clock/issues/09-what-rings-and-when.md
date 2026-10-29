@@ -14,6 +14,7 @@ Spec: `.scratch/school-clock/spec.md` (Implementation Decisions: clock model "ri
 - [ ] Period Alarms apply only to Periods (Periods 1–7 by default; Seminar and Super Seminar when ticked), never Breaks or Assemblies; minutes-from-start, minutes-before-end and halfway land at the right times on both 45- and 85-minute Periods
 - [ ] Bell Schedule scoping works, and the Block Days shortcut selects Even, Odd, Late Start Even and HS Super Seminar Even
 - [ ] A disabled Alarm never rings
+- [ ] A "once" Clock Alarm that rings during simulated time (06) is not turned off
 - [ ] A timer end time passed in comes back as a ring
 - [ ] Windows are half-open: a ring exactly on a window's edge appears in exactly one of two adjacent windows
 - [ ] Unit tests cover each rule above. The page test checks the "next rings" list for a fake time

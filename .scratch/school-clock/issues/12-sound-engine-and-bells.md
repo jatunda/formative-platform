@@ -26,6 +26,7 @@ Spec: `.scratch/school-clock/spec.md` (Implementation Decisions: sound engine, v
 - [ ] The volume and the chosen sounds come from saved settings (10)
 - [ ] The flash stays under 3 per second; the reduced-motion variant is a steady highlight; colour is not the only signal
 - [ ] The sound player is passed into the page. Tests use a fake player: scheduled times match the rings, the prompt shows while suspended, dismiss works, the flash class toggles, and reduced motion is respected
+- [ ] Under simulated time (06), rings are mapped onto the audio clock using the speed factor, so `?at=…&speed=60` plays Bells at the right simulated moments
 - [ ] The page states plainly that the tab must stay open for sounds
 - [ ] `npm run lint`, `npm run typecheck`, `npm run test:coverage` in `web/` pass
 

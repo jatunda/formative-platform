@@ -21,6 +21,8 @@ Spec: `.scratch/school-clock/spec.md` (Implementation Decisions: new context and
 - [ ] All values are computed from the current time on each tick, never by adding up ticks
 - [ ] `/clock` is served by a hosting rewrite placed above the catch-all, with no database or Cloud Function involved
 - [ ] The page controller takes time as a parameter. A jsdom test drives it with a fake clock and checks the text for an in-Period time, a Passing Period time, and an after-school time
+- [ ] **Simulated time:** the page accepts `?at=<local date-time>` (e.g. `?at=2027-01-20T09:50`), which starts its clock at that moment and ticks forward from there, and an optional `&speed=<n>` (e.g. `60` = one real second is one minute). It's built as the page's clock source, so every later ticket gets it for free. An invalid value is ignored. While simulated, a visible "Simulated time" banner shows the spoofed time
+- [ ] A test covers `?at=` and `&speed=` (the page shows the spoofed moment and advances at the given rate), plus an invalid value falling back to real time
 - [ ] Model unit tests cover each state above, including Period 2 → Nutrition (no Passing Period) and Nutrition → Period 3 (a 5-minute Passing Period showing up next)
 - [ ] `npm run lint`, `npm run typecheck`, `npm run test:coverage` in `web/` pass
 
