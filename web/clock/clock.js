@@ -9,7 +9,7 @@
 // onto its audio clock, so they play on time even when this tab's timers are
 // throttled behind other windows. The window is redone when settings change,
 // when the tab is shown again, when sound turns on, and as it rolls forward.
-import { alarmsAfterRinging, describeMoment, ringsInWindow } from './clock-model.js';
+import { alarmsAfterRinging, describeMoment, ringsInWindow, ringsUntilDismissed } from './clock-model.js';
 import { LABELLED_PERIODS } from './clock-settings.js';
 import { createSettingsStore } from './clock-storage.js';
 import { createClockSource } from './clock-source.js';
@@ -316,7 +316,7 @@ export function initClockApp({
       key: ringKey(ring),
       at: audioNow + (ring.at.getTime() - t) / 1000 / clock.speed,
       sound: ring.sound,
-      repeat: ring.source !== 'bell',
+      repeat: ringsUntilDismissed(ring),
     })));
   }
 
@@ -625,7 +625,7 @@ export function initClockApp({
       const rang = ringsInWindow(lastTick, now, schoolYears, settings);
       const text = textFor(settings);
       for (const ring of rang) {
-        if (ring.at.getTime() >= staleBefore) startRinging(ringSourceText(ring, text), ring.source !== 'bell');
+        if (ring.at.getTime() >= staleBefore) startRinging(ringSourceText(ring, text), ringsUntilDismissed(ring));
       }
       const alarms = alarmsAfterRinging(settings.alarms, rang, { simulated: clock.simulated });
       if (alarms !== settings.alarms) {
