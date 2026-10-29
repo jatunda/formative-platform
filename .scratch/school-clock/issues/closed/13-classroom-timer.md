@@ -26,6 +26,4 @@ Spec: `.scratch/school-clock/spec.md` (user stories 42–47, 64). Vocabulary: `w
 
 ## Comments
 
-## Comments
-
 - Typed input: minutes ('7', '1.5'), m:ss, h:mm:ss; 1 s to 24 h. Starting replaces a running timer. A timer that ended while closed is cleared without ringing. Presets aren't added to quick picks. In simulated time the timer is memory-only and never touches the saved real timer.
