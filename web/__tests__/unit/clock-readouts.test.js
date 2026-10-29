@@ -67,11 +67,6 @@ describe('readoutText', () => {
       .toBe('4d 22h until next school day');
   });
 
-  it('writes a dash when there is nothing to count', () => {
-    expect(readoutText({ kind: 'duration', ms: null, caption: 'until next school day', long: true }))
-      .toBe('— until next school day');
-  });
-
   it('writes the current time with seconds, in 24-hour form when asked', () => {
     const at = tue(13, 4, 9);
     expect(readoutText({ kind: 'time', at })).toBe('1:04:09 PM');
@@ -121,10 +116,10 @@ describe('readoutValue', () => {
     expect(countup).toMatchObject({ caption: 'since school ended', ms: (20 * 60 + 50) * MIN });
   });
 
-  it('in Summer with next year unknown: nothing to count down to', () => {
+  it('in Summer with next year unknown: nothing to count down to, so the current time', () => {
     const now = new Date(2027, 6, 1, 12, 0);
     const { countdown, countup } = valuesAt(now);
-    expect(countdown).toEqual({ kind: 'duration', ms: null, caption: 'until next school day', long: true });
+    expect(countdown).toEqual({ kind: 'time', at: now });
     expect(countup.ms).toBeGreaterThan(0);
   });
 

@@ -159,6 +159,14 @@ describe('School Clock page', () => {
       expect(text).not.toContain('Next school day');
     });
 
+    it('is a plain clock with no next year: the Readout shows the time, never a dash', () => {
+      const real = fakeRealClock(new Date(2027, 4, 28, 10, 0, 0));
+      app = start({ realNow: real.now });
+      const readout = document.querySelector('#clockApp .clock-readout--big .clock-readout-value');
+      expect(readout.textContent).toBe('10:00:00 AM');
+      expect(pageText()).not.toContain('—');
+    });
+
     it('counts down to the first day once next year is registered', () => {
       const nextYear = {
         id: '2027-28',
