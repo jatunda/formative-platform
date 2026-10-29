@@ -17,18 +17,18 @@ Spec: `.scratch/school-clock/spec.md` (Implementation Decisions: sound engine, v
 
 **Blocked by:** 09, 10
 
-**Status:** ready-for-agent
+**Status:** closed
 
-- [ ] The voices are generated with Web Audio; no audio assets are added to hosting
-- [ ] Rings from the "rings in a window" query are scheduled ahead on the audio clock for a lookahead window, and rescheduled when settings change, when the tab becomes visible, and when the window rolls over. No ring plays twice or is skipped across a window boundary
-- [ ] The audio context starts suspended. The "turn sound on" control resumes it on click, and shows again whenever the context is suspended
-- [ ] Bells play about 3 s. Alarms repeat until dismissed or 60 s. Dismiss stops the current ring
-- [ ] The volume and the chosen sounds come from saved settings (10)
-- [ ] The flash stays under 3 per second; the reduced-motion variant is a steady highlight; colour is not the only signal
-- [ ] The sound player is passed into the page. Tests use a fake player: scheduled times match the rings, the prompt shows while suspended, dismiss works, the flash class toggles, and reduced motion is respected
-- [ ] Under simulated time (06), rings are mapped onto the audio clock using the speed factor, so `?at=…&speed=60` plays Bells at the right simulated moments
-- [ ] The page states plainly that the tab must stay open for sounds
-- [ ] `npm run lint`, `npm run typecheck`, `npm run test:coverage` in `web/` pass
+- [x] The voices are generated with Web Audio; no audio assets are added to hosting
+- [x] Rings from the "rings in a window" query are scheduled ahead on the audio clock for a lookahead window, and rescheduled when settings change, when the tab becomes visible, and when the window rolls over. No ring plays twice or is skipped across a window boundary
+- [x] The audio context starts suspended. The "turn sound on" control resumes it on click, and shows again whenever the context is suspended
+- [x] Bells play about 3 s. Alarms repeat until dismissed or 60 s. Dismiss stops the current ring
+- [x] The volume and the chosen sounds come from saved settings (10)
+- [x] The flash stays under 3 per second; the reduced-motion variant is a steady highlight; colour is not the only signal
+- [x] The sound player is passed into the page. Tests use a fake player: scheduled times match the rings, the prompt shows while suspended, dismiss works, the flash class toggles, and reduced motion is respected
+- [x] Under simulated time (06), rings are mapped onto the audio clock using the speed factor, so `?at=…&speed=60` plays Bells at the right simulated moments
+- [x] The page states plainly that the tab must stay open for sounds
+- [x] `npm run lint`, `npm run typecheck`, `npm run test:coverage` in `web/` pass
 
 ## Comments
 
