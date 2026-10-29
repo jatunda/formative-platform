@@ -15,7 +15,8 @@ Spec: `.scratch/school-clock/spec.md`.
 2. In **Chrome**: open the mini player, drag it over Slides or Docs, and check it stays on top and updates. In Safari and Firefox, check the mini player button isn't shown.
 3. Project it in your classroom. From the back row, check you can read the big Readout and the Segment name, and that the flash is noticeable but not unpleasant.
 4. On your phone, open the clock and check it's usable.
-5. Write anything that felt off under `## Comments` (or tell Claude in chat).
+5. To check a state without waiting for it, add `?at=` to the URL, e.g. `mrhsieh.app/clock?at=2027-01-20T09:50` (HS Experience Week) or `?at=2026-11-04T11:03&speed=30` to watch a Passing Period and its Bells go by quickly. A "Simulated time" banner shows while spoofed.
+6. Write anything that felt off under `## Comments` (or tell Claude in chat).
 
 - [ ] Checked in Safari, Chrome and Firefox on the MacBook
 - [ ] Mini player checked in Chrome
