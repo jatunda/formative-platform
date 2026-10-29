@@ -10,8 +10,10 @@ import { LABELLED_PERIODS } from './clock-settings.js';
 import { createSettingsStore } from './clock-storage.js';
 import { createClockSource } from './clock-source.js';
 import {
-  formatClockTime, formatDate, formatDuration, formatLongDuration, formatSegmentName, formatShortDate,
+  formatClockTime, formatDate, formatLongDuration, formatSegmentName, formatShortDate,
 } from './format.js';
+import { addReadout, createLayoutStore, cycleReadout, newLayout, removeReadout } from './readout-layout.js';
+import { readoutText, readoutValue } from './readouts.js';
 import { SCHOOL_YEARS } from './school-years.js';
 
 const TICK_MS = 1000;
@@ -51,27 +53,18 @@ function displayLines(now, moment, simulated, text) {
 
   const upNext = (segment) => ['p', `Up next: ${text.name(segment)} at ${text.time(segment.start)}`];
   switch (moment.state) {
+    // Time left, elapsed and until school starts are the Readouts' job.
     case 'segment':
       lines.push(
         ['h2', `${text.name(moment.current)} · ${text.division}`],
         ['p', `${text.time(moment.current.start)} – ${text.time(moment.current.end)}`],
-        ['p', `${formatDuration(moment.timeLeftMs)} left`],
-        ['p', `${formatDuration(moment.timeElapsedMs)} elapsed`],
       );
       break;
     case 'passing':
-      lines.push(
-        ['h2', 'Passing Period'],
-        ['p', `${formatDuration(moment.timeLeftMs)} left`],
-        upNext(moment.upNext),
-      );
+      lines.push(['h2', 'Passing Period'], upNext(moment.upNext));
       break;
     case 'beforeSchool':
-      lines.push(
-        ['h2', 'Before school'],
-        upNext(moment.upNext),
-        ['p', `${formatDuration(moment.timeLeftMs)} until school starts`],
-      );
+      lines.push(['h2', 'Before school'], upNext(moment.upNext));
       break;
     case 'afterSchool':
       lines.push(
@@ -171,9 +164,10 @@ function el(tag, props = {}, children = []) {
 /**
  * Mount the School Clock.
  * @param {{ mountId?: string, search?: string, realNow?: () => number, schoolYears?: object[],
- *   storage?: Pick<Storage, 'getItem' | 'setItem'> }} [options]
+ *   storage?: Pick<Storage, 'getItem' | 'setItem'>, tabStorage?: Pick<Storage, 'getItem' | 'setItem'> }} [options]
  *   `search` is `location.search` (for `?at=` / `&speed=`); `realNow` is the real clock;
- *   `storage` holds the device's settings (localStorage on the real page).
+ *   `storage` holds the device's settings and last used Readout layout (localStorage on
+ *   the real page); `tabStorage` holds this tab's Readout layout (sessionStorage).
  * @returns {{ destroy: () => void } | null} null if the mount element is missing
  */
 export function initClockApp({
@@ -182,6 +176,7 @@ export function initClockApp({
   realNow = Date.now,
   schoolYears = SCHOOL_YEARS,
   storage = globalThis.localStorage,
+  tabStorage = globalThis.sessionStorage,
 } = {}) {
   const mount = document.getElementById(mountId);
   if (!mount) return null;
@@ -191,6 +186,19 @@ export function initClockApp({
   const store = createSettingsStore(storage);
   let settings = store.load();
   let lastTick = new Date(clock.now());
+
+  // This tab's Readouts: its own saved layout, else the last used one; with
+  // neither, a default one is made from the first moment the clock describes.
+  const layoutStore = createLayoutStore({ session: tabStorage, local: storage });
+  let layout = layoutStore.load();
+  if (layout) layoutStore.keepInTab(layout);
+  /** @param {import('./readout-layout.js').Layout} next */
+  function changeLayout(next) {
+    layout = next;
+    layoutStore.save(layout);
+    buildReadouts();
+    render(new Date(clock.now()));
+  }
 
   /** @param {Partial<import('./clock-settings.js').ClockSettings>} change */
   function updateSettings(change) {
@@ -207,7 +215,31 @@ export function initClockApp({
       el('button', { type: 'button', textContent: name, onclick: () => updateSettings({ division: key }) })),
   ]);
 
-  const display = el('div', { className: 'clock-display' });
+  // The Readouts, rebuilt only when the layout changes (so focus survives the
+  // ticks); each tick just rewrites their text. The first is the big one.
+  const readoutsSection = el('section', { 'aria-label': 'Readouts', className: 'clock-readouts' });
+  let readoutButtons = [];
+  let lastMoment = null;
+  function buildReadouts() {
+    readoutButtons = layout.readouts.map((_, i) =>
+      el('button', { type: 'button', className: 'clock-readout-value', onclick: () => changeLayout(cycleReadout(layout, i)) }));
+    const removable = layout.readouts.length > 1;
+    readoutsSection.replaceChildren(
+      ...readoutButtons.map((button, i) => el('div', {
+        className: i === 0 ? 'clock-readout clock-readout--big' : 'clock-readout',
+      }, [
+        button,
+        ...(removable ? [el('button', {
+          type: 'button', textContent: '×', 'aria-label': 'Remove Readout',
+          onclick: () => changeLayout(removeReadout(layout, i)),
+        })] : []),
+      ])),
+      el('button', { type: 'button', textContent: 'Add Readout', onclick: () => changeLayout(addReadout(layout, lastMoment)) }),
+    );
+  }
+
+  const info = el('div');
+  const display = el('div', { className: 'clock-display' }, [readoutsSection, info]);
 
   // The settings, built once so typing isn't interrupted by the ticks.
   const divisionSelect = el('select', {
@@ -254,10 +286,33 @@ export function initClockApp({
     if (chosen) divisionSelect.value = settings.division;
     const text = textFor(settings);
     const moment = chosen ? describeMoment(now, schoolYears, { division: settings.division }) : null;
-    display.replaceChildren(
+    renderReadouts(now, moment);
+    info.replaceChildren(
       ...displayLines(now, moment, clock.simulated, text).map(([tag, line]) => el(tag, { textContent: line })),
       ...(chosen ? nextRingsNodes(now, schoolYears, settings, text) : []),
     );
+  }
+
+  /**
+   * Show the Readouts for `moment`; none before a Division is chosen or on a
+   * date the clock knows nothing about (the time alone is shown then).
+   * @param {Date} now @param {import('./clock-model.js').Moment | null} moment
+   */
+  function renderReadouts(now, moment) {
+    if (!moment || moment.state === 'unknown') {
+      readoutsSection.replaceChildren();
+      readoutButtons = [];
+      return;
+    }
+    lastMoment = moment;
+    if (!layout) {
+      layout = newLayout(moment);
+      layoutStore.keepInTab(layout);
+    }
+    if (readoutButtons.length === 0) buildReadouts();
+    layout.readouts.forEach(({ mode }, i) => {
+      readoutButtons[i].textContent = readoutText(readoutValue(mode, moment, now), settings);
+    });
   }
 
   render(lastTick);
@@ -272,5 +327,5 @@ export function initClockApp({
 }
 
 if (typeof document !== 'undefined' && document.getElementById('clockApp')) {
-  initClockApp({ search: window.location.search, storage: window.localStorage });
+  initClockApp({ search: window.location.search, storage: window.localStorage, tabStorage: window.sessionStorage });
 }

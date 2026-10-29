@@ -31,7 +31,9 @@ const saved = (storage) => JSON.parse(storage.getItem(SETTINGS_KEY));
  * `settings`), so the tests that aren't about the first visit skip the prompt.
  */
 const start = ({ settings = {}, ...options } = {}) =>
-  initClockApp({ storage: storageWith({ division: 'HS', ...settings }), ...options });
+  initClockApp({
+    storage: storageWith({ division: 'HS', ...settings }), tabStorage: createFakeStorage(), ...options,
+  });
 
 describe('School Clock page', () => {
   let app;
@@ -47,7 +49,7 @@ describe('School Clock page', () => {
     vi.useRealTimers();
   });
 
-  it('shows the Day Label, the current Period, its times, and time left and elapsed', () => {
+  it('shows the Day Label, the current Period, its times, and a Readout of time left', () => {
     // Tue 2026-10-27 is an All Day.
     const real = fakeRealClock(new Date(2026, 9, 27, 10, 32, 0));
     app = start({ realNow: real.now });
@@ -57,7 +59,6 @@ describe('School Clock page', () => {
     expect(text).toContain('Period 3');
     expect(text).toContain('10:30 AM – 11:15 AM');
     expect(text).toContain('43:00 left');
-    expect(text).toContain('2:00 elapsed');
     expect(text).toContain('10:32:00 AM');
     expect(text).not.toContain('Simulated time');
   });
@@ -242,6 +243,7 @@ describe('School Clock page', () => {
       expect(vi.getTimerCount()).toBe(1);
     } finally {
       localStorage.clear();
+      sessionStorage.clear();
     }
   });
 
@@ -528,6 +530,152 @@ describe('School Clock page', () => {
       app = start({ realNow: evenDay().now });
       expect(listen.mock.calls.map(([type]) => type)).not.toContain('storage');
       listen.mockRestore();
+    });
+  });
+
+  describe('Readouts', () => {
+    const readouts = () => [...document.querySelectorAll('#clockApp .clock-readout-value')].map((b) => b.textContent);
+    const tapReadout = (i) => document.querySelectorAll('#clockApp .clock-readout-value')[i].click();
+    const removeButtons = () => [...document.querySelectorAll('#clockApp button')]
+      .filter((b) => b.getAttribute('aria-label') === 'Remove Readout');
+    const addButton = () => [...document.querySelectorAll('#clockApp button')].find((b) => b.textContent === 'Add Readout');
+    // Tue 10/27/26 10:32, All Day Period 3 (10:30–11:15).
+    const inPeriod3 = () => fakeRealClock(new Date(2026, 9, 27, 10, 32, 0));
+
+    /** One device: shared localStorage (settings + last used layout), one sessionStorage per tab. */
+    function device() {
+      const storage = storageWith({ division: 'HS' });
+      return {
+        storage,
+        newTab: () => ({ tabStorage: createFakeStorage(), open(realNow) {
+          app = initClockApp({ realNow, storage, tabStorage: this.tabStorage });
+          return this;
+        } }),
+      };
+    }
+
+    it('cycles a Readout on each tap: time left, time elapsed, current time, and back', () => {
+      app = start({ realNow: inPeriod3().now });
+      expect(readouts()).toEqual(['43:00 left']);
+      tapReadout(0);
+      expect(readouts()).toEqual(['2:00 elapsed']);
+      tapReadout(0);
+      expect(readouts()).toEqual(['10:32:00 AM']);
+      tapReadout(0);
+      expect(readouts()).toEqual(['43:00 left']);
+    });
+
+    it('marks the first Readout as the big one', () => {
+      app = start({ realNow: inPeriod3().now });
+      addButton().click();
+      const shown = document.querySelectorAll('#clockApp .clock-readout');
+      expect(shown[0].classList.contains('clock-readout--big')).toBe(true);
+      expect(shown[1].classList.contains('clock-readout--big')).toBe(false);
+    });
+
+    it('adds Readouts that each switch on their own, and removes them down to one', () => {
+      app = start({ realNow: inPeriod3().now });
+      expect(removeButtons()).toHaveLength(0);
+
+      addButton().click();
+      addButton().click();
+      tapReadout(1);
+      tapReadout(2);
+      tapReadout(2);
+      expect(readouts()).toEqual(['43:00 left', '2:00 elapsed', '10:32:00 AM']);
+      expect(removeButtons()).toHaveLength(3);
+
+      removeButtons()[0].click();
+      expect(readouts()).toEqual(['2:00 elapsed', '10:32:00 AM']);
+      removeButtons()[1].click();
+      expect(readouts()).toEqual(['2:00 elapsed']);
+      expect(removeButtons()).toHaveLength(0);
+    });
+
+    it('keeps ticking each Readout', () => {
+      const real = inPeriod3();
+      app = start({ realNow: real.now });
+      addButton().click();
+      tapReadout(1);
+      real.advance(1000);
+      expect(readouts()).toEqual(['42:59 left', '2:01 elapsed']);
+    });
+
+    it('keeps its place in the cycle as school ends', () => {
+      // Period 7 is 14:25–15:10.
+      const real = fakeRealClock(new Date(2026, 9, 27, 15, 9, 58));
+      app = start({ realNow: real.now });
+      addButton().click();
+      tapReadout(1);
+      expect(readouts()).toEqual(['0:02 left', '44:58 elapsed']);
+      real.advance(3000);
+      expect(readouts()).toEqual(['17:19:59 until next school day', '0:01 since school ended']);
+    });
+
+    it('starts in the default for the moment: since school ended, after school', () => {
+      app = start({ realNow: fakeRealClock(new Date(2026, 9, 27, 16, 0, 0)).now });
+      expect(readouts()).toEqual(['50:00 since school ended']);
+    });
+
+    it('shows no Readouts before a Division is chosen, or on a date outside every School Year', () => {
+      app = initClockApp({ realNow: inPeriod3().now, storage: createFakeStorage(), tabStorage: createFakeStorage() });
+      expect(readouts()).toEqual([]);
+      expect(addButton()).toBeUndefined();
+      app.destroy();
+      app = start({ realNow: fakeRealClock(new Date(2030, 0, 1, 9, 0, 0)).now });
+      expect(readouts()).toEqual([]);
+    });
+
+    it('keeps a layout per tab: two tabs differ, reloads restore their own, and a new tab starts from the last changed', () => {
+      const { newTab } = device();
+      const now = inPeriod3().now;
+
+      const tabA = newTab().open(now);
+      tapReadout(0); // A: elapsed
+      app.destroy();
+
+      const tabB = newTab().open(now);
+      expect(readouts()).toEqual(['2:00 elapsed']); // starts from A's, the last used
+      addButton().click(); // B: elapsed + left
+      tapReadout(1);
+      tapReadout(1); // B: elapsed + current time
+      app.destroy();
+
+      tabA.open(now); // reloading A: its own layout, untouched by B
+      expect(readouts()).toEqual(['2:00 elapsed']);
+      app.destroy();
+
+      tabB.open(now);
+      expect(readouts()).toEqual(['2:00 elapsed', '10:32:00 AM']);
+      app.destroy();
+
+      newTab().open(now); // a third tab: B changed last
+      expect(readouts()).toEqual(['2:00 elapsed', '10:32:00 AM']);
+    });
+
+    it('a tab keeps the layout it opened with through a reload, even after another tab changes', () => {
+      const { newTab } = device();
+      const now = inPeriod3().now;
+
+      const tabA = newTab().open(now); // default layout, never changed
+      app.destroy();
+      newTab().open(now);
+      tapReadout(0); // another tab changes the last used layout
+      app.destroy();
+
+      tabA.open(now);
+      expect(readouts()).toEqual(['43:00 left']);
+    });
+
+    it('an open tab is not changed by another tab saving', () => {
+      const { storage } = device();
+      const real = inPeriod3();
+      const tabStorage = createFakeStorage();
+      app = initClockApp({ realNow: real.now, storage, tabStorage });
+      // Another tab (sharing this device's localStorage) saves a different layout.
+      storage.setItem('school-clock-layout-v1', JSON.stringify({ readouts: [{ mode: 'clock' }] }));
+      real.advance(1000);
+      expect(readouts()).toEqual(['42:59 left']);
     });
   });
 });
