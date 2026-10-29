@@ -1,0 +1,37 @@
+/* School Clock. Only what behaviour needs so far; the design reference
+   (tickets 03/04) styles the rest. */
+
+/* Ringing: the screen flashes once a second, well under the 3 flashes a
+   second WCAG 2.3.1 allows. Each flash also draws a thick outline, so colour
+   isn't the only signal; the "Ringing: …" banner says what rang. */
+.clock-ringing--flash {
+  animation: clock-flash 1s step-end infinite;
+}
+
+@keyframes clock-flash {
+  0% {
+    background: #fff3b0;
+    outline: 0.75rem solid #92400e;
+    outline-offset: -0.75rem;
+  }
+  50% {
+    background: transparent;
+    outline: none;
+  }
+}
+
+/* Reduced motion: the same highlight, held steady. */
+.clock-ringing--steady {
+  background: #fff3b0;
+  outline: 0.75rem solid #92400e;
+  outline-offset: -0.75rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .clock-ringing--flash {
+    animation: none;
+    background: #fff3b0;
+    outline: 0.75rem solid #92400e;
+    outline-offset: -0.75rem;
+  }
+}

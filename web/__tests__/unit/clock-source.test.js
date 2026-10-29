@@ -43,6 +43,8 @@ describe('createClockSource', () => {
 
     real.advance(2 * SEC);
     expect(clock.now()).toBe(new Date(2027, 0, 20, 9, 52).getTime());
+    // The sound engine maps simulated time onto the audio clock with it.
+    expect(clock.speed).toBe(60);
   });
 
   it.each([
@@ -77,6 +79,7 @@ describe('createClockSource', () => {
     real.advance(2 * SEC);
     expect(clock.simulated).toBe(false);
     expect(clock.now()).toBe(REAL_START + 2 * SEC);
+    expect(clock.speed).toBe(1);
   });
 
   it('defaults to the real clock and no query string', () => {

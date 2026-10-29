@@ -5,8 +5,9 @@
 // Invalid values are ignored. `&speed=` only applies alongside `?at=`.
 
 /**
- * @typedef {{ now: () => number, simulated: boolean }} ClockSource
- * `now()` returns epoch milliseconds; `simulated` is true while `?at=` is in use.
+ * @typedef {{ now: () => number, simulated: boolean, speed: number }} ClockSource
+ * `now()` returns epoch milliseconds; `simulated` is true while `?at=` is in use;
+ * `speed` is how many clock milliseconds pass per real one (1 unless `&speed=`).
  */
 
 const AT_PATTERN = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/;
@@ -44,11 +45,12 @@ function parseSpeed(value) {
 export function createClockSource({ search = '', realNow = Date.now } = {}) {
   const params = new URLSearchParams(search);
   const at = parseLocalDateTime(params.get('at'));
-  if (at === null) return { now: realNow, simulated: false };
+  if (at === null) return { now: realNow, simulated: false, speed: 1 };
   const speed = parseSpeed(params.get('speed'));
   const realStart = realNow();
   return {
     now: () => at + (realNow() - realStart) * speed,
     simulated: true,
+    speed,
   };
 }
