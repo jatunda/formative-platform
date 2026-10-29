@@ -37,7 +37,9 @@ describe('createStorageAdapter', () => {
     expect(() => adapter.save({})).toThrow('QuotaExceededError');
   });
 
-  it('when quiet, an unreadable storage loads as nothing saved', () => {
-    expect(createStorageAdapter('k', blocked, { quiet: true }).load()).toBeNull();
+  it('when quiet, an unreadable storage loads as nothing saved and a failed save is dropped', () => {
+    const adapter = createStorageAdapter('k', blocked, { quiet: true });
+    expect(adapter.load()).toBeNull();
+    expect(() => adapter.save({})).not.toThrow();
   });
 });

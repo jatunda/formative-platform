@@ -106,12 +106,6 @@ export function createSettingsStore(storage) {
   const adapter = createStorageAdapter(SETTINGS_KEY, storage, { quiet: true });
   return {
     load: () => parseSettings(adapter.load()),
-    save(settings) {
-      try {
-        adapter.save(settings);
-      } catch {
-        // Not saved; the page carries on with the settings in memory.
-      }
-    },
+    save: (settings) => adapter.save(settings),
   };
 }
