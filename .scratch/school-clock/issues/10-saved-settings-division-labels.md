@@ -27,3 +27,5 @@ Spec: `.scratch/school-clock/spec.md` (Implementation Decisions: device storage;
 - [ ] `npm run lint`, `npm run typecheck`, `npm run test:coverage` in `web/` pass
 
 ## Comments
+
+**2026-10-29: built on `school-clock-10`.** Shared adapter `web/storage.js` `createStorageAdapter(key, storage = localStorage)` (Robotics wraps it, tests untouched). Clock settings: `web/clock/clock-storage.js`, one key `school-clock-settings-v1`, parsed field by field (a bad field gets its default; bad Alarms are dropped). Decisions: no Division saved → the page shows only the time plus a "Which Division do you teach?" prompt (no Periods, no rings, settings hidden) until one is picked; Period Labels apply to Periods by name (shared across Divisions), never Breaks/Assemblies, blank = none; 24-hour form is zero-padded "08:05" / "00:00"; the Next School Day line now says "… at 8:30 AM · starts in …"; volume defaults to 0.8 (no UI yet); new devices start with Bells on (School bell) and no Alarms — `SAMPLE_SETTINGS` is gone. `initClockApp` takes `storage` instead of `settings`/`onSettingsChange`. Story 23: the current Segment heading ends with the Division, e.g. "Period 3 · AP CSA · HS".

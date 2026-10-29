@@ -1,7 +1,6 @@
 // @ts-check
 // Text formatting for the School Clock. Every clock time on the page goes
-// through formatClockTime, so the 24-hour setting (ticket 10) has one place to
-// live. Durations ("42:17 left") are separate and never affected by it.
+// through formatClockTime, so the 24-hour setting has one place to live. Durations ("42:17 left") are separate and never affected by it.
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -10,16 +9,30 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 const pad2 = (n) => String(n).padStart(2, '0');
 
 /**
- * A time of day, e.g. "8:05 AM" or with seconds "1:04:09 PM".
+ * A time of day: "8:05 AM" (with seconds "1:04:09 PM"), or with `use24Hour`
+ * "08:05" / "13:04:09". The one clock-time formatter on the page.
  * @param {Date} date
- * @param {{ seconds?: boolean }} [options]
+ * @param {{ seconds?: boolean, use24Hour?: boolean }} [options]
  * @returns {string}
  */
-export function formatClockTime(date, { seconds = false } = {}) {
+export function formatClockTime(date, { seconds = false, use24Hour = false } = {}) {
   const h = date.getHours();
-  const hour12 = h % 12 === 0 ? 12 : h % 12;
   const secs = seconds ? `:${pad2(date.getSeconds())}` : '';
+  if (use24Hour) return `${pad2(h)}:${pad2(date.getMinutes())}${secs}`;
+  const hour12 = h % 12 === 0 ? 12 : h % 12;
   return `${hour12}:${pad2(date.getMinutes())}${secs} ${h < 12 ? 'AM' : 'PM'}`;
+}
+
+/**
+ * A Segment's name as the page shows it: a Period with a Period Label reads
+ * "Period 3 · AP CSA"; Breaks and Assemblies are never labelled.
+ * @param {{ name: string, kind: string }} segment
+ * @param {Record<string, string>} periodLabels Period name -> label
+ * @returns {string}
+ */
+export function formatSegmentName(segment, periodLabels) {
+  const label = segment.kind === 'period' ? periodLabels[segment.name]?.trim() : '';
+  return label ? `${segment.name} · ${label}` : segment.name;
 }
 
 /**

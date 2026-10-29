@@ -1,6 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { initClockApp } from '../../clock/clock.js';
+import { SETTINGS_KEY } from '../../clock/clock-storage.js';
+import { BLOCK_DAYS, DEFAULT_ALARM_PERIODS } from '../../clock/clock-settings.js';
 import { SCHOOL_YEARS } from '../../clock/school-years.js';
+import { createFakeStorage } from '../helpers/fake-storage.js';
 
 /** A real clock the test moves by hand; the page's ticks come from fake timers. */
 function fakeRealClock(date) {
@@ -15,6 +18,20 @@ function fakeRealClock(date) {
 }
 
 const pageText = () => document.getElementById('clockApp').textContent.replace(/\s+/g, ' ');
+/** Just the clock display, without the Division prompt or the settings. */
+const displayText = () => document.querySelector('#clockApp .clock-display').textContent.trim();
+
+/** Fake device storage already holding `settings` (as the page would have saved them). */
+const storageWith = (settings) => createFakeStorage({ [SETTINGS_KEY]: JSON.stringify(settings) });
+/** What the page has saved to `storage`. */
+const saved = (storage) => JSON.parse(storage.getItem(SETTINGS_KEY));
+
+/**
+ * Start the page on a device that already chose HS (plus any other saved
+ * `settings`), so the tests that aren't about the first visit skip the prompt.
+ */
+const start = ({ settings = {}, ...options } = {}) =>
+  initClockApp({ storage: storageWith({ division: 'HS', ...settings }), ...options });
 
 describe('School Clock page', () => {
   let app;
@@ -33,7 +50,7 @@ describe('School Clock page', () => {
   it('shows the Day Label, the current Period, its times, and time left and elapsed', () => {
     // Tue 2026-10-27 is an All Day.
     const real = fakeRealClock(new Date(2026, 9, 27, 10, 32, 0));
-    app = initClockApp({ realNow: real.now });
+    app = start({ realNow: real.now });
 
     const text = pageText();
     expect(text).toContain('All Day');
@@ -47,7 +64,7 @@ describe('School Clock page', () => {
 
   it('ticks every second, recomputing from the clock rather than counting ticks', () => {
     const real = fakeRealClock(new Date(2026, 9, 27, 10, 32, 0));
-    app = initClockApp({ realNow: real.now });
+    app = start({ realNow: real.now });
 
     real.advance(1000);
     expect(pageText()).toContain('42:59 left');
@@ -60,7 +77,7 @@ describe('School Clock page', () => {
 
   it('counts down a Passing Period and says what is up next', () => {
     const real = fakeRealClock(new Date(2026, 9, 27, 10, 27, 20));
-    app = initClockApp({ realNow: real.now });
+    app = start({ realNow: real.now });
 
     const text = pageText();
     expect(text).toContain('Passing Period');
@@ -70,7 +87,7 @@ describe('School Clock page', () => {
 
   it('says it is after school, and for how long', () => {
     const real = fakeRealClock(new Date(2026, 9, 27, 16, 0, 0));
-    app = initClockApp({ realNow: real.now });
+    app = start({ realNow: real.now });
 
     const text = pageText();
     expect(text).toContain('All Day');
@@ -81,7 +98,7 @@ describe('School Clock page', () => {
 
   it('says it is before school, and when the first Segment starts', () => {
     const real = fakeRealClock(new Date(2026, 9, 27, 8, 0, 0));
-    app = initClockApp({ realNow: real.now });
+    app = start({ realNow: real.now });
 
     const text = pageText();
     expect(text).toContain('Before school');
@@ -91,7 +108,7 @@ describe('School Clock page', () => {
 
   it('labels a weekend', () => {
     const real = fakeRealClock(new Date(2026, 9, 31, 10, 0, 0));
-    app = initClockApp({ realNow: real.now });
+    app = start({ realNow: real.now });
     expect(pageText()).toContain('Weekend');
   });
 
@@ -99,23 +116,23 @@ describe('School Clock page', () => {
     // Wed 11/25/26, Thanksgiving Break. School ended Thu 11/19 at 3:10 PM
     // (Fri 11/20 was In-Service); it's back Mon 11/30 at 8:30 AM.
     const real = fakeRealClock(new Date(2026, 10, 25, 10, 0, 0));
-    app = initClockApp({ realNow: real.now });
+    app = start({ realNow: real.now });
 
     const text = pageText();
     expect(text).toContain('Thanksgiving Break');
-    expect(text).toContain('Next school day: Mon, Nov 30 · starts in 4d 22h');
+    expect(text).toContain('Next school day: Mon, Nov 30 at 8:30 AM · starts in 4d 22h');
     expect(text).toContain('5d 18h since school ended');
   });
 
   it('after school, says when the Next School Day starts', () => {
     const real = fakeRealClock(new Date(2026, 9, 27, 16, 0, 0));
-    app = initClockApp({ realNow: real.now });
-    expect(pageText()).toContain('Next school day: Wed, Oct 28 · starts in 16:30:00');
+    app = start({ realNow: real.now });
+    expect(pageText()).toContain('Next school day: Wed, Oct 28 at 8:30 AM · starts in 16:30:00');
   });
 
   it('before school, says how long since the last School Day ended', () => {
     const real = fakeRealClock(new Date(2026, 9, 27, 8, 0, 0));
-    app = initClockApp({ realNow: real.now });
+    app = start({ realNow: real.now });
     // Since Mon 10/26 at 3:10 PM.
     expect(pageText()).toContain('16:50:00 since school ended');
   });
@@ -123,17 +140,17 @@ describe('School Clock page', () => {
   it('names HS Experience Week and points past it', () => {
     // Wed 1/20/27; HS is back Mon 1/25/27.
     const real = fakeRealClock(new Date(2027, 0, 20, 10, 0, 0));
-    app = initClockApp({ realNow: real.now });
+    app = start({ realNow: real.now });
     const text = pageText();
     expect(text).toContain('HS Experience Week');
-    expect(text).toContain('Next school day: Mon, Jan 25 ·');
+    expect(text).toContain('Next school day: Mon, Jan 25 at 8:30 AM ·');
   });
 
   describe('Summer', () => {
     it('counts the days of Summer, with no countdown until next year is known', () => {
       // Fri 5/28/27, the day after the last School Day.
       const real = fakeRealClock(new Date(2027, 4, 28, 10, 0, 0));
-      app = initClockApp({ realNow: real.now });
+      app = start({ realNow: real.now });
 
       const text = pageText();
       expect(text).toContain('Day 2 of Summer');
@@ -153,24 +170,24 @@ describe('School Clock page', () => {
         calendarExceptions: [],
       };
       const real = fakeRealClock(new Date(2027, 4, 28, 10, 0, 0));
-      app = initClockApp({ realNow: real.now, schoolYears: [...SCHOOL_YEARS, nextYear] });
+      app = start({ realNow: real.now, schoolYears: [...SCHOOL_YEARS, nextYear] });
 
       const text = pageText();
       expect(text).toContain('Day 2 of Summer');
-      expect(text).toContain('First day: Mon, Aug 16 · starts in 79d 22h');
+      expect(text).toContain('First day: Mon, Aug 16 at 8:30 AM · starts in 79d 22h');
     });
   });
 
   it('just tells the time on a date outside every School Year', () => {
     const real = fakeRealClock(new Date(2030, 0, 1, 9, 0, 0));
-    app = initClockApp({ realNow: real.now });
-    expect(pageText().trim()).toBe('9:00:00 AM');
+    app = start({ realNow: real.now });
+    expect(displayText()).toBe('9:00:00 AM');
   });
 
   describe('simulated time', () => {
     it('starts at ?at=, shows a banner with the spoofed time, and ticks from there', () => {
       const real = fakeRealClock(new Date(2026, 9, 28, 20, 0, 0));
-      app = initClockApp({ realNow: real.now, search: '?at=2026-10-27T10:32' });
+      app = start({ realNow: real.now, search: '?at=2026-10-27T10:32' });
 
       expect(pageText()).toContain('Simulated time: Tue, Oct 27, 2026, 10:32:00 AM');
       expect(pageText()).toContain('Period 3');
@@ -183,7 +200,7 @@ describe('School Clock page', () => {
 
     it('advances at &speed= times real time', () => {
       const real = fakeRealClock(new Date(2026, 9, 28, 20, 0, 0));
-      app = initClockApp({ realNow: real.now, search: '?at=2026-10-27T10:32&speed=60' });
+      app = start({ realNow: real.now, search: '?at=2026-10-27T10:32&speed=60' });
 
       real.advance(3000);
       expect(pageText()).toContain('10:35:00 AM');
@@ -192,7 +209,7 @@ describe('School Clock page', () => {
 
     it('ignores an invalid ?at= and shows real time with no banner', () => {
       const real = fakeRealClock(new Date(2026, 9, 27, 10, 32, 0));
-      app = initClockApp({ realNow: real.now, search: '?at=whenever&speed=60' });
+      app = start({ realNow: real.now, search: '?at=whenever&speed=60' });
 
       expect(pageText()).not.toContain('Simulated time');
       expect(pageText()).toContain('43:00 left');
@@ -203,8 +220,8 @@ describe('School Clock page', () => {
 
   it('stops ticking when destroyed, and a second init replaces the first', () => {
     const real = fakeRealClock(new Date(2026, 9, 27, 10, 32, 0));
-    const first = initClockApp({ realNow: real.now });
-    app = initClockApp({ realNow: real.now });
+    const first = start({ realNow: real.now });
+    app = start({ realNow: real.now });
     first.destroy();
     expect(vi.getTimerCount()).toBe(1);
     app.destroy();
@@ -213,13 +230,19 @@ describe('School Clock page', () => {
 
   it('starts itself on the real page, where the mount exists when the script loads', async () => {
     vi.setSystemTime(new Date(2026, 9, 27, 10, 32, 0));
-    vi.resetModules();
-    const fresh = await import('../../clock/clock.js');
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify({ division: 'HS' }));
+    try {
+      vi.resetModules();
+      const fresh = await import('../../clock/clock.js');
 
-    expect(pageText()).toContain('43:00 left');
-    // The self-started clock is the active one; a new init replaces it.
-    app = fresh.initClockApp();
-    expect(vi.getTimerCount()).toBe(1);
+      // It reads the device's real localStorage.
+      expect(pageText()).toContain('43:00 left');
+      // The self-started clock is the active one; a new init replaces it.
+      app = fresh.initClockApp();
+      expect(vi.getTimerCount()).toBe(1);
+    } finally {
+      localStorage.clear();
+    }
   });
 
   it('does nothing without its mount', () => {
@@ -231,10 +254,21 @@ describe('School Clock page', () => {
     const ringLines = () =>
       [...document.querySelectorAll('#clockApp li')].map((li) => li.textContent);
 
-    it('lists every upcoming ring of the sample settings with its time, source and sound', () => {
+    it('lists every upcoming ring of the saved Bells and Alarms with its time, source and sound', () => {
+      const settings = {
+        bells: { on: true, sound: 'schoolBell' },
+        alarms: [
+          { id: 'check-email', kind: 'clock', label: 'Check email', enabled: true, sound: 'chime',
+            bellSchedules: null, time: '08:20', repeat: 'everySchoolDay' },
+          { id: 'wrap-up', kind: 'period', enabled: true, sound: 'beep', bellSchedules: null,
+            anchor: { from: 'end', minutes: 5 }, periods: [...DEFAULT_ALARM_PERIODS] },
+          { id: 'walk', kind: 'period', label: 'Mid-period walk', enabled: true, sound: 'buzzer',
+            bellSchedules: [...BLOCK_DAYS], anchor: { from: 'halfway' }, periods: [...DEFAULT_ALARM_PERIODS] },
+        ],
+      };
       // Wed 10/28/26, HS Even Day: Period 6 13:45–15:10 is the last Segment.
       const real = fakeRealClock(new Date(2026, 9, 28, 13, 40, 0));
-      app = initClockApp({ realNow: real.now });
+      app = start({ realNow: real.now, settings });
 
       expect(pageText()).toContain('Next rings today');
       expect(ringLines()).toEqual([
@@ -248,7 +282,7 @@ describe('School Clock page', () => {
 
     it('drops a ring once its moment has passed, and drops the list when nothing is left', () => {
       const real = fakeRealClock(new Date(2026, 9, 27, 15, 9, 59));
-      app = initClockApp({ realNow: real.now });
+      app = start({ realNow: real.now });
       expect(ringLines()).toEqual(['3:10 PM · Bell · Period 7 ends · School bell']);
 
       real.advance(1000); // 3:10:00, the ring's own moment
@@ -273,7 +307,7 @@ describe('School Clock page', () => {
         timerSound: 'beep',
       };
       const real = fakeRealClock(new Date(2026, 9, 27, 10, 0, 0));
-      app = initClockApp({ realNow: real.now, settings });
+      app = start({ realNow: real.now, settings });
 
       expect(ringLines().slice(0, 5)).toEqual([
         '10:05 AM · Clock Alarm · Exit tickets, every School Day · Chime',
@@ -291,40 +325,209 @@ describe('School Clock page', () => {
           time, repeat: 'once', date: '2026-10-27' }],
       });
 
-      it('is turned off once it rings in real time', () => {
+      it('is turned off, and saved that way, once it rings in real time', () => {
         const real = fakeRealClock(new Date(2026, 9, 27, 10, 59, 58));
-        const onSettingsChange = vi.fn();
-        app = initClockApp({ realNow: real.now, settings: onceAt('11:00'), onSettingsChange });
+        const storage = storageWith({ division: 'HS', ...onceAt('11:00') });
+        const setItem = vi.spyOn(storage, 'setItem');
+        app = initClockApp({ realNow: real.now, storage });
 
         real.advance(1000);
-        expect(onSettingsChange).not.toHaveBeenCalled();
+        expect(setItem).not.toHaveBeenCalled();
         real.advance(2000);
-        expect(onSettingsChange).toHaveBeenCalledTimes(1);
-        expect(onSettingsChange.mock.calls[0][0].alarms[0]).toMatchObject({ id: 'o', enabled: false });
-        real.advance(5000);
-        expect(onSettingsChange).toHaveBeenCalledTimes(1);
-      });
-
-      it('rings and drops off the list with nobody listening for settings changes', () => {
-        const real = fakeRealClock(new Date(2026, 9, 27, 10, 59, 59));
-        app = initClockApp({ realNow: real.now, settings: onceAt('11:00') });
-        real.advance(2000);
+        expect(setItem).toHaveBeenCalledTimes(1);
+        expect(saved(storage).alarms[0]).toMatchObject({ id: 'o', enabled: false });
         expect(ringLines()).toEqual([]);
-        expect(pageText()).toContain('11:00:01 AM');
+        real.advance(5000);
+        expect(setItem).toHaveBeenCalledTimes(1);
       });
 
       it('is not turned off when it rings in simulated time', () => {
         const real = fakeRealClock(new Date(2026, 9, 1, 12, 0, 0));
-        const onSettingsChange = vi.fn();
-        app = initClockApp({
-          realNow: real.now, search: '?at=2026-10-27T10:59:58', settings: onceAt('11:00'), onSettingsChange,
-        });
+        const storage = storageWith({ division: 'HS', ...onceAt('11:00') });
+        const setItem = vi.spyOn(storage, 'setItem');
+        app = initClockApp({ realNow: real.now, search: '?at=2026-10-27T10:59:58', storage });
         expect(ringLines()).toEqual(['11:00 AM · Clock Alarm · once · Chime']);
 
         real.advance(5000);
         expect(ringLines()).toEqual([]);
-        expect(onSettingsChange).not.toHaveBeenCalled();
+        expect(setItem).not.toHaveBeenCalled();
+        expect(saved(storage).alarms[0].enabled).toBe(true);
       });
+    });
+  });
+
+  describe('saved device settings', () => {
+    const button = (name) => [...document.querySelectorAll('#clockApp button')].find((b) => b.textContent === name);
+    const divisionSelect = () => document.querySelector('#clockApp select');
+    const labelInput = (period) =>
+      [...document.querySelectorAll('#clockApp label')].find((l) => l.textContent.startsWith(`${period} label`))
+        .querySelector('input');
+    const use24HourBox = () => document.querySelector('#clockApp input[type=checkbox]');
+    const isShown = (node) => !node.closest('[hidden]');
+
+    // Wed 10/28/26 is an Even Day: at 10:30 HS is in Chapel, MS in Period 4.
+    const evenDay = () => fakeRealClock(new Date(2026, 9, 28, 10, 30, 0));
+
+    describe('the first visit', () => {
+      it('asks for the Division and shows no Periods until it is chosen', () => {
+        const real = evenDay();
+        app = initClockApp({ realNow: real.now, storage: createFakeStorage() });
+
+        expect(isShown(button('Middle School'))).toBe(true);
+        expect(isShown(divisionSelect())).toBe(false);
+        expect(displayText()).toBe('10:30:00 AM');
+        real.advance(1000);
+        expect(displayText()).toBe('10:30:01 AM');
+      });
+
+      it('saves the chosen Division and follows its Bell Schedules', () => {
+        const storage = createFakeStorage();
+        app = initClockApp({ realNow: evenDay().now, storage });
+
+        button('Middle School').click();
+
+        expect(isShown(button('Middle School'))).toBe(false);
+        expect(displayText()).toContain('Period 4');
+        expect(divisionSelect().value).toBe('MS');
+        expect(saved(storage).division).toBe('MS');
+      });
+
+      it('is not asked again once a Division is saved', () => {
+        app = start({ realNow: evenDay().now });
+        expect(isShown(button('Middle School'))).toBe(false);
+        expect(displayText()).toContain('Chapel');
+      });
+
+      it.each([
+        ['corrupt', '{not json'],
+        ['the wrong shape', '"HS"'],
+      ])('treats %s saved data as a first visit, without throwing', (_, raw) => {
+        app = initClockApp({ realNow: evenDay().now, storage: createFakeStorage({ [SETTINGS_KEY]: raw }) });
+        expect(isShown(button('High School'))).toBe(true);
+      });
+    });
+
+    it('switches Division in one step, saved, and follows that Division', () => {
+      const storage = storageWith({ division: 'HS' });
+      app = initClockApp({ realNow: evenDay().now, storage });
+      expect(displayText()).toContain('Chapel');
+
+      divisionSelect().value = 'MS';
+      divisionSelect().dispatchEvent(new Event('change'));
+
+      expect(displayText()).toContain('Period 4');
+      expect(displayText()).toContain('10:15 AM – 11:40 AM');
+      expect(saved(storage).division).toBe('MS');
+    });
+
+    it('shows the current Division next to the current Segment name', () => {
+      const real = fakeRealClock(new Date(2026, 9, 27, 10, 32, 0));
+      app = start({ realNow: real.now, settings: { periodLabels: { 'Period 3': 'AP CSA' } } });
+      expect(document.querySelector('#clockApp .clock-display h2').textContent).toBe('Period 3 · AP CSA · HS');
+
+      divisionSelect().value = 'MS';
+      divisionSelect().dispatchEvent(new Event('change'));
+      expect(document.querySelector('#clockApp .clock-display h2').textContent).toBe('Period 3 · AP CSA · MS');
+    });
+
+    it("follows the Division's Calendar Exceptions (HS Experience Week, MS All Day)", () => {
+      // Wed 1/20/27.
+      const real = fakeRealClock(new Date(2027, 0, 20, 10, 32, 0));
+      app = start({ realNow: real.now, settings: { division: 'MS' } });
+      expect(displayText()).toContain('All Day');
+      expect(displayText()).toContain('Period 3');
+
+      divisionSelect().value = 'HS';
+      divisionSelect().dispatchEvent(new Event('change'));
+      expect(displayText()).toContain('HS Experience Week');
+      expect(displayText()).not.toContain('Period 3');
+    });
+
+    describe('Period Labels', () => {
+      const walk = {
+        id: 'walk', kind: 'period', enabled: true, sound: 'buzzer', bellSchedules: null,
+        anchor: { from: 'end', minutes: 5 }, periods: ['Period 3'],
+      };
+
+      it('shows a saved label on the current Period, its Bells and its Alarms', () => {
+        // Tue 10/27/26 10:32, All Day Period 3.
+        const real = fakeRealClock(new Date(2026, 9, 27, 10, 32, 0));
+        app = start({ realNow: real.now, settings: { periodLabels: { 'Period 3': 'AP CSA' }, alarms: [walk] } });
+
+        const text = displayText();
+        expect(text).toContain('Period 3 · AP CSA');
+        expect(text).toContain('11:10 AM · Period Alarm · Period 3 · AP CSA, 5 min before the end · Buzzer');
+        expect(text).toContain('11:15 AM · Bell · Period 3 · AP CSA ends · School bell');
+        expect(labelInput('Period 3').value).toBe('AP CSA');
+      });
+
+      it('shows a label typed in at once, in "up next" too, and saves it', () => {
+        const storage = storageWith({ division: 'HS' });
+        // Tue 10/27/26 10:27, the Passing Period before Period 3.
+        app = initClockApp({ realNow: fakeRealClock(new Date(2026, 9, 27, 10, 27, 0)).now, storage });
+
+        labelInput('Period 3').value = 'AP CSA';
+        labelInput('Period 3').dispatchEvent(new Event('input'));
+
+        expect(displayText()).toContain('Up next: Period 3 · AP CSA at 10:30 AM');
+        expect(saved(storage).periodLabels).toEqual({ 'Period 3': 'AP CSA' });
+      });
+
+      it('keeps the label inputs (and so the typing) across ticks', () => {
+        const real = fakeRealClock(new Date(2026, 9, 27, 10, 27, 0));
+        app = start({ realNow: real.now });
+        const input = labelInput('Seminar');
+        real.advance(3000);
+        expect(labelInput('Seminar')).toBe(input);
+      });
+    });
+
+    describe('24-hour time', () => {
+      it('is off by default, and turning it on shows every clock time in 24-hour form, saved', () => {
+        const storage = storageWith({ division: 'HS' });
+        // Tue 10/27/26 13:45, All Day Period 6 (13:35–14:20).
+        app = initClockApp({ realNow: fakeRealClock(new Date(2026, 9, 27, 13, 45, 0)).now, storage });
+        expect(use24HourBox().checked).toBe(false);
+        expect(displayText()).toContain('1:45:00 PM');
+
+        use24HourBox().checked = true;
+        use24HourBox().dispatchEvent(new Event('change'));
+
+        const text = displayText();
+        expect(text).toContain('13:45:00');
+        expect(text).toMatch(/\d\d:\d\d – \d\d:\d\d/);
+        expect(text).not.toMatch(/AM|PM/);
+        expect(text).toContain('left'); // durations unchanged
+        expect(saved(storage).use24Hour).toBe(true);
+      });
+
+      it('shows "starts at" and the next rings in 24-hour form when saved on', () => {
+        // Tue 10/27/26 16:00, after school.
+        const real = fakeRealClock(new Date(2026, 9, 27, 16, 0, 0));
+        app = start({ realNow: real.now, settings: { use24Hour: true } });
+        expect(use24HourBox().checked).toBe(true);
+        expect(displayText()).toContain('School ended at 15:10');
+        expect(displayText()).toContain('Next school day: Wed, Oct 28 at 08:30 · starts in 16:30:00');
+      });
+
+      it('shows the next rings in 24-hour form', () => {
+        const real = fakeRealClock(new Date(2026, 9, 27, 15, 9, 0));
+        app = start({ realNow: real.now, settings: { use24Hour: true } });
+        expect(displayText()).toContain('15:10 · Bell · Period 7 ends · School bell');
+      });
+    });
+
+    it('uses saved Bells and their sound', () => {
+      const real = fakeRealClock(new Date(2026, 9, 27, 15, 9, 0));
+      app = start({ realNow: real.now, settings: { bells: { on: true, sound: 'chime' } } });
+      expect(displayText()).toContain('3:10 PM · Bell · Period 7 ends · Chime');
+    });
+
+    it('never listens for other tabs changing storage', () => {
+      const listen = vi.spyOn(window, 'addEventListener');
+      app = start({ realNow: evenDay().now });
+      expect(listen.mock.calls.map(([type]) => type)).not.toContain('storage');
+      listen.mockRestore();
     });
   });
 });

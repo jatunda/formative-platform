@@ -1,3 +1,6 @@
+// The Robotics app's persistence, built on the shared storage adapter.
+import { createStorageAdapter } from '../storage.js';
+
 /**
  * A swappable persistence adapter for the Tournament state: today this is
  * backed by localStorage (single-device, no backend), but the rest of the
@@ -8,18 +11,5 @@
  * @returns {{load: () => object|null, save: (state: object) => void}}
  */
 export function createLocalStorageAdapter(key) {
-  return {
-    load() {
-      const raw = localStorage.getItem(key);
-      if (raw === null) return null;
-      try {
-        return JSON.parse(raw);
-      } catch {
-        return null;
-      }
-    },
-    save(state) {
-      localStorage.setItem(key, JSON.stringify(state));
-    },
-  };
+  return createStorageAdapter(key, localStorage);
 }
