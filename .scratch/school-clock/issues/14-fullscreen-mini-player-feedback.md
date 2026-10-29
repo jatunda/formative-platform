@@ -20,14 +20,16 @@ Spec: `.scratch/school-clock/spec.md` (Implementation Decisions: mini player, Wa
 
 **Blocked by:** 06 (only the mini player's dismiss checkbox needs 12; the rest can start straight away)
 
-**Status:** ready-for-agent
+**Status:** closed
 
-- [ ] Fullscreen, Wake Lock and Document PiP are passed into the page as capabilities, each detected rather than assumed
-- [ ] Wake Lock is requested on entering fullscreen, released on exit, and requested again when the page becomes visible while still fullscreen
-- [ ] The mini player button is hidden when Document PiP is missing. When present, it opens a window that updates every tick from the same state as the main page and closes cleanly when the main tab closes
-- [ ] The mini player's dismiss button stops a ring (needs 12)
-- [ ] The feedback link's `mailto:` target has the address and subject, URL-encoded
-- [ ] Tests with fake capabilities: button hidden without PiP; Wake Lock requested and released; mini player content mirrors the main page; the mailto string
-- [ ] `npm run lint`, `npm run typecheck`, `npm run test:coverage` in `web/` pass
+- [x] Fullscreen, Wake Lock and Document PiP are passed into the page as capabilities, each detected rather than assumed
+- [x] Wake Lock is requested on entering fullscreen, released on exit, and requested again when the page becomes visible while still fullscreen
+- [x] The mini player button is hidden when Document PiP is missing. When present, it opens a window that updates every tick from the same state as the main page and closes cleanly when the main tab closes
+- [x] The mini player's dismiss button stops a ring (needs 12)
+- [x] The feedback link's `mailto:` target has the address and subject, URL-encoded
+- [x] Tests with fake capabilities: button hidden without PiP; Wake Lock requested and released; mini player content mirrors the main page; the mailto string
+- [x] `npm run lint`, `npm run typecheck`, `npm run test:coverage` in `web/` pass
 
 ## Comments
+
+The model now gives up next during a Segment, for the mini player. Fullscreen covers the whole page with only the display and the ringing banner shown; you exit with Esc. The mini player is 320×200 and shows the time when there are no Readouts. Feedback link is in a footer.
