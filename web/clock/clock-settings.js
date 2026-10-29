@@ -1,7 +1,8 @@
 // @ts-check
-// The shapes of a teacher's device settings that decide what rings: Bells and
-// Alarms. Plain JSON-friendly data (ticket 10 saves it in localStorage); the
-// clock model's "rings in a window" query reads it.
+// The shapes of a teacher's device settings: Division, Period Labels, time
+// format, and what rings (Bells and Alarms). Plain JSON-friendly data that
+// `clock-storage.js` saves in localStorage; the clock model's "rings in a
+// window" query reads the ring fields.
 
 /** @typedef {import('./school-years.js').Division} Division */
 
@@ -80,6 +81,25 @@
  * }} RingSettings
  */
 
+/**
+ * Everything a teacher sets on their device (saved by `clock-storage.js`).
+ * - `division`: null until the teacher has been asked on their first visit.
+ * - `use24Hour`: show clock times as "13:05" rather than "1:05 PM".
+ * - `periodLabels`: Period name ("Period 3") -> the teacher's label ("AP CSA").
+ * - `volume`: 0–1, for every sound.
+ * The rest are the RingSettings fields.
+ * @typedef {{
+ *   division: Division | null,
+ *   use24Hour: boolean,
+ *   periodLabels: Record<string, string>,
+ *   bells: BellsSettings,
+ *   alarms: Alarm[],
+ *   volume: number,
+ *   timerEndsAt: number | null,
+ *   timerSound: SoundName,
+ * }} ClockSettings
+ */
+
 /** The Block Days shortcut: Bell Schedules with long (~85-minute) Periods. */
 export const BLOCK_DAYS = Object.freeze(['even', 'odd', 'lateStartEven', 'hsSuperSeminar']);
 
@@ -88,24 +108,5 @@ export const DEFAULT_ALARM_PERIODS = Object.freeze(
   ['Period 1', 'Period 2', 'Period 3', 'Period 4', 'Period 5', 'Period 6', 'Period 7'],
 );
 
-/**
- * A hard-coded sample the page shows until saved settings exist (ticket 10).
- * @type {RingSettings}
- */
-export const SAMPLE_SETTINGS = {
-  bells: { on: true, sound: 'schoolBell' },
-  alarms: [
-    {
-      id: 'sample-check-email', kind: 'clock', label: 'Check email', enabled: true, sound: 'chime',
-      bellSchedules: null, time: '08:20', repeat: 'everySchoolDay',
-    },
-    {
-      id: 'sample-wrap-up', kind: 'period', enabled: true, sound: 'beep', bellSchedules: null,
-      anchor: { from: 'end', minutes: 5 }, periods: [...DEFAULT_ALARM_PERIODS],
-    },
-    {
-      id: 'sample-walk', kind: 'period', label: 'Mid-period walk', enabled: true, sound: 'buzzer',
-      bellSchedules: [...BLOCK_DAYS], anchor: { from: 'halfway' }, periods: [...DEFAULT_ALARM_PERIODS],
-    },
-  ],
-};
+/** Every Period a teacher can give a Period Label, in the order the page lists them. */
+export const LABELLED_PERIODS = Object.freeze([...DEFAULT_ALARM_PERIODS, 'Seminar', 'Super Seminar']);

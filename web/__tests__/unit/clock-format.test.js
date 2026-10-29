@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatClockTime, formatDuration, formatDate, formatShortDate, formatLongDuration } from '../../clock/format.js';
+import { formatClockTime, formatDuration, formatDate, formatShortDate, formatLongDuration, formatSegmentName } from '../../clock/format.js';
 
 describe('formatClockTime (12-hour)', () => {
   it.each([
@@ -13,6 +13,39 @@ describe('formatClockTime (12-hour)', () => {
 
   it('can include seconds', () => {
     expect(formatClockTime(new Date(2026, 9, 27, 13, 4, 9), { seconds: true })).toBe('1:04:09 PM');
+  });
+});
+
+describe('formatClockTime (24-hour)', () => {
+  it.each([
+    [new Date(2026, 9, 27, 8, 5), '08:05'],
+    [new Date(2026, 9, 27, 0, 0), '00:00'],
+    [new Date(2026, 9, 27, 12, 0), '12:00'],
+    [new Date(2026, 9, 27, 15, 10), '15:10'],
+    [new Date(2026, 9, 27, 23, 59), '23:59'],
+  ])('shows %s as %s', (date, text) => {
+    expect(formatClockTime(date, { use24Hour: true })).toBe(text);
+  });
+
+  it('can include seconds', () => {
+    expect(formatClockTime(new Date(2026, 9, 27, 13, 4, 9), { seconds: true, use24Hour: true })).toBe('13:04:09');
+  });
+});
+
+describe('formatSegmentName', () => {
+  const period3 = { name: 'Period 3', kind: 'period' };
+
+  it('adds the Period Label to a Period', () => {
+    expect(formatSegmentName(period3, { 'Period 3': 'AP CSA' })).toBe('Period 3 · AP CSA');
+  });
+
+  it('leaves a Period with no label, or a blank one, as its name', () => {
+    expect(formatSegmentName(period3, {})).toBe('Period 3');
+    expect(formatSegmentName(period3, { 'Period 3': '   ' })).toBe('Period 3');
+  });
+
+  it('never labels a Break or an Assembly, even one sharing a labelled name', () => {
+    expect(formatSegmentName({ name: 'Lunch', kind: 'break' }, { Lunch: 'Duty' })).toBe('Lunch');
   });
 });
 
