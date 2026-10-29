@@ -21,6 +21,7 @@ The command is in ticket 09: cache-busting `?cb=` on a non-existent slug, first-
 |---|---|---|---|
 | 2026-10-22, before (firebase-admin in our code, 5-min CDN cache) | ~2.3 s | ~2.7 s | ~0.16–0.18 s |
 | 2026-10-27, after ticket 06 (plain REST `fetch`, day-long cache) | 1.88 s | 2.66 s | 0.16–0.33 s |
+| 2026-10-28, after bundling with esbuild | 1.77 s | 1.88 s | 0.17–0.22 s |
 
 One cold sample per route is noisy. Both functions run the same code, so the `/p` vs `/practice` gap is probably noise, not a real difference.
 
@@ -37,7 +38,7 @@ Conclusion: of the ~1.9–2.7 s cold start, loading our code accounts for a few 
 
 ## Routes still open (cheapest first)
 
-1. **Bundle the function with esbuild.** *Built 2026-10-27; the cloud cold start hasn't been measured yet. Re-run the loop below after the next deploy and record the result here.* Measured locally: load time ~370 ms → ~105 ms, a 1.8 MB single file. The bundled exports carry identical deploy metadata (`__endpoint`), so `firebase deploy` should treat them the same.
+1. **Bundle the function with esbuild.** *Built and deployed 2026-10-28. Cold starts measured 1.77 s (`/practice`, down ~0.1 s) and 1.88 s (`/p`, down ~0.8 s). Both functions run the same bundle, so the true saving is probably in between; one sample per route is noisy. Both are still over 1 s, as expected.* Measured locally: load time ~370 ms → ~105 ms, a 1.8 MB single file. The bundled exports carry identical deploy metadata (`__endpoint`), so `firebase deploy` should treat them the same.
    - Work: add `esbuild` as a dev dependency in `functions/`, a `bundle` script (deliberately not named `build`, so Google's Cloud Build doesn't try to run it), point `main` at the bundle, add a `predeploy` build step to `firebase.json`'s `functions` block, and gitignore the bundle. About half an hour.
    - Expected saving: probably ~0.3–0.8 s off a cold start. This is an estimate scaled from local timings; it hasn't been measured in the cloud. On its own it won't get under 1 s.
 2. **Startup CPU boost.** 2nd-gen functions run as Cloud Run services, and Cloud Run can give extra CPU only while an instance starts. Unverified:
