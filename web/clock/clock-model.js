@@ -35,7 +35,8 @@
  *   sinceSchoolEndedMs: number | null,
  *   summerDay: number | null,
  * }} Moment
- * - `segment`: inside `current`; time left/elapsed are within it.
+ * - `segment`: inside `current`; time left/elapsed are within it. `upNext`
+ *   is the Segment after it today (null after the last).
  * - `passing`: in the gap `passing` before `upNext`; time left/elapsed are
  *   within the gap. Segments that touch have no Passing Period between them.
  * - `beforeSchool`: `upNext` is the first Segment; time left counts down to it.
@@ -268,6 +269,7 @@ export function describeMoment(now, schoolYears, { division = 'HS' } = {}) {
       dayLabel,
       state: 'segment',
       current,
+      upNext: segments[segments.indexOf(current) + 1] ?? null,
       timeLeftMs: current.end.getTime() - t,
       timeElapsedMs: t - current.start.getTime(),
     };

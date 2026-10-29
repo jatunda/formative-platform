@@ -62,6 +62,13 @@ describe('School Clock hosting', () => {
     });
   });
 
+  it('shows only the clock (and what is ringing) in fullscreen, on a page-coloured background', () => {
+    const css = readFileSync(resolve(clockDir, 'clock.css'), 'utf8');
+    expect(css).toMatch(/#clockApp:fullscreen\s*>\s*:not\(\.clock-display,\s*\[aria-label="Ringing"\]\)\s*\{\s*display:\s*none/);
+    // Without a background a fullscreen element shows the black backdrop through it.
+    expect(css).toMatch(/:where\(#clockApp\):fullscreen\s*\{[^}]*background:\s*Canvas/);
+  });
+
   it('ships no audio files: every sound is generated in the browser', () => {
     const audio = readdirSync(clockDir).filter((f) => /\.(mp3|wav|ogg|m4a|aac|flac|webm)$/i.test(f));
     expect(audio).toEqual([]);

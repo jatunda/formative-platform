@@ -19,6 +19,7 @@ import {
 import { addReadout, createLayoutStore, cycleReadout, newLayout, removeReadout } from './readout-layout.js';
 import { readoutText, readoutValue } from './readouts.js';
 import { SCHOOL_YEARS } from './school-years.js';
+import { createWakeLockKeeper, detectCapabilities } from './screen.js';
 import { BELL_SECONDS, ALARM_MAX_SECONDS, SOUNDS, createSoundPlayer } from './sound.js';
 import {
   PRESET_MINUTES, cancelTimer, durationLabel, parseDuration, pauseTimer, rememberDuration, resumeTimer,
@@ -33,6 +34,9 @@ const LOOKAHEAD_MS = 5 * 60 * 1000;
  * kept rather than cancelled when the window is redone. */
 const GRACE_MS = 1000;
 const DIVISIONS = [['MS', 'Middle School'], ['HS', 'High School']];
+const FEEDBACK_HREF = `mailto:erich@villagechristian.org?subject=${encodeURIComponent('Clock feedback')}`;
+/** The mini player's starting size (the user can resize it). */
+const MINI_PLAYER_SIZE = { width: 320, height: 200 };
 
 let destroyActiveApp = null;
 
@@ -46,6 +50,35 @@ function textFor(settings) {
     name: (segment) => formatSegmentName(segment, settings.periodLabels),
     division: settings.division,
   };
+}
+
+/**
+ * The day's heading: the Day Label, or "Day N of Summer".
+ * @param {import('./clock-model.js').Moment} moment
+ */
+function dayHeading(moment) {
+  return moment.state === 'summer' ? `Day ${moment.summerDay} of Summer` : moment.dayLabel;
+}
+
+/**
+ * Where the day is: the current Segment (with the Division), a Passing
+ * Period, before or after school; null on a day with no Segments.
+ * @param {import('./clock-model.js').Moment} moment
+ * @param {ReturnType<typeof textFor>} text
+ */
+function statusHeading(moment, text) {
+  switch (moment.state) {
+    case 'segment': return `${text.name(moment.current)} · ${text.division}`;
+    case 'passing': return 'Passing Period';
+    case 'beforeSchool': return 'Before school';
+    case 'afterSchool': return 'After school';
+    default: return null;
+  }
+}
+
+/** @param {import('./clock-model.js').TimedSegment} segment @param {ReturnType<typeof textFor>} text */
+function upNextText(segment, text) {
+  return `Up next: ${text.name(segment)} at ${text.time(segment.start)}`;
 }
 
 /**
@@ -63,29 +96,21 @@ function displayLines(now, moment, simulated, text) {
   }
   lines.push(['p', text.time(now, { seconds: true })]);
   if (!moment) return lines;
-  if (moment.state === 'summer') lines.push(['h1', `Day ${moment.summerDay} of Summer`]);
-  else if (moment.dayLabel) lines.push(['h1', moment.dayLabel]);
-
-  const upNext = (segment) => ['p', `Up next: ${text.name(segment)} at ${text.time(segment.start)}`];
+  const day = dayHeading(moment);
+  if (day) lines.push(['h1', day]);
+  const status = statusHeading(moment, text);
+  if (status) lines.push(['h2', status]);
+  // Time left, elapsed and until school starts are the Readouts' job.
   switch (moment.state) {
-    // Time left, elapsed and until school starts are the Readouts' job.
     case 'segment':
-      lines.push(
-        ['h2', `${text.name(moment.current)} · ${text.division}`],
-        ['p', `${text.time(moment.current.start)} – ${text.time(moment.current.end)}`],
-      );
+      lines.push(['p', `${text.time(moment.current.start)} – ${text.time(moment.current.end)}`]);
       break;
     case 'passing':
-      lines.push(['h2', 'Passing Period'], upNext(moment.upNext));
-      break;
     case 'beforeSchool':
-      lines.push(['h2', 'Before school'], upNext(moment.upNext));
+      lines.push(['p', upNextText(moment.upNext, text)]);
       break;
     case 'afterSchool':
-      lines.push(
-        ['h2', 'After school'],
-        ['p', `School ended at ${text.time(moment.schoolEndedAt)}`],
-      );
+      lines.push(['p', `School ended at ${text.time(moment.schoolEndedAt)}`]);
       break;
   }
 
@@ -203,12 +228,15 @@ function el(tag, props = {}, children = []) {
  * Mount the School Clock.
  * @param {{ mountId?: string, search?: string, realNow?: () => number, schoolYears?: object[],
  *   storage?: Pick<Storage, 'getItem' | 'setItem'>, tabStorage?: Pick<Storage, 'getItem' | 'setItem'>,
- *   soundPlayer?: import('./sound.js').SoundPlayer, prefersReducedMotion?: () => boolean }} [options]
+ *   soundPlayer?: import('./sound.js').SoundPlayer, prefersReducedMotion?: () => boolean,
+ *   capabilities?: import('./screen.js').Capabilities }} [options]
  *   `search` is `location.search` (for `?at=` / `&speed=`); `realNow` is the real clock;
  *   `storage` holds the device's settings and last used Readout layout (localStorage on
  *   the real page); `tabStorage` holds this tab's Readout layout (sessionStorage);
  *   `soundPlayer` plays the rings (the page closes it when destroyed);
- *   `prefersReducedMotion` swaps the ringing flash for a steady highlight.
+ *   `prefersReducedMotion` swaps the ringing flash for a steady highlight;
+ *   `capabilities` are the browser's Fullscreen, Wake Lock and Document PiP (each null
+ *   when missing, and its control left out).
  * @returns {{ destroy: () => void } | null} null if the mount element is missing
  */
 export function initClockApp({
@@ -220,6 +248,7 @@ export function initClockApp({
   tabStorage = globalThis.sessionStorage,
   soundPlayer = browserSoundPlayer(),
   prefersReducedMotion = browserPrefersReducedMotion,
+  capabilities = detectCapabilities(globalThis),
 } = {}) {
   const mount = document.getElementById(mountId);
   if (!mount) return null;
@@ -306,11 +335,13 @@ export function initClockApp({
     ringingBanner.hidden = false;
     mount.classList.remove('clock-ringing--flash', 'clock-ringing--steady');
     mount.classList.add('clock-ringing', prefersReducedMotion() ? 'clock-ringing--steady' : 'clock-ringing--flash');
+    renderMiniRinging();
   }
   function stopRinging() {
     ringingUntil = null;
     ringingBanner.hidden = true;
     mount.classList.remove('clock-ringing', 'clock-ringing--flash', 'clock-ringing--steady');
+    renderMiniRinging();
   }
   /** Stop the current ring, sound and all. */
   function dismiss() {
@@ -480,7 +511,101 @@ export function initClockApp({
       type: 'button', textContent: `Preview ${SOUND_NAMES[sound]}`, onclick: () => soundPlayer.play(sound),
     })),
   ]);
-  mount.replaceChildren(prompt, ringingBanner, soundControls, display, timerSection, settingsPanel);
+  // Fullscreen for projecting: the screen is kept awake for as long as it
+  // lasts (however it ends), where the browser allows a wake lock.
+  const { fullscreen, pictureInPicture } = capabilities;
+  const wakeLock = createWakeLockKeeper(capabilities.wakeLock);
+  const fullscreenButton = el('button', {
+    type: 'button', hidden: !fullscreen,
+    onclick: () => (fullscreen.isActive() ? fullscreen.exit() : fullscreen.request(mount)).catch(() => {}),
+  });
+  function showFullscreen() {
+    const on = Boolean(fullscreen?.isActive());
+    fullscreenButton.textContent = on ? 'Exit fullscreen' : 'Fullscreen';
+    if (on) wakeLock.hold();
+    else wakeLock.release();
+  }
+  const stopWatchingFullscreen = fullscreen?.onChange(showFullscreen);
+  showFullscreen();
+
+  // The mini player: an always-on-top window (Document Picture-in-Picture,
+  // where it exists) that mirrors the big Readout, the current Segment, up
+  // next and what's ringing, redrawn with every render of the main page.
+  let mini = null;
+  const miniButton = el('button', {
+    type: 'button', hidden: !pictureInPicture,
+    onclick: () => (mini ? closeMini() : openMini()),
+  });
+  function showMiniState() {
+    miniButton.textContent = mini ? 'Close mini player' : 'Mini player';
+  }
+  showMiniState();
+  async function openMini() {
+    let win;
+    try {
+      win = await pictureInPicture.open(MINI_PLAYER_SIZE);
+    } catch {
+      return;
+    }
+    const doc = win.document;
+    doc.title = 'School Clock';
+    const stylesheet = doc.createElement('link');
+    stylesheet.rel = 'stylesheet';
+    stylesheet.href = '/clock/clock.css';
+    doc.head.append(stylesheet);
+    const parts = {
+      win,
+      readout: el('p', { className: 'clock-mini-readout' }),
+      status: el('p'),
+      upNext: el('p'),
+      ringingText: el('p'),
+      dismiss: el('button', { type: 'button', textContent: 'Dismiss', onclick: () => dismiss() }),
+    };
+    doc.body.className = 'clock-mini';
+    doc.body.replaceChildren(parts.readout, parts.status, parts.upNext, parts.ringingText, parts.dismiss);
+    // Closed by the user, by this page, or because this tab went away. A
+    // window this page already closed may say so after a new one has opened.
+    win.addEventListener('pagehide', () => {
+      if (mini !== parts) return;
+      mini = null;
+      showMiniState();
+    });
+    mini = parts;
+    showMiniState();
+    render(new Date(clock.now()));
+    renderMiniRinging();
+  }
+  /** Close it now; the window's own pagehide comes a moment later. */
+  function closeMini() {
+    if (!mini) return;
+    const { win } = mini;
+    mini = null;
+    showMiniState();
+    win.close();
+  }
+  globalThis.addEventListener('pagehide', closeMini);
+
+  /**
+   * @param {Date} now @param {import('./clock-model.js').Moment | null} moment
+   * @param {string | null} bigReadout the big Readout's text (null when the Readouts are hidden)
+   * @param {ReturnType<typeof textFor>} text
+   */
+  function renderMini(now, moment, bigReadout, text) {
+    if (!mini) return;
+    mini.readout.textContent = bigReadout ?? text.time(now, { seconds: true });
+    mini.status.textContent = moment ? (statusHeading(moment, text) ?? dayHeading(moment) ?? '') : '';
+    mini.upNext.textContent = moment?.upNext ? upNextText(moment.upNext, text) : '';
+  }
+  function renderMiniRinging() {
+    if (!mini) return;
+    mini.ringingText.textContent = ringingBanner.hidden ? '' : ringingText.textContent;
+    mini.dismiss.hidden = ringingBanner.hidden;
+  }
+
+  const viewControls = el('section', { 'aria-label': 'View' }, [fullscreenButton, miniButton]);
+  const footer = el('footer', {}, [el('a', { href: FEEDBACK_HREF, textContent: 'Feedback? Email Eric' })]);
+
+  mount.replaceChildren(prompt, ringingBanner, soundControls, viewControls, display, timerSection, settingsPanel, footer);
 
   /** Settle whatever rang since the last tick, then redraw. */
   function tick() {
@@ -511,7 +636,7 @@ export function initClockApp({
     if (chosen) divisionSelect.value = settings.division;
     const text = textFor(settings);
     const moment = chosen ? describeMoment(now, schoolYears, { division: settings.division }) : null;
-    renderReadouts(now, moment);
+    renderMini(now, moment, renderReadouts(now, moment), text);
     info.replaceChildren(
       ...displayLines(now, moment, clock.simulated, text).map(([tag, line]) => el(tag, { textContent: line })),
       ...(chosen ? nextRingsNodes(now, schoolYears, settings, text) : []),
@@ -522,12 +647,13 @@ export function initClockApp({
    * Show the Readouts for `moment`; none before a Division is chosen or on a
    * date the clock knows nothing about (the time alone is shown then).
    * @param {Date} now @param {import('./clock-model.js').Moment | null} moment
+   * @returns {string | null} the big Readout's text, null when none are shown
    */
   function renderReadouts(now, moment) {
     if (!moment || moment.state === 'unknown') {
       readoutsSection.replaceChildren();
       readoutButtons = [];
-      return;
+      return null;
     }
     lastMoment = moment;
     if (!layout) {
@@ -538,19 +664,27 @@ export function initClockApp({
     layout.readouts.forEach(({ mode }, i) => {
       readoutButtons[i].textContent = readoutText(readoutValue(mode, moment, now), settings);
     });
+    return readoutButtons[0].textContent;
   }
 
   render(lastTick);
   scheduleSounds(lastTick);
   const interval = setInterval(tick, TICK_MS);
   const onVisibility = () => {
-    if (document.visibilityState === 'visible') scheduleSounds(new Date(clock.now()));
+    if (document.visibilityState !== 'visible') return;
+    scheduleSounds(new Date(clock.now()));
+    // The browser let go of the wake lock while the tab was hidden.
+    wakeLock.refresh();
   };
   document.addEventListener('visibilitychange', onVisibility);
 
   function destroy() {
     clearInterval(interval);
     document.removeEventListener('visibilitychange', onVisibility);
+    globalThis.removeEventListener('pagehide', closeMini);
+    stopWatchingFullscreen?.();
+    wakeLock.release();
+    closeMini();
     soundPlayer.close();
     if (destroyActiveApp === destroy) destroyActiveApp = null;
   }
