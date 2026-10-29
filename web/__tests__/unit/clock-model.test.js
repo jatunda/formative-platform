@@ -23,6 +23,14 @@ describe('describeMoment on an ordinary All Day', () => {
     expect(moment.timeElapsedMs).toBe(7 * MIN);
   });
 
+  it('says what is up next during a Segment, and nothing after the last one of the day', () => {
+    expect(describeMoment(tue(10, 37), SCHOOL_YEARS).upNext).toEqual({
+      name: 'Period 4', kind: 'period', start: tue(11, 20), end: tue(12, 5),
+    });
+    expect(describeMoment(tue(15, 0), SCHOOL_YEARS).current.name).toBe('Period 7');
+    expect(describeMoment(tue(15, 0), SCHOOL_YEARS).upNext).toBeNull();
+  });
+
   it('goes straight from Period 2 into Nutrition with no Passing Period where they touch', () => {
     const lastSecondOfPeriod2 = describeMoment(tue(10, 9, 59), SCHOOL_YEARS);
     expect(lastSecondOfPeriod2.state).toBe('segment');

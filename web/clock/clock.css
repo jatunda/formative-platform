@@ -1,6 +1,20 @@
 /* School Clock. Only what behaviour needs so far; the design reference
    (tickets 03/04) styles the rest. */
 
+/* Fullscreen (projecting): only the clock and what's ringing; Esc leaves it.
+   A fullscreen element needs its own background, or the black backdrop shows
+   through. :where() keeps this as weak as a class, so the ringing highlight
+   below still wins. */
+:where(#clockApp):fullscreen {
+  background: Canvas;
+  color: CanvasText;
+  overflow: auto;
+}
+
+#clockApp:fullscreen > :not(.clock-display, [aria-label="Ringing"]) {
+  display: none;
+}
+
 /* Ringing: the screen flashes once a second, well under the 3 flashes a
    second WCAG 2.3.1 allows. Each flash also draws a thick outline, so colour
    isn't the only signal; the "Ringing: …" banner says what rang. */
