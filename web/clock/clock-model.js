@@ -1,12 +1,12 @@
 // @ts-check
 // The School Clock's model: every rule about what a moment means lives here.
 // Pure: give it a time and the School Year registry, get a description back.
-// Times are local wall-clock (see school-year-types.js).
+// Times are local wall-clock (see school-years.js).
 
-/** @typedef {import('./school-year-types.js').SchoolYear} SchoolYear */
-/** @typedef {import('./school-year-types.js').Segment} Segment */
-/** @typedef {import('./school-year-types.js').SegmentKind} SegmentKind */
-/** @typedef {import('./school-year-types.js').Division} Division */
+/** @typedef {import('./school-years.js').SchoolYear} SchoolYear */
+/** @typedef {import('./school-years.js').Segment} Segment */
+/** @typedef {import('./school-years.js').SegmentKind} SegmentKind */
+/** @typedef {import('./school-years.js').Division} Division */
 
 /**
  * A Segment placed on a real date.

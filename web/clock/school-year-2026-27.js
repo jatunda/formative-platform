@@ -7,7 +7,7 @@
 // with the full 2026–27 data (ticket 07); until then a Wednesday or Thursday
 // names a Bell Schedule that isn't here yet.
 
-/** @type {import('./school-year-types.js').SchoolYear} */
+/** @type {import('./school-years.js').SchoolYear} */
 export const SCHOOL_YEAR_2026_27 = {
   id: '2026-27',
   start: '2026-08-17',
