@@ -5,6 +5,10 @@
 // counted up or down by ticks, so a throttled or sleeping tab is right the
 // moment it ticks again. Settings are read once at start and saved on every
 // change; the page never listens for other tabs' storage events.
+// Sound: the coming rings are handed to the sound player ahead of time, mapped
+// onto its audio clock, so they play on time even when this tab's timers are
+// throttled behind other windows. The window is redone when settings change,
+// when the tab is shown again, when sound turns on, and as it rolls forward.
 import { alarmsAfterRinging, describeMoment, ringsInWindow } from './clock-model.js';
 import { LABELLED_PERIODS } from './clock-settings.js';
 import { createSettingsStore } from './clock-storage.js';
@@ -15,8 +19,15 @@ import {
 import { addReadout, createLayoutStore, cycleReadout, newLayout, removeReadout } from './readout-layout.js';
 import { readoutText, readoutValue } from './readouts.js';
 import { SCHOOL_YEARS } from './school-years.js';
+import { BELL_SECONDS, ALARM_MAX_SECONDS, SOUNDS, createSoundPlayer } from './sound.js';
 
 const TICK_MS = 1000;
+/** How far ahead (real time) rings are handed to the sound player: past the
+ * minute-long timer throttling of a background tab. */
+const LOOKAHEAD_MS = 5 * 60 * 1000;
+/** Rings this recent (real time) stay in the window, so one already playing is
+ * kept rather than cancelled when the window is redone. */
+const GRACE_MS = 1000;
 const DIVISIONS = [['MS', 'Middle School'], ['HS', 'High School']];
 
 let destroyActiveApp = null;
@@ -123,6 +134,29 @@ function ringSourceText(ring, text) {
 }
 
 /**
+ * A name for one ring that stays the same each time the window is redone, so
+ * the sound player can tell a ring it already has from a new one.
+ * @param {import('./clock-model.js').Ring} ring
+ */
+function ringKey(ring) {
+  return `${ring.at.getTime()}|${ring.source}|${'alarm' in ring ? ring.alarm.id : ''}`;
+}
+
+/** Whether the browser asks for less motion (no flashing). */
+function browserPrefersReducedMotion() {
+  try {
+    return Boolean(globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
+  } catch {
+    return false;
+  }
+}
+
+/** The browser's sound player (silent where there's no Web Audio). */
+function browserSoundPlayer() {
+  return createSoundPlayer({ AudioContextClass: globalThis.AudioContext ?? globalThis.webkitAudioContext });
+}
+
+/**
  * The "Next rings today" list: every ring from `now` to midnight (nothing
  * at all when none are left, so a day off stays a plain clock).
  * @param {Date} now
@@ -164,10 +198,13 @@ function el(tag, props = {}, children = []) {
 /**
  * Mount the School Clock.
  * @param {{ mountId?: string, search?: string, realNow?: () => number, schoolYears?: object[],
- *   storage?: Pick<Storage, 'getItem' | 'setItem'>, tabStorage?: Pick<Storage, 'getItem' | 'setItem'> }} [options]
+ *   storage?: Pick<Storage, 'getItem' | 'setItem'>, tabStorage?: Pick<Storage, 'getItem' | 'setItem'>,
+ *   soundPlayer?: import('./sound.js').SoundPlayer, prefersReducedMotion?: () => boolean }} [options]
  *   `search` is `location.search` (for `?at=` / `&speed=`); `realNow` is the real clock;
  *   `storage` holds the device's settings and last used Readout layout (localStorage on
- *   the real page); `tabStorage` holds this tab's Readout layout (sessionStorage).
+ *   the real page); `tabStorage` holds this tab's Readout layout (sessionStorage);
+ *   `soundPlayer` plays the rings (the page closes it when destroyed);
+ *   `prefersReducedMotion` swaps the ringing flash for a steady highlight.
  * @returns {{ destroy: () => void } | null} null if the mount element is missing
  */
 export function initClockApp({
@@ -177,6 +214,8 @@ export function initClockApp({
   schoolYears = SCHOOL_YEARS,
   storage = globalThis.localStorage,
   tabStorage = globalThis.sessionStorage,
+  soundPlayer = browserSoundPlayer(),
+  prefersReducedMotion = browserPrefersReducedMotion,
 } = {}) {
   const mount = document.getElementById(mountId);
   if (!mount) return null;
@@ -204,7 +243,58 @@ export function initClockApp({
   function updateSettings(change) {
     settings = { ...settings, ...change };
     store.save(settings);
-    render(new Date(clock.now()));
+    soundPlayer.setVolume(settings.volume);
+    const now = new Date(clock.now());
+    scheduleSounds(now);
+    render(now);
+  }
+
+  // Sound. The coming rings, [now - grace, now + lookahead) in clock time,
+  // mapped onto the audio clock: at &speed=60 a clock minute is a real second.
+  let windowEnd = -Infinity;
+  /** @param {Date} now */
+  function scheduleSounds(now) {
+    const t = now.getTime();
+    windowEnd = t + LOOKAHEAD_MS * clock.speed;
+    if (soundPlayer.state() !== 'running') return;
+    const rings = settings.division
+      ? ringsInWindow(new Date(t - GRACE_MS * clock.speed), new Date(windowEnd), schoolYears, settings)
+      : [];
+    const audioNow = soundPlayer.currentTime();
+    soundPlayer.schedule(rings.map((ring) => ({
+      key: ringKey(ring),
+      at: audioNow + (ring.at.getTime() - t) / 1000 / clock.speed,
+      sound: ring.sound,
+      repeat: ring.source !== 'bell',
+    })));
+  }
+
+  // What's ringing on screen: a flash (or a steady highlight) and words for
+  // it, about 3 s for a Bell and until dismissed (60 s at most) otherwise.
+  let ringingUntil = null;
+  const ringingText = el('p');
+  const ringingBanner = el('section', { 'aria-label': 'Ringing', role: 'alert', hidden: true }, [
+    ringingText,
+    el('button', { type: 'button', textContent: 'Dismiss', onclick: () => dismiss() }),
+  ]);
+  /** @param {string} what @param {boolean} untilDismissed */
+  function startRinging(what, untilDismissed) {
+    const seconds = untilDismissed ? ALARM_MAX_SECONDS : BELL_SECONDS;
+    ringingUntil = Math.max(ringingUntil ?? 0, realNow() + seconds * 1000);
+    ringingText.textContent = `Ringing: ${what}`;
+    ringingBanner.hidden = false;
+    mount.classList.remove('clock-ringing--flash', 'clock-ringing--steady');
+    mount.classList.add('clock-ringing', prefersReducedMotion() ? 'clock-ringing--steady' : 'clock-ringing--flash');
+  }
+  function stopRinging() {
+    ringingUntil = null;
+    ringingBanner.hidden = true;
+    mount.classList.remove('clock-ringing', 'clock-ringing--flash', 'clock-ringing--steady');
+  }
+  /** Stop the current ring, sound and all. */
+  function dismiss() {
+    soundPlayer.dismiss();
+    stopRinging();
   }
 
 
@@ -238,6 +328,39 @@ export function initClockApp({
     );
   }
 
+  // Turning sound on (browsers need one click after every load), the Bells
+  // toggle and a test ring, one tap from the main screen.
+  const soundOn = el('button', { type: 'button', textContent: 'Turn sound on', onclick: () => soundPlayer.resume() });
+  const noSound = el('p', { textContent: "Sound isn't available in this browser." });
+  const bellsToggle = el('input', {
+    type: 'checkbox', checked: settings.bells.on,
+    onchange: () => updateSettings({ bells: { ...settings.bells, on: bellsToggle.checked } }),
+  });
+  const soundControls = el('section', { 'aria-label': 'Sound' }, [
+    soundOn,
+    noSound,
+    el('label', {}, [bellsToggle, ' Bells']),
+    el('button', {
+      type: 'button', textContent: 'Test ring',
+      onclick: () => {
+        soundPlayer.play(settings.bells.sound);
+        startRinging('Test ring', false);
+      },
+    }),
+    el('p', { textContent: 'Keep this tab open for sounds to play. It can stay behind other windows.' }),
+  ]);
+  function showSoundState() {
+    const state = soundPlayer.state();
+    soundOn.hidden = state !== 'suspended';
+    noSound.hidden = state !== 'unavailable';
+  }
+  soundPlayer.onStateChange(() => {
+    showSoundState();
+    scheduleSounds(new Date(clock.now()));
+  });
+  showSoundState();
+  soundPlayer.setVolume(settings.volume);
+
   const info = el('div');
   const display = el('div', { className: 'clock-display' }, [readoutsSection, info]);
 
@@ -256,19 +379,36 @@ export function initClockApp({
     });
     return el('label', {}, [`${period} label `, input]);
   });
+  const volume = el('input', {
+    type: 'range', min: '0', max: '100', step: '5', value: String(Math.round(settings.volume * 100)),
+    oninput: () => updateSettings({ volume: Number(volume.value) / 100 }),
+  });
+  const bellSound = el('select', {
+    onchange: () => updateSettings({ bells: { ...settings.bells, sound: bellSound.value } }),
+  }, SOUNDS.map((sound) => el('option', { value: sound, textContent: SOUND_NAMES[sound] })));
+  bellSound.value = settings.bells.sound;
   const settingsPanel = el('section', { 'aria-label': 'Settings' }, [
     el('h2', { textContent: 'Settings' }),
     el('label', {}, ['Division ', divisionSelect]),
     el('label', {}, [use24Hour, ' 24-hour time']),
     ...labelInputs,
+    el('label', {}, ['Volume ', volume]),
+    el('label', {}, ['Bell sound ', bellSound]),
+    ...SOUNDS.map((sound) => el('button', {
+      type: 'button', textContent: `Preview ${SOUND_NAMES[sound]}`, onclick: () => soundPlayer.play(sound),
+    })),
   ]);
-  mount.replaceChildren(prompt, display, settingsPanel);
+  mount.replaceChildren(prompt, ringingBanner, soundControls, display, settingsPanel);
 
   /** Settle whatever rang since the last tick, then redraw. */
   function tick() {
     const now = new Date(clock.now());
+    if (ringingUntil !== null && realNow() >= ringingUntil) stopRinging();
+    if (now.getTime() >= windowEnd - (LOOKAHEAD_MS * clock.speed) / 2) scheduleSounds(now);
     if (settings.division) {
       const rang = ringsInWindow(lastTick, now, schoolYears, settings);
+      const text = textFor(settings);
+      for (const ring of rang) startRinging(ringSourceText(ring, text), ring.source !== 'bell');
       const alarms = alarmsAfterRinging(settings.alarms, rang, { simulated: clock.simulated });
       if (alarms !== settings.alarms) {
         settings = { ...settings, alarms };
@@ -316,10 +456,17 @@ export function initClockApp({
   }
 
   render(lastTick);
+  scheduleSounds(lastTick);
   const interval = setInterval(tick, TICK_MS);
+  const onVisibility = () => {
+    if (document.visibilityState === 'visible') scheduleSounds(new Date(clock.now()));
+  };
+  document.addEventListener('visibilitychange', onVisibility);
 
   function destroy() {
     clearInterval(interval);
+    document.removeEventListener('visibilitychange', onVisibility);
+    soundPlayer.close();
     if (destroyActiveApp === destroy) destroyActiveApp = null;
   }
   destroyActiveApp = destroy;
@@ -327,5 +474,8 @@ export function initClockApp({
 }
 
 if (typeof document !== 'undefined' && document.getElementById('clockApp')) {
-  initClockApp({ search: window.location.search, storage: window.localStorage, tabStorage: window.sessionStorage });
+  initClockApp({
+    search: window.location.search, storage: window.localStorage, tabStorage: window.sessionStorage,
+    soundPlayer: browserSoundPlayer(),
+  });
 }

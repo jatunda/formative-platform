@@ -364,7 +364,8 @@ describe('School Clock page', () => {
     const labelInput = (period) =>
       [...document.querySelectorAll('#clockApp label')].find((l) => l.textContent.startsWith(`${period} label`))
         .querySelector('input');
-    const use24HourBox = () => document.querySelector('#clockApp input[type=checkbox]');
+    const use24HourBox = () =>
+      [...document.querySelectorAll('#clockApp label')].find((l) => l.textContent.trim() === '24-hour time').querySelector('input');
     const isShown = (node) => !node.closest('[hidden]');
 
     // Wed 10/28/26 is an Even Day: at 10:30 HS is in Chapel, MS in Period 4.

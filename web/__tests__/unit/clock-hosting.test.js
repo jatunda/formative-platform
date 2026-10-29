@@ -30,6 +30,46 @@ describe('School Clock hosting', () => {
     expect(relative).toEqual([]);
   });
 
+  it('links the clock styles by absolute path', () => {
+    const html = readFileSync(resolve(clockDir, 'index.html'), 'utf8');
+    expect(html).toContain('<link rel="stylesheet" href="/clock/clock.css" />');
+  });
+
+  describe('the ringing flash', () => {
+    const css = readFileSync(resolve(clockDir, 'clock.css'), 'utf8');
+    const rule = (selector) => {
+      const match = new RegExp(`${selector.replace(/[.-]/g, '\\$&')}\\s*\\{([^}]*)\\}`).exec(css);
+      return match ? match[1] : '';
+    };
+
+    it('flashes fewer than 3 times a second (WCAG 2.3.1)', () => {
+      const animation = /animation:\s*clock-flash\s+([\d.]+)(m?s)/.exec(rule('.clock-ringing--flash'));
+      expect(animation).not.toBeNull();
+      const seconds = Number(animation[1]) / (animation[2] === 'ms' ? 1000 : 1);
+      // One flash per animation cycle.
+      expect(1 / seconds).toBeLessThan(3);
+    });
+
+    it('is a steady highlight under reduced motion, not a flash', () => {
+      expect(rule('.clock-ringing--steady')).not.toMatch(/animation/);
+      expect(rule('.clock-ringing--steady')).toMatch(/outline/);
+      const reduced = css.slice(css.indexOf('@media (prefers-reduced-motion: reduce)'));
+      expect(reduced).toMatch(/\.clock-ringing--flash\s*\{[^}]*animation:\s*none/);
+    });
+
+    it('is more than a colour change: it also draws a thick outline', () => {
+      expect(css).toMatch(/@keyframes clock-flash[^@]*outline/);
+    });
+  });
+
+  it('ships no audio files: every sound is generated in the browser', () => {
+    const audio = readdirSync(clockDir).filter((f) => /\.(mp3|wav|ogg|m4a|aac|flac|webm)$/i.test(f));
+    expect(audio).toEqual([]);
+    const sources = readdirSync(clockDir).filter((f) => f.endsWith('.js'))
+      .map((f) => readFileSync(resolve(clockDir, f), 'utf8'));
+    expect(sources.filter((src) => /new Audio\(|\.mp3|\.wav|decodeAudioData/.test(src))).toEqual([]);
+  });
+
   it('imports no Firebase or database module', () => {
     const imports = readdirSync(clockDir)
       .filter((f) => f.endsWith('.js'))
