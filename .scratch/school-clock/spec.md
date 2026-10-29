@@ -142,6 +142,10 @@ A public page at `mrhsieh.app/clock` that any teacher can bookmark. No login. It
 78. As a teacher, I want the clock to work in current Safari, Chrome and Firefox on a MacBook, and in other modern browsers, so that whatever I use works.
 79. As a teacher, I want all settings in one drawer, out of the way, so that the projected view stays clean.
 
+### Time format
+
+80a. As a teacher, I want a 24-hour (military) time toggle, saved on my device, so that every clock time on the page (current time, Segment times, "starts at", Alarm times) shows the way I read time.
+
 ### Feedback
 
 80. As a teacher, I want a small "Feedback? Email Eric" link that opens a new email to erich@villagechristian.org with the subject "Clock feedback", so that sending a suggestion takes no effort.
@@ -188,12 +192,13 @@ A public page at `mrhsieh.app/clock` that any teacher can bookmark. No login. It
   - Defaults: "until school starts" before school on a School Day; "since school ended" after school; "until Next School Day" on days off.
   - A Readout keeps its position in the mode cycle as the day moves between in-school and Off-Hours.
 - **Device storage.** A small storage adapter (Robotics' `createLocalStorageAdapter` is the precedent) with versioned keys, falling back to defaults on missing or corrupt data.
-  - **Saved in `localStorage`:** Division, Period Labels, Alarms, Bells on/off, sound choices, volume, the running timer's end time, the recent custom durations, and the "last used" Readout layout.
+  - **Saved in `localStorage`:** Division, the 24-hour time setting (default off, i.e. 12-hour), Period Labels, Alarms, Bells on/off, sound choices, volume, the running timer's end time, the recent custom durations, and the "last used" Readout layout.
   - **Per tab:** the layout lives in `sessionStorage` and is read from `localStorage` only when a tab with no session layout opens. The page never listens for cross-tab storage events, so open tabs never change each other.
 - **Sound engine.** Web Audio synthesis only, with no audio assets: a few named voices (e.g. chime, school bell, beep, buzzer), each a short function of an audio context and a start time.
   - Upcoming rings are scheduled ahead on the audio clock for a lookahead window, so they play on time even when timers in a background tab are throttled. The schedule is recomputed whenever settings change, the tab becomes visible, or the window rolls over.
   - The engine starts suspended. A visible "turn sound on" control resumes it after any user click, and is shown again whenever the audio context is suspended (after every load).
   - Bells play about 3 s and stop on their own. Alarms and the timer repeat until dismissed, for at most 60 s.
+- **Time format.** One formatter turns a clock time into text according to the 24-hour setting, and every clock time on the page and in the mini player goes through it. Durations and countdowns ("12:04 left", "2d 14h") are not affected.
 - **Ticking.** The display recomputes from the current time on each tick. It never counts up or down by adding ticks, so a throttled or sleeping tab is correct the moment it renders again.
 - **Visual ringing.** The flash must stay under 3 flashes per second (WCAG 2.3.1) and fall back to a steady highlight under `prefers-reduced-motion`.
 - **Mini player.** Document Picture-in-Picture, used only when the API exists. It mirrors the big Readout, current Segment, up next, and a dismiss button from the main tab's state. The button is hidden when the API is unavailable. No video-PiP fallback.

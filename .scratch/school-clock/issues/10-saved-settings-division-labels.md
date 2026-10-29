@@ -21,6 +21,7 @@ Spec: `.scratch/school-clock/spec.md` (Implementation Decisions: device storage;
 - [ ] Division: asked on first visit (no saved value), switchable afterwards, and the page uses the chosen Division's Bell Schedules and exceptions
 - [ ] Period Labels appear wherever the page names that Period (current Segment, up next, next-rings list)
 - [ ] Alarms, Bells on/off, sound choices and volume round-trip through storage
+- [ ] **24-hour time:** a toggle (default off) saved per device. When on, every clock time on the page (current time, Segment start/end, Next School Day "starts at", next-rings list) shows in 24-hour format through one shared formatter; durations and countdowns are unchanged. Tests cover both formats, including midnight and noon
 - [ ] Nothing listens for cross-tab storage events
 - [ ] Tests use fake storage: first-visit prompt, Division switch, labels shown, corrupt-data fallback
 - [ ] `npm run lint`, `npm run typecheck`, `npm run test:coverage` in `web/` pass
