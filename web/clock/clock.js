@@ -20,13 +20,14 @@ const DIVISIONS = [['MS', 'Middle School'], ['HS', 'High School']];
 let destroyActiveApp = null;
 
 /**
- * How the page writes clock times and Segment names under the current settings.
+ * How the page writes clock times, Segment names and the Division under the current settings.
  * @param {import('./clock-settings.js').ClockSettings} settings
  */
 function textFor(settings) {
   return {
     time: (date, { seconds = false } = {}) => formatClockTime(date, { seconds, use24Hour: settings.use24Hour }),
     name: (segment) => formatSegmentName(segment, settings.periodLabels),
+    division: settings.division,
   };
 }
 
@@ -52,7 +53,7 @@ function displayLines(now, moment, simulated, text) {
   switch (moment.state) {
     case 'segment':
       lines.push(
-        ['h2', text.name(moment.current)],
+        ['h2', `${text.name(moment.current)} · ${text.division}`],
         ['p', `${text.time(moment.current.start)} – ${text.time(moment.current.end)}`],
         ['p', `${formatDuration(moment.timeLeftMs)} left`],
         ['p', `${formatDuration(moment.timeElapsedMs)} elapsed`],

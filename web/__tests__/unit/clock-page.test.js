@@ -420,6 +420,16 @@ describe('School Clock page', () => {
       expect(saved(storage).division).toBe('MS');
     });
 
+    it('shows the current Division next to the current Segment name', () => {
+      const real = fakeRealClock(new Date(2026, 9, 27, 10, 32, 0));
+      app = start({ realNow: real.now, settings: { periodLabels: { 'Period 3': 'AP CSA' } } });
+      expect(document.querySelector('#clockApp .clock-display h2').textContent).toBe('Period 3 · AP CSA · HS');
+
+      divisionSelect().value = 'MS';
+      divisionSelect().dispatchEvent(new Event('change'));
+      expect(document.querySelector('#clockApp .clock-display h2').textContent).toBe('Period 3 · AP CSA · MS');
+    });
+
     it("follows the Division's Calendar Exceptions (HS Experience Week, MS All Day)", () => {
       // Wed 1/20/27.
       const real = fakeRealClock(new Date(2027, 0, 20, 10, 32, 0));
