@@ -9,22 +9,20 @@
 // onto its audio clock, so they play on time even when this tab's timers are
 // throttled behind other windows. The window is redone when settings change,
 // when the tab is shown again, when sound turns on, and as it rolls forward.
-import { alarmsAfterRinging, describeMoment, ringsInWindow } from './clock-model.js';
+import { alarmsAfterRinging, describeMoment, ringsInWindow, ringsUntilDismissed } from './clock-model.js';
 import { LABELLED_PERIODS } from './clock-settings.js';
 import { createSettingsStore } from './clock-storage.js';
 import { createClockSource } from './clock-source.js';
-import {
-  formatClockTime, formatDate, formatDuration, formatLongDuration, formatSegmentName, formatShortDate,
-} from './format.js';
+import { el } from './dom.js';
+import { formatClockTime, formatDate, formatLongDuration, formatSegmentName, formatShortDate } from './format.js';
+import { createMiniPlayer } from './mini-player.js';
 import { addReadout, createLayoutStore, cycleReadout, newLayout, removeReadout } from './readout-layout.js';
 import { readoutText, readoutValue } from './readouts.js';
 import { SCHOOL_YEARS } from './school-years.js';
 import { createWakeLockKeeper, detectCapabilities } from './screen.js';
-import { BELL_SECONDS, ALARM_MAX_SECONDS, SOUNDS, createSoundPlayer } from './sound.js';
-import {
-  PRESET_MINUTES, cancelTimer, durationLabel, parseDuration, pauseTimer, rememberDuration, resumeTimer,
-  settleTimer, startTimer, timerStatus,
-} from './timer.js';
+import { BELL_SECONDS, ALARM_MAX_SECONDS, SOUNDS, SOUND_NAMES, createSoundPlayer } from './sound.js';
+import { cancelTimer, settleTimer } from './timer.js';
+import { createTimerPanel } from './timer-panel.js';
 
 const TICK_MS = 1000;
 /** How far ahead (real time) rings are handed to the sound player: past the
@@ -33,10 +31,11 @@ const LOOKAHEAD_MS = 5 * 60 * 1000;
 /** Rings this recent (real time) stay in the window, so one already playing is
  * kept rather than cancelled when the window is redone. */
 const GRACE_MS = 1000;
+/** Rings older than this (real time) when a tick finally reaches them were
+ * missed while the tab slept or was throttled: they don't ring late. */
+const STALE_MS = 5 * 1000;
 const DIVISIONS = [['MS', 'Middle School'], ['HS', 'High School']];
 const FEEDBACK_HREF = `mailto:erich@villagechristian.org?subject=${encodeURIComponent('Clock feedback')}`;
-/** The mini player's starting size (the user can resize it). */
-const MINI_PLAYER_SIZE = { width: 320, height: 200 };
 
 let destroyActiveApp = null;
 
@@ -128,8 +127,6 @@ function displayLines(now, moment, simulated, text) {
   return lines;
 }
 
-const SOUND_NAMES = { chime: 'Chime', schoolBell: 'School bell', beep: 'Beep', buzzer: 'Buzzer' };
-
 /** @param {import('./clock-settings.js').PeriodAnchor} anchor */
 function anchorText(anchor) {
   if (anchor.from === 'start') return `minute ${anchor.minutes}`;
@@ -210,21 +207,6 @@ function nextRingsNodes(now, schoolYears, ringSettings, text) {
 }
 
 /**
- * A DOM element: `props` are set as properties, except hyphenated names
- * ('aria-label'), which are set as attributes.
- * @param {string} tag @param {object} [props] @param {(Node | string)[]} [children]
- */
-function el(tag, props = {}, children = []) {
-  const node = document.createElement(tag);
-  for (const [key, value] of Object.entries(props)) {
-    if (key.includes('-')) node.setAttribute(key, value);
-    else node[key] = value;
-  }
-  node.append(...children);
-  return node;
-}
-
-/**
  * Mount the School Clock.
  * @param {{ mountId?: string, search?: string, realNow?: () => number, schoolYears?: object[],
  *   storage?: Pick<Storage, 'getItem' | 'setItem'>, tabStorage?: Pick<Storage, 'getItem' | 'setItem'>,
@@ -233,7 +215,7 @@ function el(tag, props = {}, children = []) {
  *   `search` is `location.search` (for `?at=` / `&speed=`); `realNow` is the real clock;
  *   `storage` holds the device's settings and last used Readout layout (localStorage on
  *   the real page); `tabStorage` holds this tab's Readout layout (sessionStorage);
- *   `soundPlayer` plays the rings (the page closes it when destroyed);
+ *   `soundPlayer` plays the rings (the browser's by default; the page closes it when destroyed);
  *   `prefersReducedMotion` swaps the ringing flash for a steady highlight;
  *   `capabilities` are the browser's Fullscreen, Wake Lock and Document PiP (each null
  *   when missing, and its control left out).
@@ -246,13 +228,14 @@ export function initClockApp({
   schoolYears = SCHOOL_YEARS,
   storage = globalThis.localStorage,
   tabStorage = globalThis.sessionStorage,
-  soundPlayer = browserSoundPlayer(),
+  soundPlayer: givenSoundPlayer,
   prefersReducedMotion = browserPrefersReducedMotion,
   capabilities = detectCapabilities(globalThis),
 } = {}) {
   const mount = document.getElementById(mountId);
   if (!mount) return null;
   destroyActiveApp?.();
+  const soundPlayer = givenSoundPlayer ?? browserSoundPlayer();
 
   const clock = createClockSource({ search, realNow });
   const store = createSettingsStore(storage);
@@ -315,7 +298,7 @@ export function initClockApp({
       key: ringKey(ring),
       at: audioNow + (ring.at.getTime() - t) / 1000 / clock.speed,
       sound: ring.sound,
-      repeat: ring.source !== 'bell',
+      repeat: ringsUntilDismissed(ring),
     })));
   }
 
@@ -413,66 +396,8 @@ export function initClockApp({
   showSoundState();
   soundPlayer.setVolume(settings.volume);
 
-  // The classroom timer, one tap from the main screen. Built once (so typing
-  // a custom duration survives the ticks); each tick rewrites its time left.
-  const timerLeft = el('p');
-  const timerError = el('p', { 'aria-live': 'polite' });
-  /** @param {Partial<import('./clock-settings.js').ClockSettings>} change */
-  const changeTimer = (change) => {
-    timerError.textContent = '';
-    updateSettings(change);
-  };
-  const pauseButton = el('button', {
-    type: 'button', textContent: 'Pause', onclick: () => changeTimer(pauseTimer(settings, clock.now())),
-  });
-  const resumeButton = el('button', {
-    type: 'button', textContent: 'Resume', onclick: () => changeTimer(resumeTimer(settings, clock.now())),
-  });
-  const cancelButton = el('button', { type: 'button', textContent: 'Cancel', onclick: () => changeTimer(cancelTimer()) });
-  /** A typed duration or a quick pick: it starts and becomes the first quick pick. @param {number} ms */
-  function startCustom(ms) {
-    changeTimer({ ...startTimer(ms, clock.now()), recentDurations: rememberDuration(settings.recentDurations, ms) });
-    buildQuickPicks();
-  }
-  const quickPicks = el('div', { role: 'group', 'aria-label': 'Quick picks' });
-  function buildQuickPicks() {
-    quickPicks.replaceChildren(...settings.recentDurations.map((ms) =>
-      el('button', { type: 'button', textContent: durationLabel(ms), onclick: () => startCustom(ms) })));
-  }
-  buildQuickPicks();
-  const customInput = el('input', { type: 'text', placeholder: '7:30', autocomplete: 'off' });
-  const timerSection = el('section', { 'aria-label': 'Timer' }, [
-    el('h2', { textContent: 'Timer' }),
-    timerLeft,
-    pauseButton, resumeButton, cancelButton,
-    el('div', { role: 'group', 'aria-label': 'Presets' }, PRESET_MINUTES.map((minutes) => el('button', {
-      type: 'button', textContent: durationLabel(minutes * 60 * 1000),
-      onclick: () => changeTimer(startTimer(minutes * 60 * 1000, clock.now())),
-    }))),
-    quickPicks,
-    el('form', {
-      onsubmit: (event) => {
-        event.preventDefault();
-        const typed = parseDuration(customInput.value);
-        if (typed.ok) startCustom(typed.ms);
-        else timerError.textContent = typed.error;
-      },
-    }, [
-      el('label', {}, ['Custom (minutes or m:ss) ', customInput]),
-      el('button', { type: 'submit', textContent: 'Start' }),
-    ]),
-    timerError,
-  ]);
-  /** @param {Date} now */
-  function renderTimer(now) {
-    const { status, remainingMs } = timerStatus(settings, now.getTime());
-    // Rounded up, so a 5 min timer reads 5:00 when it starts and 0:00 as it rings.
-    const left = status === 'idle' ? '' : `${formatDuration(Math.ceil(remainingMs / 1000) * 1000)} left`;
-    timerLeft.textContent = status === 'paused' ? `Paused · ${left}` : left;
-    pauseButton.hidden = status !== 'running';
-    resumeButton.hidden = status !== 'paused';
-    cancelButton.hidden = status === 'idle';
-  }
+  // The classroom timer, one tap from the main screen.
+  const timerPanel = createTimerPanel({ settings: () => settings, now: () => clock.now(), update: updateSettings });
 
   const info = el('div');
   const display = el('div', { className: 'clock-display' }, [readoutsSection, info]);
@@ -528,62 +453,16 @@ export function initClockApp({
   const stopWatchingFullscreen = fullscreen?.onChange(showFullscreen);
   showFullscreen();
 
-  // The mini player: an always-on-top window (Document Picture-in-Picture,
-  // where it exists) that mirrors the big Readout, the current Segment, up
-  // next and what's ringing, redrawn with every render of the main page.
-  let mini = null;
-  const miniButton = el('button', {
-    type: 'button', hidden: !pictureInPicture,
-    onclick: () => (mini ? closeMini() : openMini()),
+  // The mini player, redrawn with every render of the main page.
+  const mini = createMiniPlayer({
+    pictureInPicture,
+    onOpen: () => {
+      render(new Date(clock.now()));
+      renderMiniRinging();
+    },
+    onDismiss: () => dismiss(),
   });
-  function showMiniState() {
-    miniButton.textContent = mini ? 'Close mini player' : 'Mini player';
-  }
-  showMiniState();
-  async function openMini() {
-    let win;
-    try {
-      win = await pictureInPicture.open(MINI_PLAYER_SIZE);
-    } catch {
-      return;
-    }
-    const doc = win.document;
-    doc.title = 'School Clock';
-    const stylesheet = doc.createElement('link');
-    stylesheet.rel = 'stylesheet';
-    stylesheet.href = '/clock/clock.css';
-    doc.head.append(stylesheet);
-    const parts = {
-      win,
-      readout: el('p', { className: 'clock-mini-readout' }),
-      status: el('p'),
-      upNext: el('p'),
-      ringingText: el('p'),
-      dismiss: el('button', { type: 'button', textContent: 'Dismiss', onclick: () => dismiss() }),
-    };
-    doc.body.className = 'clock-mini';
-    doc.body.replaceChildren(parts.readout, parts.status, parts.upNext, parts.ringingText, parts.dismiss);
-    // Closed by the user, by this page, or because this tab went away. A
-    // window this page already closed may say so after a new one has opened.
-    win.addEventListener('pagehide', () => {
-      if (mini !== parts) return;
-      mini = null;
-      showMiniState();
-    });
-    mini = parts;
-    showMiniState();
-    render(new Date(clock.now()));
-    renderMiniRinging();
-  }
-  /** Close it now; the window's own pagehide comes a moment later. */
-  function closeMini() {
-    if (!mini) return;
-    const { win } = mini;
-    mini = null;
-    showMiniState();
-    win.close();
-  }
-  globalThis.addEventListener('pagehide', closeMini);
+  globalThis.addEventListener('pagehide', mini.close);
 
   /**
    * @param {Date} now @param {import('./clock-model.js').Moment | null} moment
@@ -591,31 +470,40 @@ export function initClockApp({
    * @param {ReturnType<typeof textFor>} text
    */
   function renderMini(now, moment, bigReadout, text) {
-    if (!mini) return;
-    mini.readout.textContent = bigReadout ?? text.time(now, { seconds: true });
-    mini.status.textContent = moment ? (statusHeading(moment, text) ?? dayHeading(moment) ?? '') : '';
-    mini.upNext.textContent = moment?.upNext ? upNextText(moment.upNext, text) : '';
+    mini.show({
+      readout: bigReadout ?? text.time(now, { seconds: true }),
+      status: moment ? (statusHeading(moment, text) ?? dayHeading(moment) ?? '') : '',
+      upNext: moment?.upNext ? upNextText(moment.upNext, text) : '',
+    });
   }
   function renderMiniRinging() {
-    if (!mini) return;
-    mini.ringingText.textContent = ringingBanner.hidden ? '' : ringingText.textContent;
-    mini.dismiss.hidden = ringingBanner.hidden;
+    mini.showRinging(ringingBanner.hidden ? null : ringingText.textContent);
   }
 
-  const viewControls = el('section', { 'aria-label': 'View' }, [fullscreenButton, miniButton]);
+  const viewControls = el('section', { 'aria-label': 'View' }, [fullscreenButton, mini.button]);
   const footer = el('footer', {}, [el('a', { href: FEEDBACK_HREF, textContent: 'Feedback? Email Eric' })]);
 
-  mount.replaceChildren(prompt, ringingBanner, soundControls, viewControls, display, timerSection, settingsPanel, footer);
+  mount.replaceChildren(prompt, ringingBanner, soundControls, viewControls, display, timerPanel.section, settingsPanel, footer);
 
-  /** Settle whatever rang since the last tick, then redraw. */
+  /**
+   * Settle whatever rang since the last tick, then redraw. After a sleep or a
+   * long stall, what came due meanwhile is settled (a one-time Clock Alarm is
+   * turned off) but doesn't ring late, and the sound schedule is redone so the
+   * player drops it too.
+   */
   function tick() {
     const now = new Date(clock.now());
+    const staleBefore = now.getTime() - STALE_MS * clock.speed;
     if (ringingUntil !== null && realNow() >= ringingUntil) stopRinging();
-    if (now.getTime() >= windowEnd - (LOOKAHEAD_MS * clock.speed) / 2) scheduleSounds(now);
+    if (lastTick.getTime() < staleBefore || now.getTime() >= windowEnd - (LOOKAHEAD_MS * clock.speed) / 2) {
+      scheduleSounds(now);
+    }
     if (settings.division) {
       const rang = ringsInWindow(lastTick, now, schoolYears, settings);
       const text = textFor(settings);
-      for (const ring of rang) startRinging(ringSourceText(ring, text), ring.source !== 'bell');
+      for (const ring of rang) {
+        if (ring.at.getTime() >= staleBefore) startRinging(ringSourceText(ring, text), ringsUntilDismissed(ring));
+      }
       const alarms = alarmsAfterRinging(settings.alarms, rang, { simulated: clock.simulated });
       if (alarms !== settings.alarms) {
         settings = { ...settings, alarms };
@@ -631,8 +519,8 @@ export function initClockApp({
     const chosen = settings.division !== null;
     prompt.hidden = chosen;
     settingsPanel.hidden = !chosen;
-    timerSection.hidden = !chosen;
-    renderTimer(now);
+    timerPanel.section.hidden = !chosen;
+    timerPanel.render(now);
     if (chosen) divisionSelect.value = settings.division;
     const text = textFor(settings);
     const moment = chosen ? describeMoment(now, schoolYears, { division: settings.division }) : null;
@@ -681,10 +569,10 @@ export function initClockApp({
   function destroy() {
     clearInterval(interval);
     document.removeEventListener('visibilitychange', onVisibility);
-    globalThis.removeEventListener('pagehide', closeMini);
+    globalThis.removeEventListener('pagehide', mini.close);
     stopWatchingFullscreen?.();
     wakeLock.release();
-    closeMini();
+    mini.close();
     soundPlayer.close();
     if (destroyActiveApp === destroy) destroyActiveApp = null;
   }
@@ -693,8 +581,5 @@ export function initClockApp({
 }
 
 if (typeof document !== 'undefined' && document.getElementById('clockApp')) {
-  initClockApp({
-    search: window.location.search, storage: window.localStorage, tabStorage: window.sessionStorage,
-    soundPlayer: browserSoundPlayer(),
-  });
+  initClockApp({ search: window.location.search });
 }

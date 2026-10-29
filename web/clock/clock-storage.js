@@ -5,6 +5,8 @@
 // Alarm), so a bad save never stops the clock. Nothing here listens for
 // cross-tab storage events: open tabs never change each other.
 import { createStorageAdapter } from '../storage.js';
+import { SOUNDS } from './sound.js';
+import { QUICK_PICKS } from './timer.js';
 
 /** @typedef {import('./clock-settings.js').ClockSettings} ClockSettings */
 /** @typedef {import('./clock-settings.js').Alarm} Alarm */
@@ -26,24 +28,20 @@ export const DEFAULT_SETTINGS = Object.freeze(/** @type {ClockSettings} */ ({
   recentDurations: [],
 }));
 
-/** How many recent custom durations are kept as quick picks. */
-const QUICK_PICKS = 3;
-const SOUNDS = ['chime', 'schoolBell', 'beep', 'buzzer'];
-
 /** @param {unknown} v @returns {v is Record<string, any>} */
 const isObject = (v) => typeof v === 'object' && v !== null && !Array.isArray(v);
 /** @param {unknown} v */
-const isSound = (v) => SOUNDS.includes(/** @type {string} */ (v));
+const isSound = (v) => SOUNDS.includes(/** @type {import('./clock-settings.js').SoundName} */ (v));
 /** @param {unknown} v */
 const isStringList = (v) => Array.isArray(v) && v.every((s) => typeof s === 'string');
-/** @param {unknown} v */
-const isMinutes = (v) => typeof v === 'number' && Number.isFinite(v);
+/** @param {unknown} v @returns {v is number} */
+const isFiniteNumber = (v) => typeof v === 'number' && Number.isFinite(v);
 
 /** @param {unknown} anchor */
 function isAnchor(anchor) {
   if (!isObject(anchor)) return false;
   if (anchor.from === 'halfway') return true;
-  return (anchor.from === 'start' || anchor.from === 'end') && isMinutes(anchor.minutes);
+  return (anchor.from === 'start' || anchor.from === 'end') && isFiniteNumber(anchor.minutes);
 }
 
 /**
@@ -77,8 +75,8 @@ function parseSettings(saved) {
     }
   }
   const bells = s.bells;
-  const timerEndsAt = isMinutes(s.timerEndsAt) ? s.timerEndsAt : d.timerEndsAt;
-  const isPositive = (v) => isMinutes(v) && v > 0;
+  const timerEndsAt = isFiniteNumber(s.timerEndsAt) ? s.timerEndsAt : d.timerEndsAt;
+  const isPositive = (v) => isFiniteNumber(v) && v > 0;
   return {
     division: s.division === 'MS' || s.division === 'HS' ? s.division : d.division,
     use24Hour: typeof s.use24Hour === 'boolean' ? s.use24Hour : d.use24Hour,
@@ -86,7 +84,7 @@ function parseSettings(saved) {
     bells: isObject(bells) && typeof bells.on === 'boolean' && isSound(bells.sound)
       ? { on: bells.on, sound: bells.sound } : { ...d.bells },
     alarms: Array.isArray(s.alarms) ? s.alarms.filter(isAlarm) : [],
-    volume: isMinutes(s.volume) && s.volume >= 0 && s.volume <= 1 ? s.volume : d.volume,
+    volume: isFiniteNumber(s.volume) && s.volume >= 0 && s.volume <= 1 ? s.volume : d.volume,
     timerEndsAt,
     // One timer at a time: a running one wins over a paused one.
     timerPausedMs: timerEndsAt === null && isPositive(s.timerPausedMs) ? s.timerPausedMs : d.timerPausedMs,
@@ -103,15 +101,9 @@ function parseSettings(saved) {
  *   `save` never throws: if storage is full or blocked the change just isn't kept.
  */
 export function createSettingsStore(storage) {
-  const adapter = createStorageAdapter(SETTINGS_KEY, storage);
+  const adapter = createStorageAdapter(SETTINGS_KEY, storage, { quiet: true });
   return {
     load: () => parseSettings(adapter.load()),
-    save(settings) {
-      try {
-        adapter.save(settings);
-      } catch {
-        // Not saved; the page carries on with the settings in memory.
-      }
-    },
+    save: (settings) => adapter.save(settings),
   };
 }

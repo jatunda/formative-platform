@@ -76,20 +76,13 @@ function parseLayout(saved) {
  *   blocked storage area just doesn't keep it.
  */
 export function createLayoutStore({ session, local }) {
-  const [tab, device] = [session, local].map((area) => createStorageAdapter(LAYOUT_KEY, area));
-  /** @param {ReturnType<typeof createStorageAdapter>[]} areas @param {Layout} layout */
-  function saveTo(areas, layout) {
-    for (const area of areas) {
-      try {
-        area.save(layout);
-      } catch {
-        // Not kept here; the tab carries on with the layout in memory.
-      }
-    }
-  }
+  const [tab, device] = [session, local].map((area) => createStorageAdapter(LAYOUT_KEY, area, { quiet: true }));
   return {
     load: () => parseLayout(tab.load()) ?? parseLayout(device.load()),
-    save: (layout) => saveTo([tab, device], layout),
-    keepInTab: (layout) => saveTo([tab], layout),
+    save: (layout) => {
+      tab.save(layout);
+      device.save(layout);
+    },
+    keepInTab: (layout) => tab.save(layout),
   };
 }

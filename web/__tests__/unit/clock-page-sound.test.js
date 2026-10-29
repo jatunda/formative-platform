@@ -10,6 +10,8 @@ function fakeRealClock(date) {
   return {
     now: () => t,
     advance: (ms) => { t += ms; vi.advanceTimersByTime(ms); },
+    /** Time passes with no timers firing, like a sleeping or throttled tab. */
+    jump: (ms) => { t += ms; },
   };
 }
 
@@ -193,7 +195,7 @@ describe('School Clock sound', () => {
         when: at(11, 13, 59),
         settings: { alarms: [{ id: 'a', label: 'Wrap up', kind: 'clock', time: '11:14', repeat: 'everySchoolDay', enabled: true, sound: 'chime', bellSchedules: null }] },
       });
-      real.advance(30 * SEC);
+      for (let i = 0; i < 30; i += 1) real.advance(SEC);
       expect(mount().classList.contains('clock-ringing')).toBe(true);
       expect(ringing().textContent).toContain('Wrap up');
 
@@ -252,6 +254,47 @@ describe('School Clock sound', () => {
       } finally {
         window.matchMedia = original;
       }
+    });
+
+    describe('after the tab sleeps or is throttled', () => {
+      const onceAt = (time) => ({
+        id: 'once', kind: 'clock', time, repeat: 'once', date: '2026-10-27',
+        enabled: true, sound: 'chime', bellSchedules: null,
+      });
+
+      it('does not ring for Bells and Alarms that came due while it slept', () => {
+        open({ when: at(11, 12), settings: { alarms: [{ ...onceAt('11:13'), repeat: 'everySchoolDay' }] } });
+        real.jump(10 * 60 * SEC);
+        real.advance(SEC);
+        expect(mount().classList.contains('clock-ringing')).toBe(false);
+        expect(ringing().hidden).toBe(true);
+      });
+
+      it('still turns off a one-time Clock Alarm it slept through', () => {
+        open({ when: at(11, 12), settings: { alarms: [onceAt('11:13')] } });
+        real.jump(10 * 60 * SEC);
+        real.advance(SEC);
+        expect(ringing().hidden).toBe(true);
+        expect(saved(storage).alarms[0].enabled).toBe(false);
+      });
+
+      it('still rings for a ring only a few seconds late', () => {
+        // The 11:15 Bell is 2 s old when the stalled tick finally runs.
+        open({ when: at(11, 14, 58) });
+        real.jump(3 * SEC);
+        real.advance(SEC);
+        expect(ringing().hidden).toBe(false);
+        expect(ringing().textContent).toContain('Bell · Period 3 ends');
+      });
+
+      it('drops a missed ring from the sound schedule, even when the audio clock slept too', () => {
+        open({ when: at(11, 14), sound: { state: 'running', time: 0 } });
+        expect(player.scheduled).toEqual([expect.objectContaining({ at: 60 })]);
+        // 90 s asleep; the audio clock stood still meanwhile.
+        real.jump(90 * SEC);
+        real.advance(SEC);
+        expect(player.scheduled.map((r) => r.at)).not.toContain(60);
+      });
     });
 
     it('a test ring plays the Bells sound now and flashes like a Bell', () => {

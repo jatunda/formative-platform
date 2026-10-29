@@ -37,23 +37,26 @@ export function defaultMode(moment) {
 
 /**
  * What a Readout shows: a length of time with its caption ("43:00 left"), or
- * the current time. `ms` is null when there's nothing to count (Summer before
- * next year's dates are known). `long` durations can run for days.
- * @typedef {{ kind: 'duration', ms: number | null, caption: string, long: boolean }
+ * the current time. `long` durations can run for days.
+ * @typedef {{ kind: 'duration', ms: number, caption: string, long: boolean }
  *   | { kind: 'time', at: Date }} ReadoutValue
  */
 
 /**
- * The value a Readout in `mode` shows at `now`.
+ * The value a Readout in `mode` shows at `now`. With nothing to count to or
+ * from (Summer before next year's dates are known), it's the current time, so
+ * the clock stays a plain clock rather than a broken countdown.
  * @param {ReadoutMode} mode
  * @param {import('./clock-model.js').Moment} moment `describeMoment(now, ...)`
  * @param {Date} now
  * @returns {ReadoutValue}
  */
 export function readoutValue(mode, moment, now) {
+  /** @type {ReadoutValue} */
+  const time = { kind: 'time', at: now };
   /** @type {(ms: number | null, caption: string, long?: boolean) => ReadoutValue} */
-  const duration = (ms, caption, long = false) => ({ kind: 'duration', ms, caption, long });
-  if (mode === 'clock' || moment.state === 'unknown') return { kind: 'time', at: now };
+  const duration = (ms, caption, long = false) => (ms === null ? time : { kind: 'duration', ms, caption, long });
+  if (mode === 'clock' || moment.state === 'unknown') return time;
   if (moment.state === 'segment') {
     return mode === 'countdown'
       ? duration(moment.timeLeftMs, 'left')
@@ -68,14 +71,13 @@ export function readoutValue(mode, moment, now) {
 
 /**
  * A Readout's value in words: "43:00 left", "4d 22h until next school day",
- * "— until next school day", or the time with seconds ("1:04:09 PM").
+ * or the time with seconds ("1:04:09 PM").
  * @param {ReadoutValue} value
  * @param {{ use24Hour?: boolean }} [options]
  * @returns {string}
  */
 export function readoutText(value, { use24Hour = false } = {}) {
   if (value.kind === 'time') return formatClockTime(value.at, { seconds: true, use24Hour });
-  if (value.ms === null) return `— ${value.caption}`;
   const amount = value.long ? formatLongDuration(value.ms) : formatDuration(value.ms);
   return `${amount} ${value.caption}`;
 }

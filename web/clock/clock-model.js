@@ -337,6 +337,15 @@ export function describeMoment(now, schoolYears, { division = 'HS' } = {}) {
  */
 
 /**
+ * Whether `ring` rings until dismissed (Alarms and the timer) rather than for
+ * a Bell's few seconds.
+ * @param {Ring} ring
+ */
+export function ringsUntilDismissed(ring) {
+  return ring.source !== 'bell';
+}
+
+/**
  * When a Period Alarm rings in `period`, or null if the Period is too short
  * for its anchor.
  * @param {PeriodAlarm} alarm
