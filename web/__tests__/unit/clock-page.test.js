@@ -226,4 +226,105 @@ describe('School Clock page', () => {
     document.body.innerHTML = '';
     expect(initClockApp({ realNow: () => 0 })).toBeNull();
   });
+
+  describe('next rings today', () => {
+    const ringLines = () =>
+      [...document.querySelectorAll('#clockApp li')].map((li) => li.textContent);
+
+    it('lists every upcoming ring of the sample settings with its time, source and sound', () => {
+      // Wed 10/28/26, HS Even Day: Period 6 13:45–15:10 is the last Segment.
+      const real = fakeRealClock(new Date(2026, 9, 28, 13, 40, 0));
+      app = initClockApp({ realNow: real.now });
+
+      expect(pageText()).toContain('Next rings today');
+      expect(ringLines()).toEqual([
+        '1:40 PM · Bell · Lunch ends · School bell',
+        '1:45 PM · Bell · Period 6 starts · School bell',
+        '2:27:30 PM · Period Alarm · Mid-period walk · Period 6, halfway · Buzzer',
+        '3:05 PM · Period Alarm · Period 6, 5 min before the end · Beep',
+        '3:10 PM · Bell · Period 6 ends · School bell',
+      ]);
+    });
+
+    it('drops a ring once its moment has passed, and drops the list when nothing is left', () => {
+      const real = fakeRealClock(new Date(2026, 9, 27, 15, 9, 59));
+      app = initClockApp({ realNow: real.now });
+      expect(ringLines()).toEqual(['3:10 PM · Bell · Period 7 ends · School bell']);
+
+      real.advance(1000); // 3:10:00, the ring's own moment
+      expect(ringLines()).toHaveLength(1);
+      real.advance(1000);
+      expect(ringLines()).toEqual([]);
+      expect(pageText()).not.toContain('Next rings today');
+    });
+
+    it('names a shared-edge Bell once, a Clock Alarm by its label and repeat, and the timer', () => {
+      const settings = {
+        bells: { on: true, sound: 'chime' },
+        alarms: [
+          { id: 'c1', kind: 'clock', label: 'Exit tickets', enabled: true, sound: 'chime', bellSchedules: null,
+            time: '10:05', repeat: 'everySchoolDay' },
+          { id: 'c2', kind: 'clock', enabled: true, sound: 'beep', bellSchedules: null,
+            time: '10:07', repeat: 'once', date: '2026-10-27' },
+          { id: 'p1', kind: 'period', enabled: true, sound: 'buzzer', bellSchedules: null,
+            anchor: { from: 'start', minutes: 40 }, periods: ['Period 2'] },
+        ],
+        timerEndsAt: new Date(2026, 9, 27, 10, 8, 0).getTime(),
+        timerSound: 'beep',
+      };
+      const real = fakeRealClock(new Date(2026, 9, 27, 10, 0, 0));
+      app = initClockApp({ realNow: real.now, settings });
+
+      expect(ringLines().slice(0, 5)).toEqual([
+        '10:05 AM · Clock Alarm · Exit tickets, every School Day · Chime',
+        '10:05 AM · Period Alarm · Period 2, minute 40 · Buzzer',
+        '10:07 AM · Clock Alarm · once · Beep',
+        '10:08 AM · Timer · Beep',
+        '10:10 AM · Bell · Period 2 ends, Nutrition starts · Chime',
+      ]);
+    });
+
+    describe('a "once" Clock Alarm', () => {
+      const onceAt = (time) => ({
+        bells: { on: false, sound: 'chime' },
+        alarms: [{ id: 'o', kind: 'clock', enabled: true, sound: 'chime', bellSchedules: null,
+          time, repeat: 'once', date: '2026-10-27' }],
+      });
+
+      it('is turned off once it rings in real time', () => {
+        const real = fakeRealClock(new Date(2026, 9, 27, 10, 59, 58));
+        const onSettingsChange = vi.fn();
+        app = initClockApp({ realNow: real.now, settings: onceAt('11:00'), onSettingsChange });
+
+        real.advance(1000);
+        expect(onSettingsChange).not.toHaveBeenCalled();
+        real.advance(2000);
+        expect(onSettingsChange).toHaveBeenCalledTimes(1);
+        expect(onSettingsChange.mock.calls[0][0].alarms[0]).toMatchObject({ id: 'o', enabled: false });
+        real.advance(5000);
+        expect(onSettingsChange).toHaveBeenCalledTimes(1);
+      });
+
+      it('rings and drops off the list with nobody listening for settings changes', () => {
+        const real = fakeRealClock(new Date(2026, 9, 27, 10, 59, 59));
+        app = initClockApp({ realNow: real.now, settings: onceAt('11:00') });
+        real.advance(2000);
+        expect(ringLines()).toEqual([]);
+        expect(pageText()).toContain('11:00:01 AM');
+      });
+
+      it('is not turned off when it rings in simulated time', () => {
+        const real = fakeRealClock(new Date(2026, 9, 1, 12, 0, 0));
+        const onSettingsChange = vi.fn();
+        app = initClockApp({
+          realNow: real.now, search: '?at=2026-10-27T10:59:58', settings: onceAt('11:00'), onSettingsChange,
+        });
+        expect(ringLines()).toEqual(['11:00 AM · Clock Alarm · once · Chime']);
+
+        real.advance(5000);
+        expect(ringLines()).toEqual([]);
+        expect(onSettingsChange).not.toHaveBeenCalled();
+      });
+    });
+  });
 });

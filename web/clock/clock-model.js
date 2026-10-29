@@ -62,7 +62,8 @@
 
 /**
  * What one date is, for one Division.
- * @typedef {{ kind: 'school', dayLabel: string, segments: TimedSegment[] }
+ * `bellSchedule` is the School Day's key in `SchoolYear.bellSchedules`.
+ * @typedef {{ kind: 'school', dayLabel: string, bellSchedule: string, segments: TimedSegment[] }
  *   | { kind: 'dayOff', dayLabel: string }
  *   | { kind: 'experienceWeek' }
  *   | { kind: 'unknown' }} Day
@@ -154,7 +155,7 @@ function planDay(day, schoolYears, division) {
     start: atWallClock(day, s.start),
     end: atWallClock(day, s.end),
   }));
-  return { kind: 'school', dayLabel: bellSchedule.name, segments };
+  return { kind: 'school', dayLabel: bellSchedule.name, bellSchedule: key, segments };
 }
 
 /**
@@ -304,4 +305,149 @@ export function describeMoment(now, schoolYears, { division = 'HS' } = {}) {
     timeLeftMs: passing.end.getTime() - t,
     timeElapsedMs: t - passing.start.getTime(),
   };
+}
+
+/** @typedef {import('./clock-settings.js').RingSettings} RingSettings */
+/** @typedef {import('./clock-settings.js').SoundName} SoundName */
+
+/**
+ * One moment something rings.
+ * @typedef {{ at: Date, source: 'bell', sound: SoundName, starts: TimedSegment | null, ends: TimedSegment | null }} BellRing
+ *   `starts`/`ends`: the Segment starting/ending at this Bell (one Bell where
+ *   one ends as the next begins).
+ */
+
+/** @typedef {import('./clock-settings.js').ClockAlarm} ClockAlarm */
+
+/** @typedef {{ at: Date, source: 'clockAlarm', sound: SoundName, alarm: ClockAlarm }} ClockAlarmRing */
+
+/** @typedef {import('./clock-settings.js').PeriodAlarm} PeriodAlarm */
+
+/** @typedef {{ at: Date, source: 'periodAlarm', sound: SoundName, alarm: PeriodAlarm, period: TimedSegment }} PeriodAlarmRing */
+
+/**
+ * @typedef {{ at: Date, source: 'timer', sound: SoundName }} TimerRing
+ */
+
+/**
+ * @typedef {BellRing | ClockAlarmRing | PeriodAlarmRing | TimerRing} Ring
+ * `source` says what rang; Alarm rings carry the `alarm` that rang.
+ */
+
+/**
+ * When a Period Alarm rings in `period`, or null if the Period is too short
+ * for its anchor.
+ * @param {PeriodAlarm} alarm
+ * @param {TimedSegment} period
+ * @returns {Date | null}
+ */
+function periodAlarmTime(alarm, period) {
+  const start = period.start.getTime();
+  const end = period.end.getTime();
+  const { anchor } = alarm;
+  let t;
+  if (anchor.from === 'start') t = start + anchor.minutes * 60000;
+  else if (anchor.from === 'end') t = end - anchor.minutes * 60000;
+  else t = start + (end - start) / 2;
+  return start <= t && t <= end ? new Date(t) : null;
+}
+
+/**
+ * Whether an Alarm limited to some Bell Schedules may ring on `plan`'s day.
+ * @param {import('./clock-settings.js').Alarm} alarm
+ * @param {Day} plan
+ */
+function inScope(alarm, plan) {
+  return alarm.bellSchedules === null || (plan.kind === 'school' && alarm.bellSchedules.includes(plan.bellSchedule));
+}
+
+/**
+ * When a Clock Alarm rings on `day`, if it does.
+ * @param {ClockAlarm} alarm
+ * @param {Date} day
+ * @param {Day} plan
+ * @returns {Date | null}
+ */
+function clockAlarmTime(alarm, day, plan) {
+  const onItsDay = alarm.repeat === 'once' ? alarm.date === isoDate(day) : plan.kind === 'school';
+  return onItsDay && inScope(alarm, plan) ? atWallClock(day, alarm.time) : null;
+}
+
+/**
+ * The Bells of one School Day: start and end of every Period and Break, one
+ * per moment.
+ * @param {TimedSegment[]} segments
+ * @param {SoundName} sound
+ * @returns {BellRing[]}
+ */
+function bellsOf(segments, sound) {
+  /** @type {Map<number, BellRing>} */
+  const byTime = new Map();
+  const at = (/** @type {Date} */ date) => {
+    const t = date.getTime();
+    if (!byTime.has(t)) byTime.set(t, { at: date, source: 'bell', sound, starts: null, ends: null });
+    return /** @type {BellRing} */ (byTime.get(t));
+  };
+  for (const s of segments) {
+    if (s.kind === 'assembly') continue;
+    at(s.start).starts = s;
+    at(s.end).ends = s;
+  }
+  return [...byTime.values()];
+}
+
+/**
+ * The Alarms after `rings` have rung: a "once" Clock Alarm that rang is
+ * turned off, except in simulated time, so trying out a moment never changes
+ * a teacher's real Alarms. Returns `alarms` itself when nothing changes.
+ * @param {import('./clock-settings.js').Alarm[]} alarms
+ * @param {Ring[]} rings
+ * @param {{ simulated: boolean }} options
+ * @returns {import('./clock-settings.js').Alarm[]}
+ */
+export function alarmsAfterRinging(alarms, rings, { simulated }) {
+  if (simulated) return alarms;
+  const rang = new Set(rings.flatMap((r) => (r.source === 'clockAlarm' && r.alarm.repeat === 'once' ? [r.alarm.id] : [])));
+  if (rang.size === 0) return alarms;
+  return alarms.map((a) => (rang.has(a.id) ? { ...a, enabled: false } : a));
+}
+
+/**
+ * Every ring in the half-open window [start, end): Bells, Clock Alarms,
+ * Period Alarms and the timer's end, in time order.
+ * @param {Date} start
+ * @param {Date} end
+ * @param {SchoolYear[]} schoolYears the registry (school-years.js)
+ * @param {RingSettings} settings
+ * @returns {Ring[]}
+ */
+export function ringsInWindow(start, end, schoolYears, settings) {
+  const division = settings.division ?? 'HS';
+  const from = start.getTime();
+  const to = end.getTime();
+  /** @type {Ring[]} */
+  const rings = [];
+  for (let day = localMidnight(isoDate(start)); day.getTime() < to; day = addDays(day, 1)) {
+    const plan = planDay(day, schoolYears, division);
+    if (plan.kind === 'school' && settings.bells.on) rings.push(...bellsOf(plan.segments, settings.bells.sound));
+    for (const alarm of settings.alarms) {
+      if (!alarm.enabled) continue;
+      if (alarm.kind === 'clock') {
+        const at = clockAlarmTime(alarm, day, plan);
+        if (at) rings.push({ at, source: 'clockAlarm', sound: alarm.sound, alarm });
+      } else if (plan.kind === 'school' && inScope(alarm, plan)) {
+        for (const period of plan.segments) {
+          if (period.kind !== 'period' || !alarm.periods.includes(period.name)) continue;
+          const at = periodAlarmTime(alarm, period);
+          if (at) rings.push({ at, source: 'periodAlarm', sound: alarm.sound, alarm, period });
+        }
+      }
+    }
+  }
+  if (settings.timerEndsAt != null) {
+    rings.push({ at: new Date(settings.timerEndsAt), source: 'timer', sound: settings.timerSound ?? 'beep' });
+  }
+  return rings
+    .filter((r) => from <= r.at.getTime() && r.at.getTime() < to)
+    .sort((a, b) => a.at.getTime() - b.at.getTime());
 }
