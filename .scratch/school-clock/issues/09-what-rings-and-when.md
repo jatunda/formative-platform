@@ -6,7 +6,7 @@ Spec: `.scratch/school-clock/spec.md` (Implementation Decisions: clock model "ri
 
 **Blocked by:** 06
 
-**Status:** ready-for-agent
+**Status:** closed
 
 - [x] JSDoc-typed settings shapes for Bells (on/off, sound) and Alarms (kind, enabled, sound; Clock Alarm time and once / every School Day; Period Alarm anchor as minutes from start, minutes before end, or halfway; Period selection; Bell Schedule selection)
 - [x] Bells ring at the start and end of every Period and Break, never Assemblies, and ring once where one Segment ends exactly as the next begins
