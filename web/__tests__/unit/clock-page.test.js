@@ -255,9 +255,16 @@ describe('School Clock page', () => {
     }
   });
 
-  it('does nothing without its mount', () => {
+  it('does nothing without its mount, not even opening an audio context', () => {
     document.body.innerHTML = '';
-    expect(initClockApp({ realNow: () => 0 })).toBeNull();
+    const AudioContext = vi.fn();
+    vi.stubGlobal('AudioContext', AudioContext);
+    try {
+      expect(initClockApp({ realNow: () => 0 })).toBeNull();
+      expect(AudioContext).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   describe('next rings today', () => {

@@ -234,7 +234,7 @@ function el(tag, props = {}, children = []) {
  *   `search` is `location.search` (for `?at=` / `&speed=`); `realNow` is the real clock;
  *   `storage` holds the device's settings and last used Readout layout (localStorage on
  *   the real page); `tabStorage` holds this tab's Readout layout (sessionStorage);
- *   `soundPlayer` plays the rings (the page closes it when destroyed);
+ *   `soundPlayer` plays the rings (the browser's by default; the page closes it when destroyed);
  *   `prefersReducedMotion` swaps the ringing flash for a steady highlight;
  *   `capabilities` are the browser's Fullscreen, Wake Lock and Document PiP (each null
  *   when missing, and its control left out).
@@ -247,13 +247,14 @@ export function initClockApp({
   schoolYears = SCHOOL_YEARS,
   storage = globalThis.localStorage,
   tabStorage = globalThis.sessionStorage,
-  soundPlayer = browserSoundPlayer(),
+  soundPlayer: givenSoundPlayer,
   prefersReducedMotion = browserPrefersReducedMotion,
   capabilities = detectCapabilities(globalThis),
 } = {}) {
   const mount = document.getElementById(mountId);
   if (!mount) return null;
   destroyActiveApp?.();
+  const soundPlayer = givenSoundPlayer ?? browserSoundPlayer();
 
   const clock = createClockSource({ search, realNow });
   const store = createSettingsStore(storage);
@@ -704,8 +705,5 @@ export function initClockApp({
 }
 
 if (typeof document !== 'undefined' && document.getElementById('clockApp')) {
-  initClockApp({
-    search: window.location.search, storage: window.localStorage, tabStorage: window.sessionStorage,
-    soundPlayer: browserSoundPlayer(),
-  });
+  initClockApp({ search: window.location.search });
 }
