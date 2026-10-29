@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>School Clock: three mockup directions</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 32px clamp(16px, 4vw, 56px) 64px;
+        background: #e9ebee;
+        color: #15181c;
+        font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+      }
+      h1 { margin: 0 0 8px; font-size: 30px; }
+      h2 { margin: 0; font-size: 24px; }
+      .intro { max-width: 860px; color: #3d444c; }
+      code { background: #fff; padding: 1px 5px; border-radius: 4px; }
+      .direction {
+        margin-top: 40px;
+        padding: 24px;
+        border-radius: 14px;
+        background: #fff;
+        box-shadow: 0 2px 10px rgb(0 0 0 / 0.06);
+      }
+      .direction__head { display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; }
+      .pitch { max-width: 900px; margin: 10px 0 18px; }
+      .gallery { display: flex; flex-wrap: wrap; gap: 18px; align-items: flex-start; }
+      figure { margin: 0; }
+      figcaption { margin-top: 6px; font-size: 13px; color: #4b535c; }
+      figcaption a { color: inherit; }
+      .frame {
+        position: relative;
+        overflow: hidden;
+        border-radius: 6px;
+        outline: 1px solid rgb(0 0 0 / 0.25);
+        background: #000;
+      }
+      .frame iframe {
+        position: absolute;
+        top: 0;
+        left: 0;
+        border: 0;
+        transform-origin: 0 0;
+        pointer-events: none;
+      }
+      .states { margin-top: 14px; font-size: 14px; }
+      .states a { margin-right: 10px; white-space: nowrap; }
+    </style>
+  </head>
+  <body>
+    <h1>School Clock: three mockup directions</h1>
+    <p class="intro">
+      Static, non-functional mockups with fake 2026–27 data, for picking a direction (ticket 02). Every frame below is the real page,
+      live and scaled down, at the sizes from the self-review checklist. Open a direction to click through every state with the
+      switcher in its bottom-left corner, or address a state directly, e.g. <code>a/index.html#passing&amp;theme=light</code>.
+      Add <code>&amp;clock=24</code> for the 24-hour time setting. Full-size screenshots: run
+      <code>node .scratch/school-clock/mockups/shoot.mjs</code> and look in <code>shots/</code> (not committed). Notes from the
+      self-review are in <code>REVIEW.md</code>.
+    </p>
+
+    <section class="direction" data-dir="a">
+      <div class="direction__head"><h2>A · Monument</h2><a href="a/index.html#period">Open A</a></div>
+      <p class="pitch">
+        A dark wall clock. One huge, light-weight number in the middle, the Segment name above it, a hairline progress bar of the
+        Segment with its start and end times, and nothing else competing; the controls are a row of quiet text buttons along the
+        bottom. <strong>Optimises for</strong> reading the number from the back of the room and a calm projected view.
+        <strong>Trade-off:</strong> the least context: you see now and up next, never the shape of the whole day, and the thin
+        digits lose some punch on a washed-out projector in the light theme.
+      </p>
+      <div class="gallery"></div>
+    </section>
+
+    <section class="direction" data-dir="b">
+      <div class="direction__head"><h2>B · Timeline</h2><a href="b/index.html#period">Open B</a></div>
+      <p class="pitch">
+        Schedule-aware, like a departure board. A condensed signage face sets the number left-aligned and very large, an Up next
+        card sits beside it, and a strip of today's Segments runs along the bottom with a Now marker, so the class can see where
+        the day stands (on a phone the strip becomes an agenda list). Breaks are hatched and Assemblies dotted, not just recoloured.
+        <strong>Optimises for</strong> situational awareness: exact times, what's next and how the day is shaped, all at once.
+        <strong>Trade-off:</strong> the busiest projected view, and the strip needs width; it is the most to look at.
+      </p>
+      <div class="gallery"></div>
+    </section>
+
+    <section class="direction" data-dir="c">
+      <div class="direction__head"><h2>C · Dial</h2><a href="c/index.html#period">Open C</a></div>
+      <p class="pitch">
+        A progress ring around the number, with rounded type and soft tiles beside it for Up next, extra Readouts and the timer.
+        Long countdowns read in whole minutes ("42 minutes left"), switching to m:ss under 10 minutes; the ring carries the sense of
+        time draining away. A Passing Period dashes the ring. <strong>Optimises for</strong> a friendly, at-a-glance feel of "how
+        much is left", and an easy place to grow extra Readouts. <strong>Trade-off:</strong> no seconds on long countdowns, and the
+        ring costs width, so four-digit values (a 10:12 clock) are smaller than in A or B.
+      </p>
+      <div class="gallery"></div>
+    </section>
+
+    <script>
+      // [state, width, height, scale, label]
+      const FRAMES = [
+        ['period', 1920, 1080, 0.2, 'In a Period · 1920×1080'],
+        ['period&theme=light', 1920, 1080, 0.2, 'Light theme'],
+        ['readouts&clock=24', 1920, 1080, 0.2, 'Several Readouts · 24-hour time'],
+        ['passing', 1920, 1080, 0.2, 'Passing Period'],
+        ['ringing', 1920, 1080, 0.2, 'Alarm ringing'],
+        ['dayoff', 1920, 1080, 0.2, 'Day off'],
+        ['timer', 1440, 900, 0.25, 'Timer · 1440×900'],
+        ['alarm', 1440, 900, 0.25, 'Settings: add Period Alarm'],
+        ['period', 390, 844, 0.4, 'Phone'],
+        ['passing', 390, 844, 0.4, 'Phone · Passing'],
+        ['period', 480, 320, 0.5, 'Laptop corner'],
+        ['passing', 480, 320, 0.5, 'Laptop corner · Passing'],
+        ['mini', 320, 180, 0.75, 'Mini player'],
+        ['mini-ringing', 320, 180, 0.75, 'Mini player · ringing'],
+      ];
+      const STATES = ['period', 'readouts', 'passing', 'break', 'assembly', 'before', 'after', 'dayoff', 'experience', 'summer', 'ringing', 'sound', 'timer', 'picker', 'settings', 'alarm', 'first', 'mini', 'mini-passing', 'mini-ringing'];
+      for (const section of document.querySelectorAll('.direction')) {
+        const dir = section.dataset.dir;
+        const gallery = section.querySelector('.gallery');
+        for (const [state, w, h, s, label] of FRAMES) {
+          const src = `${dir}/index.html#${state}&shot=1`;
+          const fig = document.createElement('figure');
+          fig.innerHTML = `<div class="frame" style="width:${w * s}px;height:${h * s}px">
+              <iframe src="${src}" title="${dir.toUpperCase()}: ${label}" width="${w}" height="${h}" style="width:${w}px;height:${h}px;transform:scale(${s})" loading="lazy" tabindex="-1"></iframe>
+            </div><figcaption><a href="${dir}/index.html#${state}">${label}</a></figcaption>`;
+          gallery.append(fig);
+        }
+        const links = document.createElement('p');
+        links.className = 'states';
+        links.innerHTML = 'Every state: ' + STATES.map((st) => `<a href="${dir}/index.html#${st}">${st}</a>`).join('');
+        section.append(links);
+      }
+    </script>
+  </body>
+</html>
