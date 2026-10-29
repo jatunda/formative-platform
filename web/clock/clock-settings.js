@@ -87,6 +87,10 @@
  * - `use24Hour`: show clock times as "13:05" rather than "1:05 PM".
  * - `periodLabels`: Period name ("Period 3") -> the teacher's label ("AP CSA").
  * - `volume`: 0–1, for every sound.
+ * - `timerPausedMs`: a paused timer's time left (null unless paused; then
+ *   `timerEndsAt` is null). See `timer.js`.
+ * - `recentDurations`: the last 3 distinct custom timer durations (ms), most
+ *   recent first: the timer's quick picks.
  * The rest are the RingSettings fields.
  * @typedef {{
  *   division: Division | null,
@@ -96,7 +100,9 @@
  *   alarms: Alarm[],
  *   volume: number,
  *   timerEndsAt: number | null,
+ *   timerPausedMs: number | null,
  *   timerSound: SoundName,
+ *   recentDurations: number[],
  * }} ClockSettings
  */
 

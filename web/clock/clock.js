@@ -14,12 +14,16 @@ import { LABELLED_PERIODS } from './clock-settings.js';
 import { createSettingsStore } from './clock-storage.js';
 import { createClockSource } from './clock-source.js';
 import {
-  formatClockTime, formatDate, formatLongDuration, formatSegmentName, formatShortDate,
+  formatClockTime, formatDate, formatDuration, formatLongDuration, formatSegmentName, formatShortDate,
 } from './format.js';
 import { addReadout, createLayoutStore, cycleReadout, newLayout, removeReadout } from './readout-layout.js';
 import { readoutText, readoutValue } from './readouts.js';
 import { SCHOOL_YEARS } from './school-years.js';
 import { BELL_SECONDS, ALARM_MAX_SECONDS, SOUNDS, createSoundPlayer } from './sound.js';
+import {
+  PRESET_MINUTES, cancelTimer, durationLabel, parseDuration, pauseTimer, rememberDuration, resumeTimer,
+  settleTimer, startTimer, timerStatus,
+} from './timer.js';
 
 const TICK_MS = 1000;
 /** How far ahead (real time) rings are handed to the sound player: past the
@@ -225,6 +229,23 @@ export function initClockApp({
   const store = createSettingsStore(storage);
   let settings = store.load();
   let lastTick = new Date(clock.now());
+  // Simulated time affects only this tab: its timer lives in memory, and the
+  // real timer saved by other tabs is neither loaded, cleared nor overwritten.
+  const savedTimer = { timerEndsAt: settings.timerEndsAt, timerPausedMs: settings.timerPausedMs };
+  if (clock.simulated) settings = { ...settings, ...cancelTimer() };
+  /** Save the settings (in simulated time, with the real timer as it was saved). */
+  function saveSettings() {
+    store.save(clock.simulated ? { ...settings, ...savedTimer } : settings);
+  }
+  // A timer that ended while the page was closed is simply gone: it doesn't ring late.
+  settleSavedTimer(lastTick);
+
+  /** Clear the timer once its end has passed (it has rung by then). @param {Date} now */
+  function settleSavedTimer(now) {
+    if (settleTimer(settings, now.getTime()) === settings) return;
+    settings = { ...settings, ...cancelTimer() };
+    saveSettings();
+  }
 
   // This tab's Readouts: its own saved layout, else the last used one; with
   // neither, a default one is made from the first moment the clock describes.
@@ -242,7 +263,7 @@ export function initClockApp({
   /** @param {Partial<import('./clock-settings.js').ClockSettings>} change */
   function updateSettings(change) {
     settings = { ...settings, ...change };
-    store.save(settings);
+    saveSettings();
     soundPlayer.setVolume(settings.volume);
     const now = new Date(clock.now());
     scheduleSounds(now);
@@ -361,6 +382,67 @@ export function initClockApp({
   showSoundState();
   soundPlayer.setVolume(settings.volume);
 
+  // The classroom timer, one tap from the main screen. Built once (so typing
+  // a custom duration survives the ticks); each tick rewrites its time left.
+  const timerLeft = el('p');
+  const timerError = el('p', { 'aria-live': 'polite' });
+  /** @param {Partial<import('./clock-settings.js').ClockSettings>} change */
+  const changeTimer = (change) => {
+    timerError.textContent = '';
+    updateSettings(change);
+  };
+  const pauseButton = el('button', {
+    type: 'button', textContent: 'Pause', onclick: () => changeTimer(pauseTimer(settings, clock.now())),
+  });
+  const resumeButton = el('button', {
+    type: 'button', textContent: 'Resume', onclick: () => changeTimer(resumeTimer(settings, clock.now())),
+  });
+  const cancelButton = el('button', { type: 'button', textContent: 'Cancel', onclick: () => changeTimer(cancelTimer()) });
+  /** A typed duration or a quick pick: it starts and becomes the first quick pick. @param {number} ms */
+  function startCustom(ms) {
+    changeTimer({ ...startTimer(ms, clock.now()), recentDurations: rememberDuration(settings.recentDurations, ms) });
+    buildQuickPicks();
+  }
+  const quickPicks = el('div', { role: 'group', 'aria-label': 'Quick picks' });
+  function buildQuickPicks() {
+    quickPicks.replaceChildren(...settings.recentDurations.map((ms) =>
+      el('button', { type: 'button', textContent: durationLabel(ms), onclick: () => startCustom(ms) })));
+  }
+  buildQuickPicks();
+  const customInput = el('input', { type: 'text', placeholder: '7:30', autocomplete: 'off' });
+  const timerSection = el('section', { 'aria-label': 'Timer' }, [
+    el('h2', { textContent: 'Timer' }),
+    timerLeft,
+    pauseButton, resumeButton, cancelButton,
+    el('div', { role: 'group', 'aria-label': 'Presets' }, PRESET_MINUTES.map((minutes) => el('button', {
+      type: 'button', textContent: durationLabel(minutes * 60 * 1000),
+      onclick: () => changeTimer(startTimer(minutes * 60 * 1000, clock.now())),
+    }))),
+    quickPicks,
+    el('form', {
+      onsubmit: (event) => {
+        event.preventDefault();
+        const typed = parseDuration(customInput.value);
+        if (typed.ok) startCustom(typed.ms);
+        else timerError.textContent = typed.error;
+      },
+    }, [
+      el('label', {}, ['Custom (minutes or m:ss) ', customInput]),
+      el('button', { type: 'submit', textContent: 'Start' }),
+    ]),
+    timerError,
+  ]);
+  /** @param {Date} now */
+  function renderTimer(now) {
+    const { status, remainingMs } = timerStatus(settings, now.getTime());
+    // Rounded up, so a 5 min timer reads 5:00 when it starts and 0:00 as it rings.
+    const left = status === 'idle' ? '' : `${formatDuration(Math.ceil(remainingMs / 1000) * 1000)} left`;
+    timerLeft.textContent = status === 'paused' ? `Paused · ${left}` : left;
+    pauseButton.hidden = status !== 'running';
+    resumeButton.hidden = status !== 'paused';
+    cancelButton.hidden = status === 'idle';
+  }
+
   const info = el('div');
   const display = el('div', { className: 'clock-display' }, [readoutsSection, info]);
 
@@ -398,7 +480,7 @@ export function initClockApp({
       type: 'button', textContent: `Preview ${SOUND_NAMES[sound]}`, onclick: () => soundPlayer.play(sound),
     })),
   ]);
-  mount.replaceChildren(prompt, ringingBanner, soundControls, display, settingsPanel);
+  mount.replaceChildren(prompt, ringingBanner, soundControls, display, timerSection, settingsPanel);
 
   /** Settle whatever rang since the last tick, then redraw. */
   function tick() {
@@ -412,8 +494,9 @@ export function initClockApp({
       const alarms = alarmsAfterRinging(settings.alarms, rang, { simulated: clock.simulated });
       if (alarms !== settings.alarms) {
         settings = { ...settings, alarms };
-        store.save(settings);
+        saveSettings();
       }
+      settleSavedTimer(now);
     }
     lastTick = now;
     render(now);
@@ -423,6 +506,8 @@ export function initClockApp({
     const chosen = settings.division !== null;
     prompt.hidden = chosen;
     settingsPanel.hidden = !chosen;
+    timerSection.hidden = !chosen;
+    renderTimer(now);
     if (chosen) divisionSelect.value = settings.division;
     const text = textFor(settings);
     const moment = chosen ? describeMoment(now, schoolYears, { division: settings.division }) : null;
