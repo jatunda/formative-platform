@@ -41,10 +41,33 @@ describe('clock settings store', () => {
     const settings = {
       division: 'MS', use24Hour: true, periodLabels: { 'Period 3': 'AP CSA', Seminar: 'Advisory' },
       bells: { on: false, sound: 'chime' }, alarms: [clockAlarm, onceAlarm, periodAlarm],
-      volume: 0.25, timerEndsAt: 1793000000000, timerSound: 'buzzer',
+      volume: 0.25, timerEndsAt: 1793000000000, timerPausedMs: null, timerSound: 'buzzer',
+      recentDurations: [450000, 900000],
     };
     createSettingsStore(storage).save(settings);
     expect(createSettingsStore(storage).load()).toEqual(settings);
+  });
+
+  it('round-trips a paused timer, and has no timer or quick picks on a first visit', () => {
+    expect(DEFAULT_SETTINGS).toMatchObject({ timerPausedMs: null, recentDurations: [] });
+    expect(storeHolding({ timerPausedMs: 180000 }).load().timerPausedMs).toBe(180000);
+  });
+
+  it('a running timer wins over a paused one saved alongside it', () => {
+    const settings = storeHolding({ timerEndsAt: 1793000000000, timerPausedMs: 180000 }).load();
+    expect(settings).toMatchObject({ timerEndsAt: 1793000000000, timerPausedMs: null });
+  });
+
+  it.each([
+    ['not a list', 'soon', []],
+    ['with bad entries dropped', [450000, -5, 'x', 0, 900000], [450000, 900000]],
+    ['to the 3 most recent', [1000, 2000, 3000, 4000], [1000, 2000, 3000]],
+  ])('keeps the quick picks %s', (_, saved, kept) => {
+    expect(storeHolding({ recentDurations: saved }).load().recentDurations).toEqual(kept);
+  });
+
+  it.each([0, -1000, 'soon'])('defaults a paused timer of %s', (saved) => {
+    expect(storeHolding({ timerPausedMs: saved }).load().timerPausedMs).toBeNull();
   });
 
   it('accepts every Period Alarm anchor', () => {

@@ -21,9 +21,13 @@ export const DEFAULT_SETTINGS = Object.freeze(/** @type {ClockSettings} */ ({
   alarms: [],
   volume: 0.8,
   timerEndsAt: null,
+  timerPausedMs: null,
   timerSound: 'beep',
+  recentDurations: [],
 }));
 
+/** How many recent custom durations are kept as quick picks. */
+const QUICK_PICKS = 3;
 const SOUNDS = ['chime', 'schoolBell', 'beep', 'buzzer'];
 
 /** @param {unknown} v @returns {v is Record<string, any>} */
@@ -73,6 +77,8 @@ function parseSettings(saved) {
     }
   }
   const bells = s.bells;
+  const timerEndsAt = isMinutes(s.timerEndsAt) ? s.timerEndsAt : d.timerEndsAt;
+  const isPositive = (v) => isMinutes(v) && v > 0;
   return {
     division: s.division === 'MS' || s.division === 'HS' ? s.division : d.division,
     use24Hour: typeof s.use24Hour === 'boolean' ? s.use24Hour : d.use24Hour,
@@ -81,8 +87,12 @@ function parseSettings(saved) {
       ? { on: bells.on, sound: bells.sound } : { ...d.bells },
     alarms: Array.isArray(s.alarms) ? s.alarms.filter(isAlarm) : [],
     volume: isMinutes(s.volume) && s.volume >= 0 && s.volume <= 1 ? s.volume : d.volume,
-    timerEndsAt: isMinutes(s.timerEndsAt) ? s.timerEndsAt : d.timerEndsAt,
+    timerEndsAt,
+    // One timer at a time: a running one wins over a paused one.
+    timerPausedMs: timerEndsAt === null && isPositive(s.timerPausedMs) ? s.timerPausedMs : d.timerPausedMs,
     timerSound: isSound(s.timerSound) ? s.timerSound : d.timerSound,
+    recentDurations: Array.isArray(s.recentDurations)
+      ? s.recentDurations.filter(isPositive).slice(0, QUICK_PICKS) : [],
   };
 }
 
