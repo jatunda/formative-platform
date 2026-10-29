@@ -1,0 +1,751 @@
+/* Direction C, "Dial". Rounded system face, a progress ring as the hero,
+   soft rounded tiles for everything secondary, one mint accent. */
+
+:root {
+  --font: ui-rounded, "SF Pro Rounded", "Arial Rounded MT Bold", "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+  --radius: 22px;
+  --radius-sm: 14px;
+  --dial: min(92vh, 56vw);
+}
+
+[data-theme="dark"] {
+  --bg: #121417;
+  --surface: #1c2025;
+  --surface-2: #252a30;
+  --input-bg: #15181c;
+  --fg: #f4f6f8;
+  --muted: #a7afb8;
+  --line: #727b85;
+  --line-soft: #2c3138;
+  --accent: #3ddc97;
+  --accent-text: #3ddc97;
+  --accent-soft: rgb(61 220 151 / 0.14);
+  --on-accent: #052417;
+  --focus: #ffcf5a;
+  --ring: #3ddc97;
+  --on-ring: #052417;
+  --ring-wash: rgb(61 220 151 / 0.12);
+  --scrim: rgb(0 0 0 / 0.6);
+  --shadow: 0 16px 48px rgb(0 0 0 / 0.55);
+  --track: #2b3037;
+}
+
+[data-theme="light"] {
+  --bg: #eef1f4;
+  --surface: #ffffff;
+  --surface-2: #f3f5f7;
+  --input-bg: #ffffff;
+  --fg: #101418;
+  --muted: #505a64;
+  --line: #78828c;
+  --line-soft: #dde2e7;
+  --accent: #0a7a4f;
+  --accent-text: #076441;
+  --accent-soft: rgb(10 122 79 / 0.1);
+  --on-accent: #ffffff;
+  --focus: #6b3fd1;
+  --ring: #0a7a4f;
+  --on-ring: #ffffff;
+  --ring-wash: rgb(10 122 79 / 0.08);
+  --scrim: rgb(16 20 24 / 0.35);
+  --shadow: 0 16px 40px rgb(16 20 24 / 0.15);
+  --track: #d6dce2;
+}
+
+.c-screen {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 3vw;
+  height: 100vh;
+  padding: 4vh 3vw;
+}
+
+/* ---------- the dial ---------- */
+
+.c-dial {
+  position: relative;
+  width: var(--dial);
+  height: var(--dial);
+  container-type: size;
+}
+
+.c-dial__svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.c-dial__track,
+.c-dial__arc {
+  fill: none;
+  stroke-width: 2.6;
+}
+
+.c-dial__track {
+  stroke: var(--track);
+}
+
+.c-dial__arc {
+  stroke: var(--accent);
+  stroke-linecap: round;
+}
+
+/* Passing Period: the ring goes dashed, so it reads differently without colour. */
+.c-dial.is-passing .c-dial__track {
+  stroke-dasharray: 1.2 1.4;
+}
+
+.c-dial__inner {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.c-dial__seg {
+  font-size: 6.4cqw;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.c-dial__tag {
+  display: block;
+  font-size: 0.72em;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.c-big {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 2cqw;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  cursor: pointer;
+}
+
+.c-big__value {
+  font-weight: 650;
+  line-height: 0.95;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+
+.c-big__value.len-2 {
+  font-size: 44cqw;
+}
+
+.c-big__value.len-3 {
+  font-size: 37cqw;
+}
+
+/* Four digits ("10:12", "1:15" counts as three) */
+.c-big__value.len-4 {
+  font-size: 33cqw;
+}
+
+.c-big__value.len-long {
+  font-size: 26cqw;
+}
+
+.c-big__value .unit {
+  font-size: 0.4em;
+  font-weight: 500;
+  color: var(--muted);
+  margin: 0 0.1em 0 0.03em;
+}
+
+.c-big__caption {
+  margin-top: 0.4cqw;
+  font-size: 4.4cqw;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.c-dial__span {
+  margin-top: 2.4cqw;
+  font-size: 3.6cqw;
+  color: var(--muted);
+}
+
+.c-dial.is-timer .c-big__value,
+.c-dial.is-timer .c-dial__seg {
+  color: var(--accent-text);
+}
+
+/* ---------- side: day, tiles, dock ---------- */
+
+.c-side {
+  display: flex;
+  flex-direction: column;
+  gap: 2.4vh;
+  height: 100%;
+  min-height: 0;
+  justify-content: center;
+}
+
+.c-day {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: clamp(16px, 3vh, 34px);
+}
+
+.c-day__label {
+  font-weight: 700;
+}
+
+.c-day__date {
+  color: var(--muted);
+  margin-left: 0.3em;
+}
+
+.c-chip {
+  min-height: 44px;
+  min-width: 56px;
+  padding: 0 14px;
+  border: 1.5px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  font-size: 0.7em;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.c-tiles {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.6vh;
+}
+
+.c-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 0.4vh;
+  min-height: 44px;
+  padding: 2.2vh 1.6vw;
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--surface);
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  min-width: 0;
+}
+
+.c-tile--wide {
+  grid-column: 1 / -1;
+}
+
+.c-tile__label {
+  font-size: clamp(12px, 1.9vh, 22px);
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.c-tile__main {
+  font-size: clamp(17px, 3.8vh, 44px);
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.c-tile__sub {
+  font-size: clamp(14px, 2.4vh, 28px);
+  color: var(--muted);
+}
+
+.c-tile__num {
+  font-size: clamp(22px, 6.5vh, 76px);
+  font-weight: 650;
+  line-height: 1;
+}
+
+.c-tile__num .unit {
+  font-size: 0.4em;
+  color: var(--muted);
+  margin-left: 0.1em;
+}
+
+.c-tile--readout {
+  cursor: pointer;
+}
+
+.c-tile--next.is-hot {
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 3px var(--accent);
+}
+
+.c-tile--next.is-hot .c-tile__label {
+  color: var(--accent-text);
+}
+
+.c-tile--next.is-hot .c-tile__main {
+  font-size: clamp(22px, 6vh, 70px);
+}
+
+.c-tile--quiet {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--line-soft);
+}
+
+.c-tile--quiet .c-tile__main {
+  font-size: clamp(15px, 2.8vh, 32px);
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.c-tile--add {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--line);
+  color: var(--muted);
+  font-size: clamp(14px, 2.2vh, 24px);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.c-tile--actions {
+  grid-column: 1 / -1;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  background: transparent;
+  padding: 0;
+}
+
+.c-tile--actions .btn {
+  flex: 1;
+  border-radius: var(--radius-sm);
+}
+
+.c-dock {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px;
+  margin-top: 1vh;
+}
+
+.c-ctl {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 4px 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+
+.c-ctl__icon {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--fg);
+}
+
+.c-ctl__icon .icon {
+  width: 22px;
+  height: 22px;
+}
+
+.c-ctl[aria-pressed="true"] .c-ctl__icon {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.c-ctl:hover .c-ctl__icon {
+  background: var(--surface-2);
+}
+
+.c-ctl[aria-pressed="true"]:hover .c-ctl__icon {
+  background: var(--accent);
+}
+
+.c-ctl__label {
+  white-space: nowrap;
+}
+
+/* ---------- overlays, Dial flavour ---------- */
+
+.sound-prompt {
+  top: 3vh;
+  left: 3vw;
+}
+
+.ring-card {
+  top: 4vh;
+  right: 3vw;
+  width: min(42vw, 640px);
+  padding: 28px;
+}
+
+.ring-card__title {
+  font-size: 40px;
+}
+
+.ring-card__dismiss {
+  align-self: stretch;
+  border-radius: var(--radius-sm);
+}
+
+.btn {
+  border-radius: var(--radius-sm);
+}
+
+/* ---------- small windows ---------- */
+
+@media (max-width: 1100px) and (min-height: 521px) and (min-width: 521px) {
+  .c-ctl__label {
+    font-size: 12px;
+  }
+
+  .c-ctl__icon {
+    width: 44px;
+    height: 44px;
+  }
+}
+
+/* Laptop corner: dial left, the one tile that matters on the right. */
+@media (max-height: 520px) {
+  :root {
+    --dial: min(88vh, 54vw);
+  }
+
+  .c-screen {
+    gap: 10px;
+    padding: 4vh 10px;
+  }
+
+  .c-side {
+    gap: 6px;
+  }
+
+  .c-day {
+    font-size: 13px;
+  }
+
+  .c-day__date {
+    display: none;
+  }
+
+  .c-chip {
+    min-height: 32px;
+    min-width: 44px;
+  }
+
+  .c-tiles {
+    gap: 6px;
+  }
+
+  .c-tile {
+    padding: 6px 10px;
+    border-radius: var(--radius-sm);
+  }
+
+  .c-tile--add,
+  .c-tile--quiet {
+    display: none;
+  }
+
+  .c-tile__label {
+    font-size: 11px;
+  }
+
+  .c-tile__main,
+  .c-tile--next.is-hot .c-tile__main {
+    font-size: 15px;
+  }
+
+  .c-tile__sub {
+    font-size: 12px;
+  }
+
+  .c-tile__num {
+    font-size: 20px;
+  }
+
+  .c-tile--actions .btn {
+    min-height: 36px;
+    padding: 0 8px;
+  }
+
+  .c-dock {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2px;
+    margin: 0;
+  }
+
+  .has-timer .c-tile--next {
+    display: none;
+  }
+
+  .c-ctl {
+    padding: 0;
+  }
+
+  .c-ctl__label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .c-ctl__icon {
+    width: 32px;
+    height: 32px;
+  }
+
+  .ring-card,
+  .sound-prompt {
+    top: auto;
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    width: auto;
+    flex-direction: row;
+    align-items: center;
+    padding: 8px 8px 8px 16px;
+  }
+
+  .ring-card__kind,
+  .ring-card__detail {
+    display: none;
+  }
+
+  .ring-card__title {
+    flex: 1;
+    font-size: 20px;
+  }
+
+  .ring-card__title::before {
+    content: "Ringing · ";
+    font-weight: 500;
+  }
+
+  .ring-card__dismiss {
+    margin: 0;
+    align-self: auto;
+    min-height: 44px;
+    font-size: 16px;
+    padding: 0 16px;
+  }
+
+  .sound-prompt__text {
+    flex: 1;
+  }
+}
+
+/* Phone, portrait: dial on top, tiles under it, dock at the bottom. */
+@media (max-width: 520px) and (min-height: 521px) {
+  :root {
+    --dial: min(84vw, 46vh);
+  }
+
+  .c-screen {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
+    justify-items: center;
+    gap: 16px;
+    padding: 16px;
+  }
+
+  .c-side {
+    width: 100%;
+    gap: 12px;
+    justify-content: flex-start;
+  }
+
+  .c-day {
+    order: -1;
+    font-size: 17px;
+  }
+
+  .c-screen {
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+  }
+
+  .c-side {
+    display: contents;
+  }
+
+  .c-day {
+    grid-row: 1;
+    width: 100%;
+  }
+
+  .c-dial {
+    grid-row: 2;
+  }
+
+  .c-tiles {
+    grid-row: 3;
+    width: 100%;
+    align-self: start;
+    gap: 10px;
+  }
+
+  .c-tile {
+    padding: 12px 16px;
+    border-radius: 18px;
+  }
+
+  .c-tile__main {
+    font-size: 20px;
+  }
+
+  .c-tile--next.is-hot .c-tile__main {
+    font-size: 28px;
+  }
+
+  .c-tile__num {
+    font-size: 30px;
+  }
+
+  .c-tile--add,
+  .c-tile--quiet,
+  .has-timer .c-tile--next {
+    display: none;
+  }
+
+  .c-dock {
+    grid-row: 4;
+    width: 100%;
+    gap: 4px;
+  }
+
+  .c-ctl__label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .c-ctl__icon {
+    width: 48px;
+    height: 48px;
+  }
+
+  .ring-card,
+  .sound-prompt {
+    top: auto;
+    left: 12px;
+    right: 12px;
+    bottom: 84px;
+    width: auto;
+    padding: 20px;
+  }
+
+  .ring-card__title {
+    font-size: 28px;
+  }
+}
+
+/* ---------- mini player ---------- */
+
+.c-mini {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  height: 100vh;
+  padding: 8px 12px 8px 8px;
+}
+
+.c-mini .ring-flash {
+  --ring-width: 6px;
+}
+
+.c-dial--mini {
+  --dial: calc(100vh - 16px);
+}
+
+.c-dial--mini .c-big__value.len-2 {
+  font-size: 46cqw;
+}
+
+.c-dial--mini .c-big__value.len-3 {
+  font-size: 34cqw;
+}
+
+.c-dial--mini .c-big__value.len-4 {
+  font-size: 30cqw;
+}
+
+.c-dial--mini .c-big__caption {
+  font-size: 9cqw;
+}
+
+.c-dial--mini .c-dial__track,
+.c-dial--mini .c-dial__arc {
+  stroke-width: 5;
+}
+
+.cm-side {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.cm-seg {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.c-mini.is-ringing .cm-seg {
+  color: var(--accent-text);
+}
+
+.cm-sub {
+  font-size: 15px;
+  color: var(--muted);
+}
+
+.cm-next {
+  display: flex;
+  flex-direction: column;
+  margin-top: 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.cm-next__k {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent-text);
+}
+
+.cm-dismiss {
+  position: relative;
+  z-index: 9;
+  margin-top: 8px;
+}
