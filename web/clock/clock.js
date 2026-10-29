@@ -33,6 +33,9 @@ const LOOKAHEAD_MS = 5 * 60 * 1000;
 /** Rings this recent (real time) stay in the window, so one already playing is
  * kept rather than cancelled when the window is redone. */
 const GRACE_MS = 1000;
+/** Rings older than this (real time) when a tick finally reaches them were
+ * missed while the tab slept or was throttled: they don't ring late. */
+const STALE_MS = 5 * 1000;
 const DIVISIONS = [['MS', 'Middle School'], ['HS', 'High School']];
 const FEEDBACK_HREF = `mailto:erich@villagechristian.org?subject=${encodeURIComponent('Clock feedback')}`;
 /** The mini player's starting size (the user can resize it). */
@@ -607,15 +610,25 @@ export function initClockApp({
 
   mount.replaceChildren(prompt, ringingBanner, soundControls, viewControls, display, timerSection, settingsPanel, footer);
 
-  /** Settle whatever rang since the last tick, then redraw. */
+  /**
+   * Settle whatever rang since the last tick, then redraw. After a sleep or a
+   * long stall, what came due meanwhile is settled (a one-time Clock Alarm is
+   * turned off) but doesn't ring late, and the sound schedule is redone so the
+   * player drops it too.
+   */
   function tick() {
     const now = new Date(clock.now());
+    const staleBefore = now.getTime() - STALE_MS * clock.speed;
     if (ringingUntil !== null && realNow() >= ringingUntil) stopRinging();
-    if (now.getTime() >= windowEnd - (LOOKAHEAD_MS * clock.speed) / 2) scheduleSounds(now);
+    if (lastTick.getTime() < staleBefore || now.getTime() >= windowEnd - (LOOKAHEAD_MS * clock.speed) / 2) {
+      scheduleSounds(now);
+    }
     if (settings.division) {
       const rang = ringsInWindow(lastTick, now, schoolYears, settings);
       const text = textFor(settings);
-      for (const ring of rang) startRinging(ringSourceText(ring, text), ring.source !== 'bell');
+      for (const ring of rang) {
+        if (ring.at.getTime() >= staleBefore) startRinging(ringSourceText(ring, text), ring.source !== 'bell');
+      }
       const alarms = alarmsAfterRinging(settings.alarms, rang, { simulated: clock.simulated });
       if (alarms !== settings.alarms) {
         settings = { ...settings, alarms };
