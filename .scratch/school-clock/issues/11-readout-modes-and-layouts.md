@@ -23,13 +23,15 @@ Spec: `.scratch/school-clock/spec.md` (Implementation Decisions: Readout modes, 
 
 **Blocked by:** 08, 10
 
-**Status:** ready-for-agent
+**Status:** closed
 
-- [ ] Readout logic is a pure module: given the moment from the clock model and a Readout's mode, it gives the value to show; cycling goes through the three modes in order
-- [ ] The defaults above apply to a new Readout; position in the cycle carries across in-school ↔ Off-Hours
-- [ ] Add and remove Readouts; there's always at least one
-- [ ] The layout is saved per tab (session storage) and copied as "last used" (local storage). A tab with no session layout starts from "last used". Open tabs never change each other
-- [ ] Tests: cycling, defaults in each state, Passing Period behaviour, a two-tab scenario with fake storage (two independent layouts; a third "new tab" gets the last-changed one), and reload restores the tab's own layout
-- [ ] `npm run lint`, `npm run typecheck`, `npm run test:coverage` in `web/` pass
+- [x] Readout logic is a pure module: given the moment from the clock model and a Readout's mode, it gives the value to show; cycling goes through the three modes in order
+- [x] The defaults above apply to a new Readout; position in the cycle carries across in-school ↔ Off-Hours
+- [x] Add and remove Readouts; there's always at least one
+- [x] The layout is saved per tab (session storage) and copied as "last used" (local storage). A tab with no session layout starts from "last used". Open tabs never change each other
+- [x] Tests: cycling, defaults in each state, Passing Period behaviour, a two-tab scenario with fake storage (two independent layouts; a third "new tab" gets the last-changed one), and reload restores the tab's own layout
+- [x] `npm run lint`, `npm run typecheck`, `npm run test:coverage` in `web/` pass
 
 ## Comments
+
+Modes are stored as a cycle position (countdown/countup/clock), so a Readout keeps its place across in-school/Off-Hours. During a Passing Period both countdown and count-up show the Passing Period's time left. Layout key `school-clock-layout-v1` (session + last-used). Deferred to design tickets: big-Readout styling; the plain time line at the top duplicates a current-time Readout.
