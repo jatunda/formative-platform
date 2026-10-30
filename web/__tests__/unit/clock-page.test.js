@@ -4,6 +4,7 @@ import { SETTINGS_KEY } from '../../clock/clock-storage.js';
 import { BLOCK_DAYS, DEFAULT_ALARM_PERIODS } from '../../clock/clock-settings.js';
 import { SCHOOL_YEARS } from '../../clock/school-years.js';
 import { createFakeStorage } from '../helpers/fake-storage.js';
+import { field, setValue, toggle } from '../helpers/clock-dom.js';
 
 /** A real clock the test moves by hand; the page's ticks come from fake timers. */
 function fakeRealClock(date) {
@@ -69,25 +70,19 @@ describe('School Clock page', () => {
     expect(pageText()).not.toContain('Simulated time');
   });
 
-  it('opens the timer and the settings from the top bar, one at a time, and closes them again', () => {
+  it('opens the timer from the top bar and closes it again', () => {
     app = start({ realNow: fakeRealClock(new Date(2026, 9, 27, 10, 32, 0)).now });
-    const panel = (name) => document.querySelector(`#clockApp section[aria-label="${name}"]`);
-    expect(panel('Timer').hidden).toBe(true);
-    expect(panel('Settings').hidden).toBe(true);
+    const panel = () => document.querySelector('#clockApp section[aria-label="Timer"]');
+    expect(panel().hidden).toBe(true);
 
     control('Timer').click();
-    expect(panel('Timer').hidden).toBe(false);
+    expect(panel().hidden).toBe(false);
     expect(control('Timer').getAttribute('aria-expanded')).toBe('true');
-    expect(control('Timer').getAttribute('aria-controls')).toBe(panel('Timer').id);
+    expect(control('Timer').getAttribute('aria-controls')).toBe(panel().id);
 
-    control('Settings').click();
-    expect(panel('Timer').hidden).toBe(true);
+    control('Timer').click();
+    expect(panel().hidden).toBe(true);
     expect(control('Timer').getAttribute('aria-expanded')).toBe('false');
-    expect(panel('Settings').hidden).toBe(false);
-
-    control('Settings').click();
-    expect(panel('Settings').hidden).toBe(true);
-    expect(control('Settings').getAttribute('aria-expanded')).toBe('false');
   });
 
   it('has no plain time line duplicating a current-time Readout', () => {
@@ -344,7 +339,7 @@ describe('School Clock page', () => {
       expect(ringLines()).toHaveLength(1);
       real.advance(1000);
       expect(ringLines()).toEqual([]);
-      expect(pageText()).not.toContain('Next rings today');
+      expect(document.getElementById('clock-settings-today').hidden).toBe(true);
     });
 
     it('names a shared-edge Bell once, a Clock Alarm by its label and repeat, and the timer', () => {
@@ -413,12 +408,11 @@ describe('School Clock page', () => {
 
   describe('saved device settings', () => {
     const button = (name) => [...document.querySelectorAll('#clockApp button')].find((b) => b.textContent.trim() === name);
-    const divisionSelect = () => document.querySelector('#clockApp select');
-    const labelInput = (period) =>
-      [...document.querySelectorAll('#clockApp label')].find((l) => l.textContent.startsWith(`${period} label`))
-        .querySelector('input');
-    const use24HourBox = () =>
-      [...document.querySelectorAll('#clockApp label')].find((l) => l.textContent.trim() === '24-hour time').querySelector('input');
+    /** The Division chosen in the Settings drawer ('MS' or 'HS'). */
+    const chosenDivision = () => document.querySelector('#clockApp input[type="radio"]:checked')?.value;
+    const chooseDivision = (name) => field(name).click();
+    const labelInput = (period) => field(period);
+    const use24HourBox = () => field('24-hour time');
     const isShown = (node) => !node.closest('[hidden]');
 
     // Wed 10/28/26 is an Even Day: at 10:30 HS is in Chapel, MS in Period 4.
@@ -444,7 +438,7 @@ describe('School Clock page', () => {
 
         expect(isShown(button('Middle School'))).toBe(false);
         expect(headingText()).toBe('Period 4');
-        expect(divisionSelect().value).toBe('MS');
+        expect(chosenDivision()).toBe('MS');
         expect(saved(storage).division).toBe('MS');
       });
 
@@ -468,8 +462,7 @@ describe('School Clock page', () => {
       app = initClockApp({ realNow: evenDay().now, storage });
       expect(displayText()).toContain('Chapel');
 
-      divisionSelect().value = 'MS';
-      divisionSelect().dispatchEvent(new Event('change'));
+      chooseDivision('Middle School');
 
       // MS Period 4 runs 10:15–11:40.
       expect(headingText()).toBe('Period 4');
@@ -484,13 +477,12 @@ describe('School Clock page', () => {
       // "HS" shows; the rest is for screen readers.
       expect(chip.textContent).toBe('Division: HS, switch Division');
       expect([...chip.querySelectorAll('.visually-hidden')].map((n) => n.textContent)).toEqual(['Division: ', ', switch Division']);
-      expect(isShown(divisionSelect())).toBe(false);
+      expect(isShown(field('High School'))).toBe(false);
 
       chip.click();
-      expect(isShown(divisionSelect())).toBe(true);
-      expect(document.activeElement).toBe(divisionSelect());
-      divisionSelect().value = 'MS';
-      divisionSelect().dispatchEvent(new Event('change'));
+      expect(isShown(field('High School'))).toBe(true);
+      expect(document.activeElement).toBe(field('High School'));
+      chooseDivision('Middle School');
       expect(control('Division: MS, switch Division')).toBeDefined();
     });
 
@@ -501,8 +493,7 @@ describe('School Clock page', () => {
       expect(dayText()).toBe('All Day · Wed, Jan 20');
       expect(headingText()).toBe('Period 3');
 
-      divisionSelect().value = 'HS';
-      divisionSelect().dispatchEvent(new Event('change'));
+      chooseDivision('High School');
       expect(headingText()).toBe('HS Experience Week');
       expect(displayText()).not.toContain('Period 3');
     });
@@ -530,8 +521,7 @@ describe('School Clock page', () => {
         // Tue 10/27/26 10:27, the Passing Period before Period 3.
         app = initClockApp({ realNow: fakeRealClock(new Date(2026, 9, 27, 10, 27, 0)).now, storage });
 
-        labelInput('Period 3').value = 'AP CSA';
-        labelInput('Period 3').dispatchEvent(new Event('input'));
+        setValue('Period 3', 'AP CSA');
 
         expect(displayText()).toContain('Up next Period 3 · AP CSA 10:30 AM');
         expect(saved(storage).periodLabels).toEqual({ 'Period 3': 'AP CSA' });
@@ -557,8 +547,7 @@ describe('School Clock page', () => {
         face.click();
         expect(readoutTexts()).toEqual(['1:45:00 PM now']);
 
-        use24HourBox().checked = true;
-        use24HourBox().dispatchEvent(new Event('change'));
+        toggle('24-hour time');
 
         expect(readoutTexts()).toEqual(['13:45:00 now']);
         expect(displayText()).not.toMatch(/AM|PM/);

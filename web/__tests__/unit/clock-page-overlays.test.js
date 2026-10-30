@@ -109,11 +109,17 @@ describe('School Clock overlays', () => {
       expect(byId(ringCard().getAttribute('aria-describedby')).textContent).toBe(detail);
     });
 
-    it('names a test ring', () => {
+    it('names a test ring, and shows over the Settings drawer it came from', () => {
       open();
       button('Settings').click();
-      button('Test ring').click();
+      const testRing = button('Test ring');
+      testRing.focus();
+      testRing.click();
       expect(byId(ringCard().getAttribute('aria-labelledby')).textContent).toBe('Test ring');
+      expect(ringCard().closest('[inert]')).toBeNull();
+      expect(ringCard().contains(document.activeElement)).toBe(true);
+      button('Dismiss', ringCard()).click();
+      expect(document.activeElement).toBe(testRing);
     });
 
     it('takes focus when it shows, and gives it back when dismissed', () => {
@@ -182,7 +188,8 @@ describe('School Clock overlays', () => {
   });
 
   describe('the first-visit Division prompt', () => {
-    const prompt = () => mount().querySelector('[role="dialog"][aria-modal="true"]');
+    const prompt = () => [...mount().querySelectorAll('[role="dialog"][aria-modal="true"]')]
+      .find((d) => byId(d.getAttribute('aria-labelledby'))?.textContent === 'Which Division are you with?');
 
     it('is a dialog asking the Division that takes focus, with the page behind it out of reach', () => {
       open({ store: createFakeStorage() });

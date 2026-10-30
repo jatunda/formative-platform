@@ -530,8 +530,8 @@ button.clock-readout__face {
 
 /* ======================= plain panels and prompts ======================= */
 
-/* The timer's and the settings' controls, opened from the top bar: a plain
-   panel on the right until tickets 22 and 19 design them. */
+/* The timer's controls, opened from the top bar: a plain panel on the right
+   until ticket 22 designs them. (Settings is a drawer: settings-drawer.css.) */
 .clock-panel {
   position: fixed;
   z-index: 10;
@@ -795,7 +795,7 @@ button.clock-readout__face {
 /* What appears on top of the main screen (ticket 18; DESIGN.md, Overlays).
    Everything transient (the ring card, the sound prompt, toasts) sits bottom
    centre, over the bar, never over the digits: the top belongs to the
-   controls. */
+   controls. A ring shows over everything, the Settings drawer included. */
 
 .clock-overlay-btn {
   display: inline-flex;
@@ -843,14 +843,10 @@ button.clock-readout__face {
 }
 
 /* First visit: a near-solid scrim behind the Division question. */
-.clock-scrim {
+.clock-first-scrim {
   position: fixed;
   inset: 0;
   z-index: 20;
-  background: var(--scrim);
-}
-
-.clock-scrim--solid {
   background: var(--bg);
   opacity: 0.94;
 }
@@ -922,7 +918,7 @@ button.clock-readout__face {
   color: var(--accent-text);
 }
 
-.clock-feedback {
+.clock-first .clock-feedback {
   align-self: center;
   display: inline-flex;
   align-items: center;
@@ -1021,7 +1017,7 @@ button.clock-readout__face {
 .clock-ring-flash {
   position: fixed;
   inset: 0;
-  z-index: 8;
+  z-index: 40;
   pointer-events: none;
   box-shadow: inset 0 0 0 var(--ring-width, 14px) var(--ring);
   background: var(--ring-wash);
@@ -1046,7 +1042,7 @@ button.clock-readout__face {
 
 .clock-ring-card {
   position: fixed;
-  z-index: 9;
+  z-index: 41;
   left: 50%;
   bottom: calc(var(--edge-y) + var(--s2));
   transform: translateX(-50%);

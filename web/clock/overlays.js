@@ -54,7 +54,7 @@ export function createDivisionPrompt({ divisions, feedbackHref, onChoose }) {
     el('a', { className: 'clock-feedback', href: feedbackHref, textContent: 'Feedback? Email Eric' }),
   ]);
   const element = el('div', { className: 'clock-overlay', hidden: true }, [
-    el('div', { className: 'clock-scrim clock-scrim--solid', 'aria-hidden': 'true' }),
+    el('div', { className: 'clock-first-scrim', 'aria-hidden': 'true' }),
     dialog,
   ]);
   let returnTo = null;

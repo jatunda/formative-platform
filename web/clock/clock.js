@@ -10,7 +10,6 @@
 // throttled behind other windows. The window is redone when settings change,
 // when the tab is shown again, when sound turns on, and as it rolls forward.
 import { alarmsAfterRinging, describeMoment, ringsInWindow, ringsUntilDismissed } from './clock-model.js';
-import { LABELLED_PERIODS } from './clock-settings.js';
 import { createSettingsStore } from './clock-storage.js';
 import { createClockSource } from './clock-source.js';
 import { displayText } from './display-text.js';
@@ -25,7 +24,8 @@ import { TEST_RING_WORDS, ringWords } from './ring-words.js';
 import { createReadoutsView } from './readouts-view.js';
 import { SCHOOL_YEARS } from './school-years.js';
 import { createWakeLockKeeper, detectCapabilities } from './screen.js';
-import { BELL_SECONDS, ALARM_MAX_SECONDS, SOUNDS, SOUND_NAMES, createSoundPlayer } from './sound.js';
+import { DIVISIONS, FEEDBACK_HREF, createSettingsDrawer } from './settings-drawer.js';
+import { BELL_SECONDS, ALARM_MAX_SECONDS, SOUND_NAMES, createSoundPlayer } from './sound.js';
 import { cancelTimer, settleTimer, timerText } from './timer.js';
 import { createTimerPanel } from './timer-panel.js';
 
@@ -39,8 +39,6 @@ const GRACE_MS = 1000;
 /** Rings older than this (real time) when a tick finally reaches them were
  * missed while the tab slept or was throttled: they don't ring late. */
 const STALE_MS = 5 * 1000;
-const DIVISIONS = [['MS', 'Middle School'], ['HS', 'High School']];
-const FEEDBACK_HREF = `mailto:erich@villagechristian.org?subject=${encodeURIComponent('Clock feedback')}`;
 
 let destroyActiveApp = null;
 
@@ -138,27 +136,19 @@ function browserSoundPlayer() {
 }
 
 /**
- * The "Next rings today" list: every ring from `now` to midnight (nothing
- * at all when none are left, so a day off stays a plain clock).
+ * The "Next rings today" lines: every ring from `now` to midnight, with its
+ * time, what rings and its sound.
  * @param {Date} now
  * @param {object[]} schoolYears
  * @param {import('./clock-settings.js').RingSettings} ringSettings
  * @param {ReturnType<typeof textFor>} text
  */
-function nextRingsNodes(now, schoolYears, ringSettings, text) {
+function nextRingLines(now, schoolYears, ringSettings, text) {
   const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
-  const rings = ringsInWindow(now, midnight, schoolYears, ringSettings);
-  if (rings.length === 0) return [];
-  const heading = document.createElement('h2');
-  heading.textContent = 'Next rings today';
-  const list = document.createElement('ul');
-  for (const ring of rings) {
-    const item = document.createElement('li');
+  return ringsInWindow(now, midnight, schoolYears, ringSettings).map((ring) => {
     const time = text.time(ring.at, { seconds: ring.at.getSeconds() !== 0 });
-    item.textContent = `${time} · ${ringSourceText(ring, text)} · ${SOUND_NAMES[ring.sound]}`;
-    list.append(item);
-  }
-  return [heading, list];
+    return `${time} · ${ringSourceText(ring, text)} · ${SOUND_NAMES[ring.sound]}`;
+  });
 }
 
 /**
@@ -342,9 +332,9 @@ export function initClockApp({
   };
   document.addEventListener('keydown', onKeyDown);
 
-  // The top bar's controls: quiet text buttons with icons. Each plain panel
-  // they open is restyled by its own ticket (the timer picker 22, the
-  // settings drawer 19); Look (21) slots in between Readouts and Settings.
+  // The top bar's controls: quiet text buttons with icons. The plain timer
+  // panel is restyled by ticket 22; Settings opens the drawer
+  // (settings-drawer.js); Look (21) slots in between Readouts and Settings.
   /** @param {string} label @param {Parameters<typeof icon>[0]} iconName @param {object} props */
   const topControl = (label, iconName, props) => {
     const text = el('span', { className: 'clock-control__label', textContent: label });
@@ -377,18 +367,13 @@ export function initClockApp({
   });
   const readoutsControl = topControl('Readouts', 'readouts', { onclick: () => setEditing(!editing) });
   readoutsControl.classList.add('clock-control--fills');
-  const divisionChip = el('button', { type: 'button', className: 'clock-chip', onclick: () => {
-    showPanel(settingsPanel);
-    divisionSelect.focus();
-  } });
+  const divisionChip = el('button', {
+    type: 'button', className: 'clock-chip', onclick: () => openSettings(divisionChip, { atDivision: true }),
+  });
 
   // Turning sound on (browsers need one click after every load): bottom
   // centre, over the bar.
   const soundPrompt = createSoundPrompt({ onTurnOn: () => soundPlayer.resume() });
-  const bellsToggle = el('input', {
-    type: 'checkbox', checked: settings.bells.on,
-    onchange: () => updateSettings({ bells: { ...settings.bells, on: bellsToggle.checked } }),
-  });
   function showSoundState() {
     // It waits for the first-visit question, and steps aside for a ring.
     soundPrompt.show(soundPlayer.state(), ringingUntil !== null || settings.division === null);
@@ -403,65 +388,30 @@ export function initClockApp({
   // The classroom timer.
   const timerPanel = createTimerPanel({ settings: () => settings, now: () => clock.now(), update: updateSettings });
 
-  // The settings, built once so typing isn't interrupted by the ticks.
-  const divisionSelect = el('select', {
-    onchange: () => updateSettings({ division: divisionSelect.value }),
-  }, DIVISIONS.map(([key, name]) => el('option', { value: key, textContent: name })));
-  const use24Hour = el('input', {
-    type: 'checkbox', checked: settings.use24Hour,
-    onchange: () => updateSettings({ use24Hour: use24Hour.checked }),
-  });
-  const showSeconds = el('input', {
-    type: 'checkbox', checked: settings.showSeconds,
-    onchange: () => updateSettings({ showSeconds: showSeconds.checked }),
-  });
-  // Saved for now; the bar itself is ticket 20, its setting the Look sheet's (21).
-  const dayStrip = el('input', {
-    type: 'checkbox', checked: settings.dayStrip,
-    onchange: () => updateSettings({ dayStrip: dayStrip.checked }),
-  });
-  const labelInputs = LABELLED_PERIODS.map((period) => {
-    const input = el('input', {
-      type: 'text', value: settings.periodLabels[period] ?? '',
-      oninput: () => updateSettings({ periodLabels: { ...settings.periodLabels, [period]: input.value } }),
-    });
-    return el('label', {}, [`${period} label `, input]);
-  });
-  const volume = el('input', {
-    type: 'range', min: '0', max: '100', step: '5', value: String(Math.round(settings.volume * 100)),
-    oninput: () => updateSettings({ volume: Number(volume.value) / 100 }),
-  });
-  const bellSound = el('select', {
-    onchange: () => updateSettings({ bells: { ...settings.bells, sound: bellSound.value } }),
-  }, SOUNDS.map((sound) => el('option', { value: sound, textContent: SOUND_NAMES[sound] })));
-  bellSound.value = settings.bells.sound;
-  const nextRings = el('div');
-  const settingsPanel = el('section', { 'aria-label': 'Settings' }, [
-    el('h2', { textContent: 'Settings' }),
-    el('label', {}, ['Division ', divisionSelect]),
-    el('label', {}, [use24Hour, ' 24-hour time']),
-    el('label', {}, [showSeconds, ' Show seconds']),
-    el('label', {}, [dayStrip, ' Day Strip']),
-    ...labelInputs,
-    el('label', {}, [bellsToggle, ' Bells']),
-    el('label', {}, ['Volume ', volume]),
-    el('label', {}, ['Bell sound ', bellSound]),
-    ...SOUNDS.map((sound) => el('button', {
-      type: 'button', textContent: `Preview ${SOUND_NAMES[sound]}`, onclick: () => soundPlayer.play(sound),
-    })),
-    el('button', {
-      type: 'button', textContent: 'Test ring',
-      onclick: () => {
-        soundPlayer.play(settings.bells.sound);
-        startRinging(TEST_RING_WORDS, false);
-      },
-    }),
-    el('p', { textContent: 'Keep this tab open for sounds to play. It can stay behind other windows.' }),
-    nextRings,
-    el('a', { href: FEEDBACK_HREF, textContent: 'Feedback? Email Eric' }),
-  ]);
   const timerControl = panelToggle(timerPanel.section, 'clock-timer-panel', 'Timer', 'timer');
-  const settingsControl = panelToggle(settingsPanel, 'clock-settings', 'Settings', 'gear');
+
+  // The Settings drawer (what the clock does), over the rest of the page.
+  const drawer = createSettingsDrawer({
+    settings: () => settings,
+    update: updateSettings,
+    play: (sound) => soundPlayer.play(sound),
+    testRing: () => {
+      soundPlayer.play(settings.bells.sound);
+      startRinging(TEST_RING_WORDS, false);
+    },
+    // A ring shows over the drawer too, so it can be seen, heard and dismissed.
+    behind: () => [...mount.children].filter((node) => !drawer.elements.includes(node) && !ringCard.elements.includes(node)),
+    onChange: (open) => settingsControl.setAttribute('aria-expanded', String(open)),
+  });
+  /** @param {HTMLElement} from @param {{ atDivision?: boolean }} [options] */
+  function openSettings(from, options) {
+    showPanel(null);
+    drawer.open(from, options);
+  }
+  const settingsControl = topControl('Settings', 'gear', {
+    'aria-controls': drawer.dialog.id, 'aria-expanded': 'false', 'aria-haspopup': 'dialog',
+    onclick: () => openSettings(settingsControl),
+  });
 
   // Fullscreen for projecting: the screen is kept awake for as long as it
   // lasts (however it ends), where the browser allows a wake lock.
@@ -536,7 +486,7 @@ export function initClockApp({
   ]);
   mount.replaceChildren(
     mainScreen, ...ringCard.elements, soundPrompt.element, saveError.element,
-    timerPanel.section, settingsPanel, divisionPrompt.element,
+    timerPanel.section, ...drawer.elements, divisionPrompt.element,
   );
 
   /**
@@ -580,8 +530,7 @@ export function initClockApp({
     divisionPrompt.show(!chosen);
     showSoundState();
     timerPanel.render(now);
-    if (chosen) divisionSelect.value = settings.division;
-    bellsToggle.checked = settings.bells.on;
+    drawer.render();
     bellsControl.setAttribute('aria-pressed', String(settings.bells.on));
     for (const control of [timerControl, bellsControl, settingsControl, divisionChip]) control.hidden = !chosen;
     divisionChip.replaceChildren(
@@ -594,7 +543,7 @@ export function initClockApp({
     }));
     renderStageText(now, moment);
     renderMini(now, moment, renderReadouts(now, moment), text);
-    nextRings.replaceChildren(...(chosen ? nextRingsNodes(now, schoolYears, settings, text) : []));
+    drawer.showRings(chosen ? nextRingLines(now, schoolYears, settings, text) : []);
   }
 
   /** "All Day · Tue, Oct 27", with the dot spaced apart. @param {string} day */
@@ -697,6 +646,7 @@ export function initClockApp({
     stopWatchingFullscreen?.();
     wakeLock.release();
     mini.close();
+    drawer.destroy();
     soundPlayer.close();
     if (destroyActiveApp === destroy) destroyActiveApp = null;
   }
