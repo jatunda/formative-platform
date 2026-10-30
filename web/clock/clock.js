@@ -13,6 +13,8 @@ import { alarmsAfterRinging, describeMoment, ringsInWindow, ringsUntilDismissed 
 import { LABELLED_PERIODS } from './clock-settings.js';
 import { createSettingsStore } from './clock-storage.js';
 import { createClockSource } from './clock-source.js';
+import { createDayBarView } from './day-bar-view.js';
+import { describeBar } from './day-bar.js';
 import { displayText } from './display-text.js';
 import { el } from './dom.js';
 import { formatClockTime, formatSegmentName, formatShortDate } from './format.js';
@@ -405,10 +407,14 @@ export function initClockApp({
     type: 'checkbox', checked: settings.showSeconds,
     onchange: () => updateSettings({ showSeconds: showSeconds.checked }),
   });
-  // Saved for now; the bar itself is ticket 20, its setting the Look sheet's (21).
-  const dayStrip = el('input', {
-    type: 'checkbox', checked: settings.dayStrip,
-    onchange: () => updateSettings({ dayStrip: dayStrip.checked }),
+  // The bar's setting (the Look sheet, ticket 21, will host it): whole day
+  // is the saved dayStrip on, just this Segment off.
+  const barChoices = [['Whole day', true], ['Just this Segment', false]].map(([label, on]) => {
+    const input = el('input', {
+      type: 'radio', name: 'clock-bar-setting', checked: settings.dayStrip === on,
+      onchange: () => updateSettings({ dayStrip: on }),
+    });
+    return el('label', {}, [input, ` ${label}`]);
   });
   const labelInputs = LABELLED_PERIODS.map((period) => {
     const input = el('input', {
@@ -431,7 +437,7 @@ export function initClockApp({
     el('label', {}, ['Division ', divisionSelect]),
     el('label', {}, [use24Hour, ' 24-hour time']),
     el('label', {}, [showSeconds, ' Show seconds']),
-    el('label', {}, [dayStrip, ' Day Strip']),
+    el('fieldset', { className: 'clock-bar-setting' }, [el('legend', { textContent: 'Bottom bar' }), ...barChoices]),
     ...labelInputs,
     el('label', {}, [bellsToggle, ' Bells']),
     el('label', {}, ['Volume ', volume]),
@@ -503,7 +509,8 @@ export function initClockApp({
 
   // The main screen: the "Simulated time" banner (with ?at=), the top bar,
   // the stage (heading, Readouts, the line under them) and the bottom row
-  // (the bar's place, ticket 20, then the window buttons).
+  // (the bar, then the window buttons).
+  const dayBar = createDayBarView();
   const banner = el('p', { className: 'clock-banner' });
   const dayLine = el('p', { className: 'clock-day' });
   const heading = el('h1', { className: 'clock-title' });
@@ -518,7 +525,7 @@ export function initClockApp({
     ]),
   ]);
   const bottom = el('footer', { className: 'clock-bottom' }, [
-    el('div', { className: 'clock-bar-slot' }),
+    el('div', { className: 'clock-bar-slot' }, [dayBar.element]),
     el('div', { className: 'clock-corner', role: 'group', 'aria-label': 'Window' }, [mini.button, fullscreenButton]),
   ]);
   const mainScreen = el('main', { className: clock.simulated ? 'clock-screen is-simulated' : 'clock-screen' }, [
@@ -578,7 +585,21 @@ export function initClockApp({
     }));
     renderStageText(now, moment);
     renderMini(now, moment, renderReadouts(now, moment), text);
+    renderBar(now, moment, text);
     nextRings.replaceChildren(...(chosen ? nextRingsNodes(now, schoolYears, settings, text) : []));
+  }
+
+  /**
+   * The bar: hidden before a Division, while the timer has the big spot (the
+   * ring needs the height), and wherever describeBar has none.
+   * @param {Date} now @param {import('./clock-model.js').Moment | null} moment @param {ReturnType<typeof textFor>} text
+   */
+  function renderBar(now, moment, text) {
+    const timerShows = timerText(settings, now.getTime()) !== '' || timerRinging;
+    const bar = moment && !timerShows
+      ? describeBar(now, moment, schoolYears, { division: settings.division, dayStrip: settings.dayStrip, periodLabels: settings.periodLabels })
+      : null;
+    dayBar.show(bar, (date) => text.time(date));
   }
 
   /** "All Day · Tue, Oct 27", with the dot spaced apart. @param {string} day */

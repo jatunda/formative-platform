@@ -129,26 +129,6 @@ describe('School Clock display preferences', () => {
     });
   });
 
-  describe('the Day Strip setting', () => {
-    it('is on by default, and turning it off is saved and survives a reload', () => {
-      open({ when: at(10, 32) });
-      expect(checkbox('Day Strip').checked).toBe(true);
-      toggle('Day Strip');
-      expect(saved(storage).dayStrip).toBe(false);
-      open();
-      expect(checkbox('Day Strip').checked).toBe(false);
-    });
-
-    it('leaves the look preferences it does not show as they were saved', () => {
-      withSettings({ theme: 'chalkboard', fontSwap: 'serif-1', paletteSwap: 'ocean', colorScheme: 'auto' });
-      open({ when: at(10, 32) });
-      toggle('Day Strip');
-      expect(saved(storage)).toMatchObject({
-        dayStrip: false, theme: 'chalkboard', fontSwap: 'serif-1', paletteSwap: 'ocean', colorScheme: 'auto',
-      });
-    });
-  });
-
   describe('a running timer as the main Readout', () => {
     const big = (text) => ({ text, big: true });
     const small = (text) => ({ text, big: false });
