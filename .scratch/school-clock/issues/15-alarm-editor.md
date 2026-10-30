@@ -6,7 +6,7 @@ Spec: `.scratch/school-clock/spec.md` (Implementation Decisions: Alarms, sound e
 
 Found missing by the code review of 06–14: ticket 10 said the editor "waits for the design reference", but no ticket owned it.
 
-**Blocked by:** 03
+**Blocked by:** 03, 19 (the Alarm editor lives in the settings drawer)
 
 **Status:** open
 
