@@ -64,7 +64,7 @@
   // ---------- time text (the shared formatter's rules, faked) ----------
   // Clock times: 12- or 24-hour; seconds, when on, are set small after the
   // minutes. Countdowns and count-ups: m:ss or h:mm:ss with seconds on;
-  // whole minutes ("42m", "1h 15m") with seconds off, except under a minute.
+  // whole minutes ("42 min", "1h 15m") with seconds off, except under a minute.
   // "4d 17h" is the same either way. The timer always shows seconds.
   const to24 = (h, m, ap) => {
     let hh = +h;
@@ -78,7 +78,8 @@
   // Returns { html, width } where width is in big-glyph units (for sizing).
   function readoutText(r, scene, opt, always = false) {
     const unit = (u) => `<span class="unit">${esc(u)}</span>`;
-    const units = (v) => esc(v).replace(/([a-z]+)/gi, '<span class="unit">$1</span>');
+    // A space before a unit ("42 min") is set at the unit's small size too.
+    const units = (v) => esc(v).replace(/ ?[a-z]+/gi, '<span class="unit">$&</span>');
     if (r.mode === 'clock') {
       const main = opt.clock24 ? timeIn(`${r.value} ${r.suffix || ''}`.trim(), true) : r.value;
       const sec = opt.seconds ? `<span class="sec">:${String(scene.sec ?? 0).padStart(2, '0')}</span>` : '';
@@ -94,7 +95,7 @@
         if (total >= 60) {
           const h = Math.floor(total / 3600);
           const mm = Math.floor((total % 3600) / 60);
-          v = h ? `${h}h ${mm}m` : `${mm}m`;
+          v = h ? `${h}h ${String(mm).padStart(2, '0')}m` : `${mm} min`;
         }
       }
     }

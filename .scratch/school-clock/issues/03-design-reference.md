@@ -70,7 +70,7 @@ The design reference is in `mockups/final/`. You can open it from the top of `mo
 1. **At most three Readouts** (one per mode). "Add Readout" goes away at three. Today the page has no limit.
 2. **Removing a Readout:** the "Readouts" button switches to an edit mode, where each Readout gets a labelled Remove button and there's an Add slot. This works the same for touch, mouse and keyboard. It replaces today's always-visible ×. OK?
 3. **The Day Strip hides while a timer runs and in the 480×320 laptop corner,** so the ring and the Segment name get the height. It comes back when the timer ends. OK?
-4. **Seconds off:** countdowns show whole minutes rounded down ("42m", "1h 15m"), then switch to `0:59` for the last minute. With seconds on, clock times show the seconds small and raised ("10:12:43 AM"), so the clock stays as big as a countdown.
+4. **Seconds off:** countdowns show whole minutes rounded down ("42 min", "1h 15m", as ticket 16 built them), then switch to `0:59` for the last minute. With seconds on, clock times show the seconds small and raised ("10:12:43 AM"), so the clock stays as big as a countdown.
 5. **Calligraphy font:** there's no webfont. The calligraphy (Segoe Script / Snell Roundhand) and handwriting fonts are already installed on Windows and Mac. On Chromebooks they fall back to a generic script font. Is that fine, or should we add one small self-hosted file, used for labels only?
 6. **Do the 15 looks cover the groups you had in mind?** Anything to add or swap?
 

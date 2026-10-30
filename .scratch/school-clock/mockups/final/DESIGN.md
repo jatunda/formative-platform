@@ -36,7 +36,7 @@ There are 32 states, each with its own URL. Every main-screen state works in lig
 | A's layout as the base | Yes | A centred big Readout with the Segment name above it, a hairline progress bar, and quiet controls along the bottom. The Division chip moved to the top right, so the Segment heading holds only the Segment and its Period Label. |
 | B's Day Strip, as a toggle (default on) | Yes | It runs above the controls. During Off-Hours it shows the Next School Day, headed "→ Next School Day · Wed, Oct 28 · Even Day". It's hidden in Summer, in Experience Week and on an unknown date. On a phone it becomes an agenda list. Turn it off with "Day Strip" in Settings → Display (`&strip=off`). Exceptions are under [Day Strip](#day-strip). |
 | C's ring, for the timer only | Yes | While a timer runs or is paused, it is the big Readout inside a ring. The ring shows the share of time left. The Period countdown moves to a small Readout beside the ring (below it on a phone). Cancel or dismiss restores the layout. |
-| Seconds toggle (default on) | Yes | "Show seconds" in Settings → Display (`&seconds=off`). Countdowns become whole minutes ("42m", "1h 15m"). Clock times drop their small seconds. The last minute and the timer always show seconds. Rules are under [Seconds and time text](#seconds-and-time-text). |
+| Seconds toggle (default on) | Yes | "Show seconds" in Settings → Display (`&seconds=off`). Countdowns become whole minutes ("42 min", "1h 15m"). Clock times drop their small seconds. The last minute and the timer always show seconds. Rules are under [Seconds and time text](#seconds-and-time-text). |
 | A set of themes, one per subject plus personality themes, never labelled by audience | Yes | 15 themes. Each is a font plus a palette, in light and dark. The picker shows previews only, and each preview's accessible name describes its look. The theme set includes the two Eric described: "Navy and orange, bold condensed" and "Blush pink and rose with flowers, calligraphy labels". |
 | Swap a theme's font or palette, only among pre-checked options | Yes | There are 13 fonts and 15 palettes, and every combination passes (see [Contrast results](#contrast-results)). |
 | Light / dark / auto stays a separate setting | Yes | It's in Settings → Look. Every theme has both modes. |
@@ -160,7 +160,7 @@ What the shared formatter shows (ticket 16). Only the look is set here.
 
 | Value | Seconds on (default) | Seconds off |
 |---|---|---|
-| Countdown or count-up under 1 hour | `42:17` | `42m` (whole minutes, rounded down) |
+| Countdown or count-up under 1 hour | `42:17` | `42 min` (whole minutes, rounded down) |
 | Countdown or count-up of 1 hour or more | `1:15:00` | `1h 15m` |
 | Under one minute | `0:42` | `0:42` (always) |
 | Timer | `4:12` | `4:12` (always) |
@@ -168,7 +168,7 @@ What the shared formatter shows (ticket 16). Only the look is set here.
 | Clock time, 12-hour | `10:12` plus small raised `:43`, then a small `AM` | `10:12` plus a small `AM` |
 | Clock time, 24-hour | `10:12` plus small raised `:43` | `10:12` |
 
-Letters ("m", "h", "d", "AM") and clock seconds are set at 0.42em in `--muted`. The seconds are raised (`vertical-align: 0.95em`), so the hour and minute stay the big number. The strip, the progress bar and Up next always show clock times without seconds.
+Letters ("min", "m", "h", "d", "AM") and clock seconds are set at 0.42em in `--muted`. The seconds are raised (`vertical-align: 0.95em`), so the hour and minute stay the big number. The strip, the progress bar and Up next always show clock times without seconds.
 
 ## Day Strip
 
@@ -448,7 +448,7 @@ Candara was the first humanist choice, but it renders old-style figures, so it w
 - **Division chip:** in the top right, a 44px button showing "HS"/"MS". It opens the drawer at the Division section.
 - **The Day Strip hides while a timer runs and on short screens.** The ring and the Segment name need the height.
 - **Clock seconds are small and raised**, so a clock Readout stays as big as a countdown.
-- **Seconds-off countdowns round down** ("42m" means 42 to 43 minutes left), then switch to `0:59` for the last minute.
+- **Seconds-off countdowns round down** ("42 min" means 42 to 43 minutes left), then switch to `0:59` for the last minute.
 - **Destructive actions apply at once with an Undo toast**, never a confirm dialog.
 - **The focus ring is yellow or orange (`--focus`), never the accent**, so focus never looks like a selected state.
 - **The ring card sits bottom centre over the strip**, never over the digits.
