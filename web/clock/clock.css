@@ -530,8 +530,8 @@ button.clock-readout__face {
 
 /* ======================= plain panels and prompts ======================= */
 
-/* The timer's and the settings' controls, opened from the top bar: a plain
-   panel on the right until tickets 22 and 19 design them. */
+/* The timer's controls, opened from the top bar: a plain panel on the right
+   until ticket 22 designs them. (Settings is a drawer: settings-drawer.css.) */
 .clock-panel {
   position: fixed;
   z-index: 10;
