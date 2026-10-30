@@ -72,6 +72,18 @@ describe('readoutText', () => {
     expect(readoutText({ kind: 'time', at })).toBe('1:04:09 PM');
     expect(readoutText({ kind: 'time', at }, { use24Hour: true })).toBe('13:04:09');
   });
+
+  it('with seconds off: the time and countdowns drop their seconds, except in the last minute', () => {
+    const off = { seconds: false };
+    expect(readoutText({ kind: 'time', at: tue(13, 4, 9) }, off)).toBe('1:04 PM');
+    expect(readoutText({ kind: 'time', at: tue(13, 4, 9) }, { ...off, use24Hour: true })).toBe('13:04');
+    expect(readoutText({ kind: 'duration', ms: 12 * MIN + 4000, caption: 'left', long: false }, off)).toBe('12 min left');
+    expect(readoutText({ kind: 'duration', ms: 59000, caption: 'left', long: false }, off)).toBe('0:59 left');
+    expect(readoutText({ kind: 'duration', ms: 14 * 60 * MIN + 22 * MIN + 10000, caption: 'until school starts', long: true }, off))
+      .toBe('14h 22m until school starts');
+    expect(readoutText({ kind: 'duration', ms: 62 * 60 * MIN, caption: 'until next school day', long: true }, off))
+      .toBe('2d 14h until next school day');
+  });
 });
 
 describe('readoutValue', () => {

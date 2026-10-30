@@ -71,13 +71,14 @@ export function readoutValue(mode, moment, now) {
 
 /**
  * A Readout's value in words: "43:00 left", "4d 22h until next school day",
- * or the time with seconds ("1:04:09 PM").
+ * or the time ("1:04:09 PM"). With `seconds` off: "12 min left" (but
+ * "0:59 left" in the last minute) and "1:04 PM".
  * @param {ReadoutValue} value
- * @param {{ use24Hour?: boolean }} [options]
+ * @param {{ use24Hour?: boolean, seconds?: boolean }} [options]
  * @returns {string}
  */
-export function readoutText(value, { use24Hour = false } = {}) {
-  if (value.kind === 'time') return formatClockTime(value.at, { seconds: true, use24Hour });
-  const amount = value.long ? formatLongDuration(value.ms) : formatDuration(value.ms);
+export function readoutText(value, { use24Hour = false, seconds = true } = {}) {
+  if (value.kind === 'time') return formatClockTime(value.at, { seconds, use24Hour });
+  const amount = (value.long ? formatLongDuration : formatDuration)(value.ms, { seconds });
   return `${amount} ${value.caption}`;
 }

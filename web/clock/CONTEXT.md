@@ -63,7 +63,7 @@ From any moment in Off-Hours, the soonest School Day whose first Segment hasn't 
 Middle School (MS) or High School (HS). The two Divisions share most Bell Schedules but not all — on some days (an Even Day, a Pep Rally day) the same named Bell Schedule has a different Period order or different Periods for each Division, and some days are School Days for one Division but not the other.
 
 **Readout**:
-One displayed number on the clock screen, with its own mode (e.g. time left in the Period, time since it started, current time). A screen can show several Readouts at once, each switched independently. During Off-Hours a Readout's modes become their Off-Hours counterparts (until the Next School Day, since school ended, current time).
+One displayed number on the clock screen, with its own mode (e.g. time left in the Period, time since it started, current time). A screen can show several Readouts at once, each switched independently. During Off-Hours a Readout's modes become their Off-Hours counterparts (until the Next School Day, since school ended, current time). While the classroom timer runs, is paused or rings, it takes the big Readout's place and the others become smaller; the saved layout itself never changes.
 
 **Alarm**:
 Any sound a teacher sets up to ring. Always one of two kinds: a Clock Alarm or a Period Alarm.

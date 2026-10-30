@@ -43,9 +43,29 @@ describe('clock settings store', () => {
       bells: { on: false, sound: 'chime' }, alarms: [clockAlarm, onceAlarm, periodAlarm],
       volume: 0.25, timerEndsAt: 1793000000000, timerPausedMs: null, timerSound: 'buzzer',
       recentDurations: [450000, 900000],
+      showSeconds: false, dayStrip: false, theme: 'chalkboard', fontSwap: 'serif-1', paletteSwap: 'ocean',
+      colorScheme: 'light',
     };
     createSettingsStore(storage).save(settings);
     expect(createSettingsStore(storage).load()).toEqual(settings);
+  });
+
+  it('starts with seconds on, the Day Strip on and the dark default theme, with no swaps', () => {
+    expect(DEFAULT_SETTINGS).toMatchObject({
+      showSeconds: true, dayStrip: true, theme: 'default', fontSwap: null, paletteSwap: null, colorScheme: 'dark',
+    });
+  });
+
+  it.each(['light', 'dark', 'auto'])('keeps the %s colour scheme', (colorScheme) => {
+    expect(storeHolding({ colorScheme }).load().colorScheme).toBe(colorScheme);
+  });
+
+  it('defaults each display preference that is corrupt', () => {
+    const settings = storeHolding({
+      division: 'HS', showSeconds: 'no', dayStrip: 0, theme: '', fontSwap: 5, paletteSwap: { id: 'x' },
+      colorScheme: 'sepia',
+    }).load();
+    expect(settings).toEqual({ ...DEFAULT_SETTINGS, division: 'HS' });
   });
 
   it('round-trips a paused timer, and has no timer or quick picks on a first visit', () => {

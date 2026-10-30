@@ -37,27 +37,32 @@ export function formatSegmentName(segment, periodLabels) {
 
 /**
  * A length of time as "M:SS", or "H:MM:SS" from an hour up. Whole seconds,
- * rounded down.
+ * rounded down. With `seconds: false` it's whole minutes ("42 min", "1h 05m"),
+ * except under a minute, which always shows its seconds ("0:59") so the end
+ * of a countdown stays exact.
  * @param {number} ms
+ * @param {{ seconds?: boolean }} [options]
  * @returns {string}
  */
-export function formatDuration(ms) {
+export function formatDuration(ms, { seconds = true } = {}) {
   const total = Math.floor(ms / 1000);
   const h = Math.floor(total / 3600);
   const m = Math.floor((total % 3600) / 60);
   const s = total % 60;
+  if (!seconds && total >= 60) return h > 0 ? `${h}h ${pad2(m)}m` : `${m} min`;
   return h > 0 ? `${h}:${pad2(m)}:${pad2(s)}` : `${m}:${pad2(s)}`;
 }
 
 /**
  * A countdown that may run for days: like formatDuration under a day, then
- * whole days and hours, e.g. "2d 14h" (rounded down).
+ * whole days and hours, e.g. "2d 14h" (rounded down, whatever `seconds` says).
  * @param {number} ms
+ * @param {{ seconds?: boolean }} [options]
  * @returns {string}
  */
-export function formatLongDuration(ms) {
+export function formatLongDuration(ms, options = {}) {
   const totalHours = Math.floor(ms / 3600000);
-  if (totalHours < 24) return formatDuration(ms);
+  if (totalHours < 24) return formatDuration(ms, options);
   return `${Math.floor(totalHours / 24)}d ${totalHours % 24}h`;
 }
 

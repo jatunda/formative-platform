@@ -3,10 +3,9 @@
 // once (so typing a custom duration survives the ticks); each render rewrites
 // its time left. The timer itself is plain data in the settings (timer.js).
 import { el } from './dom.js';
-import { formatDuration } from './format.js';
 import {
   PRESET_MINUTES, cancelTimer, durationLabel, parseDuration, pauseTimer, rememberDuration, resumeTimer,
-  startTimer, timerStatus,
+  startTimer, timerStatus, timerText,
 } from './timer.js';
 
 /**
@@ -68,10 +67,8 @@ export function createTimerPanel({ settings, now, update }) {
 
   /** @param {Date} at */
   function render(at) {
-    const { status, remainingMs } = timerStatus(settings(), at.getTime());
-    // Rounded up, so a 5 min timer reads 5:00 when it starts and 0:00 as it rings.
-    const left = status === 'idle' ? '' : `${formatDuration(Math.ceil(remainingMs / 1000) * 1000)} left`;
-    timerLeft.textContent = status === 'paused' ? `Paused · ${left}` : left;
+    const { status } = timerStatus(settings(), at.getTime());
+    timerLeft.textContent = timerText(settings(), at.getTime());
     pauseButton.hidden = status !== 'running';
     resumeButton.hidden = status !== 'paused';
     cancelButton.hidden = status === 'idle';

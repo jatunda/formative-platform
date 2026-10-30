@@ -26,7 +26,19 @@ export const DEFAULT_SETTINGS = Object.freeze(/** @type {ClockSettings} */ ({
   timerPausedMs: null,
   timerSound: 'beep',
   recentDurations: [],
+  showSeconds: true,
+  dayStrip: true,
+  // Ticket 02's default: a dark muted blue look (ticket 21 names the theme set).
+  theme: 'default',
+  fontSwap: null,
+  paletteSwap: null,
+  colorScheme: 'dark',
 }));
+
+/** @type {readonly import('./clock-settings.js').ColorScheme[]} */
+const COLOR_SCHEMES = Object.freeze(['light', 'dark', 'auto']);
+/** A theme, font or palette id: the set itself isn't known until ticket 21. @param {unknown} v */
+const isId = (v) => typeof v === 'string' && v !== '';
 
 /** @param {unknown} v @returns {v is Record<string, any>} */
 const isObject = (v) => typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -91,6 +103,12 @@ function parseSettings(saved) {
     timerSound: isSound(s.timerSound) ? s.timerSound : d.timerSound,
     recentDurations: Array.isArray(s.recentDurations)
       ? s.recentDurations.filter(isPositive).slice(0, QUICK_PICKS) : [],
+    showSeconds: typeof s.showSeconds === 'boolean' ? s.showSeconds : d.showSeconds,
+    dayStrip: typeof s.dayStrip === 'boolean' ? s.dayStrip : d.dayStrip,
+    theme: isId(s.theme) ? s.theme : d.theme,
+    fontSwap: isId(s.fontSwap) ? s.fontSwap : d.fontSwap,
+    paletteSwap: isId(s.paletteSwap) ? s.paletteSwap : d.paletteSwap,
+    colorScheme: COLOR_SCHEMES.includes(s.colorScheme) ? s.colorScheme : d.colorScheme,
   };
 }
 

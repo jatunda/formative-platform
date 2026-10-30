@@ -21,7 +21,7 @@ import { readoutText, readoutValue } from './readouts.js';
 import { SCHOOL_YEARS } from './school-years.js';
 import { createWakeLockKeeper, detectCapabilities } from './screen.js';
 import { BELL_SECONDS, ALARM_MAX_SECONDS, SOUNDS, SOUND_NAMES, createSoundPlayer } from './sound.js';
-import { cancelTimer, settleTimer } from './timer.js';
+import { cancelTimer, settleTimer, timerText } from './timer.js';
 import { createTimerPanel } from './timer-panel.js';
 
 const TICK_MS = 1000;
@@ -46,6 +46,11 @@ let destroyActiveApp = null;
 function textFor(settings) {
   return {
     time: (date, { seconds = false } = {}) => formatClockTime(date, { seconds, use24Hour: settings.use24Hour }),
+    /** The current time, with seconds when they're on. @param {Date} date */
+    now: (date) => formatClockTime(date, { seconds: settings.showSeconds, use24Hour: settings.use24Hour }),
+    /** A countdown that may run for days, with seconds when they're on (and in its last minute). @param {number} ms */
+    duration: (ms) => formatLongDuration(ms, { seconds: settings.showSeconds }),
+    readout: { use24Hour: settings.use24Hour, seconds: settings.showSeconds },
     name: (segment) => formatSegmentName(segment, settings.periodLabels),
     division: settings.division,
   };
@@ -91,9 +96,9 @@ function upNextText(segment, text) {
 function displayLines(now, moment, simulated, text) {
   const lines = [];
   if (simulated) {
-    lines.push(['p', `Simulated time: ${formatDate(now)}, ${text.time(now, { seconds: true })}`]);
+    lines.push(['p', `Simulated time: ${formatDate(now)}, ${text.now(now)}`]);
   }
-  lines.push(['p', text.time(now, { seconds: true })]);
+  lines.push(['p', text.now(now)]);
   if (!moment) return lines;
   const day = dayHeading(moment);
   if (day) lines.push(['h1', day]);
@@ -119,10 +124,10 @@ function displayLines(now, moment, simulated, text) {
     const lead = moment.state === 'summer' ? 'First day' : 'Next school day';
     const first = moment.nextSchoolDay.firstSegment.start;
     lines.push(['p',
-      `${lead}: ${formatShortDate(first)} at ${text.time(first)} · starts in ${formatLongDuration(moment.untilNextSchoolDayMs)}`]);
+      `${lead}: ${formatShortDate(first)} at ${text.time(first)} · starts in ${text.duration(moment.untilNextSchoolDayMs)}`]);
   }
   if (moment.schoolEndedAt) {
-    lines.push(['p', `${formatLongDuration(moment.sinceSchoolEndedMs)} since school ended`]);
+    lines.push(['p', `${text.duration(moment.sinceSchoolEndedMs)} since school ended`]);
   }
   return lines;
 }
@@ -305,6 +310,8 @@ export function initClockApp({
   // What's ringing on screen: a flash (or a steady highlight) and words for
   // it, about 3 s for a Bell and until dismissed (60 s at most) otherwise.
   let ringingUntil = null;
+  /** The timer has rung and is still ringing: it keeps the big Readout until then. */
+  let timerRinging = false;
   const ringingText = el('p');
   const ringingBanner = el('section', { 'aria-label': 'Ringing', role: 'alert', hidden: true }, [
     ringingText,
@@ -322,6 +329,7 @@ export function initClockApp({
   }
   function stopRinging() {
     ringingUntil = null;
+    timerRinging = false;
     ringingBanner.hidden = true;
     mount.classList.remove('clock-ringing', 'clock-ringing--flash', 'clock-ringing--steady');
     renderMiniRinging();
@@ -330,6 +338,7 @@ export function initClockApp({
   function dismiss() {
     soundPlayer.dismiss();
     stopRinging();
+    render(new Date(clock.now()));
   }
 
 
@@ -340,18 +349,25 @@ export function initClockApp({
       el('button', { type: 'button', textContent: name, onclick: () => updateSettings({ division: key }) })),
   ]);
 
-  // The Readouts, rebuilt only when the layout changes (so focus survives the
-  // ticks); each tick just rewrites their text. The first is the big one.
+  // The Readouts, rebuilt only when the layout changes or the timer comes and
+  // goes (so focus survives the ticks); each tick just rewrites their text.
+  // The first is the big one: the layout's first, or the timer while it's
+  // running, paused or ringing. The timer's spot is never part of the saved
+  // layout, so when it goes the layout is back exactly as it was.
   const readoutsSection = el('section', { 'aria-label': 'Readouts', className: 'clock-readouts' });
   let readoutButtons = [];
   let lastMoment = null;
-  function buildReadouts() {
+  const timerReadout = el('p', { className: 'clock-readout-value' });
+  let builtWithTimer = false;
+  function buildReadouts(withTimer = builtWithTimer) {
+    builtWithTimer = withTimer;
     readoutButtons = layout.readouts.map((_, i) =>
       el('button', { type: 'button', className: 'clock-readout-value', onclick: () => changeLayout(cycleReadout(layout, i)) }));
     const removable = layout.readouts.length > 1;
     readoutsSection.replaceChildren(
+      ...(withTimer ? [el('div', { className: 'clock-readout clock-readout--big clock-readout--timer' }, [timerReadout])] : []),
       ...readoutButtons.map((button, i) => el('div', {
-        className: i === 0 ? 'clock-readout clock-readout--big' : 'clock-readout',
+        className: i === 0 && !withTimer ? 'clock-readout clock-readout--big' : 'clock-readout',
       }, [
         button,
         ...(removable ? [el('button', {
@@ -410,6 +426,15 @@ export function initClockApp({
     type: 'checkbox', checked: settings.use24Hour,
     onchange: () => updateSettings({ use24Hour: use24Hour.checked }),
   });
+  const showSeconds = el('input', {
+    type: 'checkbox', checked: settings.showSeconds,
+    onchange: () => updateSettings({ showSeconds: showSeconds.checked }),
+  });
+  // Saved for now; the strip itself comes with the design reference (ticket 20).
+  const dayStrip = el('input', {
+    type: 'checkbox', checked: settings.dayStrip,
+    onchange: () => updateSettings({ dayStrip: dayStrip.checked }),
+  });
   const labelInputs = LABELLED_PERIODS.map((period) => {
     const input = el('input', {
       type: 'text', value: settings.periodLabels[period] ?? '',
@@ -429,6 +454,8 @@ export function initClockApp({
     el('h2', { textContent: 'Settings' }),
     el('label', {}, ['Division ', divisionSelect]),
     el('label', {}, [use24Hour, ' 24-hour time']),
+    el('label', {}, [showSeconds, ' Show seconds']),
+    el('label', {}, [dayStrip, ' Day Strip']),
     ...labelInputs,
     el('label', {}, ['Volume ', volume]),
     el('label', {}, ['Bell sound ', bellSound]),
@@ -471,7 +498,7 @@ export function initClockApp({
    */
   function renderMini(now, moment, bigReadout, text) {
     mini.show({
-      readout: bigReadout ?? text.time(now, { seconds: true }),
+      readout: bigReadout ?? text.now(now),
       status: moment ? (statusHeading(moment, text) ?? dayHeading(moment) ?? '') : '',
       upNext: moment?.upNext ? upNextText(moment.upNext, text) : '',
     });
@@ -502,7 +529,9 @@ export function initClockApp({
       const rang = ringsInWindow(lastTick, now, schoolYears, settings);
       const text = textFor(settings);
       for (const ring of rang) {
-        if (ring.at.getTime() >= staleBefore) startRinging(ringSourceText(ring, text), ringsUntilDismissed(ring));
+        if (ring.at.getTime() < staleBefore) continue;
+        startRinging(ringSourceText(ring, text), ringsUntilDismissed(ring));
+        if (ring.source === 'timer') timerRinging = true;
       }
       const alarms = alarmsAfterRinging(settings.alarms, rang, { simulated: clock.simulated });
       if (alarms !== settings.alarms) {
@@ -548,11 +577,16 @@ export function initClockApp({
       layout = newLayout(moment);
       layoutStore.keepInTab(layout);
     }
-    if (readoutButtons.length === 0) buildReadouts();
+    const timer = timerText(settings, now.getTime());
+    const withTimer = timer !== '' || timerRinging;
+    if (readoutButtons.length === 0 || withTimer !== builtWithTimer) buildReadouts(withTimer);
+    const options = textFor(settings).readout;
     layout.readouts.forEach(({ mode }, i) => {
-      readoutButtons[i].textContent = readoutText(readoutValue(mode, moment, now), settings);
+      readoutButtons[i].textContent = readoutText(readoutValue(mode, moment, now), options);
     });
-    return readoutButtons[0].textContent;
+    if (!withTimer) return readoutButtons[0].textContent;
+    timerReadout.textContent = timer || "Time's up";
+    return timerReadout.textContent;
   }
 
   render(lastTick);
