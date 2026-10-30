@@ -1,10 +1,14 @@
 // School Clock design reference: one page, every state addressable by hash.
 //
-//   index.html#<state>&mode=light&theme=<id>&font=<id>&palette=<id>
-//              &seconds=off&strip=off&clock=24&shot=1
+//   index.html#<state>&theme=<id>&font=<id>&palette=<id>&flip=1
+//              &seconds=off&bar=segment&clock=24&shot=1
+//
+// `flip=1` shows the theme's other version (light for a dark theme). The
+// mockup-only `mode=dark|light` forces a version, so the checks can render
+// every palette both ways. `strip=off` still works as `bar=segment`.
 //
 // Static and non-functional: every value is fake (data.js). The markup and
-// class names are a suggestion for 17-23, not a contract; the tokens
+// class names are a suggestion for 15-23, not a contract; the tokens
 // (tokens.css, themes.css) and the rules in DESIGN.md are the contract.
 (function () {
   const { STATES } = window.FinalData;
@@ -22,6 +26,7 @@
     pip: '<rect x="3" y="5" width="18" height="14" rx="2"/><rect x="12" y="11" width="7" height="6" rx="1"/>',
     expand: '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>',
     gear: '<circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/>',
+    look: '<path d="M12 3a9 9 0 1 0 0 18c1.4 0 2-1 2-2 0-.6-.3-1-.6-1.4-.3-.4-.6-.8-.6-1.4 0-1.1.9-2 2-2h2.3A3.9 3.9 0 0 0 21 10.5C21 6.4 17 3 12 3z"/><circle cx="7.5" cy="11" r="1.2"/><circle cx="10" cy="7" r="1.2"/><circle cx="14.5" cy="7" r="1.2"/>',
     close: '<path d="M6 6l12 12M18 6L6 18"/>',
     soundOff: '<path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M17 9l4 6M21 9l-4 6"/>',
     sound: '<path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/>',
@@ -42,7 +47,7 @@
     ${[[60, 60, 30], [128, 96, 22], [36, 140, 18]].map(([x, y, r]) => `<g class="deco__flower" transform="translate(${x} ${y})">${[0, 72, 144, 216, 288].map((a) => `<ellipse rx="${r * 0.42}" ry="${r * 0.72}" transform="rotate(${a}) translate(0 ${-r * 0.62})"/>`).join('')}<circle class="deco__heart" r="${r * 0.3}"/></g>`).join('')}`;
   const deco = () =>
     `<svg class="deco deco--tr" viewBox="0 0 180 180" aria-hidden="true" focusable="false">${FLOWERS}</svg>
-     <svg class="deco deco--bl" viewBox="0 0 180 180" aria-hidden="true" focusable="false">${FLOWERS}</svg>`;
+     <svg class="deco deco--tl" viewBox="0 0 180 180" aria-hidden="true" focusable="false">${FLOWERS}</svg>`;
 
   // ---------- routing ----------
   const parse = () => {
@@ -50,22 +55,24 @@
     const p = Object.fromEntries(rest.map((kv) => kv.split('=')));
     return {
       id: id || 'period',
-      mode: p.mode === 'light' ? 'light' : 'dark',
+      mode: p.mode === 'light' || p.mode === 'dark' ? p.mode : undefined,
+      flip: p.flip === '1',
       theme: T.THEMES.some((t) => t.id === p.theme) ? p.theme : T.DEFAULT_THEME,
       font: p.font,
       palette: p.palette,
       seconds: p.seconds !== 'off',
-      strip: p.strip !== 'off',
+      bar: p.bar === 'segment' || p.strip === 'off' ? 'segment' : 'day',
       clock24: p.clock === '24',
       shot: p.shot === '1',
     };
   };
 
   // ---------- time text (the shared formatter's rules, faked) ----------
-  // Clock times: 12- or 24-hour; seconds, when on, are set small after the
-  // minutes. Countdowns and count-ups: m:ss or h:mm:ss with seconds on;
-  // whole minutes ("42 min", "1h 15m") with seconds off, except under a minute.
-  // "4d 17h" is the same either way. The timer always shows seconds.
+  // Clock times: 12- or 24-hour; seconds, when on, are part of the time at
+  // the same size and weight ("10:12:43"). Countdowns and count-ups: m:ss or
+  // h:mm:ss with seconds on; whole minutes ("42 min", "1h 05m") with seconds
+  // off, except under a minute. "4d 17h" is the same either way. The timer
+  // always shows seconds.
   const to24 = (h, m, ap) => {
     let hh = +h;
     if (ap === 'PM' && hh < 12) hh += 12;
@@ -75,20 +82,17 @@
   };
   const timeIn = (s, on) => (on ? String(s).replace(/\b(\d{1,2}):(\d{2})(?:\s?(AM|PM))?/g, (_, h, m, ap) => to24(h, m, ap)) : String(s));
 
-  // Returns { html, width } where width is in big-glyph units (for sizing).
+  // Returns { html, fit } where fit is the inline style that tells the CSS
+  // sizing rule how many digits (--d), colons (--c) and small letters (--u)
+  // the value has.
   function readoutText(r, scene, opt, always = false) {
-    const unit = (u) => `<span class="unit">${esc(u)}</span>`;
-    // A space before a unit ("42 min") is set at the unit's small size too.
-    const units = (v) => esc(v).replace(/ ?[a-z]+/gi, '<span class="unit">$&</span>');
-    if (r.mode === 'clock') {
-      const main = opt.clock24 ? timeIn(`${r.value} ${r.suffix || ''}`.trim(), true) : r.value;
-      const sec = opt.seconds ? `<span class="sec">:${String(scene.sec ?? 0).padStart(2, '0')}</span>` : '';
-      const suffix = !opt.clock24 && r.suffix ? unit(r.suffix) : '';
-      const small = (opt.seconds ? 3 : 0) + (suffix ? 2 : 0);
-      return { html: esc(main) + sec + suffix, width: main.length + small * 0.42 };
-    }
     let v = r.value;
-    if (!opt.seconds && !always) {
+    let suffix = '';
+    if (r.mode === 'clock') {
+      v = opt.clock24 ? timeIn(`${r.value} ${r.suffix || ''}`.trim(), true) : r.value;
+      if (opt.seconds) v += `:${String(scene.sec ?? 0).padStart(2, '0')}`;
+      if (!opt.clock24 && r.suffix) suffix = r.suffix;
+    } else if (!opt.seconds && !always) {
       const m = v.match(/^(?:(\d+):)?(\d+):(\d\d)$/);
       if (m) {
         const total = (+(m[1] || 0)) * 3600 + +m[2] * 60 + +m[3];
@@ -99,20 +103,25 @@
         }
       }
     }
-    const letters = (v.match(/[a-z]/gi) || []).length;
-    return { html: units(v), width: v.replace(/[a-z ]/gi, '').length + letters * 0.42 };
+    // Letters ("min", "h", "AM") and the space before them are set small.
+    const html = esc(v).replace(/ ?[a-z]+/gi, '<span class="unit">$&</span>') + (suffix ? `<span class="unit">${esc(suffix)}</span>` : '');
+    const count = (re) => (v.match(re) || []).length;
+    const fit = `--d:${count(/\d/g)};--c:${count(/:/g)};--u:${count(/[a-z]/gi) + suffix.length}`;
+    return { html, fit, text: v + (suffix ? ' ' + suffix : '') };
   }
 
   const clockAt = (t, opt) => esc(timeIn(t, opt.clock24));
   const periodName = (p) => (LABELS[p] ? `${p} · ${LABELS[p]}` : p);
+  // A Segment's short name for tight blocks. "Nutrition" is never cut to
+  // "Nut": it is "Nutr." at its shortest.
+  const shortName = (name) => (name.startsWith('Period ') ? 'P' + name.slice(7) : name === 'Nutrition' ? 'Nutr.' : name);
 
-  // ---------- main screen pieces ----------
+  // ---------- top bar ----------
   const CONTROLS = (st) => [
     { id: 'timer', icon: 'timer', label: 'Timer' },
     { id: 'bells', icon: 'bell', label: 'Bells', pressed: true },
     { id: 'readouts', icon: 'readouts', label: st.edit ? 'Done' : 'Readouts', pressed: !!st.edit },
-    { id: 'mini', icon: 'pip', label: 'Mini player' },
-    { id: 'full', icon: 'expand', label: 'Fullscreen' },
+    { id: 'look', icon: 'look', label: 'Look', expanded: st.overlay === 'look' },
     { id: 'settings', icon: 'gear', label: 'Settings' },
   ];
 
@@ -120,8 +129,9 @@
     <nav class="controls" aria-label="Clock controls">
       ${CONTROLS(st)
         .map((c) => {
-          const btn = `<button type="button" class="ctl" data-ctl="${c.id}"${c.pressed !== undefined ? ` aria-pressed="${c.pressed}"` : ''}>${icon(c.icon)}<span class="ctl__label">${esc(c.label)}</span></button>`;
-          if (c.id === 'settings' && st.overlay === 'hint') {
+          const state = c.pressed !== undefined ? ` aria-pressed="${c.pressed}"` : c.expanded !== undefined ? ` aria-haspopup="dialog" aria-expanded="${c.expanded}"` : '';
+          const btn = `<button type="button" class="ctl" data-ctl="${c.id}"${state}>${icon(c.icon)}<span class="ctl__label">${esc(c.label)}</span></button>`;
+          if (c.id === 'look' && st.overlay === 'hint') {
             return `<span class="ctl-wrap">${btn}<span class="hint-pop" role="note"><span>Pick a theme</span><button type="button" class="hint-pop__close" aria-label="Dismiss the theme hint">${icon('close')}</button></span></span>`;
           }
           return btn;
@@ -129,6 +139,14 @@
         .join('')}
     </nav>`;
 
+  // Bottom right: icon-only, named by aria-label (and a tooltip).
+  const corner = () => `
+    <div class="corner" role="group" aria-label="Window">
+      <button type="button" class="ctl ctl--icon" data-ctl="mini" aria-label="Mini player" title="Mini player">${icon('pip')}</button>
+      <button type="button" class="ctl ctl--icon" data-ctl="full" aria-label="Fullscreen" title="Fullscreen">${icon('expand')}</button>
+    </div>`;
+
+  // ---------- Readouts ----------
   const removeBtn = (caption) =>
     `<button type="button" class="readout__remove">${icon('close')}<span>Remove</span><span class="visually-hidden"> Readout: ${esc(caption)}</span></button>`;
 
@@ -136,7 +154,7 @@
     const t = readoutText(s.big, s, opt);
     return `<div class="readout readout--big${st.edit ? ' is-editing' : ''}">
         <button type="button" class="readout__btn">
-          <span class="readout__value num" style="--units:${t.width.toFixed(2)}" data-readout="big">${t.html}</span>
+          <span class="readout__value num" style="${t.fit}" data-readout="big">${t.html}</span>
           <span class="readout__caption">${esc(s.big.caption)}</span>
         </button>
         ${st.edit && removable ? removeBtn(s.big.caption) : ''}
@@ -147,21 +165,12 @@
     const t = readoutText(r, s, opt, always);
     return `<div class="readout readout--small${st.edit ? ' is-editing' : ''}">
         <button type="button" class="readout__btn">
-          <span class="readout__value num">${t.html}</span>
+          <span class="readout__value num" style="${t.fit}">${t.html}</span>
           <span class="readout__caption">${esc(r.caption)}</span>
         </button>
         ${st.edit ? removeBtn(r.caption) : ''}
       </div>`;
   };
-
-  const progress = (s, opt) =>
-    s.progress == null
-      ? ''
-      : `<div class="progress">
-          <span class="progress__time num">${clockAt(s.span.start, opt)}</span>
-          <span class="progress__bar" role="progressbar" aria-label="${esc(s.headline)} progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(s.progress * 100)}"><span style="width:${(s.progress * 100).toFixed(1)}%"></span></span>
-          <span class="progress__time num">${clockAt(s.span.end, opt)}</span>
-        </div>`;
 
   const upNext = (s, opt) => {
     if (s.kind === 'passing' && s.upNext) {
@@ -171,51 +180,76 @@
     return '';
   };
 
-  // The Day Strip: today's Segments, or the Next School Day's during Off-Hours.
-  function strip(s, opt, compact) {
-    if (!opt.strip || !s.strip) return '';
-    const segs = SCHEDULES[s.strip.schedule];
-    const isToday = !s.strip.label || s.strip.today;
-    const t0 = segs[0].startMin;
-    const t1 = segs[segs.length - 1].endMin;
-    const pct = (m) => (((m - t0) / (t1 - t0)) * 100).toFixed(2);
+  // ---------- the bar ----------
+  // One element along the bottom. "Whole day": today's Segments (the Next
+  // School Day's during Off-Hours); the current block fills left to right and
+  // a thin Now marker sits above it. A Passing Period fills its gap and the
+  // next block is highlighted. "Just this Segment": the current Segment (or
+  // Passing Period) alone, full width, with its start and end times.
+  function bar(s, opt) {
+    if (!s.strip) return '';
+    const segs = SCHEDULES[s.strip.schedule].map((g) => ({ ...g, short: shortName(g.name) }));
     const live = !s.strip.label && s.nowMin != null;
-    const stateOf = (g) => (!live ? 'later' : s.nowMin >= g.endMin ? 'past' : s.nowMin >= g.startMin ? 'now' : 'later');
+    const cur = live ? segs.find((g) => s.nowMin >= g.startMin && s.nowMin < g.endMin) : null;
+    const next = live && !cur ? segs.find((g) => g.startMin > s.nowMin) : null;
+    const prev = next ? segs[segs.indexOf(next) - 1] : null;
+    const passing = next && prev ? { name: 'Passing Period', short: 'Passing', kind: 'passing', label: '', start: prev.end, end: next.start, startMin: prev.endMin, endMin: next.startMin } : null;
+    const active = cur || passing;
+    const done = active ? ((s.nowMin - active.startMin) / (active.endMin - active.startMin)) * 100 : 0;
+    // Off-Hours has no current Segment, so both settings show the Next School Day.
+    const single = opt.bar === 'segment' && active;
+    const fill = (g) => `<span class="seg__fill" role="progressbar" aria-label="${esc(g.name)} progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(done)}"></span>`;
+    const hidden = (g, state) => `${esc(g.name)}${g.label ? ' · ' + esc(g.label) : ''}, ${clockAt(g.start, opt)} to ${clockAt(g.end, opt)}${state === 'now' ? ', now' : state === 'next' ? ', up next' : ''}`;
+    const block = (g, state, left, width) => `<li class="seg seg--${g.kind} is-${state}" style="left:${left}%;width:${width}%${state === 'now' ? `;--done:${done.toFixed(1)}%` : ''}">
+          ${state === 'now' ? fill(g) : ''}
+          <span class="seg__text" aria-hidden="true">
+            <span class="seg__name"><span class="seg__long">${esc(g.name)}</span><span class="seg__short">${esc(g.short)}</span></span>
+            ${g.label ? `<span class="seg__label">${esc(g.label)}</span>` : ''}
+          </span>
+          <span class="seg__time num" aria-hidden="true">${clockAt(g.start, opt)}</span>
+          <span class="visually-hidden">${hidden(g, state)}</span>
+        </li>`;
+
+    let items;
+    let nowAt = null;
+    let end = segs[segs.length - 1].end;
+    if (single) {
+      items = block(active, 'now', 0, 100);
+      nowAt = done;
+      end = active.end;
+    } else {
+      const t0 = segs[0].startMin;
+      const t1 = segs[segs.length - 1].endMin;
+      const pct = (m) => ((m - t0) / (t1 - t0)) * 100;
+      const stateOf = (g) => (!live ? 'later' : g === cur ? 'now' : g === next ? 'next' : s.nowMin >= g.endMin ? 'past' : 'later');
+      items = segs.map((g) => block(g, stateOf(g), pct(g.startMin).toFixed(2), (pct(g.endMin) - pct(g.startMin)).toFixed(2))).join('');
+      if (passing) items += block(passing, 'now', pct(passing.startMin).toFixed(2), (pct(passing.endMin) - pct(passing.startMin)).toFixed(2));
+      if (live && s.nowMin >= t0 && s.nowMin <= t1) nowAt = pct(s.nowMin);
+    }
+    const now = nowAt == null ? '' : `<span class="bar__now" style="left:${nowAt.toFixed(2)}%" aria-hidden="true"></span>`;
     const heading = s.strip.label ? (s.strip.today ? `Today · ${s.strip.label.split(' · ')[1]}` : `Next School Day · ${s.strip.label}`) : '';
-    const name = s.strip.label && !s.strip.today ? `Segments on ${s.strip.label}` : "Today's Segments";
-    const hidden = (g, state) => `${esc(g.name)}${g.label ? ' · ' + esc(g.label) : ''}, ${clockAt(g.start, opt)} to ${clockAt(g.end, opt)}${state === 'now' ? ', now' : ''}`;
-    const items = segs
-      .map((g) => {
-        const state = stateOf(g);
-        const done = state === 'now' ? `;--done:${(((s.nowMin - g.startMin) / (g.endMin - g.startMin)) * 100).toFixed(1)}%` : '';
-        return `<li class="seg seg--${g.kind} is-${state}" style="left:${pct(g.startMin)}%;width:${(pct(g.endMin) - pct(g.startMin)).toFixed(2)}%${done}">
-            <span class="seg__name" aria-hidden="true">${esc(g.short)}</span>
-            ${!compact && g.label ? `<span class="seg__label" aria-hidden="true">${esc(g.label)}</span>` : ''}
-            <span class="seg__time num" aria-hidden="true">${clockAt(g.start, opt)}</span>
-            <span class="visually-hidden">${hidden(g, state)}</span>
-          </li>`;
-      })
-      .join('');
-    const now = live && s.nowMin >= t0 && s.nowMin <= t1
-      ? `<span class="strip__now" style="left:${pct(s.nowMin)}%" aria-hidden="true"><span class="strip__now-label">Now</span></span>`
-      : '';
-    const agendaRows = segs
-      .map((g) => {
-        const state = stateOf(g);
-        return `<li class="agenda__row agenda--${g.kind} is-${state}"><span class="num agenda__time">${clockAt(g.start, opt)}</span><span class="agenda__name">${esc(g.name)}${g.label ? ` · ${esc(g.label)}` : ''}</span>${state === 'now' ? '<span class="agenda__now">Now</span>' : ''}</li>`;
-      })
-      .join('');
-    return `<section class="strip${compact ? ' strip--compact' : ''}${isToday ? '' : ' strip--next'}" aria-label="${esc(name)}">
-        ${heading ? `<p class="strip__heading">${esc(heading)}</p>` : ''}
-        <div class="strip__day">
-          <ol class="strip__track">${items}</ol>
+    const name = single ? `${active.name}${active.label ? ' · ' + active.label : ''}` : s.strip.label && !s.strip.today ? `Segments on ${s.strip.label}` : "Today's Segments";
+    const agendaRows = single
+      ? ''
+      : segs
+          .map((g) => {
+            const state = !live ? 'later' : g === cur ? 'now' : g === next ? 'next' : s.nowMin >= g.endMin ? 'past' : 'later';
+            const pill = state === 'now' ? '<span class="agenda__pill">Now</span>' : state === 'next' ? '<span class="agenda__pill agenda__pill--next">Up next</span>' : '';
+            return `<li class="agenda__row agenda--${g.kind} is-${state}"><span class="num agenda__time">${clockAt(g.start, opt)}</span><span class="agenda__name">${esc(g.name)}${g.label ? ` · ${esc(g.label)}` : ''}</span>${pill}</li>`;
+          })
+          .join('');
+    return `<section class="bar ${single ? 'bar--segment' : 'bar--day'}${s.strip.label && !s.strip.today ? ' bar--next' : ''}" aria-label="${esc(name)}">
+        ${heading ? `<p class="bar__heading">${esc(heading)}</p>` : ''}
+        <div class="bar__day">
+          <ol class="bar__track">${items}</ol>
           ${now}
-          <span class="strip__end num" aria-hidden="true">${clockAt(segs[segs.length - 1].end, opt)}</span>
+          <span class="bar__end num" aria-hidden="true">${clockAt(end, opt)}</span>
         </div>
-        <ol class="agenda" tabindex="0" aria-label="${esc(name)}">${agendaRows}</ol>
+        ${single ? '' : `<ol class="agenda" tabindex="0" aria-label="${esc(name)}">${agendaRows}</ol>`}
       </section>`;
   }
 
+  // ---------- timer ----------
   function timerStage(s, opt, st) {
     const t = s.timer;
     const val = readoutText({ value: t.value, mode: 'left' }, s, opt, true);
@@ -229,7 +263,7 @@
           </svg>
           <div class="timer__inner">
             <p class="timer__title">${t.paused ? `${icon('pause')}<span>Paused</span>` : `<span>Timer</span>`} <span class="timer__of num">of ${esc(t.total)}</span></p>
-            <p class="timer__value num" style="--units:${val.width.toFixed(2)}" role="timer" aria-label="Timer, ${esc(t.value)} left of ${esc(t.total)}" data-readout="big">${val.html}</p>
+            <p class="timer__value num" style="${val.fit}" role="timer" aria-label="Timer, ${esc(t.value)} left of ${esc(t.total)}" data-readout="big">${val.html}</p>
             <div class="timer__actions">
               ${t.paused ? `<button type="button" class="btn btn--accent">${icon('play')}Resume</button>` : `<button type="button" class="btn">${icon('pause')}Pause</button>`}
               <button type="button" class="btn">${icon('stop')}Cancel</button>
@@ -240,6 +274,7 @@
       </div>`;
   }
 
+  // ---------- main screen ----------
   function renderMain(s, st, opt) {
     const isTimer = !!s.timer;
     const removable = 1 + s.small.length > 1;
@@ -250,25 +285,33 @@
     const addSlot = st.edit && 1 + s.small.length < 3
       ? `<button type="button" class="readout-add">${icon('plus')}<span>Add Readout</span></button>`
       : '';
+    const hasSmalls = s.small.length > 0 || !!addSlot;
     const stage = isTimer
       ? `<h1 class="visually-hidden">Timer, ${esc(s.headline)}${s.tag ? ' · ' + esc(s.tag) : ''}</h1>${timerStage(s, opt, st)}`
       : `<h1 class="title">${heading}</h1>
-         ${bigReadout(s, opt, st, removable)}
-         ${progress(s, opt)}
+         <div class="readouts${hasSmalls ? ' has-smalls' : ''}">
+           ${bigReadout(s, opt, st, removable)}
+           ${hasSmalls ? `<div class="smalls" data-count="${s.small.length}">${s.small.map((r) => smallReadout(r, s, opt, st)).join('')}${addSlot}</div>` : ''}
+         </div>
          ${upNext(s, opt)}
-         ${s.small.length || addSlot ? `<div class="smalls" data-count="${s.small.length}">${s.small.map((r) => smallReadout(r, s, opt, st)).join('')}${addSlot}</div>` : ''}
          ${st.edit ? '<p class="edit-note">Tap a Readout to change what it shows</p>' : ''}`;
+    const theBar = isTimer ? '' : bar(s, opt);
     return `
-      <main class="screen${st.edit ? ' is-editing' : ''}${isTimer ? ' has-timer' : ''}${opt.strip && s.strip && !isTimer ? ' has-strip' : ''}${s.simulated ? ' is-simulated' : ''}">
+      <main class="screen${st.edit ? ' is-editing' : ''}${isTimer ? ' has-timer' : ''}${theBar ? ' has-bar' : ''}${theBar && opt.bar === 'day' ? ' has-day-bar' : ''}${s.simulated ? ' is-simulated' : ''}${st.overlay === 'look' ? ' has-sheet' : ''}">
         ${deco()}
         ${s.simulated ? `<p class="sim-banner">${icon('clock')}<span>${esc(s.simulated)}</span></p>` : ''}
         <header class="top">
           <p class="day">${dayText}</p>
-          ${s.division ? `<button type="button" class="chip"><span class="visually-hidden">Division: </span>${esc(s.division)}<span class="visually-hidden">, switch Division</span></button>` : ''}
+          <div class="top__end">
+            ${controls(st)}
+            ${s.division ? `<button type="button" class="chip"><span class="visually-hidden">Division: </span>${esc(s.division)}<span class="visually-hidden">, switch Division</span></button>` : ''}
+          </div>
         </header>
         <section class="stage" aria-label="Clock">${stage}</section>
-        ${isTimer ? '' : strip(s, opt, false)}
-        ${controls(st)}
+        <footer class="bottom">
+          ${theBar}
+          ${corner()}
+        </footer>
       </main>`;
   }
 
@@ -282,14 +325,14 @@
     if (ringing) head = `${icon('bell')}<span>Ringing · ${esc(st.ring.title)}</span>`;
     let foot = '';
     if (ringing) foot = '<button type="button" class="btn btn--accent mini__dismiss">Dismiss</button>';
-    else if (t) foot = `<span class="mini__bar" role="progressbar" aria-label="Timer time left" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(t.left * 100)}"><span style="width:${(t.left * 100).toFixed(1)}%"></span></span><span class="mini__sub num">${esc(readoutText(s.big, s, opt).html.replace(/<[^>]+>/g, ''))} left in ${esc(s.headline)}</span>`;
+    else if (t) foot = `<span class="mini__bar" role="progressbar" aria-label="Timer time left" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(t.left * 100)}"><span style="width:${(t.left * 100).toFixed(1)}%"></span></span><span class="mini__sub num">${esc(readoutText(s.big, s, opt).text)} left in ${esc(s.headline)}</span>`;
     else if (s.kind === 'passing' && s.upNext) foot = `<span class="mini__next"><span class="next__label">Up next</span> ${esc(periodName(s.upNext.name))}</span>`;
     else if (s.progress != null) foot = `<span class="mini__bar" role="progressbar" aria-label="${esc(s.headline)} progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(s.progress * 100)}"><span style="width:${(s.progress * 100).toFixed(1)}%"></span></span><span class="mini__sub num">ends ${clockAt(s.span.end, opt)}</span>`;
     return `
       <main class="mini${ringing ? ' is-ringing' : ''}${t ? ' has-timer' : ''}">
         ${ringing ? '<div class="ring-flash" aria-hidden="true"></div>' : ''}
         <h1 class="mini__seg">${head}</h1>
-        <p class="mini__big num" style="--units:${big.width.toFixed(2)}" data-readout="big">${big.html}</p>
+        <p class="mini__big num" style="${big.fit}" data-readout="big">${big.html}</p>
         <div class="mini__foot">${foot}</div>
       </main>`;
   }
@@ -400,13 +443,17 @@
       </div>
     </form>`;
 
-  // Theme picker: previews only. Each preview is drawn in its own theme by
-  // putting the theme attributes on the tile; the accessible name is the look.
-  function lookSection(opt) {
+  // The Look sheet: what the clock looks like. Non-modal in feel (no scrim,
+  // the clock stays visible and previews every change live), but it keeps
+  // focus while open. Theme previews are drawn in each theme's own version;
+  // each accessible name is the look.
+  function lookSheet(opt) {
     const cur = T.THEMES.find((t) => t.id === opt.theme);
     const attrs = T.themeAttributes(opt);
+    const flipped = attrs['data-mode'] !== T.nativeMode(attrs['data-palette']);
+    const other = T.nativeMode(attrs['data-palette']) === 'dark' ? 'light' : 'dark';
     const tile = (t) => {
-      const a = T.themeAttributes({ theme: t.id, mode: opt.mode });
+      const a = T.themeAttributes({ theme: t.id });
       const on = t.id === opt.theme;
       return `<label class="theme-tile" data-palette="${a['data-palette']}" data-font="${a['data-font']}" data-mode="${a['data-mode']}"${a['data-deco'] ? ` data-deco="${a['data-deco']}"` : ''}>
           <input type="radio" name="theme"${on ? ' checked' : ''}>
@@ -425,18 +472,29 @@
         <span class="swatch__face" aria-hidden="true"><span class="swatch__aa">Aa</span><span class="num">42</span></span>
         <span class="visually-hidden">${esc(f.look[0].toUpperCase() + f.look.slice(1))}${f.id === cur.font ? ' (the theme’s own)' : ''}</span>
       </label>`;
-    const palChip = (p) => `<label class="swatch swatch--palette" data-palette="${p.id}" data-mode="${opt.mode}">
+    // A palette dot shows what picking it would give: its own version, or
+    // its other one while the theme is flipped.
+    const palChip = (p) => `<label class="swatch swatch--palette" data-palette="${p.id}" data-mode="${flipped ? (p.native === 'dark' ? 'light' : 'dark') : p.native}">
         <input type="radio" name="palette"${attrs['data-palette'] === p.id ? ' checked' : ''}>
         <span class="swatch__dot" aria-hidden="true"><span></span></span>
         <span class="visually-hidden">${esc(p.look)}${p.id === cur.palette ? ' (the theme’s own)' : ''}</span>
       </label>`;
     const swapped = attrs['data-font'] !== cur.font || attrs['data-palette'] !== cur.palette;
     return `
-      <section class="drawer__section" id="look" aria-labelledby="s-look">
-        <h3 id="s-look">Look</h3>
+    <div class="sheet look" role="dialog" aria-modal="true" aria-labelledby="look-title">
+      <div class="sheet__head">
+        <h2 id="look-title">Look</h2>
+        <button type="button" class="btn btn--icon" aria-label="Close Look">${icon('close')}</button>
+      </div>
+      <div class="sheet__body">
         <fieldset class="fieldset">
           <legend>Theme</legend>
           <div class="theme-grid">${T.THEMES.map(tile).join('')}</div>
+        </fieldset>
+        ${toggle(other === 'light' ? 'Light version' : 'Dark version', flipped, 'Flips this theme. Picking a theme shows its own version again.')}
+        <fieldset class="fieldset">
+          <legend>Bottom bar</legend>
+          <div class="segmented" role="radiogroup" aria-label="Bottom bar">${radio('Whole day', opt.bar === 'day', 'bar')}${radio('Just this Segment', opt.bar === 'segment', 'bar')}</div>
         </fieldset>
         <fieldset class="fieldset">
           <legend>Font</legend>
@@ -447,13 +505,12 @@
           <div class="swatches">${T.PALETTES.map(palChip).join('')}</div>
         </fieldset>
         ${swapped ? `<button type="button" class="btn btn--small btn--quiet">Use the theme’s own font and colours</button>` : ''}
-        <fieldset class="fieldset">
-          <legend>Light or dark</legend>
-          <div class="segmented segmented--3">${radio('Dark', opt.mode === 'dark', 'mode')}${radio('Light', opt.mode === 'light', 'mode')}${radio('Auto', false, 'mode')}</div>
-        </fieldset>
-      </section>`;
+      </div>
+    </div>`;
   }
 
+  // The Settings drawer: what the clock does. Look settings are in the Look
+  // sheet, not here.
   const drawer = (form, opt) => `
     <div class="scrim" aria-hidden="true"></div>
     <div class="drawer" role="dialog" aria-modal="true" aria-labelledby="drawer-title">
@@ -466,12 +523,10 @@
           <h3 id="s-div">Division</h3>
           <div class="segmented" role="radiogroup" aria-labelledby="s-div">${radio('Middle School', false, 'div')}${radio('High School', true, 'div')}</div>
         </section>
-        ${lookSection(opt)}
-        <section class="drawer__section" id="display" aria-labelledby="s-display">
-          <h3 id="s-display">Display</h3>
+        <section class="drawer__section" id="time" aria-labelledby="s-time">
+          <h3 id="s-time">Time</h3>
           ${toggle('Show seconds', opt.seconds, 'The last minute of a countdown and the timer always show seconds.')}
           ${toggle('24-hour time', opt.clock24, opt.clock24 ? 'Clock times show as 13:05.' : 'Clock times show as 1:05.')}
-          ${toggle('Day Strip', opt.strip, "Today's Segments along the bottom")}
         </section>
         <section class="drawer__section" id="sound" aria-labelledby="s-sound">
           <h3 id="s-sound">Sound</h3>
@@ -539,6 +594,7 @@
       case 'ringing': return ringing(st);
       case 'sound': return soundPrompt();
       case 'picker': return picker();
+      case 'look': return lookSheet(opt);
       case 'settings': return drawer('', opt);
       case 'alarm': return drawer('period', opt);
       case 'alarm-clock': return drawer('clock', opt);
@@ -553,12 +609,13 @@
   function switcher(cur, opt) {
     const q = (o) => {
       const parts = [];
-      if (o.mode === 'light') parts.push('mode=light');
+      if (o.mode) parts.push(`mode=${o.mode}`);
+      if (o.flip) parts.push('flip=1');
       if (o.theme !== T.DEFAULT_THEME) parts.push(`theme=${o.theme}`);
       if (o.font) parts.push(`font=${o.font}`);
       if (o.palette) parts.push(`palette=${o.palette}`);
       if (!o.seconds) parts.push('seconds=off');
-      if (!o.strip) parts.push('strip=off');
+      if (o.bar === 'segment') parts.push('bar=segment');
       if (o.clock24) parts.push('clock=24');
       return parts.length ? '&' + parts.join('&') : '';
     };
@@ -568,11 +625,11 @@
       <nav aria-label="Mockup states"><ul>
         ${STATES.map((s) => `<li><a href="${href(s.id)}"${s.id === cur.id ? ' aria-current="true"' : ''}>${esc(s.title)}</a></li>`).join('')}
       </ul>
-      <p><a href="${href(cur.id, { ...opt, mode: opt.mode === 'light' ? 'dark' : 'light' })}">${opt.mode === 'light' ? 'Dark' : 'Light'}</a> ·
+      <p><a href="${href(cur.id, { ...opt, mode: undefined, flip: !opt.flip })}">${opt.flip ? 'Theme’s own version' : 'Flip light/dark'}</a> ·
         <a href="${href(cur.id, { ...opt, seconds: !opt.seconds })}">Seconds ${opt.seconds ? 'off' : 'on'}</a> ·
-        <a href="${href(cur.id, { ...opt, strip: !opt.strip })}">Day Strip ${opt.strip ? 'off' : 'on'}</a> ·
+        <a href="${href(cur.id, { ...opt, bar: opt.bar === 'day' ? 'segment' : 'day' })}">Bar: ${opt.bar === 'day' ? 'just this Segment' : 'whole day'}</a> ·
         <a href="${href(cur.id, { ...opt, clock24: !opt.clock24 })}">${opt.clock24 ? '12' : '24'}-hour</a></p>
-      <p>Theme: ${T.THEMES.map((t) => `<a href="${href(cur.id, { ...opt, theme: t.id, font: undefined, palette: undefined })}"${t.id === opt.theme ? ' aria-current="true"' : ''}>${t.id}</a>`).join(' ')}</p>
+      <p>Theme: ${T.THEMES.map((t) => `<a href="${href(cur.id, { ...opt, mode: undefined, flip: false, theme: t.id, font: undefined, palette: undefined })}"${t.id === opt.theme ? ' aria-current="true"' : ''}>${t.id}</a>`).join(' ')}</p>
       <p><a href="../index.html">All mockups</a></p></nav>
     </details>`;
   }

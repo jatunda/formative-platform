@@ -2,13 +2,14 @@
    tokens.css. The default palette ("slate") and font ("system") live in
    tokens.css on :root, so they are not repeated here.
 
-   Every palette block sets all sixteen colour tokens, in dark and in light:
+   Every palette block sets all seventeen colour tokens, in dark and in light (each palette's native
+   mode is in themes.js; the other block is its flipped version):
      --bg --surface --surface-2 --fg --muted --line --line-soft --accent
      --accent-text --on-accent --focus --ring --on-ring --track --digits
      --deco --deco-2
    Every font block sets the font tokens:
      --font-ui --font-display --font-digits --digits-weight --digits-tracking
-     --display-weight --display-tracking --display-scale --digits-fit
+     --display-weight --display-tracking --display-scale --digits-fit --colon-units
    contrast.mjs checks both rules and every colour pair, for every palette in
    both modes, and shoot.mjs runs axe over every font x palette x mode.
    Which palette and font each theme uses, and the look descriptions used as
@@ -32,7 +33,7 @@
   --track: #c9dcdd; --digits: #0f2027; --deco: #0b7a74; --deco-2: #44606a;
 }
 
-/* Charcoal and lime */
+/* Pale sage and leaf green (native light; the dark version is charcoal and lime) */
 [data-palette="lab"] {
   --bg: #161a16; --surface: #20261f; --surface-2: #2a3128;
   --fg: #eef3e8; --muted: #a9b5a0; --line: #75836c; --line-soft: #333c30;
@@ -128,7 +129,7 @@
   --track: #cbd9ce; --digits: #0d1a10; --deco: #11743a; --deco-2: #405446;
 }
 
-/* Charcoal and vermilion */
+/* Gallery white and vermilion (native light; the dark version is charcoal) */
 [data-palette="gallery"] {
   --bg: #1a1a1c; --surface: #242427; --surface-2: #2e2e32;
   --fg: #f4f1ec; --muted: #b3aea6; --line: #807c76; --line-soft: #38383c;
@@ -160,7 +161,7 @@
   --track: #d6d4e3; --digits: #141629; --deco: #8a5a00; --deco-2: #4f4d66;
 }
 
-/* Forest green and gold */
+/* Pale mint and forest green (native light; the dark version is forest green and gold) */
 [data-palette="court"] {
   --bg: #0f2318; --surface: #163021; --surface-2: #1e3c2a;
   --fg: #edf7f0; --muted: #a5c4b0; --line: #6f9480; --line-soft: #244633;
@@ -224,7 +225,7 @@
   --track: #c6d8cd; --digits: #183029; --deco: #2a6b56; --deco-2: #3e5a50;
 }
 
-/* High contrast */
+/* High contrast, black on white (native light; the dark version is white on black) */
 [data-palette="contrast"] {
   --bg: #000000; --surface: #121212; --surface-2: #1e1e1e;
   --fg: #ffffff; --muted: #c8c8c8; --line: #9a9a9a; --line-soft: #333333;
@@ -252,7 +253,7 @@
   --font-digits: "Bahnschrift Condensed", "DIN Condensed", "Roboto Condensed", "Arial Narrow", sans-serif;
   --digits-weight: 700; --digits-tracking: 0;
   --display-weight: 700; --display-tracking: 0.01em; --display-scale: 1.1;
-  --digits-fit: 1.25;
+  --digits-fit: 1.25; --colon-units: 0.55;
 }
 
 [data-font="din"] {
@@ -261,7 +262,7 @@
   --font-digits: "Bahnschrift", "DIN Alternate", "Roboto", sans-serif;
   --digits-weight: 400; --digits-tracking: -0.01em;
   --display-weight: 400; --display-tracking: 0; --display-scale: 1;
-  --digits-fit: 1;
+  --digits-fit: 1; --colon-units: 0.55;
 }
 
 [data-font="serif"] {
@@ -270,7 +271,7 @@
   --font-digits: Cambria, Charter, "Bitstream Charter", "Noto Serif", serif;
   --digits-weight: 400; --digits-tracking: -0.01em;
   --display-weight: 400; --display-tracking: 0; --display-scale: 1;
-  --digits-fit: 1;
+  --digits-fit: 1; --colon-units: 0.55;
 }
 
 [data-font="classic"] {
@@ -279,7 +280,7 @@
   --font-digits: "Palatino Linotype", Palatino, "Book Antiqua", "URW Palladio L", serif;
   --digits-weight: 400; --digits-tracking: -0.01em;
   --display-weight: 400; --display-tracking: 0.01em; --display-scale: 1;
-  --digits-fit: 1;
+  --digits-fit: 1; --colon-units: 0.55;
 }
 
 [data-font="slab"] {
@@ -288,7 +289,7 @@
   --font-digits: Rockwell, "Roboto Slab", "American Typewriter", Cambria, serif;
   --digits-weight: 400; --digits-tracking: -0.01em;
   --display-weight: 700; --display-tracking: 0; --display-scale: 1;
-  --digits-fit: 0.95;
+  --digits-fit: 0.95; --colon-units: 0.55;
 }
 
 [data-font="mono"] {
@@ -297,7 +298,7 @@
   --font-digits: "Cascadia Mono", "SF Mono", Menlo, Consolas, "Roboto Mono", monospace;
   --digits-weight: 400; --digits-tracking: -0.04em;
   --display-weight: 400; --display-tracking: 0; --display-scale: 0.92;
-  --digits-fit: 0.88;
+  --digits-fit: 0.88; --colon-units: 1;
 }
 
 [data-font="rounded"] {
@@ -306,7 +307,7 @@
   --font-digits: "Arial Rounded MT Bold", ui-rounded, "SF Pro Rounded", "Nunito", "Segoe UI", sans-serif;
   --digits-weight: 400; --digits-tracking: -0.02em;
   --display-weight: 400; --display-tracking: 0; --display-scale: 1;
-  --digits-fit: 0.95;
+  --digits-fit: 0.95; --colon-units: 0.55;
 }
 
 [data-font="humanist"] {
@@ -315,7 +316,7 @@
   --font-digits: "Trebuchet MS", Seravek, "Gill Sans", "Noto Sans", sans-serif;
   --digits-weight: 400; --digits-tracking: -0.01em;
   --display-weight: 400; --display-tracking: 0; --display-scale: 1.04;
-  --digits-fit: 1;
+  --digits-fit: 1; --colon-units: 0.7;
 }
 
 [data-font="geometric"] {
@@ -324,7 +325,7 @@
   --font-digits: "Century Gothic", Futura, "Avenir Next", "Segoe UI", sans-serif;
   --digits-weight: 400; --digits-tracking: -0.03em;
   --display-weight: 400; --display-tracking: 0.02em; --display-scale: 1;
-  --digits-fit: 0.95;
+  --digits-fit: 0.95; --colon-units: 0.55;
 }
 
 [data-font="heavy"] {
@@ -333,7 +334,7 @@
   --font-digits: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", sans-serif;
   --digits-weight: 800; --digits-tracking: -0.03em;
   --display-weight: 900; --display-tracking: 0; --display-scale: 1;
-  --digits-fit: 0.92;
+  --digits-fit: 0.92; --colon-units: 0.55;
 }
 
 /* Calligraphy labels: the script face is display-only; digits and UI stay a
@@ -344,7 +345,7 @@
   --font-digits: Cambria, Charter, "Bitstream Charter", "Noto Serif", serif;
   --digits-weight: 400; --digits-tracking: -0.01em;
   --display-weight: 400; --display-tracking: 0; --display-scale: 1.15;
-  --digits-fit: 1;
+  --digits-fit: 1; --colon-units: 0.55;
 }
 
 /* Handwritten labels: a chalk-like hand for display, a rounded face for
@@ -355,7 +356,7 @@
   --font-digits: "Arial Rounded MT Bold", ui-rounded, "SF Pro Rounded", "Segoe UI", sans-serif;
   --digits-weight: 400; --digits-tracking: -0.02em;
   --display-weight: 400; --display-tracking: 0; --display-scale: 1.12;
-  --digits-fit: 0.95;
+  --digits-fit: 0.95; --colon-units: 0.55;
 }
 
 /* ======================= decorations ======================= */
@@ -369,14 +370,14 @@
   z-index: 0;
   pointer-events: none;
   display: none;
-  width: min(22vh, 15vw);
+  width: min(18vh, 13vw);
   height: auto;
   opacity: 0.55;
 }
 
 [data-deco="flowers"] .deco { display: block; }
-.deco--tr { top: 10vh; right: 0; }
-.deco--bl { bottom: 32vh; left: 0; transform: rotate(180deg); }
+.deco--tr { top: 9vh; right: 0; }
+.deco--tl { top: 9vh; left: 0; transform: scaleX(-1); }
 .deco__flower { fill: var(--deco); }
 .deco__leaf { fill: var(--deco-2); }
 .deco__heart { fill: var(--deco-2); }

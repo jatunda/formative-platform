@@ -13,22 +13,26 @@
 // Works as a browser script (window.ClockThemes) and in Node (module.exports),
 // so the real page can turn it into a // @ts-check ES module unchanged.
 (function (root) {
+  // `native` is the palette's own mode: the version a theme using it shows
+  // until the teacher flips it. Eight are dark and seven light. Every palette
+  // also has its other version (themes.css), which the flip switch shows.
+  // `look` describes the native version.
   const PALETTES = [
-    { id: 'slate', look: 'Slate blue and sky blue' },
-    { id: 'ink', look: 'Deep ink and teal' },
-    { id: 'lab', look: 'Charcoal and lime' },
-    { id: 'paper', look: 'Cream paper and ink blue' },
-    { id: 'parchment', look: 'Parchment and oxblood' },
-    { id: 'coast', look: 'Ocean blue and coral' },
-    { id: 'vesper', look: 'Deep plum and gold' },
-    { id: 'terminal', look: 'Black and green' },
-    { id: 'gallery', look: 'Charcoal and vermilion' },
-    { id: 'stage', look: 'Midnight and brass' },
-    { id: 'court', look: 'Forest green and gold' },
-    { id: 'team', look: 'Navy and orange' },
-    { id: 'blush', look: 'Blush pink and rose' },
-    { id: 'chalk', look: 'Chalkboard green' },
-    { id: 'contrast', look: 'High contrast black and white' },
+    { id: 'slate', native: 'dark', look: 'Slate blue and sky blue' },
+    { id: 'ink', native: 'dark', look: 'Deep ink and teal' },
+    { id: 'lab', native: 'light', look: 'Pale sage and leaf green' },
+    { id: 'paper', native: 'light', look: 'Cream paper and ink blue' },
+    { id: 'parchment', native: 'light', look: 'Parchment and oxblood' },
+    { id: 'coast', native: 'dark', look: 'Ocean blue and coral' },
+    { id: 'vesper', native: 'dark', look: 'Deep plum and gold' },
+    { id: 'terminal', native: 'dark', look: 'Black and green' },
+    { id: 'gallery', native: 'light', look: 'Gallery white and vermilion' },
+    { id: 'stage', native: 'dark', look: 'Midnight and brass' },
+    { id: 'court', native: 'light', look: 'Pale mint and forest green' },
+    { id: 'team', native: 'dark', look: 'Navy and orange' },
+    { id: 'blush', native: 'light', look: 'Blush pink and rose' },
+    { id: 'chalk', native: 'dark', look: 'Chalkboard green' },
+    { id: 'contrast', native: 'light', look: 'High contrast, black on white' },
   ];
 
   const FONTS = [
@@ -78,18 +82,28 @@
     return `${p}${d}, ${f}`;
   }
 
+  /** A palette's own mode: "dark" or "light". */
+  const nativeMode = (paletteId) => (byId(PALETTES, paletteId) || PALETTES[0]).native;
+
   /**
-   * What <html> gets for a theme with optional swaps. `mode` is "dark" or
-   * "light" (the page resolves "auto" with matchMedia first).
+   * What <html> gets for a theme with optional swaps.
+   * - The mode is the (possibly swapped) palette's native mode, or its other
+   *   version when `flip` is true. Picking a theme clears `flip`; swapping
+   *   the palette keeps it. There is no "auto".
+   * - `mode` ("dark" | "light") overrides both. Only the mockup's checks use
+   *   it, to render every palette in both versions.
    */
-  function themeAttributes({ theme = 'slate', font, palette, mode = 'dark' } = {}) {
+  function themeAttributes({ theme = 'slate', font, palette, flip = false, mode } = {}) {
     const t = byId(THEMES, theme) || THEMES[0];
     const f = byId(FONTS, font) ? font : t.font;
     const p = byId(PALETTES, palette) ? palette : t.palette;
-    return { 'data-mode': mode === 'light' ? 'light' : 'dark', 'data-palette': p, 'data-font': f, 'data-deco': t.deco || '' };
+    const own = nativeMode(p);
+    const other = own === 'dark' ? 'light' : 'dark';
+    const m = mode === 'light' || mode === 'dark' ? mode : flip ? other : own;
+    return { 'data-mode': m, 'data-palette': p, 'data-font': f, 'data-deco': t.deco || '' };
   }
 
-  const api = { PALETTES, FONTS, DECOS, THEMES, themeLook, themeAttributes, DEFAULT_THEME: 'slate' };
+  const api = { PALETTES, FONTS, DECOS, THEMES, themeLook, themeAttributes, nativeMode, DEFAULT_THEME: 'slate' };
   if (typeof module === 'object' && module.exports) module.exports = api;
   root.ClockThemes = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

@@ -31,7 +31,7 @@ const QUICK = process.argv.includes('--quick');
 const SWEEP_ONLY = process.argv.includes('--sweep');
 
 const MAIN = ['period', 'readouts', 'edit', 'passing', 'break', 'assembly', 'before', 'after', 'dayoff', 'experience', 'summer', 'unknown', 'simulated', 'ringing', 'sound', 'timer', 'timer-paused', 'timer-readouts', 'timer-ringing', 'picker', 'settings', 'look', 'alarm', 'alarm-clock', 'first', 'hint', 'toast', 'toast-error'];
-const SMALL = ['period', 'readouts', 'passing', 'before', 'dayoff', 'ringing', 'timer', 'sound', 'edit', 'hint', 'toast'];
+const SMALL = ['period', 'readouts', 'passing', 'before', 'dayoff', 'ringing', 'timer', 'sound', 'edit', 'hint', 'toast', 'look'];
 const MINI = ['mini', 'mini-passing', 'mini-ringing', 'mini-timer'];
 const BOTH = ['dark', 'light'];
 
@@ -47,19 +47,21 @@ const PLAN = [
   [480, 270, MINI, ['dark'], ''],
   // settings variants
   [1920, 1080, ['period', 'readouts', 'passing', 'summer'], ['dark'], 'seconds=off'],
-  [1920, 1080, ['period', 'passing', 'readouts', 'before'], ['dark'], 'strip=off'],
+  [1920, 1080, ['period', 'passing', 'readouts', 'break', 'before', 'look'], ['dark', 'light'], 'bar=segment'],
+  [1440, 900, ['period', 'passing', 'readouts'], ['dark'], 'bar=segment'],
   [1920, 1080, ['readouts', 'before', 'look'], ['dark'], 'clock=24'],
-  [390, 844, ['period'], ['dark'], 'strip=off'],
-  [480, 320, ['period'], ['dark'], 'strip=off'],
+  [390, 844, ['period', 'passing', 'look'], ['dark'], 'bar=segment'],
+  [480, 320, ['period'], ['dark'], 'bar=segment'],
   [320, 180, ['mini'], ['dark'], 'seconds=off'],
   // swaps shown in the picker
-  [1920, 1080, ['look', 'period'], ['dark'], 'theme=team&font=serif&palette=court'],
+  [1920, 1080, ['look', 'period'], ['native', 'flipped'], 'theme=team&font=serif&palette=court'],
+  [1920, 1080, ['look', 'readouts'], ['native', 'flipped'], 'theme=bloom'],
 ];
 // Every theme, in-Period, both modes, at the projected size, plus the
 // theme's ringing and timer states (they use the accent and ring colours).
 for (const t of Themes.THEMES) {
-  PLAN.push([1920, 1080, ['period', 'timer', 'ringing'], BOTH, `theme=${t.id}`]);
-  PLAN.push([390, 844, ['period'], ['dark'], `theme=${t.id}`]);
+  PLAN.push([1920, 1080, ['period', 'timer', 'ringing'], ['native', 'flipped'], `theme=${t.id}`]);
+  PLAN.push([390, 844, ['period'], ['native'], `theme=${t.id}`]);
 }
 
 const outDir = path.join(here, 'shots');
@@ -89,7 +91,10 @@ function pageChecks(isPhone) {
     const c = typeof el.className === 'string' ? el.className : el.className?.baseVal || '';
     return (c ? '.' + c.trim().split(/\s+/).join('.') : el.tagName.toLowerCase()) + ` "${(el.textContent || '').trim().slice(0, 30)}"`;
   };
-  const result = { clipped: [], overlaps: [], smallTargets: [], decoOverlaps: [], pageScroll: false, digitRatio: null, digitFits: true, flash: null };
+  const result = { clipped: [], overlaps: [], smallTargets: [], decoOverlaps: [], badWords: [], pageScroll: false, digitRatio: null, digitFits: true, flash: null };
+  // "Nutrition" is never shortened to "Nut" (visible or accessible text).
+  const app0 = document.getElementById('app');
+  if (/\bNut\b/.test(app0.innerText) || /\bNut\b/.test(app0.textContent)) result.badWords.push('Nut');
 
   const root = document.scrollingElement;
   result.pageScroll = root.scrollWidth > vw + 1 || root.scrollHeight > vh + 1;
@@ -204,7 +209,8 @@ if (!SWEEP_ONLY) {
     page.on('pageerror', (e) => errors.push(String(e)));
     for (const mode of modes) {
       for (const state of states) {
-        const hash = `${state}&mode=${mode}${extra ? '&' + extra : ''}&shot=1`;
+        const modeHash = mode === 'native' ? '' : mode === 'flipped' ? '&flip=1' : `&mode=${mode}`;
+        const hash = `${state}${modeHash}${extra ? '&' + extra : ''}&shot=1`;
         await page.goto(`${url}#${hash}`);
         await page.reload();
         await page.waitForLoadState('load');
@@ -245,7 +251,7 @@ if (!QUICK) {
   for (const font of Themes.FONTS) {
     for (const palette of Themes.PALETTES) {
       for (const mode of BOTH) {
-        for (const state of ['readouts', 'passing', 'timer', 'ringing']) {
+        for (const state of ['readouts', 'passing', 'timer', 'ringing', 'break&bar=segment']) {
           await go(`${state}&mode=${mode}&font=${font.id}&palette=${palette.id}&shot=1`);
           const checks = await page.evaluate(pageChecks, false);
           const axe = await runAxe(page);
@@ -349,6 +355,7 @@ if (report.shots.length) {
     ...r.clipped.map((c) => `${label(r)}: clipped ${c}`),
     ...r.overlaps.map((c) => `${label(r)}: overlap ${c}`),
     ...r.decoOverlaps.map((c) => `${label(r)}: decoration over ${c}`),
+    ...r.badWords.map((c) => `${label(r)}: shows "${c}"`),
     ...r.smallTargets.map((c) => `${label(r)}: small target ${c}`),
     ...r.errors.map((c) => `${label(r)}: page error ${c}`),
     ...(r.digitFits ? [] : [`${label(r)}: big digits don't fit`]),
@@ -375,7 +382,7 @@ if (report.sweep.length) {
     byState[k].min = Math.min(byState[k].min, r.digitRatio);
     byState[k].max = Math.max(byState[k].max, r.digitRatio);
   }
-  console.log(`\n=== sweep: ${rows.length} renders (${Themes.FONTS.length} fonts x ${Themes.PALETTES.length} palettes x 2 modes x 4 states, + picker per palette x mode)`);
+  console.log(`\n=== sweep: ${rows.length} renders (${Themes.FONTS.length} fonts x ${Themes.PALETTES.length} palettes x 2 modes x 5 states, + picker per palette x mode)`);
   console.log(`digit height range by state: ${Object.entries(byState).map(([k, v]) => `${k} ${v.min}-${v.max}`).join(', ')}`);
   console.log(`lowest: ${minRatio.font}/${minRatio.palette}/${minRatio.state} ${minRatio.digitRatio}`);
   console.log(`renders with problems: ${bad.length}`);

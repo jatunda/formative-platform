@@ -26,14 +26,14 @@ Spec: `.scratch/school-clock/spec.md`. Vocabulary: `web/clock/CONTEXT.md`.
 
 **Blocked by:** 02
 
-**Status:** open
+**Status:** closed
 
 - [x] Eric's 02 feedback is applied, and each point is noted as done (or explained if not)
 - [x] Every state and size from 01's list is present in the final mockup, plus: Day Strip on and off; a running timer as the main ringed Readout with the Period countdown smaller; seconds on and off; the theme picker in the settings drawer
 - [x] Every theme is shown in at least the in-Period state, in light and dark, and passes the contrast checks (all swappable font × palette combinations too)
 - [x] Passes the full self-review checklist in `01-design-mockups.md`, with screenshots and notes saved
 - [x] Design notes written: theme tokens and swap lists, type and spacing scales, breakpoints, Readout arrangement, flash spec, mini player
-- [ ] Eric has signed off on the final mockup (recorded under Comments)
+- [x] Eric has signed off on the final mockup (recorded under Comments: he waived sign-off on the final revision)
 
 ## Comments
 
@@ -90,3 +90,25 @@ The design reference is in `mockups/final/`. You can open it from the top of `mo
 - **Themes own their mode:** the set is a mix of light and dark themes (roughly half each), and picking a theme switches to its native mode. One small switch in Look flips the current theme to its other version. Drop "auto".
 - **Seconds at equal weight:** with seconds on, the seconds in a clock time are the same size and weight as the hours and minutes (no small raised seconds). Seconds off showing "42 min" / "1h 05m" is fine.
 - **Accepted as is:** the Day Strip hiding while a timer runs and in the 480×320 corner; the system-font fallback for calligraphy and handwriting faces; the theme set ("good enough for now").
+
+**2026-10-30: Revision 1 done; closed.** Every point from Eric's review is applied in `mockups/final/` and written up in `DESIGN.md` (a point-by-point table near the top). URLs now take `&flip=1` and `&bar=segment`; `&strip=off` still works.
+
+- **Readouts:** at most three and the edit mode stay as built. On wide displays (4:3 or wider, larger than 760×520) the extra Readouts stack to the **right** of the big one; the big one keeps 26% digit height at 1920×1080. Narrower screens keep them below. **Done.**
+- **Controls:** Timer, Bells, Readouts, Look, Settings and the Division chip go along the **top**. Mini player and Fullscreen are **icon-only buttons in the bottom right**, with `aria-label`s and tooltips. **Done.**
+- **Nutrition:** the bar shows "Nutrition" where it fits, "Nutr." where it's tight (that's what it shows at 1920, 1440 and 1280 wide), and never "Nut". The screenshot checks now fail on any "Nut". **Done.**
+- **One bar, two settings:** the hairline and the Day Strip are now one bar along the bottom. **Whole day:** the current block fills left to right, with a thin Now notch above it. A Passing Period fills its gap and highlights the next block. **Just this Segment:** the current Segment alone, full width, with its start and end times. The setting is "Bottom bar" in the Look sheet, and 16's `dayStrip` maps to it. **Done.**
+- **Look is its own menu:** a Look button in the top bar (a palette icon, matching the other icons, rather than the 🎨 emoji) opens a compact sheet beside the clock. It has no scrim, and the clock re-fits next to it so every change previews live. It becomes a bottom sheet on small screens. It holds the themes, the flip switch, the bottom bar setting, and the font and colour swaps. The Settings drawer keeps Division, Time (seconds, 24-hour), Sound, Period Labels, Alarms and About. **Done.**
+- **Themes own their mode:** 8 palettes are natively dark and 7 natively light (lab, paper, parchment, gallery, court, blush, contrast; their look names now describe the light version). Picking a theme shows its own version. One switch flips it, and its other version passes every contrast check too. There's no auto. DESIGN.md says how 21 migrates 16's light/dark/auto setting. **Done.**
+- **Seconds at equal weight:** "10:12:43 AM" has full-size seconds, and only AM/PM stays small. A colon now counts as about half a digit in the sizing rule (measured per font), so a clock with seconds still gets about 26% digit height. **Done.**
+- **Accepted as is:** the bar still hides while a timer runs and at 480×320, the calligraphy fallback is unchanged, and the theme set has the same 15 looks.
+
+**Checks:** 0 contrast failures (15 palettes × both versions × 26 pairs). 0 axe violations and 0 layout issues across 327 screenshots and 1980 sweep renders (every font × palette × mode in 5 states, plus the Look sheet in every palette × mode). The flash is 1 per second and steady under reduced motion. Details are in `REVIEW.md`.
+
+**Sign-off:** Eric waived approval for this final revision ("no need for approval from me for the final revision - we can always change stuff later"). This was relayed by the coordinator, so the ticket is closed without a separate review.
+
+**Small calls made here, easy to change later (also in DESIGN.md "Not settled"):**
+
+1. On a phone, "just this Segment" stays a single bar, and only "whole day" becomes the agenda list. Ticket 20 lists the agenda list under both settings.
+2. During Off-Hours, both settings show the Next School Day's whole day, as ticket 20 asks. The alternative is hiding the bar until school starts.
+3. With the Look sheet open, the 15-minute Nutrition block is too thin for any name, so it shows only its hatching.
+4. With Readouts beside the big one, the monospace swap's digits drop to 19.9% of the screen height. Every other case is at least 24.2%.

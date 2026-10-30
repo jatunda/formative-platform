@@ -1,6 +1,6 @@
 // Fake data for the design reference. Reuses ticket 01's scenes
 // (../shared/data.js) and adds what 03 needs: seconds per scene, the Next
-// School Day the Day Strip shows during Off-Hours, the timer scenes, edit
+// School Day the bar shows during Off-Hours, the timer scenes, edit
 // mode, unknown date, simulated time, the hint and toasts.
 (function () {
   const M = window.MockData;
@@ -10,7 +10,7 @@
   // The current second of each scene, so "seconds on" clock times are right.
   const SEC = { period: 43, passing: 20, break: 48, assembly: 30, before: 0, after: 0, dayoff: 12, experience: 12, summer: 12 };
 
-  // What the Day Strip shows: today's Segments during school, the Next School
+  // What the bar shows: today's Segments during school, the Next School
   // Day's during Off-Hours (`next` says which day), nothing in Summer and
   // Experience Week (schedule null) or on an unknown date.
   const STRIP_NEXT = {
@@ -86,7 +86,7 @@
     }),
     S('picker', 'Timer picker', P, { overlay: 'picker' }),
     S('settings', 'Settings drawer', P, { overlay: 'settings' }),
-    S('look', 'Settings: theme picker', P, { overlay: 'settings', scrollTo: 'look' }),
+    S('look', 'Look sheet', P, { overlay: 'look' }),
     S('alarm', 'Settings: add Period Alarm', P, { overlay: 'alarm' }),
     S('alarm-clock', 'Settings: add Clock Alarm', P, { overlay: 'alarm-clock' }),
     S('first', 'First visit', { ...P, division: '' }, { overlay: 'first' }),

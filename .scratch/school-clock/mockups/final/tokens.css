@@ -5,7 +5,7 @@
    overrides the colour and font tokens. See DESIGN.md for the rules.
 
    Theme selection is attributes on <html>:
-     data-mode="dark" | "light"    (auto is resolved by the page via matchMedia)
+     data-mode="dark" | "light"    (the palette's native mode, or the other when flipped; no auto)
      data-palette="<id>"           (omit, or "slate", for the default colours)
      data-font="<id>"              (omit, or "system", for the default faces)
      data-deco="flowers"           (only themes with a decoration)
@@ -93,6 +93,7 @@
   --display-tracking: -0.01em;
   --display-scale: 1;   /* script and hand faces run small, so they scale display text up */
   --digits-fit: 1;      /* below 1 for wide digit faces (monospace), so long values still fit */
+  --colon-units: 0.55;  /* a colon's width in digits (measured: 0.40-0.54 in most faces) */
 }
 
 /* ---------- scales ---------- */
