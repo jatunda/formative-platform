@@ -18,8 +18,10 @@ import { el } from './dom.js';
 import { formatClockTime, formatSegmentName, formatShortDate } from './format.js';
 import { icon } from './icons.js';
 import { createMiniPlayer } from './mini-player.js';
+import { createDivisionPrompt, createErrorToast, createRingCard, createSoundPrompt } from './overlays.js';
 import { addReadout, canAddReadout, createLayoutStore, cycleReadout, newLayout, removeReadout } from './readout-layout.js';
 import { readoutParts, readoutText, readoutValue } from './readouts.js';
+import { TEST_RING_WORDS, ringWords } from './ring-words.js';
 import { createReadoutsView } from './readouts-view.js';
 import { SCHOOL_YEARS } from './school-years.js';
 import { createWakeLockKeeper, detectCapabilities } from './screen.js';
@@ -198,9 +200,15 @@ export function initClockApp({
   // real timer saved by other tabs is neither loaded, cleared nor overwritten.
   const savedTimer = { timerEndsAt: settings.timerEndsAt, timerPausedMs: settings.timerPausedMs };
   if (clock.simulated) settings = { ...settings, ...cancelTimer() };
+  // Saving can fail (storage full or blocked): the page says so once, and
+  // carries on with the change in memory.
+  const saveError = createErrorToast("Couldn't save on this device. Changes last until this tab closes.");
+  let saveErrorShown = false;
   /** Save the settings (in simulated time, with the real timer as it was saved). */
   function saveSettings() {
-    store.save(clock.simulated ? { ...settings, ...savedTimer } : settings);
+    if (store.save(clock.simulated ? { ...settings, ...savedTimer } : settings) || saveErrorShown) return;
+    saveErrorShown = true;
+    saveError.show();
   }
   // A timer that ended while the page was closed is simply gone: it doesn't ring late.
   settleSavedTimer(lastTick);
@@ -254,31 +262,33 @@ export function initClockApp({
     })));
   }
 
-  // What's ringing on screen: a flash (or a steady highlight) and words for
-  // it, about 3 s for a Bell and until dismissed (60 s at most) otherwise.
+  // What's ringing on screen: a flash (or a steady highlight) and the ring
+  // card naming it, about 3 s for a Bell and until dismissed (60 s at most)
+  // otherwise. The card takes focus and hands it back when it goes.
   let ringingUntil = null;
+  /** What the mini player says is ringing, or null. */
+  let ringingWhat = null;
   /** The timer has rung and is still ringing: it keeps the big Readout until then. */
   let timerRinging = false;
-  const ringingText = el('p');
-  const ringingBanner = el('section', { 'aria-label': 'Ringing', role: 'alert', className: 'clock-ringing-card', hidden: true }, [
-    ringingText,
-    el('button', { type: 'button', textContent: 'Dismiss', onclick: () => dismiss() }),
-  ]);
-  /** @param {string} what @param {boolean} untilDismissed */
-  function startRinging(what, untilDismissed) {
+  const ringCard = createRingCard({ onDismiss: () => dismiss() });
+  /** @param {import('./ring-words.js').RingWords} words @param {boolean} untilDismissed */
+  function startRinging(words, untilDismissed) {
     const seconds = untilDismissed ? ALARM_MAX_SECONDS : BELL_SECONDS;
     ringingUntil = Math.max(ringingUntil ?? 0, realNow() + seconds * 1000);
-    ringingText.textContent = `Ringing: ${what}`;
-    ringingBanner.hidden = false;
+    ringingWhat = `Ringing: ${words.kind} · ${words.title}`;
+    ringCard.show(words);
     mount.classList.remove('clock-ringing--flash', 'clock-ringing--steady');
     mount.classList.add('clock-ringing', prefersReducedMotion() ? 'clock-ringing--steady' : 'clock-ringing--flash');
+    showSoundState();
     renderMiniRinging();
   }
   function stopRinging() {
     ringingUntil = null;
+    ringingWhat = null;
     timerRinging = false;
-    ringingBanner.hidden = true;
+    ringCard.hide();
     mount.classList.remove('clock-ringing', 'clock-ringing--flash', 'clock-ringing--steady');
+    showSoundState();
     renderMiniRinging();
   }
   /** Stop the current ring, sound and all. */
@@ -289,12 +299,10 @@ export function initClockApp({
   }
 
 
-  // First visit: ask the Division once. (Plain for now; ticket 18 designs it.)
-  const prompt = el('section', { 'aria-label': 'Choose your Division', className: 'clock-prompt' }, [
-    el('p', { textContent: 'Which Division do you teach?' }),
-    ...DIVISIONS.map(([key, name]) =>
-      el('button', { type: 'button', textContent: name, onclick: () => updateSettings({ division: key }) })),
-  ]);
+  // First visit: ask the Division once, in a dialog that takes focus.
+  const divisionPrompt = createDivisionPrompt({
+    divisions: DIVISIONS, feedbackHref: FEEDBACK_HREF, onChoose: (division) => updateSettings({ division }),
+  });
 
   // The Readouts, redrawn only when their arrangement changes. The big one
   // is the layout's first, or the timer while it's running, paused or
@@ -322,7 +330,13 @@ export function initClockApp({
     render(new Date(clock.now()));
   }
   const onKeyDown = (event) => {
-    if (event.key !== 'Escape' || !editing) return;
+    if (event.key !== 'Escape') return;
+    // Escape dismisses a ring first.
+    if (ringingUntil !== null) {
+      dismiss();
+      return;
+    }
+    if (!editing) return;
     setEditing(false);
     readoutsControl.focus();
   };
@@ -369,19 +383,15 @@ export function initClockApp({
   } });
 
   // Turning sound on (browsers need one click after every load): bottom
-  // centre, over the bar. (Plain for now; ticket 18 designs it.)
-  const soundOn = el('button', { type: 'button', textContent: 'Turn sound on', onclick: () => soundPlayer.resume() });
-  const noSound = el('p', { textContent: "Sound isn't available in this browser." });
-  const soundPrompt = el('section', { 'aria-label': 'Sound', className: 'clock-sound-prompt' }, [soundOn, noSound]);
+  // centre, over the bar.
+  const soundPrompt = createSoundPrompt({ onTurnOn: () => soundPlayer.resume() });
   const bellsToggle = el('input', {
     type: 'checkbox', checked: settings.bells.on,
     onchange: () => updateSettings({ bells: { ...settings.bells, on: bellsToggle.checked } }),
   });
   function showSoundState() {
-    const state = soundPlayer.state();
-    soundOn.hidden = state !== 'suspended';
-    noSound.hidden = state !== 'unavailable';
-    soundPrompt.hidden = soundOn.hidden && noSound.hidden;
+    // It waits for the first-visit question, and steps aside for a ring.
+    soundPrompt.show(soundPlayer.state(), ringingUntil !== null || settings.division === null);
   }
   soundPlayer.onStateChange(() => {
     showSoundState();
@@ -443,7 +453,7 @@ export function initClockApp({
       type: 'button', textContent: 'Test ring',
       onclick: () => {
         soundPlayer.play(settings.bells.sound);
-        startRinging('Test ring', false);
+        startRinging(TEST_RING_WORDS, false);
       },
     }),
     el('p', { textContent: 'Keep this tab open for sounds to play. It can stay behind other windows.' }),
@@ -498,7 +508,7 @@ export function initClockApp({
     });
   }
   function renderMiniRinging() {
-    mini.showRinging(ringingBanner.hidden ? null : ringingText.textContent);
+    mini.showRinging(ringingWhat);
   }
 
   // The main screen: the "Simulated time" banner (with ?at=), the top bar,
@@ -524,7 +534,10 @@ export function initClockApp({
   const mainScreen = el('main', { className: clock.simulated ? 'clock-screen is-simulated' : 'clock-screen' }, [
     ...(clock.simulated ? [banner] : []), top, stage, bottom,
   ]);
-  mount.replaceChildren(mainScreen, prompt, ringingBanner, soundPrompt, timerPanel.section, settingsPanel);
+  mount.replaceChildren(
+    mainScreen, ...ringCard.elements, soundPrompt.element, saveError.element,
+    timerPanel.section, settingsPanel, divisionPrompt.element,
+  );
 
   /**
    * Settle whatever rang since the last tick, then redraw. After a sleep or a
@@ -544,7 +557,7 @@ export function initClockApp({
       const text = textFor(settings);
       for (const ring of rang) {
         if (ring.at.getTime() < staleBefore) continue;
-        startRinging(ringSourceText(ring, text), ringsUntilDismissed(ring));
+        startRinging(ringWords(ring, text), ringsUntilDismissed(ring));
         if (ring.source === 'timer') timerRinging = true;
       }
       const alarms = alarmsAfterRinging(settings.alarms, rang, { simulated: clock.simulated });
@@ -562,7 +575,10 @@ export function initClockApp({
     const chosen = settings.division !== null;
     const text = textFor(settings);
     const moment = chosen ? describeMoment(now, schoolYears, { division: settings.division }) : null;
-    prompt.hidden = chosen;
+    // Until a Division is chosen, the prompt is the only thing in reach.
+    mainScreen.toggleAttribute('inert', !chosen);
+    divisionPrompt.show(!chosen);
+    showSoundState();
     timerPanel.render(now);
     if (chosen) divisionSelect.value = settings.division;
     bellsToggle.checked = settings.bells.on;

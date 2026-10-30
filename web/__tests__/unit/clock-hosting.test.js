@@ -37,28 +37,30 @@ describe('School Clock hosting', () => {
 
   describe('the ringing flash', () => {
     const css = readFileSync(resolve(clockDir, 'clock.css'), 'utf8');
+    const tokens = readFileSync(resolve(clockDir, 'tokens.css'), 'utf8');
     const rule = (selector) => {
       const match = new RegExp(`${selector.replace(/[.-]/g, '\\$&')}\\s*\\{([^}]*)\\}`).exec(css);
       return match ? match[1] : '';
     };
 
     it('flashes fewer than 3 times a second (WCAG 2.3.1)', () => {
-      const animation = /animation:\s*clock-flash\s+([\d.]+)(m?s)/.exec(rule('.clock-ringing--flash'));
+      const animation = /animation:\s*clock-ring-pulse\s+var\(--flash-period\)\s+steps\(1/
+        .exec(rule('.clock-ringing--flash .clock-ring-flash'));
       expect(animation).not.toBeNull();
-      const seconds = Number(animation[1]) / (animation[2] === 'ms' ? 1000 : 1);
+      const period = /--flash-period:\s*([\d.]+)(m?s)/.exec(tokens);
+      const seconds = Number(period[1]) / (period[2] === 'ms' ? 1000 : 1);
       // One flash per animation cycle.
       expect(1 / seconds).toBeLessThan(3);
     });
 
     it('is a steady highlight under reduced motion, not a flash', () => {
-      expect(rule('.clock-ringing--steady')).not.toMatch(/animation/);
-      expect(rule('.clock-ringing--steady')).toMatch(/outline/);
-      const reduced = css.slice(css.indexOf('@media (prefers-reduced-motion: reduce)'));
-      expect(reduced).toMatch(/\.clock-ringing--flash\s*\{[^}]*animation:\s*none/);
+      expect(rule('.clock-ring-flash')).not.toMatch(/animation/);
+      const reduced = css.slice(css.lastIndexOf('@media (prefers-reduced-motion: reduce)'));
+      expect(reduced).toMatch(/\.clock-ringing--flash \.clock-ring-flash\s*\{[^}]*animation:\s*none/);
     });
 
-    it('is more than a colour change: it also draws a thick outline', () => {
-      expect(css).toMatch(/@keyframes clock-flash[^@]*outline/);
+    it('is more than a colour change: it also draws a thick frame', () => {
+      expect(rule('.clock-ring-flash')).toMatch(/box-shadow:\s*inset 0 0 0 var\(--ring-width, 14px\)/);
     });
   });
 

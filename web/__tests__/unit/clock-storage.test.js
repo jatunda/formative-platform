@@ -143,8 +143,12 @@ describe('clock settings store', () => {
     expect(storeHolding({ alarms: [clockAlarm, bad, periodAlarm] }).load().alarms).toEqual([clockAlarm, periodAlarm]);
   });
 
-  it('does not throw when saving fails (storage full or blocked)', () => {
+  it('does not throw when saving fails (storage full or blocked), and says it failed', () => {
     const full = { getItem: () => null, setItem: () => { throw new Error('QuotaExceededError'); } };
-    expect(() => createSettingsStore(full).save(DEFAULT_SETTINGS)).not.toThrow();
+    expect(createSettingsStore(full).save(DEFAULT_SETTINGS)).toBe(false);
+  });
+
+  it('says a save worked', () => {
+    expect(createSettingsStore(createFakeStorage()).save(DEFAULT_SETTINGS)).toBe(true);
   });
 });
