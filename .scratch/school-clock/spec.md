@@ -142,6 +142,14 @@ A public page at `mrhsieh.app/clock` that any teacher can bookmark. No login. It
 78. As a teacher, I want the clock to work in current Safari, Chrome and Firefox on a MacBook, and in other modern browsers, so that whatever I use works.
 79. As a teacher, I want all settings in one drawer, out of the way, so that the projected view stays clean.
 
+### Display options
+
+80b. As a teacher, I want to turn seconds on or off for the clock and countdowns, while the last minute of a countdown and the timer always show seconds, so that the display is as busy as I like but the end of a Period stays exact.
+80c. As a teacher, I want a strip of today's Segments along the bottom that I can turn off, so that I can see the shape of the day, or keep the view minimal.
+80d. As a teacher, I want to pick a look from a set of themes (each a font and colours) shown as previews, so that the clock suits me and my room.
+80e. As a teacher, I want to swap a theme's font or colours separately, so that I can fine-tune it without making it unreadable.
+80f. As a teacher, I want a running timer to become the big Readout with a progress ring around it, so that the whole room can see it.
+
 ### Time format
 
 80a. As a teacher, I want a 24-hour (military) time toggle, saved on my device, so that every clock time on the page (current time, Segment times, "starts at", Alarm times) shows the way I read time.
@@ -192,13 +200,20 @@ A public page at `mrhsieh.app/clock` that any teacher can bookmark. No login. It
   - Defaults: "until school starts" before school on a School Day; "since school ended" after school; "until Next School Day" on days off.
   - A Readout keeps its position in the mode cycle as the day moves between in-school and Off-Hours.
 - **Device storage.** A small storage adapter (Robotics' `createLocalStorageAdapter` is the precedent) with versioned keys, falling back to defaults on missing or corrupt data.
-  - **Saved in `localStorage`:** Division, the 24-hour time setting (default off, i.e. 12-hour), Period Labels, Alarms, Bells on/off, sound choices, volume, the running timer's end time, the recent custom durations, and the "last used" Readout layout.
+  - **Saved in `localStorage`:** Division, the 24-hour time setting (default off, i.e. 12-hour), the seconds setting (default on), the Day Strip on/off (default on), the theme with any font or palette swap, light/dark/auto, Period Labels, Alarms, Bells on/off, sound choices, volume, the running timer's end time, the recent custom durations, and the "last used" Readout layout.
   - **Per tab:** the layout lives in `sessionStorage` and is read from `localStorage` only when a tab with no session layout opens. The page never listens for cross-tab storage events, so open tabs never change each other.
 - **Sound engine.** Web Audio synthesis only, with no audio assets: a few named voices (e.g. chime, school bell, beep, buzzer), each a short function of an audio context and a start time.
   - Upcoming rings are scheduled ahead on the audio clock for a lookahead window, so they play on time even when timers in a background tab are throttled. The schedule is recomputed whenever settings change, the tab becomes visible, or the window rolls over.
   - The engine starts suspended. A visible "turn sound on" control resumes it after any user click, and is shown again whenever the audio context is suspended (after every load).
   - Bells play about 3 s and stop on their own. Alarms and the timer repeat until dismissed, for at most 60 s.
 - **Time format.** One formatter turns a clock time into text according to the 24-hour setting, and every clock time on the page and in the mini player goes through it. Durations and countdowns ("12:04 left", "2d 14h") are not affected.
+- **Seconds.** The same formatter applies the seconds setting to clock times and countdowns. The last minute of a countdown and the timer always show seconds.
+- **Look (from tickets 02 and 03).**
+  - A's layout, with B's Day Strip (a toggle, default on). Off-Hours, the strip shows the Next School Day; it hides in Summer and Experience Week.
+  - C's ring is used only around a running timer, which becomes the big Readout while it runs.
+  - Themes, never labelled by audience, each a font plus a light and dark palette. A teacher can swap the font or palette only among pre-checked options.
+  - The default theme is a dark muted blue with light blue-grey text.
+  - Design tokens come from ticket 03's design reference.
 - **Ticking.** The display recomputes from the current time on each tick. It never counts up or down by adding ticks, so a throttled or sleeping tab is correct the moment it renders again.
 - **Visual ringing.** The flash must stay under 3 flashes per second (WCAG 2.3.1) and fall back to a steady highlight under `prefers-reduced-motion`.
 - **Mini player.** Document Picture-in-Picture, used only when the API exists. It mirrors the big Readout, current Segment, up next, and a dismiss button from the main tab's state. The button is hidden when the API is unavailable. No video-PiP fallback.
