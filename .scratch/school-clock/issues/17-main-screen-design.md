@@ -5,7 +5,9 @@
 - A's layout: one big Readout and smaller Readouts arranged as the design specifies, with adding, removing and cycling them;
 - the Day Label, the current Segment with its Period Label, up next during a Passing Period, and the Division;
 - the Off-Hours, day-off, Experience Week, Summer and unknown-date displays;
-- the main-screen controls (timer, Bells, fullscreen, settings entry point) and the feedback link placement;
+- the main-screen controls: Settings, Look and the other buttons along the top; fullscreen and mini player as icon-only buttons in the bottom right; the feedback link placement;
+- extra Readouts to the right of the big one when the display is wide enough (at most three);
+- clock-time seconds at the same size and weight as hours and minutes;
 - the "Simulated time" banner;
 - the extra plain time line at the top, which duplicates a current-time Readout, is removed.
 

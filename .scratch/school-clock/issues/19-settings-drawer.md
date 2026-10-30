@@ -6,11 +6,11 @@
 - Period Labels;
 - Bells on/off;
 - sound choices and volume, with a preview;
-- 24-hour time and seconds;
-- Day Strip on/off;
-- light / dark / auto.
+- 24-hour time and seconds.
 
-The timer and Bells stay one tap away on the main screen, and the projected view shows no settings. Themes (21) and the Alarm editor (15) are added to this drawer by their own tickets.
+Look settings (theme, font and palette swaps, the light/dark flip, and the bar's whole day / just this Segment setting) are **not** in this drawer: they live in their own Look sheet (21), per Eric's review in 03's Comments.
+
+The timer and Bells stay one tap away on the main screen, and the projected view shows no settings. The Alarm editor (15) is added to this drawer by its own ticket.
 
 Spec: `.scratch/school-clock/spec.md` (Implementation Decisions: device storage, Look; user stories 22, 26–28, 56, 63, 67, 68, 79, 80a–80c). Design reference: `.scratch/school-clock/mockups/final/`. Vocabulary: `web/clock/CONTEXT.md`.
 
@@ -22,7 +22,7 @@ Spec: `.scratch/school-clock/spec.md` (Implementation Decisions: device storage,
 - [ ] The drawer matches the design reference at every checklist size, including the phone
 - [ ] Keyboard: it opens from a labelled button, focus moves into it and is kept inside while open, Escape closes it, and focus returns to the button
 - [ ] Every control has a visible label; the axe scan has no violations
-- [ ] The drawer is laid out so 21 (themes) and 15 (Alarms) can add sections without restructuring it
+- [ ] The drawer is laid out so 15 (Alarms) can add its section without restructuring it
 - [ ] Page tests check that each setting changes what the page shows and what's saved
 - [ ] `npm run lint`, `npm run typecheck`, `npm run test:coverage` in `web/` pass
 

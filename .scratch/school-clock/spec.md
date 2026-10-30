@@ -208,7 +208,7 @@ A public page at `mrhsieh.app/clock` that any teacher can bookmark. No login. It
   - Bells play about 3 s and stop on their own. Alarms and the timer repeat until dismissed, for at most 60 s.
 - **Time format.** One formatter turns a clock time into text according to the 24-hour setting, and every clock time on the page and in the mini player goes through it. Durations and countdowns ("12:04 left", "2d 14h") are not affected.
 - **Seconds.** The same formatter applies the seconds setting to clock times and countdowns. The last minute of a countdown and the timer always show seconds.
-- **Look (from tickets 02 and 03).**
+- **Look (from tickets 02 and 03; Eric's review of the first design reference, in 03's Comments, revises the details: one bar at the bottom with whole day / just this Segment settings instead of a separate Day Strip and hairline; a separate Look menu; themes that own their light or dark mode, with no auto; controls along the top; seconds at equal weight).**
   - A's layout, with B's Day Strip (a toggle, default on). Off-Hours, the strip shows the Next School Day; it hides in Summer and Experience Week.
   - C's ring is used only around a running timer, which becomes the big Readout while it runs.
   - Themes, never labelled by audience, each a font plus a light and dark palette. A teacher can swap the font or palette only among pre-checked options.

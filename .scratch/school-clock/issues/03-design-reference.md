@@ -79,3 +79,14 @@ The design reference is in `mockups/final/`. You can open it from the top of `mo
 - In edit mode the big Readout shrinks to 18% of the screen height, on purpose.
 - With the monospace font swap, the timer's digits are 21% of the screen height (26% in the default font).
 - The Mac fonts haven't been seen yet. Ticket 05 covers that on your MacBook.
+
+**Eric's review of the first design reference (2026-10-29, in chat).** Not signed off yet; one revision round needed:
+
+- **Readouts:** at most three, and edit mode for removing them (both accepted). When the display is wide enough, extra Readouts go to the **right** of the big one rather than below it.
+- **Controls:** Settings and other buttons go along the **top**, since the bottom belongs to the bar. Fullscreen and mini player become **icon-only buttons in the bottom right** (with accessible names).
+- **Nutrition:** never abbreviate it to "Nut" (students would make fun of it). Use the full "Nutrition" wherever it fits, and "Nutr." where space is tight (e.g. a narrow Day Strip block).
+- **One bar, two settings:** the hairline progress bar and the Day Strip merge into one element at the bottom. "Whole day": today's Segments, and the current Segment's block fills left to right with a thin "now" marker (no separate hairline); a Passing Period fills its gap and highlights the next block. "Just this Segment": the same bar collapses to the current Segment alone, stretched full width (this is the hairline). The Day Strip setting becomes this whole day / just this Segment choice.
+- **Look is its own menu:** a 🎨 Look button in the top bar opens a compact sheet that keeps the clock visible and previews live. It holds the theme picker, font and palette swaps, the light/dark flip, and the bar's whole day / just this Segment setting. ⚙ Settings (the drawer) keeps what the clock *does*: Division, Period Labels, Bells, Alarms, sounds and volume, seconds, 24-hour time.
+- **Themes own their mode:** the set is a mix of light and dark themes (roughly half each), and picking a theme switches to its native mode. One small switch in Look flips the current theme to its other version. Drop "auto".
+- **Seconds at equal weight:** with seconds on, the seconds in a clock time are the same size and weight as the hours and minutes (no small raised seconds). Seconds off showing "42 min" / "1h 05m" is fine.
+- **Accepted as is:** the Day Strip hiding while a timer runs and in the 480×320 corner; the system-font fallback for calligraphy and handwriting faces; the theme set ("good enough for now").
