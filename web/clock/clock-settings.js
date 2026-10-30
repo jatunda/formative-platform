@@ -94,9 +94,12 @@
  * - `showSeconds`: clock times and countdowns show seconds (a countdown's
  *   last minute and the timer always do).
  * - `dayStrip`: show the strip of the day's Segments.
- * - `theme`: the theme's id; `fontSwap` / `paletteSwap` swap its font or
- *   palette for another pre-checked one (null keeps the theme's own).
- * - `colorScheme`: the theme's light or dark version, or the device's ('auto').
+ * - `theme`: the theme's id (`themes.js`); `fontSwap` / `paletteSwap` swap its
+ *   font or palette for another pre-checked one (null keeps the theme's own).
+ * - `flipped`: false follows the theme (its palette's own light or dark
+ *   version); true shows its other version. There is no "auto".
+ * - `themeHint`: the "Pick a theme" hint still shows (until a theme is picked
+ *   or the hint is dismissed).
  * The rest are the RingSettings fields.
  * @typedef {{
  *   division: Division | null,
@@ -114,11 +117,10 @@
  *   theme: string,
  *   fontSwap: string | null,
  *   paletteSwap: string | null,
- *   colorScheme: ColorScheme,
+ *   flipped: boolean,
+ *   themeHint: boolean,
  * }} ClockSettings
  */
-
-/** @typedef {'light' | 'dark' | 'auto'} ColorScheme */
 
 /** The Block Days shortcut: Bell Schedules with long (~85-minute) Periods. */
 export const BLOCK_DAYS = Object.freeze(['even', 'odd', 'lateStartEven', 'hsSuperSeminar']);

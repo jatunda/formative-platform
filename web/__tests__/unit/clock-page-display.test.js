@@ -140,11 +140,11 @@ describe('School Clock display preferences', () => {
     });
 
     it('leaves the look preferences it does not show as they were saved', () => {
-      withSettings({ theme: 'chalkboard', fontSwap: 'serif-1', paletteSwap: 'ocean', colorScheme: 'auto' });
+      withSettings({ theme: 'bloom', fontSwap: 'mono', paletteSwap: 'team', flipped: true });
       open({ when: at(10, 32) });
       toggle('Day Strip');
       expect(saved(storage)).toMatchObject({
-        dayStrip: false, theme: 'chalkboard', fontSwap: 'serif-1', paletteSwap: 'ocean', colorScheme: 'auto',
+        dayStrip: false, theme: 'bloom', fontSwap: 'mono', paletteSwap: 'team', flipped: true,
       });
     });
   });
