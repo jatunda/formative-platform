@@ -4,7 +4,7 @@
 
 Spec: `.scratch/school-clock/spec.md`. Design reference: `.scratch/school-clock/mockups/final/`.
 
-**Blocked by:** 03, 06–15, and the UI tickets that apply the design reference (to be written once 03 is signed off)
+**Blocked by:** 03, 06–16, and the UI tickets that apply the design reference (to be written once 03 is signed off)
 
 **Status:** open
 
