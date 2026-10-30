@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { describeMoment } from '../../clock/clock-model.js';
+import { describeMoment, segmentsOn } from '../../clock/clock-model.js';
 import { SCHOOL_YEARS } from '../../clock/school-years.js';
 
 const MIN = 60 * 1000;
@@ -461,5 +461,12 @@ describe('describeMoment across the 2026-11-01 daylight-saving change (Los Angel
     const ended = moment.schoolEndedAt;
     expect([ended.getDate(), ended.getHours(), ended.getMinutes()]).toEqual([30, 15, 10]);
     expect(moment.sinceSchoolEndedMs).toBe(65 * HOUR + 20 * MIN);
+  });
+});
+
+describe('segmentsOn', () => {
+  it("lists a School Day's Segments, and none on a day that isn't one", () => {
+    expect(segmentsOn(tue(0, 0), SCHOOL_YEARS, 'HS').map((s) => s.name)).toContain('Nutrition');
+    expect(segmentsOn(new Date(2026, 9, 31), SCHOOL_YEARS, 'HS')).toEqual([]);
   });
 });

@@ -12,6 +12,8 @@
 import { alarmsAfterRinging, describeMoment, ringsInWindow, ringsUntilDismissed } from './clock-model.js';
 import { createSettingsStore } from './clock-storage.js';
 import { createClockSource } from './clock-source.js';
+import { createDayBarView } from './day-bar-view.js';
+import { describeBar } from './day-bar.js';
 import { displayText } from './display-text.js';
 import { el } from './dom.js';
 import { formatClockTime, formatSegmentName, formatShortDate } from './format.js';
@@ -453,7 +455,8 @@ export function initClockApp({
 
   // The main screen: the "Simulated time" banner (with ?at=), the top bar,
   // the stage (heading, Readouts, the line under them) and the bottom row
-  // (the bar's place, ticket 20, then the window buttons).
+  // (the bar, then the window buttons).
+  const dayBar = createDayBarView();
   const banner = el('p', { className: 'clock-banner' });
   const dayLine = el('p', { className: 'clock-day' });
   const heading = el('h1', { className: 'clock-title' });
@@ -468,7 +471,7 @@ export function initClockApp({
     ]),
   ]);
   const bottom = el('footer', { className: 'clock-bottom' }, [
-    el('div', { className: 'clock-bar-slot' }),
+    el('div', { className: 'clock-bar-slot' }, [dayBar.element]),
     el('div', { className: 'clock-corner', role: 'group', 'aria-label': 'Window' }, [mini.button, fullscreenButton]),
   ]);
   const mainScreen = el('main', { className: clock.simulated ? 'clock-screen is-simulated' : 'clock-screen' }, [
@@ -527,7 +530,21 @@ export function initClockApp({
     }));
     renderStageText(now, moment);
     renderMini(now, moment, renderReadouts(now, moment), text);
+    renderBar(now, moment, text);
     drawer.showRings(chosen ? nextRingLines(now, schoolYears, settings, text) : []);
+  }
+
+  /**
+   * The bar: hidden before a Division, while the timer has the big spot (the
+   * ring needs the height), and wherever describeBar has none.
+   * @param {Date} now @param {import('./clock-model.js').Moment | null} moment @param {ReturnType<typeof textFor>} text
+   */
+  function renderBar(now, moment, text) {
+    const timerShows = timerText(settings, now.getTime()) !== '' || timerRinging;
+    const bar = moment && !timerShows
+      ? describeBar(now, moment, schoolYears, { division: settings.division, dayStrip: settings.dayStrip, periodLabels: settings.periodLabels })
+      : null;
+    dayBar.show(bar, (date) => text.time(date));
   }
 
   /** "All Day · Tue, Oct 27", with the dot spaced apart. @param {string} day */
