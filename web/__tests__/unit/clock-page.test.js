@@ -18,8 +18,17 @@ function fakeRealClock(date) {
 }
 
 const pageText = () => document.getElementById('clockApp').textContent.replace(/\s+/g, ' ');
-/** Just the clock display, without the Division prompt or the settings. */
-const displayText = () => document.querySelector('#clockApp .clock-display').textContent.trim();
+/** Just the clock's stage (heading, Readouts, the line under them), without the top bar or the panels. */
+const displayText = () => document.querySelector('#clockApp .clock-stage').textContent.replace(/\s+/g, ' ').trim();
+/** The Day Label and date at the top left. */
+const dayText = () => document.querySelector('#clockApp .clock-day').textContent.replace(/\s+/g, ' ').trim();
+const headingText = () => document.querySelector('#clockApp h1').textContent.replace(/\s+/g, ' ').trim();
+/** Each Readout's text, value then caption ("43:00 left"), in layout order. */
+const readoutTexts = () => [...document.querySelectorAll('#clockApp .clock-readout__face')]
+  .map((face) => face.textContent.replace(/\s+/g, ' ').trim());
+/** A control by its accessible name (its aria-label, else its text). */
+const control = (name) => [...document.querySelectorAll('#clockApp button')]
+  .find((b) => (b.getAttribute('aria-label') ?? b.textContent.replace(/\s+/g, ' ').trim()) === name && !b.closest('[hidden]'));
 
 /** Fake device storage already holding `settings` (as the page would have saved them). */
 const storageWith = (settings) => createFakeStorage({ [SETTINGS_KEY]: JSON.stringify(settings) });
@@ -49,18 +58,46 @@ describe('School Clock page', () => {
     vi.useRealTimers();
   });
 
-  it('shows the Day Label, the current Period, its times, and a Readout of time left', () => {
+  it('shows the Day Label and date, the current Period as the heading, and a Readout of time left', () => {
     // Tue 2026-10-27 is an All Day.
     const real = fakeRealClock(new Date(2026, 9, 27, 10, 32, 0));
     app = start({ realNow: real.now });
 
-    const text = pageText();
-    expect(text).toContain('All Day');
-    expect(text).toContain('Period 3');
-    expect(text).toContain('10:30 AM – 11:15 AM');
-    expect(text).toContain('43:00 left');
-    expect(text).toContain('10:32:00 AM');
-    expect(text).not.toContain('Simulated time');
+    expect(dayText()).toBe('All Day · Tue, Oct 27');
+    expect(headingText()).toBe('Period 3');
+    expect(readoutTexts()).toEqual(['43:00 left']);
+    expect(pageText()).not.toContain('Simulated time');
+  });
+
+  it('opens the timer and the settings from the top bar, one at a time, and closes them again', () => {
+    app = start({ realNow: fakeRealClock(new Date(2026, 9, 27, 10, 32, 0)).now });
+    const panel = (name) => document.querySelector(`#clockApp section[aria-label="${name}"]`);
+    expect(panel('Timer').hidden).toBe(true);
+    expect(panel('Settings').hidden).toBe(true);
+
+    control('Timer').click();
+    expect(panel('Timer').hidden).toBe(false);
+    expect(control('Timer').getAttribute('aria-expanded')).toBe('true');
+    expect(control('Timer').getAttribute('aria-controls')).toBe(panel('Timer').id);
+
+    control('Settings').click();
+    expect(panel('Timer').hidden).toBe(true);
+    expect(control('Timer').getAttribute('aria-expanded')).toBe('false');
+    expect(panel('Settings').hidden).toBe(false);
+
+    control('Settings').click();
+    expect(panel('Settings').hidden).toBe(true);
+    expect(control('Settings').getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('has no plain time line duplicating a current-time Readout', () => {
+    const real = fakeRealClock(new Date(2026, 9, 27, 10, 32, 0));
+    app = start({ realNow: real.now });
+    expect(pageText()).not.toContain('10:32');
+    document.querySelector('#clockApp .clock-readout__face').click();
+    document.querySelector('#clockApp .clock-readout__face').click();
+    expect(readoutTexts()).toEqual(['10:32:00 AM now']);
+    expect(pageText().match(/10:32:00/g)).toHaveLength(1);
   });
 
   it('ticks every second, recomputing from the clock rather than counting ticks', () => {
@@ -80,71 +117,67 @@ describe('School Clock page', () => {
     const real = fakeRealClock(new Date(2026, 9, 27, 10, 27, 20));
     app = start({ realNow: real.now });
 
-    const text = pageText();
-    expect(text).toContain('Passing Period');
-    expect(text).toContain('2:40 left');
-    expect(text).toContain('Up next: Period 3 at 10:30 AM');
+    expect(headingText()).toBe('Passing Period');
+    expect(readoutTexts()).toEqual(['2:40 until Period 3']);
+    expect(displayText()).toContain('Up next Period 3 10:30 AM');
   });
 
-  it('says it is after school, and for how long', () => {
+  it('says it is after school, for how long, and when the Next School Day starts', () => {
     const real = fakeRealClock(new Date(2026, 9, 27, 16, 0, 0));
     app = start({ realNow: real.now });
 
-    const text = pageText();
-    expect(text).toContain('All Day');
-    expect(text).toContain('After school');
-    expect(text).toContain('School ended at 3:10 PM');
-    expect(text).not.toContain('left');
+    expect(dayText()).toBe('All Day · Tue, Oct 27');
+    expect(headingText()).toBe('After school');
+    expect(readoutTexts()).toEqual(['50:00 since school ended']);
+    expect(displayText()).toContain('Next: Wed, Oct 28 · Even Day · starts in 16h 30m');
   });
 
   it('says it is before school, and when the first Segment starts', () => {
     const real = fakeRealClock(new Date(2026, 9, 27, 8, 0, 0));
     app = start({ realNow: real.now });
 
-    const text = pageText();
-    expect(text).toContain('Before school');
-    expect(text).toContain('Up next: Period 1 at 8:30 AM');
-    expect(text).toContain('30:00 until school starts');
+    expect(headingText()).toBe('Before school');
+    expect(displayText()).toContain('Up next Period 1 8:30 AM');
+    expect(readoutTexts()).toEqual(['30:00 until school starts']);
   });
 
-  it('labels a weekend', () => {
+  it('labels a weekend, and says when school is back', () => {
     const real = fakeRealClock(new Date(2026, 9, 31, 10, 0, 0));
     app = start({ realNow: real.now });
-    expect(pageText()).toContain('Weekend');
+    expect(headingText()).toBe('Weekend');
+    expect(dayText()).toBe('Sat, Oct 31');
+    expect(displayText()).toContain('Back Mon, Nov 2 · All Day');
   });
 
-  it('on a day off, names it, says when the Next School Day starts, and how long since school ended', () => {
+  it('on a day off, names it, counts down to the Next School Day, and can count since school ended', () => {
     // Wed 11/25/26, Thanksgiving Break. School ended Thu 11/19 at 3:10 PM
     // (Fri 11/20 was In-Service); it's back Mon 11/30 at 8:30 AM.
     const real = fakeRealClock(new Date(2026, 10, 25, 10, 0, 0));
     app = start({ realNow: real.now });
 
-    const text = pageText();
-    expect(text).toContain('Thanksgiving Break');
-    expect(text).toContain('Next school day: Mon, Nov 30 at 8:30 AM · starts in 4d 22h');
-    expect(text).toContain('5d 18h since school ended');
+    expect(headingText()).toBe('Thanksgiving Break');
+    expect(dayText()).toBe('Wed, Nov 25');
+    expect(readoutTexts()).toEqual(['4d 22h until Mon, Nov 30']);
+    expect(displayText()).toContain('Back Mon, Nov 30 · All Day');
+    document.querySelector('#clockApp .clock-readout__face').click();
+    expect(readoutTexts()).toEqual(['5d 18h since school ended']);
   });
 
-  it('after school, says when the Next School Day starts', () => {
-    const real = fakeRealClock(new Date(2026, 9, 27, 16, 0, 0));
-    app = start({ realNow: real.now });
-    expect(pageText()).toContain('Next school day: Wed, Oct 28 at 8:30 AM · starts in 16:30:00');
-  });
-
-  it('before school, says how long since the last School Day ended', () => {
+  it('before school, a Readout can count since the last School Day ended', () => {
     const real = fakeRealClock(new Date(2026, 9, 27, 8, 0, 0));
     app = start({ realNow: real.now });
+    document.querySelector('#clockApp .clock-readout__face').click();
     // Since Mon 10/26 at 3:10 PM.
-    expect(pageText()).toContain('16:50:00 since school ended');
+    expect(readoutTexts()).toEqual(['16:50:00 since school ended']);
   });
 
   it('names HS Experience Week and points past it', () => {
     // Wed 1/20/27; HS is back Mon 1/25/27.
     const real = fakeRealClock(new Date(2027, 0, 20, 10, 0, 0));
     app = start({ realNow: real.now });
-    const text = pageText();
-    expect(text).toContain('HS Experience Week');
-    expect(text).toContain('Next school day: Mon, Jan 25 at 8:30 AM ·');
+    expect(headingText()).toBe('HS Experience Week');
+    expect(dayText()).toBe('Wed, Jan 20');
+    expect(displayText()).toContain('Enjoy the trips · back Mon, Jan 25');
   });
 
   describe('Summer', () => {
@@ -153,17 +186,16 @@ describe('School Clock page', () => {
       const real = fakeRealClock(new Date(2027, 4, 28, 10, 0, 0));
       app = start({ realNow: real.now });
 
-      const text = pageText();
-      expect(text).toContain('Day 2 of Summer');
-      expect(text).not.toContain('First day');
-      expect(text).not.toContain('Next school day');
+      expect(headingText()).toBe('Day 2 of Summer');
+      expect(dayText()).toBe('Fri, May 28');
+      expect(displayText()).toContain('Have a great summer');
+      expect(displayText()).not.toContain('back');
     });
 
     it('is a plain clock with no next year: the Readout shows the time, never a dash', () => {
       const real = fakeRealClock(new Date(2027, 4, 28, 10, 0, 0));
       app = start({ realNow: real.now });
-      const readout = document.querySelector('#clockApp .clock-readout--big .clock-readout-value');
-      expect(readout.textContent).toBe('10:00:00 AM');
+      expect(readoutTexts()).toEqual(['10:00:00 AM now']);
       expect(pageText()).not.toContain('—');
     });
 
@@ -181,16 +213,21 @@ describe('School Clock page', () => {
       const real = fakeRealClock(new Date(2027, 4, 28, 10, 0, 0));
       app = start({ realNow: real.now, schoolYears: [...SCHOOL_YEARS, nextYear] });
 
-      const text = pageText();
-      expect(text).toContain('Day 2 of Summer');
-      expect(text).toContain('First day: Mon, Aug 16 at 8:30 AM · starts in 79d 22h');
+      expect(headingText()).toBe('Day 2 of Summer');
+      expect(readoutTexts()).toEqual(['79d 22h until Mon, Aug 16']);
+      expect(displayText()).toContain('Have a great summer · back Mon, Aug 16');
     });
   });
 
-  it('just tells the time on a date outside every School Year', () => {
+  it('just tells the time on a date outside every School Year, and says why', () => {
     const real = fakeRealClock(new Date(2030, 0, 1, 9, 0, 0));
     app = start({ realNow: real.now });
-    expect(displayText()).toBe('9:00:00 AM');
+    expect(headingText()).toBe('Tue, Jan 1, 2030');
+    expect(readoutTexts()).toEqual(['9:00:00 AM now']);
+    expect(displayText()).toContain('No school calendar for this date yet');
+    // Nothing to cycle or arrange: the time is all there is.
+    expect(control('Readouts')).toBeUndefined();
+    expect(document.querySelector('#clockApp button.clock-readout__face')).toBeNull();
   });
 
   describe('simulated time', () => {
@@ -198,12 +235,13 @@ describe('School Clock page', () => {
       const real = fakeRealClock(new Date(2026, 9, 28, 20, 0, 0));
       app = start({ realNow: real.now, search: '?at=2026-10-27T10:32' });
 
-      expect(pageText()).toContain('Simulated time: Tue, Oct 27, 2026, 10:32:00 AM');
-      expect(pageText()).toContain('Period 3');
+      const banner = () => document.querySelector('#clockApp .clock-banner').textContent.trim();
+      expect(banner()).toBe('Simulated time · Tue, Oct 27, 10:32:00 AM · this tab only');
+      expect(headingText()).toBe('Period 3');
       expect(pageText()).toContain('43:00 left');
 
       real.advance(1000);
-      expect(pageText()).toContain('Simulated time: Tue, Oct 27, 2026, 10:32:01 AM');
+      expect(banner()).toBe('Simulated time · Tue, Oct 27, 10:32:01 AM · this tab only');
       expect(pageText()).toContain('42:59 left');
     });
 
@@ -212,7 +250,7 @@ describe('School Clock page', () => {
       app = start({ realNow: real.now, search: '?at=2026-10-27T10:32&speed=60' });
 
       real.advance(3000);
-      expect(pageText()).toContain('10:35:00 AM');
+      expect(pageText()).toContain('10:35:00 AM · this tab only');
       expect(pageText()).toContain('40:00 left');
     });
 
@@ -374,7 +412,7 @@ describe('School Clock page', () => {
   });
 
   describe('saved device settings', () => {
-    const button = (name) => [...document.querySelectorAll('#clockApp button')].find((b) => b.textContent === name);
+    const button = (name) => [...document.querySelectorAll('#clockApp button')].find((b) => b.textContent.trim() === name);
     const divisionSelect = () => document.querySelector('#clockApp select');
     const labelInput = (period) =>
       [...document.querySelectorAll('#clockApp label')].find((l) => l.textContent.startsWith(`${period} label`))
@@ -392,10 +430,10 @@ describe('School Clock page', () => {
         app = initClockApp({ realNow: real.now, storage: createFakeStorage() });
 
         expect(isShown(button('Middle School'))).toBe(true);
-        expect(isShown(divisionSelect())).toBe(false);
-        expect(displayText()).toBe('10:30:00 AM');
+        expect(control('Settings')).toBeUndefined();
+        expect(readoutTexts()).toEqual(['10:30:00 AM now']);
         real.advance(1000);
-        expect(displayText()).toBe('10:30:01 AM');
+        expect(readoutTexts()).toEqual(['10:30:01 AM now']);
       });
 
       it('saves the chosen Division and follows its Bell Schedules', () => {
@@ -405,7 +443,7 @@ describe('School Clock page', () => {
         button('Middle School').click();
 
         expect(isShown(button('Middle School'))).toBe(false);
-        expect(displayText()).toContain('Period 4');
+        expect(headingText()).toBe('Period 4');
         expect(divisionSelect().value).toBe('MS');
         expect(saved(storage).division).toBe('MS');
       });
@@ -413,7 +451,7 @@ describe('School Clock page', () => {
       it('is not asked again once a Division is saved', () => {
         app = start({ realNow: evenDay().now });
         expect(isShown(button('Middle School'))).toBe(false);
-        expect(displayText()).toContain('Chapel');
+        expect(headingText()).toBe('Chapel');
       });
 
       it.each([
@@ -433,31 +471,39 @@ describe('School Clock page', () => {
       divisionSelect().value = 'MS';
       divisionSelect().dispatchEvent(new Event('change'));
 
-      expect(displayText()).toContain('Period 4');
-      expect(displayText()).toContain('10:15 AM – 11:40 AM');
+      // MS Period 4 runs 10:15–11:40.
+      expect(headingText()).toBe('Period 4');
+      expect(readoutTexts()).toEqual(['1:10:00 left']);
       expect(saved(storage).division).toBe('MS');
     });
 
-    it('shows the current Division next to the current Segment name', () => {
+    it('shows the current Division on a chip at the end of the top bar, which opens Settings at the Division', () => {
       const real = fakeRealClock(new Date(2026, 9, 27, 10, 32, 0));
-      app = start({ realNow: real.now, settings: { periodLabels: { 'Period 3': 'AP CSA' } } });
-      expect(document.querySelector('#clockApp .clock-display h2').textContent).toBe('Period 3 · AP CSA · HS');
+      app = start({ realNow: real.now });
+      const chip = control('Division: HS, switch Division');
+      // "HS" shows; the rest is for screen readers.
+      expect(chip.textContent).toBe('Division: HS, switch Division');
+      expect([...chip.querySelectorAll('.visually-hidden')].map((n) => n.textContent)).toEqual(['Division: ', ', switch Division']);
+      expect(isShown(divisionSelect())).toBe(false);
 
+      chip.click();
+      expect(isShown(divisionSelect())).toBe(true);
+      expect(document.activeElement).toBe(divisionSelect());
       divisionSelect().value = 'MS';
       divisionSelect().dispatchEvent(new Event('change'));
-      expect(document.querySelector('#clockApp .clock-display h2').textContent).toBe('Period 3 · AP CSA · MS');
+      expect(control('Division: MS, switch Division')).toBeDefined();
     });
 
     it("follows the Division's Calendar Exceptions (HS Experience Week, MS All Day)", () => {
       // Wed 1/20/27.
       const real = fakeRealClock(new Date(2027, 0, 20, 10, 32, 0));
       app = start({ realNow: real.now, settings: { division: 'MS' } });
-      expect(displayText()).toContain('All Day');
-      expect(displayText()).toContain('Period 3');
+      expect(dayText()).toBe('All Day · Wed, Jan 20');
+      expect(headingText()).toBe('Period 3');
 
       divisionSelect().value = 'HS';
       divisionSelect().dispatchEvent(new Event('change'));
-      expect(displayText()).toContain('HS Experience Week');
+      expect(headingText()).toBe('HS Experience Week');
       expect(displayText()).not.toContain('Period 3');
     });
 
@@ -472,8 +518,8 @@ describe('School Clock page', () => {
         const real = fakeRealClock(new Date(2026, 9, 27, 10, 32, 0));
         app = start({ realNow: real.now, settings: { periodLabels: { 'Period 3': 'AP CSA' }, alarms: [walk] } });
 
-        const text = displayText();
-        expect(text).toContain('Period 3 · AP CSA');
+        expect(headingText()).toBe('Period 3 · AP CSA');
+        const text = pageText();
         expect(text).toContain('11:10 AM · Period Alarm · Period 3 · AP CSA, 5 min before the end · Buzzer');
         expect(text).toContain('11:15 AM · Bell · Period 3 · AP CSA ends · School bell');
         expect(labelInput('Period 3').value).toBe('AP CSA');
@@ -487,7 +533,7 @@ describe('School Clock page', () => {
         labelInput('Period 3').value = 'AP CSA';
         labelInput('Period 3').dispatchEvent(new Event('input'));
 
-        expect(displayText()).toContain('Up next: Period 3 · AP CSA at 10:30 AM');
+        expect(displayText()).toContain('Up next Period 3 · AP CSA 10:30 AM');
         expect(saved(storage).periodLabels).toEqual({ 'Period 3': 'AP CSA' });
       });
 
@@ -506,39 +552,39 @@ describe('School Clock page', () => {
         // Tue 10/27/26 13:45, All Day Period 6 (13:35–14:20).
         app = initClockApp({ realNow: fakeRealClock(new Date(2026, 9, 27, 13, 45, 0)).now, storage });
         expect(use24HourBox().checked).toBe(false);
-        expect(displayText()).toContain('1:45:00 PM');
+        const face = document.querySelector('#clockApp .clock-readout__face');
+        face.click();
+        face.click();
+        expect(readoutTexts()).toEqual(['1:45:00 PM now']);
 
         use24HourBox().checked = true;
         use24HourBox().dispatchEvent(new Event('change'));
 
-        const text = displayText();
-        expect(text).toContain('13:45:00');
-        expect(text).toMatch(/\d\d:\d\d – \d\d:\d\d/);
-        expect(text).not.toMatch(/AM|PM/);
-        expect(text).toContain('left'); // durations unchanged
+        expect(readoutTexts()).toEqual(['13:45:00 now']);
+        expect(displayText()).not.toMatch(/AM|PM/);
         expect(saved(storage).use24Hour).toBe(true);
       });
 
-      it('shows "starts at" and the next rings in 24-hour form when saved on', () => {
-        // Tue 10/27/26 16:00, after school.
-        const real = fakeRealClock(new Date(2026, 9, 27, 16, 0, 0));
+      it('shows up next in 24-hour form when saved on, leaving durations alone', () => {
+        // Tue 10/27/26 8:00, before school.
+        const real = fakeRealClock(new Date(2026, 9, 27, 8, 0, 0));
         app = start({ realNow: real.now, settings: { use24Hour: true } });
         expect(use24HourBox().checked).toBe(true);
-        expect(displayText()).toContain('School ended at 15:10');
-        expect(displayText()).toContain('Next school day: Wed, Oct 28 at 08:30 · starts in 16:30:00');
+        expect(displayText()).toContain('Up next Period 1 08:30');
+        expect(readoutTexts()).toEqual(['30:00 until school starts']);
       });
 
       it('shows the next rings in 24-hour form', () => {
         const real = fakeRealClock(new Date(2026, 9, 27, 15, 9, 0));
         app = start({ realNow: real.now, settings: { use24Hour: true } });
-        expect(displayText()).toContain('15:10 · Bell · Period 7 ends · School bell');
+        expect(pageText()).toContain('15:10 · Bell · Period 7 ends · School bell');
       });
     });
 
     it('uses saved Bells and their sound', () => {
       const real = fakeRealClock(new Date(2026, 9, 27, 15, 9, 0));
       app = start({ realNow: real.now, settings: { bells: { on: true, sound: 'chime' } } });
-      expect(displayText()).toContain('3:10 PM · Bell · Period 7 ends · Chime');
+      expect(pageText()).toContain('3:10 PM · Bell · Period 7 ends · Chime');
     });
 
     it('never listens for other tabs changing storage', () => {
@@ -550,11 +596,16 @@ describe('School Clock page', () => {
   });
 
   describe('Readouts', () => {
-    const readouts = () => [...document.querySelectorAll('#clockApp .clock-readout-value')].map((b) => b.textContent);
-    const tapReadout = (i) => document.querySelectorAll('#clockApp .clock-readout-value')[i].click();
+    const readouts = readoutTexts;
+    const faces = () => [...document.querySelectorAll('#clockApp .clock-readout__face')];
+    const tapReadout = (i) => faces()[i].click();
     const removeButtons = () => [...document.querySelectorAll('#clockApp button')]
-      .filter((b) => b.getAttribute('aria-label') === 'Remove Readout');
-    const addButton = () => [...document.querySelectorAll('#clockApp button')].find((b) => b.textContent === 'Add Readout');
+      .filter((b) => b.textContent.replace(/\s+/g, ' ').trim().startsWith('Remove Readout') && !b.closest('[hidden]'));
+    const addButton = () => control('Add Readout');
+    const readoutsControl = () => control('Readouts') ?? control('Done');
+    const editNote = () => document.querySelector('#clockApp .clock-edit-note');
+    const isEditing = () => readoutsControl().getAttribute('aria-pressed') === 'true';
+    const pressKey = (key) => document.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
     // Tue 10/27/26 10:32, All Day Period 3 (10:30–11:15).
     const inPeriod3 = () => fakeRealClock(new Date(2026, 9, 27, 10, 32, 0));
 
@@ -570,62 +621,194 @@ describe('School Clock page', () => {
       };
     }
 
-    it('cycles a Readout on each tap: time left, time elapsed, current time, and back', () => {
+    it('cycles a Readout on each tap: time left, time since it started, current time, and back', () => {
       app = start({ realNow: inPeriod3().now });
       expect(readouts()).toEqual(['43:00 left']);
       tapReadout(0);
-      expect(readouts()).toEqual(['2:00 elapsed']);
+      expect(readouts()).toEqual(['2:00 since start']);
       tapReadout(0);
-      expect(readouts()).toEqual(['10:32:00 AM']);
+      expect(readouts()).toEqual(['10:32:00 AM now']);
       tapReadout(0);
       expect(readouts()).toEqual(['43:00 left']);
     });
 
-    it('marks the first Readout as the big one', () => {
+    it('each Readout is a button, so a tap, a click or Enter cycles it', () => {
       app = start({ realNow: inPeriod3().now });
-      addButton().click();
-      const shown = document.querySelectorAll('#clockApp .clock-readout');
-      expect(shown[0].classList.contains('clock-readout--big')).toBe(true);
-      expect(shown[1].classList.contains('clock-readout--big')).toBe(false);
+      expect(faces()[0].tagName).toBe('BUTTON');
+      expect(faces()[0].type).toBe('button');
     });
 
-    it('adds Readouts that each switch on their own, and removes them down to one', () => {
+    it('keeps focus on a Readout as it cycles and ticks', () => {
+      const real = inPeriod3();
+      app = start({ realNow: real.now });
+      faces()[0].focus();
+      tapReadout(0);
+      real.advance(1000);
+      expect(document.activeElement).toBe(faces()[0]);
+    });
+
+    it('splits the value from its caption, and sets letters small for the size rule', () => {
       app = start({ realNow: inPeriod3().now });
-      expect(removeButtons()).toHaveLength(0);
+      tapReadout(0);
+      tapReadout(0);
+      const value = document.querySelector('#clockApp .clock-readout--big .clock-readout__value');
+      expect(value.textContent).toBe('10:32:00 AM');
+      expect([...value.querySelectorAll('.clock-unit')].map((u) => u.textContent)).toEqual([' AM']);
+      expect(value.style.getPropertyValue('--d')).toBe('6');
+      expect(value.style.getPropertyValue('--c')).toBe('2');
+      expect(value.style.getPropertyValue('--u')).toBe('2');
+      expect(document.querySelector('#clockApp .clock-readout--big .clock-readout__caption').textContent).toBe('now');
+    });
 
-      addButton().click();
-      addButton().click();
-      tapReadout(1);
-      tapReadout(2);
-      tapReadout(2);
-      expect(readouts()).toEqual(['43:00 left', '2:00 elapsed', '10:32:00 AM']);
-      expect(removeButtons()).toHaveLength(3);
+    describe('edit mode (adding and removing)', () => {
+      it('is off at first: no Remove or Add buttons until the Readouts control is pressed', () => {
+        app = start({ realNow: inPeriod3().now });
+        expect(isEditing()).toBe(false);
+        expect(readoutsControl().textContent.trim()).toBe('Readouts');
+        expect(addButton()).toBeUndefined();
+        expect(editNote().hidden).toBe(true);
 
-      removeButtons()[0].click();
-      expect(readouts()).toEqual(['2:00 elapsed', '10:32:00 AM']);
-      removeButtons()[1].click();
-      expect(readouts()).toEqual(['2:00 elapsed']);
-      expect(removeButtons()).toHaveLength(0);
+        readoutsControl().click();
+        expect(isEditing()).toBe(true);
+        expect(readoutsControl().textContent.trim()).toBe('Done');
+        expect(addButton()).toBeDefined();
+        expect(editNote().hidden).toBe(false);
+        expect(editNote().textContent).toBe('Tap a Readout to change what it shows');
+        // One Readout can't be removed.
+        expect(removeButtons()).toHaveLength(0);
+
+        readoutsControl().click();
+        expect(isEditing()).toBe(false);
+        expect(addButton()).toBeUndefined();
+      });
+
+      it('adds Readouts in the modes not shown yet, up to three, then the Add slot goes', () => {
+        app = start({ realNow: inPeriod3().now });
+        readoutsControl().click();
+        addButton().click();
+        expect(readouts()).toEqual(['43:00 left', '2:00 since start']);
+        addButton().click();
+        expect(readouts()).toEqual(['43:00 left', '2:00 since start', '10:32:00 AM now']);
+        expect(addButton()).toBeUndefined();
+      });
+
+      it('moves focus to a newly added Readout', () => {
+        app = start({ realNow: inPeriod3().now });
+        readoutsControl().click();
+        addButton().click();
+        expect(document.activeElement).toBe(faces()[1]);
+      });
+
+      it('marks the first Readout as the big one and puts the rest beside or below it', () => {
+        app = start({ realNow: inPeriod3().now });
+        readoutsControl().click();
+        addButton().click();
+        const shown = document.querySelectorAll('#clockApp .clock-readout');
+        expect(shown[0].classList.contains('clock-readout--big')).toBe(true);
+        expect(shown[1].classList.contains('clock-readout--big')).toBe(false);
+        expect(shown[1].closest('.clock-smalls')).not.toBeNull();
+        expect(document.querySelector('#clockApp .clock-readouts').classList.contains('has-smalls')).toBe(true);
+      });
+
+      it('names each Remove button by the Readout it removes', () => {
+        app = start({ realNow: inPeriod3().now });
+        readoutsControl().click();
+        addButton().click();
+        expect(removeButtons().map((b) => b.textContent.replace(/\s+/g, ' ').trim()))
+          .toEqual(['Remove Readout: left', 'Remove Readout: since start']);
+      });
+
+      it('removes Readouts down to one (removing the big one promotes the next), moving focus on', () => {
+        app = start({ realNow: inPeriod3().now });
+        readoutsControl().click();
+        addButton().click();
+        addButton().click();
+        expect(removeButtons()).toHaveLength(3);
+
+        removeButtons()[0].click();
+        expect(readouts()).toEqual(['2:00 since start', '10:32:00 AM now']);
+        expect(document.activeElement).toBe(removeButtons()[0]);
+        expect(document.querySelector('#clockApp .clock-readout--big').textContent).toContain('since start');
+
+        removeButtons()[1].click();
+        expect(readouts()).toEqual(['2:00 since start']);
+        expect(removeButtons()).toHaveLength(0);
+        expect(document.activeElement).toBe(readoutsControl());
+      });
+
+      it('moves focus to the last Remove button when the last Readout is removed', () => {
+        app = start({ realNow: inPeriod3().now });
+        readoutsControl().click();
+        addButton().click();
+        addButton().click();
+        removeButtons()[2].click();
+        expect(document.activeElement).toBe(removeButtons()[1]);
+      });
+
+      it('still cycles a Readout on tap while editing', () => {
+        app = start({ realNow: inPeriod3().now });
+        readoutsControl().click();
+        tapReadout(0);
+        expect(readouts()).toEqual(['2:00 since start']);
+        expect(isEditing()).toBe(true);
+      });
+
+      it('Escape leaves edit mode and returns focus to the Readouts control', () => {
+        app = start({ realNow: inPeriod3().now });
+        readoutsControl().click();
+        addButton().focus();
+        pressKey('Escape');
+        expect(isEditing()).toBe(false);
+        expect(document.activeElement).toBe(readoutsControl());
+        pressKey('Escape'); // nothing to leave
+        expect(isEditing()).toBe(false);
+      });
+
+      it('ignores other keys', () => {
+        app = start({ realNow: inPeriod3().now });
+        readoutsControl().click();
+        pressKey('Enter');
+        expect(isEditing()).toBe(true);
+      });
+
+      it('is not saved: a reload is out of edit mode', () => {
+        const { newTab } = device();
+        const tab = newTab().open(inPeriod3().now);
+        readoutsControl().click();
+        app.destroy();
+        tab.open(inPeriod3().now);
+        expect(isEditing()).toBe(false);
+      });
+
+      it('stops listening for Escape once destroyed', () => {
+        app = start({ realNow: inPeriod3().now });
+        readoutsControl().click();
+        const control = readoutsControl();
+        app.destroy();
+        app = null;
+        pressKey('Escape');
+        expect(control.getAttribute('aria-pressed')).toBe('true');
+      });
     });
 
     it('keeps ticking each Readout', () => {
       const real = inPeriod3();
       app = start({ realNow: real.now });
+      readoutsControl().click();
       addButton().click();
-      tapReadout(1);
       real.advance(1000);
-      expect(readouts()).toEqual(['42:59 left', '2:01 elapsed']);
+      expect(readouts()).toEqual(['42:59 left', '2:01 since start']);
     });
 
     it('keeps its place in the cycle as school ends', () => {
       // Period 7 is 14:25–15:10.
       const real = fakeRealClock(new Date(2026, 9, 27, 15, 9, 58));
       app = start({ realNow: real.now });
+      readoutsControl().click();
       addButton().click();
-      tapReadout(1);
-      expect(readouts()).toEqual(['0:02 left', '44:58 elapsed']);
+      expect(readouts()).toEqual(['0:02 left', '44:58 since start']);
       real.advance(3000);
-      expect(readouts()).toEqual(['17:19:59 until next school day', '0:01 since school ended']);
+      expect(readouts()).toEqual(['17:19:59 until Wed, Oct 28', '0:01 since school ended']);
     });
 
     it('starts in the default for the moment: since school ended, after school', () => {
@@ -633,13 +816,14 @@ describe('School Clock page', () => {
       expect(readouts()).toEqual(['50:00 since school ended']);
     });
 
-    it('shows no Readouts before a Division is chosen, or on a date outside every School Year', () => {
+    it('shows just the time, with nothing to arrange, before a Division is chosen or on a date outside every School Year', () => {
       app = initClockApp({ realNow: inPeriod3().now, storage: createFakeStorage(), tabStorage: createFakeStorage() });
-      expect(readouts()).toEqual([]);
-      expect(addButton()).toBeUndefined();
+      expect(readouts()).toEqual(['10:32:00 AM now']);
+      expect(control('Readouts')).toBeUndefined();
       app.destroy();
       app = start({ realNow: fakeRealClock(new Date(2030, 0, 1, 9, 0, 0)).now });
-      expect(readouts()).toEqual([]);
+      expect(readouts()).toEqual(['9:00:00 AM now']);
+      expect(control('Readouts')).toBeUndefined();
     });
 
     it('keeps a layout per tab: two tabs differ, reloads restore their own, and a new tab starts from the last changed', () => {
@@ -651,22 +835,23 @@ describe('School Clock page', () => {
       app.destroy();
 
       const tabB = newTab().open(now);
-      expect(readouts()).toEqual(['2:00 elapsed']); // starts from A's, the last used
-      addButton().click(); // B: elapsed + left
+      expect(readouts()).toEqual(['2:00 since start']); // starts from A's, the last used
+      readoutsControl().click();
+      addButton().click(); // B: since start + left
       tapReadout(1);
-      tapReadout(1); // B: elapsed + current time
+      tapReadout(1); // B: since start + current time
       app.destroy();
 
       tabA.open(now); // reloading A: its own layout, untouched by B
-      expect(readouts()).toEqual(['2:00 elapsed']);
+      expect(readouts()).toEqual(['2:00 since start']);
       app.destroy();
 
       tabB.open(now);
-      expect(readouts()).toEqual(['2:00 elapsed', '10:32:00 AM']);
+      expect(readouts()).toEqual(['2:00 since start', '10:32:00 AM now']);
       app.destroy();
 
       newTab().open(now); // a third tab: B changed last
-      expect(readouts()).toEqual(['2:00 elapsed', '10:32:00 AM']);
+      expect(readouts()).toEqual(['2:00 since start', '10:32:00 AM now']);
     });
 
     it('a tab keeps the layout it opened with through a reload, even after another tab changes', () => {

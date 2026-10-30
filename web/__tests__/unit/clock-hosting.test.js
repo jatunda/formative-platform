@@ -62,11 +62,23 @@ describe('School Clock hosting', () => {
     });
   });
 
-  it('shows only the clock (and what is ringing) in fullscreen, on a page-coloured background', () => {
+  it('keeps the page background in fullscreen', () => {
     const css = readFileSync(resolve(clockDir, 'clock.css'), 'utf8');
-    expect(css).toMatch(/#clockApp:fullscreen\s*>\s*:not\(\.clock-display,\s*\[aria-label="Ringing"\]\)\s*\{\s*display:\s*none/);
     // Without a background a fullscreen element shows the black backdrop through it.
-    expect(css).toMatch(/:where\(#clockApp\):fullscreen\s*\{[^}]*background:\s*Canvas/);
+    expect(css).toMatch(/#clockApp:fullscreen\s*\{[^}]*background:\s*var\(--bg\)/);
+  });
+
+  it('styles the page from the design tokens, loaded before the components, with the default theme on <html>', () => {
+    const html = readFileSync(resolve(clockDir, 'index.html'), 'utf8');
+    const tokens = html.indexOf('<link rel="stylesheet" href="/clock/tokens.css" />');
+    expect(tokens).toBeGreaterThan(-1);
+    expect(tokens).toBeLessThan(html.indexOf('/clock/clock.css'));
+    expect(html).toMatch(/<html lang="en" data-mode="dark">/);
+    const css = readFileSync(resolve(clockDir, 'tokens.css'), 'utf8');
+    expect(css).toContain('--bg: #1e2836;');
+    // The components name no colour of their own: every colour is a token.
+    const components = readFileSync(resolve(clockDir, 'clock.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+    expect(components).not.toMatch(/#[0-9a-f]{3,8}\b|rgb\(/i);
   });
 
   it('ships no audio files: every sound is generated in the browser', () => {

@@ -3,6 +3,7 @@
 // current Segment, up next and what's ringing. The page works out the words;
 // this shows them while the window is open.
 import { el } from './dom.js';
+import { icon } from './icons.js';
 
 /** The mini player's starting size (the user can resize it). */
 const MINI_PLAYER_SIZE = { width: 320, height: 200 };
@@ -24,8 +25,12 @@ export function createMiniPlayer({ pictureInPicture, onOpen, onDismiss }) {
     type: 'button', hidden: !pictureInPicture,
     onclick: () => (mini ? close() : open()),
   });
+  // Icon-only, named by its aria-label and a matching tooltip.
+  button.append(icon('pip'));
   function showState() {
-    button.textContent = mini ? 'Close mini player' : 'Mini player';
+    const name = mini ? 'Close mini player' : 'Mini player';
+    button.setAttribute('aria-label', name);
+    button.title = name;
   }
   showState();
 
@@ -38,11 +43,13 @@ export function createMiniPlayer({ pictureInPicture, onOpen, onDismiss }) {
     }
     const doc = win.document;
     doc.title = 'School Clock';
-    const stylesheet = doc.createElement('link');
-    stylesheet.rel = 'stylesheet';
-    stylesheet.href = '/clock/clock.css';
-    doc.head.append(stylesheet);
-    const parts = {
+    // The page's tokens then its components, so the window follows the theme.
+    for (const href of ['/clock/tokens.css', '/clock/clock.css']) {
+      const stylesheet = doc.createElement('link');
+      stylesheet.rel = 'stylesheet';
+      stylesheet.href = href;
+      doc.head.append(stylesheet);
+    }    const parts = {
       win,
       readout: el('p', { className: 'clock-mini-readout' }),
       status: el('p'),

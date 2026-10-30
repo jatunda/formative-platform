@@ -9,10 +9,11 @@ import { createFakePictureInPicture } from '../helpers/fake-screen.js';
 const SEC = 1000;
 const MIN = 60 * SEC;
 const mount = () => document.getElementById('clockApp');
-const displayText = () => mount().querySelector('.clock-display').textContent.replace(/\s+/g, ' ');
+const displayText = () => mount().querySelector('.clock-stage').textContent.replace(/\s+/g, ' ');
 const isShown = (node) => !node.closest('[hidden]');
-const button = (name, root = mount()) =>
-  [...root.querySelectorAll('button')].find((b) => b.textContent === name && isShown(b));
+/** A visible button by its accessible name (its aria-label, else its text). */
+const button = (name, root = mount()) => [...root.querySelectorAll('button')]
+  .find((b) => (b.getAttribute('aria-label') ?? b.textContent.replace(/\s+/g, ' ').trim()) === name && isShown(b));
 const checkbox = (name) =>
   [...mount().querySelectorAll('label')].find((l) => l.textContent.trim() === name).querySelector('input');
 const toggle = (name) => {
@@ -21,10 +22,15 @@ const toggle = (name) => {
   box.dispatchEvent(new Event('change'));
 };
 const readouts = () => [...mount().querySelectorAll('.clock-readout')].map((r) => ({
-  text: r.querySelector('.clock-readout-value').textContent,
+  text: r.querySelector('.clock-readout__face').textContent.replace(/\s+/g, ' ').trim(),
   big: r.classList.contains('clock-readout--big'),
 }));
-const timerSection = () => mount().querySelector('[aria-label="Timer"]');
+/** The timer panel, opened from the top bar's Timer control if it isn't open yet. */
+const timerSection = () => {
+  const section = mount().querySelector('[aria-label="Timer"]');
+  if (section.hidden) button('Timer').click();
+  return section;
+};
 const saved = (storage) => JSON.parse(storage.getItem(SETTINGS_KEY));
 const settle = async () => { for (let i = 0; i < 5; i += 1) await Promise.resolve(); };
 
@@ -71,15 +77,16 @@ describe('School Clock display preferences', () => {
     it('are on by default; turning them off drops them from the time and the countdowns, saved', () => {
       open({ when: at(10, 32, 30) });
       expect(checkbox('Show seconds').checked).toBe(true);
-      expect(displayText()).toContain('10:32:30 AM');
       expect(readouts()[0].text).toBe('42:30 left');
+      button('Readouts').click();
+      button('Add Readout').click();
+      mount().querySelectorAll('.clock-readout__face')[1].click();
+      expect(readouts()[1].text).toBe('10:32:30 AM now');
 
       toggle('Show seconds');
       expect(saved(storage).showSeconds).toBe(false);
-      expect(displayText()).toContain('10:32 AM');
+      expect(readouts().map((r) => r.text)).toEqual(['42 min left', '10:32 AM now']);
       expect(displayText()).not.toContain('10:32:30');
-      expect(readouts()[0].text).toBe('42 min left');
-      expect(displayText()).toContain('10:30 AM – 11:15 AM');
     });
 
     it('stay off through a reload, and a countdown shows them again in its last minute', () => {
@@ -91,11 +98,16 @@ describe('School Clock display preferences', () => {
       expect(readouts()[0].text).toBe('0:55 left');
     });
 
-    it('when off, Off-Hours lines drop them too, but days and hours stay as they are', () => {
+    it('Off-Hours lines never show them; days and hours stay as they are', () => {
+      open({ when: at(16, 0, 0) });
+      expect(displayText()).toContain('starts in 16h 30m');
+    });
+
+    it('when off, Off-Hours Readouts drop them too, but days and hours stay as they are', () => {
       withSettings({ showSeconds: false });
       open({ when: at(16, 0, 0) });
       expect(displayText()).toContain('starts in 16h 30m');
-      expect(displayText()).toContain('50 min since school ended');
+      expect(readouts()[0].text).toBe('50 min since school ended');
       open({ when: new Date(2026, 9, 23, 16, 0).getTime() }); // Friday: back on Monday
       expect(displayText()).toContain('starts in 2d 16h');
     });
@@ -140,25 +152,26 @@ describe('School Clock display preferences', () => {
   describe('a running timer as the main Readout', () => {
     const big = (text) => ({ text, big: true });
     const small = (text) => ({ text, big: false });
-    const tapReadout = (i) => mount().querySelectorAll('button.clock-readout-value')[i].click();
+    const tapReadout = (i) => mount().querySelectorAll('button.clock-readout__face')[i].click();
     const savedLayouts = () => [tabStorage, storage].map((area) => area.getItem(LAYOUT_KEY));
     const ringing = () => mount().querySelector('[aria-label="Ringing"]');
 
     /** In Period 3, a layout of time left (big) and the current time. */
     function openWithTwoReadouts() {
       open({ when: at(10, 32, 30) });
+      button('Readouts').click();
       button('Add Readout').click();
+      button('Done').click();
       tapReadout(1);
-      tapReadout(1);
-      expect(readouts()).toEqual([big('42:30 left'), small('10:32:30 AM')]);
+      expect(readouts()).toEqual([big('42:30 left'), small('10:32:30 AM now')]);
     }
 
     it('takes the big spot while it runs, and the previous main Readout becomes a smaller one', () => {
       openWithTwoReadouts();
       button('5 min', timerSection()).click();
-      expect(readouts()).toEqual([big('5:00 left'), small('42:30 left'), small('10:32:30 AM')]);
+      expect(readouts()).toEqual([big('5:00 left'), small('42:30 left'), small('10:32:30 AM now')]);
       advance(SEC);
-      expect(readouts()).toEqual([big('4:59 left'), small('42:29 left'), small('10:32:31 AM')]);
+      expect(readouts()).toEqual([big('4:59 left'), small('42:29 left'), small('10:32:31 AM now')]);
     });
 
     it('always shows seconds, even with seconds off', () => {
@@ -174,7 +187,7 @@ describe('School Clock display preferences', () => {
       button('5 min', timerSection()).click();
       expect(savedLayouts()).toEqual(before);
       button('Cancel', timerSection()).click();
-      expect(readouts()).toEqual([big('42:30 left'), small('10:32:30 AM')]);
+      expect(readouts()).toEqual([big('42:30 left'), small('10:32:30 AM now')]);
       expect(savedLayouts()).toEqual(before);
     });
 
@@ -189,12 +202,13 @@ describe('School Clock display preferences', () => {
     it('the smaller Readouts still switch and go on their own, into the saved layout', () => {
       openWithTwoReadouts();
       button('5 min', timerSection()).click();
-      tapReadout(0); // the previous main one: time left -> time elapsed
-      expect(readouts()).toEqual([big('5:00 left'), small('2:30 elapsed'), small('10:32:30 AM')]);
-      mount().querySelectorAll('[aria-label="Remove Readout"]')[1].click();
-      expect(readouts()).toEqual([big('5:00 left'), small('2:30 elapsed')]);
+      tapReadout(0); // the previous main one: time left -> time since start
+      expect(readouts()).toEqual([big('5:00 left'), small('2:30 since start'), small('10:32:30 AM now')]);
+      button('Readouts').click();
+      button('Remove Readout: now').click();
+      expect(readouts()).toEqual([big('5:00 left'), small('2:30 since start')]);
       button('Cancel', timerSection()).click();
-      expect(readouts()).toEqual([big('2:30 elapsed')]);
+      expect(readouts()).toEqual([big('2:30 since start')]);
       expect(JSON.parse(tabStorage.getItem(LAYOUT_KEY))).toEqual({ readouts: [{ mode: 'countup' }] });
     });
 
@@ -203,9 +217,9 @@ describe('School Clock display preferences', () => {
       button('5 min', timerSection()).click();
       advance(MIN);
       open();
-      expect(readouts()).toEqual([big('4:00 left'), small('41:30 left'), small('10:33:30 AM')]);
+      expect(readouts()).toEqual([big('4:00 left'), small('41:30 left'), small('10:33:30 AM now')]);
       button('Cancel', timerSection()).click();
-      expect(readouts()).toEqual([big('41:30 left'), small('10:33:30 AM')]);
+      expect(readouts()).toEqual([big('41:30 left'), small('10:33:30 AM now')]);
     });
 
     it('stays in the main spot while it rings, until dismissed', () => {
@@ -213,9 +227,9 @@ describe('School Clock display preferences', () => {
       button('1 min', timerSection()).click();
       advance(MIN + SEC);
       expect(ringing().hidden).toBe(false);
-      expect(readouts()).toEqual([big("Time's up"), small('41:29 left'), small('10:33:31 AM')]);
+      expect(readouts()).toEqual([big("Time's up"), small('41:29 left'), small('10:33:31 AM now')]);
       button('Dismiss', ringing()).click();
-      expect(readouts()).toEqual([big('41:29 left'), small('10:33:31 AM')]);
+      expect(readouts()).toEqual([big('41:29 left'), small('10:33:31 AM now')]);
     });
 
     it('gives the spot back when it stops ringing on its own', () => {
@@ -224,7 +238,7 @@ describe('School Clock display preferences', () => {
       advance(MIN + SEC);
       advance(61 * SEC);
       expect(ringing().hidden).toBe(true);
-      expect(readouts()).toEqual([big('40:28 left'), small('10:34:32 AM')]);
+      expect(readouts()).toEqual([big('40:28 left'), small('10:34:32 AM now')]);
     });
 
     it('is what the mini player shows', async () => {

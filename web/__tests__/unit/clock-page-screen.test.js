@@ -7,9 +7,10 @@ import { createFakeFullscreen, createFakePictureInPicture, createFakeWakeLock } 
 
 const SEC = 1000;
 const mount = () => document.getElementById('clockApp');
-const button = (name, root = mount()) =>
-  [...root.querySelectorAll('button')].find((b) => b.textContent === name && !b.closest('[hidden]'));
-const bigReadout = () => mount().querySelector('.clock-readout--big .clock-readout-value').textContent;
+/** A visible button by its accessible name (its aria-label, else its text). */
+const button = (name, root = mount()) => [...root.querySelectorAll('button')]
+  .find((b) => (b.getAttribute('aria-label') ?? b.textContent.trim()) === name && !b.closest('[hidden]'));
+const bigReadout = () => mount().querySelector('.clock-readout--big .clock-readout__face').textContent.replace(/\s+/g, ' ').trim();
 const ringing = () => mount().querySelector('[aria-label="Ringing"]');
 /** Let the capability promises (fullscreen, wake lock, PiP) settle. */
 const settle = async () => { for (let i = 0; i < 5; i += 1) await Promise.resolve(); };
@@ -185,7 +186,7 @@ describe('School Clock fullscreen, mini player and feedback', () => {
       expect(bigReadout()).toBe('2:59 left');
       expect(miniText()).toContain('2:59 left');
 
-      mount().querySelector('.clock-readout--big .clock-readout-value').click();
+      mount().querySelector('.clock-readout--big .clock-readout__face').click();
       expect(miniText()).toContain(bigReadout());
       expect(miniText()).not.toContain('2:59 left');
 
@@ -289,10 +290,36 @@ describe('School Clock fullscreen, mini player and feedback', () => {
     });
   });
 
-  it('has a "Feedback? Email Eric" link to a new email with the subject filled in', () => {
+  describe('the window buttons, bottom right', () => {
+    it('are icon-only, each named by its aria-label and a matching tooltip', () => {
+      open();
+      for (const name of ['Mini player', 'Fullscreen']) {
+        const b = button(name);
+        expect(b.closest('[role="group"][aria-label="Window"]')).not.toBeNull();
+        expect(b.getAttribute('title')).toBe(name);
+        expect(b.textContent.trim()).toBe('');
+        expect(b.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
+      }
+    });
+
+    it('rename themselves while their window is open', async () => {
+      open();
+      button('Fullscreen').click();
+      await settle();
+      expect(button('Exit fullscreen').getAttribute('title')).toBe('Exit fullscreen');
+      button('Mini player').click();
+      await settle();
+      expect(button('Close mini player').getAttribute('title')).toBe('Close mini player');
+    });
+  });
+
+  it('has a "Feedback? Email Eric" link to a new email with the subject filled in, kept out of the projected view', () => {
     open();
     const link = [...mount().querySelectorAll('a')].find((a) => a.textContent === 'Feedback? Email Eric');
     expect(link.getAttribute('href')).toBe('mailto:erich@villagechristian.org?subject=Clock%20feedback');
+    expect(link.closest('[hidden]')).not.toBeNull();
+    button('Settings').click();
+    expect(link.closest('[hidden]')).toBeNull();
   });
 
   it("detects the browser's own capabilities when none are passed in (jsdom has none)", () => {

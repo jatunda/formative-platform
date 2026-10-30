@@ -1,0 +1,155 @@
+/* School Clock design tokens: the default theme ("Slate": dark muted blue,
+   clean sans) plus the scales every theme shares. Copied as is from the
+   design reference (.scratch/school-clock/mockups/final/tokens.css); keep the
+   two in step. Every colour, face, size and gap the clock
+   uses is one of these custom properties, and a theme (themes.css) only
+   overrides the colour and font tokens. See DESIGN.md for the rules.
+
+   Theme selection is attributes on <html>:
+     data-mode="dark" | "light"    (the palette's native mode, or the other when flipped; no auto)
+     data-palette="<id>"           (omit, or "slate", for the default colours)
+     data-font="<id>"              (omit, or "system", for the default faces)
+     data-deco="flowers"           (only themes with a decoration)
+   The same attributes on any element re-theme that element and its children,
+   which is how the theme picker draws its previews. */
+
+/* ---------- colour: default palette "slate" ---------- */
+
+:root,
+[data-palette="slate"] {
+  --bg: #1e2836;            /* page background: dark muted blue (site --bg-dark / --bg-primary) */
+  --surface: #273343;       /* drawer, dialogs, cards */
+  --surface-2: #303d50;     /* raised tiles inside a surface, hover */
+  --fg: #e2e8f0;            /* main text: light grey, slight blue tint (site --text-primary) */
+  --muted: #a3b1c4;         /* secondary text: labels, captions, times */
+  --line: #7d8da4;          /* control borders (3:1 against bg and both surfaces) */
+  --line-soft: #3a4759;     /* hairline dividers (decorative, no contrast rule) */
+  --accent: #57b3ff;        /* the one accent: progress, checked controls, timer ring (site --accent-blue-godot) */
+  --accent-text: #7cc4ff;   /* accent as text ("Up next", the timer digits) */
+  --on-accent: #0a1b2e;     /* text on an accent fill */
+  --focus: #ffd166;         /* focus ring; never the accent, so focus always reads */
+  --ring: #57b3ff;          /* ringing frame and ring card */
+  --on-ring: #0a1b2e;       /* text on the ring card */
+  --track: #3a4759;         /* empty part of progress bars and the timer ring */
+  --digits: #e2e8f0;        /* the big and small Readout digits */
+  --deco: #57b3ff;          /* decoration colours (only used with data-deco) */
+  --deco-2: #a3b1c4;
+}
+
+:root[data-mode="light"],
+[data-palette="slate"][data-mode="light"] {
+  --bg: #eef2f7;
+  --surface: #ffffff;
+  --surface-2: #e3e9f1;
+  --fg: #1a202c;
+  --muted: #4a5568;
+  --line: #718096;
+  --line-soft: #cfd8e3;
+  --accent: #1f6fd1;
+  --accent-text: #1a5fb4;
+  --on-accent: #ffffff;
+  --focus: #b45309;
+  --ring: #1f6fd1;
+  --on-ring: #ffffff;
+  --track: #cfd8e3;
+  --digits: #1a202c;
+  --deco: #1f6fd1;
+  --deco-2: #4a5568;
+}
+
+/* Derived colours: never set by a palette. Declared on every themed element
+   so they follow that element's palette. */
+:root,
+[data-palette] {
+  --input-bg: var(--bg);
+  --accent-soft: color-mix(in srgb, var(--accent) 16%, transparent);
+  --ring-wash: color-mix(in srgb, var(--ring) 14%, transparent);
+  --hatch: color-mix(in srgb, var(--fg) 9%, transparent);
+  --scrim: rgb(5 10 18 / 0.62);
+  --shadow: 0 12px 48px rgb(0 0 0 / 0.5);
+  color-scheme: dark;
+}
+
+:root[data-mode="light"],
+[data-palette][data-mode="light"] {
+  --input-bg: var(--surface);
+  --accent-soft: color-mix(in srgb, var(--accent) 12%, transparent);
+  --ring-wash: color-mix(in srgb, var(--ring) 10%, transparent);
+  --hatch: color-mix(in srgb, var(--fg) 8%, transparent);
+  --scrim: rgb(20 26 36 / 0.35);
+  --shadow: 0 12px 40px rgb(20 26 36 / 0.18);
+  color-scheme: light;
+}
+
+/* ---------- type: faces (default font "system") ---------- */
+
+:root,
+[data-font="system"] {
+  --font-ui: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Roboto, sans-serif;
+  --font-display: var(--font-ui);  /* Segment name, Day Label, headlines; may be decorative */
+  --font-digits: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Roboto, sans-serif;  /* always readable */
+  --digits-weight: 300;
+  --digits-tracking: -0.02em;
+  --display-weight: 400;
+  --display-tracking: -0.01em;
+  --display-scale: 1;   /* script and hand faces run small, so they scale display text up */
+  --digits-fit: 1;      /* below 1 for wide digit faces (monospace), so long values still fit */
+  --colon-units: 0.55;  /* a colon's width in digits (measured: 0.40-0.54 in most faces) */
+}
+
+/* ---------- scales ---------- */
+
+:root {
+  /* Main-screen sizes follow the viewport, so the projected view and a
+     laptop corner are one design at different sizes. */
+  /* Big Readout: as tall as --type-digits allows, but never wider than the
+     screen. The width cap needs the value's length, so it is applied on the
+     element (style.css, .readout--big): font-size = min(--type-digits,
+     usable width x --digits-fit / (glyph units x --glyph-em)), where a digit
+     or colon is 1 unit and a small unit or seconds glyph 0.42. */
+  --type-digits: 36vh;  /* about 26% digit height on screens 16:10 and wider */
+  --glyph-em: 0.56;     /* average digit advance (em) of the default face */
+  --type-small: clamp(26px, 8.5vh, 100px);   /* small Readouts */
+  --type-segment: clamp(20px, 5.4vh, 64px);  /* Segment name with Period Label */
+  --type-line: clamp(16px, 3.8vh, 46px);     /* Up next, Off-Hours lines */
+  --type-meta: clamp(14px, 2.3vh, 28px);     /* Day Label · date (uppercase) */
+  --type-caption: clamp(12px, 2.3vh, 28px);  /* Readout captions ("left"), uppercase */
+  --type-strip: clamp(12px, 2vh, 24px);      /* Day Strip names */
+  --type-strip-small: clamp(11px, 1.7vh, 20px);  /* Day Strip times */
+  /* UI (drawer, dialogs, controls): fixed pixel sizes */
+  --type-ui-xs: 13px;   /* drawer section headings (uppercase) */
+  --type-ui-sm: 14px;   /* hints, notes, field labels */
+  --type-ui: 16px;      /* body, controls */
+  --type-ui-lg: 18px;   /* form titles */
+  --type-ui-xl: 22px;   /* dialog and drawer titles */
+  --type-ui-2xl: 28px;  /* first-visit question */
+
+  /* spacing: UI uses the fixed steps, the main screen the viewport ones */
+  --s1: 4px;
+  --s2: 8px;
+  --s3: 12px;
+  --s4: 16px;
+  --s5: 24px;
+  --s6: 32px;
+  --s7: 48px;
+  --gap-xs: clamp(4px, 1vh, 12px);
+  --gap-sm: clamp(6px, 2vh, 24px);
+  --gap-md: clamp(8px, 3vh, 36px);
+  --edge-y: clamp(8px, 3vh, 36px);   /* screen padding, top and bottom */
+  --edge-x: clamp(12px, 3vw, 64px);  /* screen padding, left and right */
+
+  --radius: 12px;
+  --radius-sm: 6px;
+  --tap: 44px;          /* minimum touch target */
+  --focus-width: 3px;
+
+  /* motion */
+  --flash-period: 1s;   /* ringing: one flash per second (limit 3) */
+  --ring-tick: 1s;      /* timer ring transition between ticks */
+
+  /* Breakpoints (media queries can't read custom properties):
+     short   (max-height: 520px)                         laptop corner, landscape phone
+     narrow  (max-width: 520px) and (min-height: 521px)  phone, portrait
+     compact (max-width: 760px), (max-height: 520px)     control labels collapse to icons
+     mini    the Document Picture-in-Picture window (<main class="mini">) */
+}

@@ -13,11 +13,14 @@ import { alarmsAfterRinging, describeMoment, ringsInWindow, ringsUntilDismissed 
 import { LABELLED_PERIODS } from './clock-settings.js';
 import { createSettingsStore } from './clock-storage.js';
 import { createClockSource } from './clock-source.js';
+import { displayText } from './display-text.js';
 import { el } from './dom.js';
-import { formatClockTime, formatDate, formatLongDuration, formatSegmentName, formatShortDate } from './format.js';
+import { formatClockTime, formatSegmentName, formatShortDate } from './format.js';
+import { icon } from './icons.js';
 import { createMiniPlayer } from './mini-player.js';
-import { addReadout, createLayoutStore, cycleReadout, newLayout, removeReadout } from './readout-layout.js';
-import { readoutText, readoutValue } from './readouts.js';
+import { addReadout, canAddReadout, createLayoutStore, cycleReadout, newLayout, removeReadout } from './readout-layout.js';
+import { readoutParts, readoutText, readoutValue } from './readouts.js';
+import { createReadoutsView } from './readouts-view.js';
 import { SCHOOL_YEARS } from './school-years.js';
 import { createWakeLockKeeper, detectCapabilities } from './screen.js';
 import { BELL_SECONDS, ALARM_MAX_SECONDS, SOUNDS, SOUND_NAMES, createSoundPlayer } from './sound.js';
@@ -48,8 +51,6 @@ function textFor(settings) {
     time: (date, { seconds = false } = {}) => formatClockTime(date, { seconds, use24Hour: settings.use24Hour }),
     /** The current time, with seconds when they're on. @param {Date} date */
     now: (date) => formatClockTime(date, { seconds: settings.showSeconds, use24Hour: settings.use24Hour }),
-    /** A countdown that may run for days, with seconds when they're on (and in its last minute). @param {number} ms */
-    duration: (ms) => formatLongDuration(ms, { seconds: settings.showSeconds }),
     readout: { use24Hour: settings.use24Hour, seconds: settings.showSeconds },
     name: (segment) => formatSegmentName(segment, settings.periodLabels),
     division: settings.division,
@@ -57,16 +58,9 @@ function textFor(settings) {
 }
 
 /**
- * The day's heading: the Day Label, or "Day N of Summer".
- * @param {import('./clock-model.js').Moment} moment
- */
-function dayHeading(moment) {
-  return moment.state === 'summer' ? `Day ${moment.summerDay} of Summer` : moment.dayLabel;
-}
-
-/**
- * Where the day is: the current Segment (with the Division), a Passing
- * Period, before or after school; null on a day with no Segments.
+ * Where the day is, for the mini player: the current Segment (with the
+ * Division), a Passing Period, before or after school, or the Day Label
+ * ("Day N of Summer" in Summer); '' on a date the clock knows nothing about.
  * @param {import('./clock-model.js').Moment} moment
  * @param {ReturnType<typeof textFor>} text
  */
@@ -76,60 +70,14 @@ function statusHeading(moment, text) {
     case 'passing': return 'Passing Period';
     case 'beforeSchool': return 'Before school';
     case 'afterSchool': return 'After school';
-    default: return null;
+    case 'summer': return `Day ${moment.summerDay} of Summer`;
+    default: return moment.dayLabel ?? '';
   }
 }
 
 /** @param {import('./clock-model.js').TimedSegment} segment @param {ReturnType<typeof textFor>} text */
 function upNextText(segment, text) {
   return `Up next: ${text.name(segment)} at ${text.time(segment.start)}`;
-}
-
-/**
- * The display as a list of [tag, text] lines. With no Division chosen yet it
- * is just the time: the Division prompt comes first.
- * @param {Date} now
- * @param {import('./clock-model.js').Moment | null} moment
- * @param {boolean} simulated
- * @param {ReturnType<typeof textFor>} text
- */
-function displayLines(now, moment, simulated, text) {
-  const lines = [];
-  if (simulated) {
-    lines.push(['p', `Simulated time: ${formatDate(now)}, ${text.now(now)}`]);
-  }
-  lines.push(['p', text.now(now)]);
-  if (!moment) return lines;
-  const day = dayHeading(moment);
-  if (day) lines.push(['h1', day]);
-  const status = statusHeading(moment, text);
-  if (status) lines.push(['h2', status]);
-  // Time left, elapsed and until school starts are the Readouts' job.
-  switch (moment.state) {
-    case 'segment':
-      lines.push(['p', `${text.time(moment.current.start)} – ${text.time(moment.current.end)}`]);
-      break;
-    case 'passing':
-    case 'beforeSchool':
-      lines.push(['p', upNextText(moment.upNext, text)]);
-      break;
-    case 'afterSchool':
-      lines.push(['p', `School ended at ${text.time(moment.schoolEndedAt)}`]);
-      break;
-  }
-
-  // Off-Hours: when school is back (before school, "Up next" already says),
-  // and how long since it ended.
-  if (moment.nextSchoolDay && moment.state !== 'beforeSchool') {
-    const lead = moment.state === 'summer' ? 'First day' : 'Next school day';
-    const first = moment.nextSchoolDay.firstSegment.start;
-    lines.push(['p',
-      `${lead}: ${formatShortDate(first)} at ${text.time(first)} · starts in ${text.duration(moment.untilNextSchoolDayMs)}`]);
-  }
-  if (moment.schoolEndedAt) {
-    lines.push(['p', `${text.duration(moment.sinceSchoolEndedMs)} since school ended`]);
-  }
-  return lines;
 }
 
 /** @param {import('./clock-settings.js').PeriodAnchor} anchor */
@@ -273,7 +221,6 @@ export function initClockApp({
   function changeLayout(next) {
     layout = next;
     layoutStore.save(layout);
-    buildReadouts();
     render(new Date(clock.now()));
   }
 
@@ -313,7 +260,7 @@ export function initClockApp({
   /** The timer has rung and is still ringing: it keeps the big Readout until then. */
   let timerRinging = false;
   const ringingText = el('p');
-  const ringingBanner = el('section', { 'aria-label': 'Ringing', role: 'alert', hidden: true }, [
+  const ringingBanner = el('section', { 'aria-label': 'Ringing', role: 'alert', className: 'clock-ringing-card', hidden: true }, [
     ringingText,
     el('button', { type: 'button', textContent: 'Dismiss', onclick: () => dismiss() }),
   ]);
@@ -342,68 +289,99 @@ export function initClockApp({
   }
 
 
-  // First visit: ask the Division once.
-  const prompt = el('section', { 'aria-label': 'Choose your Division' }, [
+  // First visit: ask the Division once. (Plain for now; ticket 18 designs it.)
+  const prompt = el('section', { 'aria-label': 'Choose your Division', className: 'clock-prompt' }, [
     el('p', { textContent: 'Which Division do you teach?' }),
     ...DIVISIONS.map(([key, name]) =>
       el('button', { type: 'button', textContent: name, onclick: () => updateSettings({ division: key }) })),
   ]);
 
-  // The Readouts, rebuilt only when the layout changes or the timer comes and
-  // goes (so focus survives the ticks); each tick just rewrites their text.
-  // The first is the big one: the layout's first, or the timer while it's
-  // running, paused or ringing. The timer's spot is never part of the saved
-  // layout, so when it goes the layout is back exactly as it was.
-  const readoutsSection = el('section', { 'aria-label': 'Readouts', className: 'clock-readouts' });
-  let readoutButtons = [];
+  // The Readouts, redrawn only when their arrangement changes. The big one
+  // is the layout's first, or the timer while it's running, paused or
+  // ringing. The timer's spot is never part of the saved layout, so when it
+  // goes the layout is back exactly as it was. Edit mode (adding and
+  // removing) belongs to this tab's page only and is never saved.
   let lastMoment = null;
-  const timerReadout = el('p', { className: 'clock-readout-value' });
-  let builtWithTimer = false;
-  function buildReadouts(withTimer = builtWithTimer) {
-    builtWithTimer = withTimer;
-    readoutButtons = layout.readouts.map((_, i) =>
-      el('button', { type: 'button', className: 'clock-readout-value', onclick: () => changeLayout(cycleReadout(layout, i)) }));
-    const removable = layout.readouts.length > 1;
-    readoutsSection.replaceChildren(
-      ...(withTimer ? [el('div', { className: 'clock-readout clock-readout--big clock-readout--timer' }, [timerReadout])] : []),
-      ...readoutButtons.map((button, i) => el('div', {
-        className: i === 0 && !withTimer ? 'clock-readout clock-readout--big' : 'clock-readout',
-      }, [
-        button,
-        ...(removable ? [el('button', {
-          type: 'button', textContent: '×', 'aria-label': 'Remove Readout',
-          onclick: () => changeLayout(removeReadout(layout, i)),
-        })] : []),
-      ])),
-      el('button', { type: 'button', textContent: 'Add Readout', onclick: () => changeLayout(addReadout(layout, lastMoment)) }),
-    );
+  let editing = false;
+  const readoutsView = createReadoutsView({
+    onCycle: (i) => changeLayout(cycleReadout(layout, i)),
+    onRemove: (i) => {
+      changeLayout(removeReadout(layout, i));
+      // Focus moves on to the next Remove button, or to Done once none is left.
+      if (!readoutsView.focusRemove(i)) readoutsControl.focus();
+    },
+    onAdd: () => {
+      changeLayout(addReadout(layout, lastMoment));
+      readoutsView.focusReadout(layout.readouts.length - 1);
+    },
+  });
+  const editNote = el('p', { className: 'clock-edit-note', textContent: 'Tap a Readout to change what it shows' });
+  /** @param {boolean} on */
+  function setEditing(on) {
+    editing = on;
+    render(new Date(clock.now()));
   }
+  const onKeyDown = (event) => {
+    if (event.key !== 'Escape' || !editing) return;
+    setEditing(false);
+    readoutsControl.focus();
+  };
+  document.addEventListener('keydown', onKeyDown);
 
-  // Turning sound on (browsers need one click after every load), the Bells
-  // toggle and a test ring, one tap from the main screen.
+  // The top bar's controls: quiet text buttons with icons. Each plain panel
+  // they open is restyled by its own ticket (the timer picker 22, the
+  // settings drawer 19); Look (21) slots in between Readouts and Settings.
+  /** @param {string} label @param {Parameters<typeof icon>[0]} iconName @param {object} props */
+  const topControl = (label, iconName, props) => {
+    const text = el('span', { className: 'clock-control__label', textContent: label });
+    const button = el('button', { type: 'button', className: 'clock-control', ...props }, [icon(iconName), text]);
+    return Object.assign(button, { setLabel: (to) => { text.textContent = to; } });
+  };
+  /** @type {{ panel: HTMLElement, button: HTMLElement }[]} */
+  const panels = [];
+  /** A plain panel the top bar opens and closes. @param {HTMLElement} panel @param {string} id */
+  function panelToggle(panel, id, label, iconName) {
+    panel.id = id;
+    panel.hidden = true;
+    panel.classList.add('clock-panel');
+    const button = topControl(label, iconName, {
+      'aria-controls': id, 'aria-expanded': 'false',
+      onclick: () => showPanel(panel.hidden ? panel : null),
+    });
+    panels.push({ panel, button });
+    return button;
+  }
+  /** Show one panel (or none), closing the others. @param {HTMLElement | null} shownPanel */
+  function showPanel(shownPanel) {
+    for (const { panel, button } of panels) {
+      panel.hidden = panel !== shownPanel;
+      button.setAttribute('aria-expanded', String(!panel.hidden));
+    }
+  }
+  const bellsControl = topControl('Bells', 'bell', {
+    onclick: () => updateSettings({ bells: { ...settings.bells, on: !settings.bells.on } }),
+  });
+  const readoutsControl = topControl('Readouts', 'readouts', { onclick: () => setEditing(!editing) });
+  readoutsControl.classList.add('clock-control--fills');
+  const divisionChip = el('button', { type: 'button', className: 'clock-chip', onclick: () => {
+    showPanel(settingsPanel);
+    divisionSelect.focus();
+  } });
+
+  // Turning sound on (browsers need one click after every load): bottom
+  // centre, over the bar. (Plain for now; ticket 18 designs it.)
   const soundOn = el('button', { type: 'button', textContent: 'Turn sound on', onclick: () => soundPlayer.resume() });
   const noSound = el('p', { textContent: "Sound isn't available in this browser." });
+  const soundPrompt = el('section', { 'aria-label': 'Sound', className: 'clock-sound-prompt' }, [soundOn, noSound]);
   const bellsToggle = el('input', {
     type: 'checkbox', checked: settings.bells.on,
     onchange: () => updateSettings({ bells: { ...settings.bells, on: bellsToggle.checked } }),
   });
-  const soundControls = el('section', { 'aria-label': 'Sound' }, [
-    soundOn,
-    noSound,
-    el('label', {}, [bellsToggle, ' Bells']),
-    el('button', {
-      type: 'button', textContent: 'Test ring',
-      onclick: () => {
-        soundPlayer.play(settings.bells.sound);
-        startRinging('Test ring', false);
-      },
-    }),
-    el('p', { textContent: 'Keep this tab open for sounds to play. It can stay behind other windows.' }),
-  ]);
   function showSoundState() {
     const state = soundPlayer.state();
     soundOn.hidden = state !== 'suspended';
     noSound.hidden = state !== 'unavailable';
+    soundPrompt.hidden = soundOn.hidden && noSound.hidden;
   }
   soundPlayer.onStateChange(() => {
     showSoundState();
@@ -412,11 +390,8 @@ export function initClockApp({
   showSoundState();
   soundPlayer.setVolume(settings.volume);
 
-  // The classroom timer, one tap from the main screen.
+  // The classroom timer.
   const timerPanel = createTimerPanel({ settings: () => settings, now: () => clock.now(), update: updateSettings });
-
-  const info = el('div');
-  const display = el('div', { className: 'clock-display' }, [readoutsSection, info]);
 
   // The settings, built once so typing isn't interrupted by the ticks.
   const divisionSelect = el('select', {
@@ -430,7 +405,7 @@ export function initClockApp({
     type: 'checkbox', checked: settings.showSeconds,
     onchange: () => updateSettings({ showSeconds: showSeconds.checked }),
   });
-  // Saved for now; the strip itself comes with the design reference (ticket 20).
+  // Saved for now; the bar itself is ticket 20, its setting the Look sheet's (21).
   const dayStrip = el('input', {
     type: 'checkbox', checked: settings.dayStrip,
     onchange: () => updateSettings({ dayStrip: dayStrip.checked }),
@@ -450,6 +425,7 @@ export function initClockApp({
     onchange: () => updateSettings({ bells: { ...settings.bells, sound: bellSound.value } }),
   }, SOUNDS.map((sound) => el('option', { value: sound, textContent: SOUND_NAMES[sound] })));
   bellSound.value = settings.bells.sound;
+  const nextRings = el('div');
   const settingsPanel = el('section', { 'aria-label': 'Settings' }, [
     el('h2', { textContent: 'Settings' }),
     el('label', {}, ['Division ', divisionSelect]),
@@ -457,23 +433,40 @@ export function initClockApp({
     el('label', {}, [showSeconds, ' Show seconds']),
     el('label', {}, [dayStrip, ' Day Strip']),
     ...labelInputs,
+    el('label', {}, [bellsToggle, ' Bells']),
     el('label', {}, ['Volume ', volume]),
     el('label', {}, ['Bell sound ', bellSound]),
     ...SOUNDS.map((sound) => el('button', {
       type: 'button', textContent: `Preview ${SOUND_NAMES[sound]}`, onclick: () => soundPlayer.play(sound),
     })),
+    el('button', {
+      type: 'button', textContent: 'Test ring',
+      onclick: () => {
+        soundPlayer.play(settings.bells.sound);
+        startRinging('Test ring', false);
+      },
+    }),
+    el('p', { textContent: 'Keep this tab open for sounds to play. It can stay behind other windows.' }),
+    nextRings,
+    el('a', { href: FEEDBACK_HREF, textContent: 'Feedback? Email Eric' }),
   ]);
+  const timerControl = panelToggle(timerPanel.section, 'clock-timer-panel', 'Timer', 'timer');
+  const settingsControl = panelToggle(settingsPanel, 'clock-settings', 'Settings', 'gear');
+
   // Fullscreen for projecting: the screen is kept awake for as long as it
   // lasts (however it ends), where the browser allows a wake lock.
   const { fullscreen, pictureInPicture } = capabilities;
   const wakeLock = createWakeLockKeeper(capabilities.wakeLock);
   const fullscreenButton = el('button', {
-    type: 'button', hidden: !fullscreen,
+    type: 'button', className: 'clock-control clock-control--icon', hidden: !fullscreen,
     onclick: () => (fullscreen.isActive() ? fullscreen.exit() : fullscreen.request(mount)).catch(() => {}),
   });
   function showFullscreen() {
     const on = Boolean(fullscreen?.isActive());
-    fullscreenButton.textContent = on ? 'Exit fullscreen' : 'Fullscreen';
+    const name = on ? 'Exit fullscreen' : 'Fullscreen';
+    fullscreenButton.setAttribute('aria-label', name);
+    fullscreenButton.title = name;
+    fullscreenButton.replaceChildren(icon(on ? 'collapse' : 'expand'));
     if (on) wakeLock.hold();
     else wakeLock.release();
   }
@@ -489,17 +482,18 @@ export function initClockApp({
     },
     onDismiss: () => dismiss(),
   });
+  mini.button.classList.add('clock-control', 'clock-control--icon', 'clock-control--mini');
   globalThis.addEventListener('pagehide', mini.close);
 
   /**
    * @param {Date} now @param {import('./clock-model.js').Moment | null} moment
-   * @param {string | null} bigReadout the big Readout's text (null when the Readouts are hidden)
+   * @param {string} bigReadout the big Readout's text
    * @param {ReturnType<typeof textFor>} text
    */
   function renderMini(now, moment, bigReadout, text) {
     mini.show({
-      readout: bigReadout ?? text.now(now),
-      status: moment ? (statusHeading(moment, text) ?? dayHeading(moment) ?? '') : '',
+      readout: bigReadout,
+      status: moment ? statusHeading(moment, text) : '',
       upNext: moment?.upNext ? upNextText(moment.upNext, text) : '',
     });
   }
@@ -507,10 +501,30 @@ export function initClockApp({
     mini.showRinging(ringingBanner.hidden ? null : ringingText.textContent);
   }
 
-  const viewControls = el('section', { 'aria-label': 'View' }, [fullscreenButton, mini.button]);
-  const footer = el('footer', {}, [el('a', { href: FEEDBACK_HREF, textContent: 'Feedback? Email Eric' })]);
-
-  mount.replaceChildren(prompt, ringingBanner, soundControls, viewControls, display, timerPanel.section, settingsPanel, footer);
+  // The main screen: the "Simulated time" banner (with ?at=), the top bar,
+  // the stage (heading, Readouts, the line under them) and the bottom row
+  // (the bar's place, ticket 20, then the window buttons).
+  const banner = el('p', { className: 'clock-banner' });
+  const dayLine = el('p', { className: 'clock-day' });
+  const heading = el('h1', { className: 'clock-title' });
+  const underLine = el('p');
+  const stage = el('section', { className: 'clock-stage', 'aria-label': 'Clock' }, [heading, readoutsView.element, underLine, editNote]);
+  const top = el('header', { className: 'clock-top' }, [
+    dayLine,
+    el('div', { className: 'clock-top__end' }, [
+      el('nav', { className: 'clock-controls', 'aria-label': 'Clock controls' },
+        [timerControl, bellsControl, readoutsControl, settingsControl]),
+      divisionChip,
+    ]),
+  ]);
+  const bottom = el('footer', { className: 'clock-bottom' }, [
+    el('div', { className: 'clock-bar-slot' }),
+    el('div', { className: 'clock-corner', role: 'group', 'aria-label': 'Window' }, [mini.button, fullscreenButton]),
+  ]);
+  const mainScreen = el('main', { className: clock.simulated ? 'clock-screen is-simulated' : 'clock-screen' }, [
+    ...(clock.simulated ? [banner] : []), top, stage, bottom,
+  ]);
+  mount.replaceChildren(mainScreen, prompt, ringingBanner, soundPrompt, timerPanel.section, settingsPanel);
 
   /**
    * Settle whatever rang since the last tick, then redraw. After a sleep or a
@@ -546,31 +560,82 @@ export function initClockApp({
 
   function render(now) {
     const chosen = settings.division !== null;
-    prompt.hidden = chosen;
-    settingsPanel.hidden = !chosen;
-    timerPanel.section.hidden = !chosen;
-    timerPanel.render(now);
-    if (chosen) divisionSelect.value = settings.division;
     const text = textFor(settings);
     const moment = chosen ? describeMoment(now, schoolYears, { division: settings.division }) : null;
-    renderMini(now, moment, renderReadouts(now, moment), text);
-    info.replaceChildren(
-      ...displayLines(now, moment, clock.simulated, text).map(([tag, line]) => el(tag, { textContent: line })),
-      ...(chosen ? nextRingsNodes(now, schoolYears, settings, text) : []),
+    prompt.hidden = chosen;
+    timerPanel.render(now);
+    if (chosen) divisionSelect.value = settings.division;
+    bellsToggle.checked = settings.bells.on;
+    bellsControl.setAttribute('aria-pressed', String(settings.bells.on));
+    for (const control of [timerControl, bellsControl, settingsControl, divisionChip]) control.hidden = !chosen;
+    divisionChip.replaceChildren(
+      el('span', { className: 'visually-hidden', textContent: 'Division: ' }),
+      String(settings.division),
+      el('span', { className: 'visually-hidden', textContent: ', switch Division' }),
     );
+    banner.replaceChildren(icon('clock'), el('span', {
+      textContent: `Simulated time · ${formatShortDate(now)}, ${text.now(now)} · this tab only`,
+    }));
+    renderStageText(now, moment);
+    renderMini(now, moment, renderReadouts(now, moment), text);
+    nextRings.replaceChildren(...(chosen ? nextRingsNodes(now, schoolYears, settings, text) : []));
+  }
+
+  /** "All Day · Tue, Oct 27", with the dot spaced apart. @param {string} day */
+  function showDay(day) {
+    const [label, date] = day.split(' · ');
+    dayLine.replaceChildren(...(date ? [
+      label, ' ', el('span', { className: 'clock-day__dot', 'aria-hidden': 'true', textContent: '·' }), ' ', date,
+    ] : [label]));
   }
 
   /**
-   * Show the Readouts for `moment`; none before a Division is chosen or on a
-   * date the clock knows nothing about (the time alone is shown then).
+   * The Day Label, the heading and the line under the Readouts.
    * @param {Date} now @param {import('./clock-model.js').Moment | null} moment
-   * @returns {string | null} the big Readout's text, null when none are shown
+   */
+  function renderStageText(now, moment) {
+    if (!moment) {
+      showDay(formatShortDate(now));
+      heading.replaceChildren(el('span', { className: 'visually-hidden', textContent: 'School Clock' }));
+      underLine.replaceChildren();
+      return;
+    }
+    const words = displayText(now, moment, settings);
+    showDay(words.day);
+    heading.replaceChildren(words.title, ...(words.tag ? [
+      ' ', el('span', { className: 'clock-title__dot', 'aria-hidden': 'true', textContent: '·' }), ' ',
+      el('span', { className: 'clock-title__tag', textContent: words.tag }),
+    ] : []));
+    if (words.upNext) {
+      underLine.className = 'clock-next';
+      underLine.replaceChildren(
+        el('span', { className: 'clock-next__label', textContent: 'Up next' }), ' ',
+        el('span', { textContent: words.upNext.name }), ' ',
+        el('span', { className: 'clock-next__at', textContent: words.upNext.at }),
+      );
+    } else {
+      underLine.className = 'clock-line';
+      underLine.textContent = words.line ?? '';
+    }
+  }
+
+  /**
+   * Show the Readouts for `moment`: the tab's layout (with the timer in the
+   * big spot while it shows), or just the time before a Division is chosen
+   * or on a date the clock knows nothing about.
+   * @param {Date} now @param {import('./clock-model.js').Moment | null} moment
+   * @returns {string} the big Readout's text
    */
   function renderReadouts(now, moment) {
-    if (!moment || moment.state === 'unknown') {
-      readoutsSection.replaceChildren();
-      readoutButtons = [];
-      return null;
+    const options = textFor(settings).readout;
+    const timeOnly = !moment || moment.state === 'unknown';
+    readoutsControl.hidden = timeOnly;
+    if (timeOnly) {
+      editing = false;
+      const parts = readoutParts({ kind: 'time', at: now }, options);
+      readoutsView.show({ count: 1, cyclable: false, timer: false, editing: false, canAdd: false }, [parts], '');
+      showEditing();
+      return parts.amount;
     }
     lastMoment = moment;
     if (!layout) {
@@ -579,14 +644,22 @@ export function initClockApp({
     }
     const timer = timerText(settings, now.getTime());
     const withTimer = timer !== '' || timerRinging;
-    if (readoutButtons.length === 0 || withTimer !== builtWithTimer) buildReadouts(withTimer);
-    const options = textFor(settings).readout;
-    layout.readouts.forEach(({ mode }, i) => {
-      readoutButtons[i].textContent = readoutText(readoutValue(mode, moment, now), options);
-    });
-    if (!withTimer) return readoutButtons[0].textContent;
-    timerReadout.textContent = timer || "Time's up";
-    return timerReadout.textContent;
+    const values = layout.readouts.map(({ mode }) => readoutValue(mode, moment, now));
+    readoutsView.show(
+      { count: values.length, cyclable: true, timer: withTimer, editing, canAdd: canAddReadout(layout) },
+      values.map((value) => readoutParts(value, options)),
+      timer || "Time's up",
+    );
+    showEditing();
+    return withTimer ? (timer || "Time's up") : readoutText(values[0], options);
+  }
+
+  /** The Readouts control's pressed state, and the screen's edit-mode look. */
+  function showEditing() {
+    readoutsControl.setAttribute('aria-pressed', String(editing));
+    readoutsControl.setLabel(editing ? 'Done' : 'Readouts');
+    editNote.hidden = !editing;
+    mainScreen.classList.toggle('is-editing', editing);
   }
 
   render(lastTick);
@@ -602,6 +675,7 @@ export function initClockApp({
 
   function destroy() {
     clearInterval(interval);
+    document.removeEventListener('keydown', onKeyDown);
     document.removeEventListener('visibilitychange', onVisibility);
     globalThis.removeEventListener('pagehide', mini.close);
     stopWatchingFullscreen?.();

@@ -33,6 +33,8 @@ describe('School Clock classroom timer', () => {
       realNow: () => t, storage, tabStorage: createFakeStorage(), soundPlayer: player,
       prefersReducedMotion: () => false, search,
     });
+    // The timer's controls open from the top bar's Timer control.
+    [...mount().querySelectorAll('button')].find((b) => b.textContent.trim() === 'Timer' && !b.hidden)?.click();
   }
   /** Time passes and the page ticks as usual. */
   const advance = (ms) => { t += ms; vi.advanceTimersByTime(ms); };

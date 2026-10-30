@@ -18,8 +18,10 @@ function fakeRealClock(date) {
 const SEC = 1000;
 const mount = () => document.getElementById('clockApp');
 const pageText = () => mount().textContent.replace(/\s+/g, ' ');
-const button = (name) =>
-  [...mount().querySelectorAll('button')].find((b) => b.textContent === name && !b.closest('[hidden]'));
+const button = (name) => [...mount().querySelectorAll('button')]
+  .find((b) => (b.getAttribute('aria-label') ?? b.textContent.trim()) === name && !b.closest('[hidden]'));
+/** Open the Settings panel from the top bar, where the sound settings are. */
+const openSettings = () => button('Settings').click();
 const checkbox = (name) =>
   [...mount().querySelectorAll('label')].find((l) => l.textContent.trim() === name).querySelector('input');
 const saved = (storage) => JSON.parse(storage.getItem(SETTINGS_KEY));
@@ -133,6 +135,18 @@ describe('School Clock sound', () => {
       expect(player.scheduled).toEqual([expect.objectContaining({ at: 120, sound: 'chime', repeat: true })]);
     });
 
+    it('the Bells control in the top bar is pressed while Bells are on, and toggles them, saved', () => {
+      open({ sound: { state: 'running' } });
+      expect(button('Bells').getAttribute('aria-pressed')).toBe('true');
+      button('Bells').click();
+      expect(button('Bells').getAttribute('aria-pressed')).toBe('false');
+      expect(checkbox('Bells').checked).toBe(false);
+      expect(player.scheduled).toEqual([]);
+      expect(saved(storage).bells.on).toBe(false);
+      button('Bells').click();
+      expect(player.scheduled).toHaveLength(1);
+    });
+
     it('reschedules when the Bells toggle changes, and the toggle is saved', () => {
       open({ sound: { state: 'running' } });
       expect(player.scheduled).toHaveLength(1);
@@ -141,6 +155,7 @@ describe('School Clock sound', () => {
 
       expect(player.scheduled).toEqual([]);
       expect(saved(storage).bells.on).toBe(false);
+      expect(button('Bells').getAttribute('aria-pressed')).toBe('false');
       checkbox('Bells').click();
       expect(player.scheduled).toHaveLength(1);
     });
@@ -299,6 +314,7 @@ describe('School Clock sound', () => {
 
     it('a test ring plays the Bells sound now and flashes like a Bell', () => {
       open({ settings: { bells: { on: true, sound: 'buzzer' } } });
+      openSettings();
 
       button('Test ring').click();
 
@@ -326,6 +342,7 @@ describe('School Clock sound', () => {
 
     it('previews each voice', () => {
       open();
+      openSettings();
       for (const name of ['Chime', 'School bell', 'Beep', 'Buzzer']) button(`Preview ${name}`).click();
       expect(player.played.map((p) => p.sound)).toEqual(['chime', 'schoolBell', 'beep', 'buzzer']);
     });

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  LAYOUT_KEY, addReadout, createLayoutStore, cycleReadout, newLayout, removeReadout,
+  LAYOUT_KEY, MAX_READOUTS, addReadout, canAddReadout, createLayoutStore, cycleReadout, newLayout, removeReadout,
 } from '../../clock/readout-layout.js';
 import { describeMoment } from '../../clock/clock-model.js';
 import { SCHOOL_YEARS } from '../../clock/school-years.js';
@@ -21,6 +21,27 @@ describe('layout changes', () => {
     const layout = { readouts: [{ mode: 'clock' }] };
     expect(modes(addReadout(layout, afterSchool))).toEqual(['clock', 'countup']);
     expect(modes(layout)).toEqual(['clock']);
+  });
+
+  it('gives an added Readout a mode no Readout shows yet, going round the cycle from the default', () => {
+    const one = newLayout(inPeriod);
+    const two = addReadout(one, inPeriod);
+    expect(modes(two)).toEqual(['countdown', 'countup']);
+    expect(modes(addReadout(two, inPeriod))).toEqual(['countdown', 'countup', 'clock']);
+    expect(modes(addReadout({ readouts: [{ mode: 'countup' }] }, afterSchool))).toEqual(['countup', 'clock']);
+  });
+
+  it('skips modes already shown, even when Readouts repeat a mode', () => {
+    const dupes = { readouts: [{ mode: 'countdown' }, { mode: 'countdown' }] };
+    expect(modes(addReadout(dupes, inPeriod))).toEqual(['countdown', 'countdown', 'countup']);
+  });
+
+  it('holds at most three Readouts: adding to a full layout changes nothing', () => {
+    expect(MAX_READOUTS).toBe(3);
+    const full = { readouts: [{ mode: 'countdown' }, { mode: 'countup' }, { mode: 'clock' }] };
+    expect(canAddReadout(full)).toBe(false);
+    expect(canAddReadout({ readouts: [{ mode: 'clock' }] })).toBe(true);
+    expect(addReadout(full, inPeriod)).toBe(full);
   });
 
   it('cycles just the one Readout tapped', () => {
@@ -89,6 +110,12 @@ describe('createLayoutStore', () => {
       });
       expect(store.load()).toEqual(layoutB);
     }
+  });
+
+  it('loads a saved layout of more than three Readouts as its first three', () => {
+    const four = { readouts: ['countdown', 'countup', 'clock', 'countdown'].map((mode) => ({ mode })) };
+    const store = createLayoutStore({ session: createFakeStorage({ [LAYOUT_KEY]: raw(four) }), local: createFakeStorage() });
+    expect(modes(store.load())).toEqual(['countdown', 'countup', 'clock']);
   });
 
   it('keeps only the modes of a saved layout', () => {

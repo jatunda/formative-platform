@@ -8,7 +8,7 @@
 // current time either way. So a Readout keeps its place in the cycle as the
 // day moves between in-school and Off-Hours.
 
-import { formatClockTime, formatDuration, formatLongDuration } from './format.js';
+import { formatClockTime, formatDuration, formatLongDuration, formatShortDate } from './format.js';
 
 /** @typedef {'countdown' | 'countup' | 'clock'} ReadoutMode */
 
@@ -36,7 +36,8 @@ export function defaultMode(moment) {
 }
 
 /**
- * What a Readout shows: a length of time with its caption ("43:00 left"), or
+ * What a Readout shows: a length of time with its caption ("43:00 left",
+ * "2:00 since start", "2:40 until Period 4", "4d 22h until Mon, Nov 30"), or
  * the current time. `long` durations can run for days.
  * @typedef {{ kind: 'duration', ms: number, caption: string, long: boolean }
  *   | { kind: 'time', at: Date }} ReadoutValue
@@ -60,12 +61,13 @@ export function readoutValue(mode, moment, now) {
   if (moment.state === 'segment') {
     return mode === 'countdown'
       ? duration(moment.timeLeftMs, 'left')
-      : duration(moment.timeElapsedMs, 'elapsed');
+      : duration(moment.timeElapsedMs, 'since start');
   }
   // With no Segment to count up from, a Passing Period shows what's left of it either way.
-  if (moment.state === 'passing') return duration(moment.timeLeftMs, 'left');
+  if (moment.state === 'passing') return duration(moment.timeLeftMs, `until ${/** @type {import('./clock-model.js').TimedSegment} */ (moment.upNext).name}`);
   if (mode === 'countup') return duration(moment.sinceSchoolEndedMs, 'since school ended', true);
-  const caption = moment.state === 'beforeSchool' ? 'until school starts' : 'until next school day';
+  const first = moment.nextSchoolDay?.firstSegment.start;
+  const caption = moment.state === 'beforeSchool' || !first ? 'until school starts' : `until ${formatShortDate(first)}`;
   return duration(moment.untilNextSchoolDayMs, caption, true);
 }
 
@@ -77,8 +79,32 @@ export function readoutValue(mode, moment, now) {
  * @param {{ use24Hour?: boolean, seconds?: boolean }} [options]
  * @returns {string}
  */
-export function readoutText(value, { use24Hour = false, seconds = true } = {}) {
-  if (value.kind === 'time') return formatClockTime(value.at, { seconds, use24Hour });
-  const amount = (value.long ? formatLongDuration : formatDuration)(value.ms, { seconds });
-  return `${amount} ${value.caption}`;
+export function readoutText(value, options = {}) {
+  const { amount, caption } = readoutParts(value, options);
+  return value.kind === 'time' ? amount : `${amount} ${caption}`;
+}
+
+/**
+ * A Readout as the page draws it: its amount ("42:17", "42 min", "10:12:43 AM")
+ * cut into pieces, where letters and the space before them ("min", "h", "AM")
+ * are set small and clock seconds are not; its caption ("left", "now"); and
+ * the glyph counts the big Readout's size rule needs.
+ * @param {ReadoutValue} value
+ * @param {{ use24Hour?: boolean, seconds?: boolean }} [options]
+ * @returns {{ amount: string, caption: string, pieces: { text: string, small: boolean }[],
+ *   glyphs: { digits: number, colons: number, letters: number } }}
+ */
+export function readoutParts(value, { use24Hour = false, seconds = true } = {}) {
+  const amount = value.kind === 'time'
+    ? formatClockTime(value.at, { seconds, use24Hour })
+    : (value.long ? formatLongDuration : formatDuration)(value.ms, { seconds });
+  const pieces = amount.split(/( ?[a-z]+)/i).filter(Boolean).map((text) => ({ text, small: /[a-z]/i.test(text) }));
+  /** @param {RegExp} pattern */
+  const count = (pattern) => (amount.match(pattern) ?? []).length;
+  return {
+    amount,
+    caption: value.kind === 'time' ? 'now' : value.caption,
+    pieces,
+    glyphs: { digits: count(/\d/g), colons: count(/:/g), letters: count(/[a-z]/gi) },
+  };
 }

@@ -24,13 +24,30 @@ export function newLayout(moment) {
   return { readouts: [{ mode: defaultMode(moment) }] };
 }
 
+/** The most Readouts a layout holds: one big and two small, one per mode. */
+export const MAX_READOUTS = 3;
+
 /**
- * The layout with one more Readout at the end, in the default mode for `moment`.
+ * Whether the layout has room for another Readout.
+ * @param {Layout} layout
+ */
+export function canAddReadout(layout) {
+  return layout.readouts.length < MAX_READOUTS;
+}
+
+/**
+ * The layout with one more Readout at the end, in the first mode no Readout
+ * shows yet, going round the cycle from the default mode for `moment`. A full
+ * layout comes back as it was.
  * @param {Layout} layout @param {Moment} moment
  * @returns {Layout}
  */
 export function addReadout(layout, moment) {
-  return { readouts: [...layout.readouts, { mode: defaultMode(moment) }] };
+  if (!canAddReadout(layout)) return layout;
+  const shown = new Set(layout.readouts.map((r) => r.mode));
+  let mode = defaultMode(moment);
+  while (shown.has(mode)) mode = nextMode(mode);
+  return { readouts: [...layout.readouts, { mode }] };
 }
 
 /**
@@ -53,7 +70,8 @@ export function removeReadout(layout, index) {
 }
 
 /**
- * Saved data (anything) to a layout, or null unless it's a non-empty list of known modes.
+ * Saved data (anything) to a layout (its first three Readouts), or null unless
+ * it's a non-empty list of known modes.
  * @param {unknown} saved
  * @returns {Layout | null}
  */
@@ -61,7 +79,7 @@ function parseLayout(saved) {
   const readouts = /** @type {any} */ (saved)?.readouts;
   if (!Array.isArray(readouts) || readouts.length === 0) return null;
   if (!readouts.every((r) => READOUT_MODES.includes(r?.mode))) return null;
-  return { readouts: readouts.map((r) => ({ mode: r.mode })) };
+  return { readouts: readouts.slice(0, MAX_READOUTS).map((r) => ({ mode: r.mode })) };
 }
 
 /**

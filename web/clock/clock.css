@@ -1,32 +1,640 @@
-/* School Clock. Only what behaviour needs so far; the design reference
-   (tickets 03/04) styles the rest. */
+/* School Clock: the main screen, built to the design reference
+   (.scratch/school-clock/mockups/final/, DESIGN.md). Every colour, face,
+   size and gap is a token from tokens.css, so a theme (ticket 21) swaps the
+   look by setting data-mode / data-palette / data-font / data-deco on <html>;
+   nothing here names a colour or a face.
 
-/* Fullscreen (projecting): only the clock and what's ringing; Esc leaves it.
-   A fullscreen element needs its own background, or the black backdrop shows
-   through. :where() keeps this as weak as a class, so the ringing highlight
-   below still wins. */
-:where(#clockApp):fullscreen {
-  background: Canvas;
-  color: CanvasText;
-  overflow: auto;
+   The plain panels and prompts at the end (timer, settings, first visit,
+   sound, ringing) only get what keeps them usable on the themed page; tickets
+   18, 19 and 22 design them. The bar's place (.clock-bar-slot) is ticket 20's. */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
 }
 
-#clockApp:fullscreen > :not(.clock-display, [aria-label="Ringing"]) {
-  display: none;
+html,
+body {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-ui);
+  font-size: var(--type-ui);
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+#clockApp {
+  height: 100%;
+}
+
+/* Fullscreen (projecting) keeps the page background, or the black backdrop
+   shows through. Esc leaves it. */
+#clockApp:fullscreen {
+  background: var(--bg);
+}
+
+#clockApp [hidden] {
+  display: none !important;
+}
+
+/* Base element styles, as weak as a bare element (:where), so every
+   component class below wins over them. */
+:where(#clockApp) :where(h1, h2, p) {
+  margin: 0;
+}
+
+:where(#clockApp) :where(button, input, select) {
+  font: inherit;
+  color: inherit;
+}
+
+:where(#clockApp) a {
+  color: var(--accent-text);
+}
+
+.clock-icon {
+  width: 1.25em;
+  height: 1.25em;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* A pressed toggle (Bells on) fills its icon: state by shape, not only colour. */
+[aria-pressed="true"] > .clock-icon {
+  fill: currentColor;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+:where(#clockApp) :focus {
+  outline: none;
+}
+
+:where(#clockApp) :focus-visible {
+  outline: var(--focus-width) solid var(--focus);
+  outline-offset: 3px;
+}
+
+/* ======================= main screen ======================= */
+
+/* Three rows: the top bar (Day Label, controls, Division), the stage, and
+   the bottom row (the bar, then the icon-only window buttons); four with
+   the "Simulated time" banner. */
+.clock-screen {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-areas: "top" "stage" "bottom";
+  height: 100vh;
+  padding: var(--edge-y) var(--edge-x);
+  row-gap: var(--gap-sm);
+  /* The width the Readouts may use: the screen, less the Look sheet while
+     it is open beside the clock (ticket 21 sets --sheet-w). */
+  --sheet-w: 0px;
+  --usable-w: calc(100vw - 2 * var(--edge-x) - var(--sheet-w));
+  --fit-w: var(--usable-w);
+}
+
+.clock-screen.is-simulated {
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  grid-template-areas: "banner" "top" "stage" "bottom";
+}
+
+.clock-banner {
+  grid-area: banner;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s2);
+  margin: calc(var(--edge-y) * -1) calc(var(--edge-x) * -1) 0;
+  padding: var(--s2) var(--s4);
+  border-bottom: 2px dashed var(--line);
+  background: var(--surface);
+  color: var(--fg);
+  font-size: var(--type-ui-sm);
+  font-weight: 600;
+  text-align: center;
+}
+
+/* ---------- top bar ---------- */
+
+.clock-top {
+  grid-area: top;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--s4);
+  min-height: var(--tap);
+}
+
+.clock-top__end {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+}
+
+.clock-day {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: var(--font-display);
+  font-size: calc(var(--type-meta) * var(--display-scale));
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.clock-day__dot {
+  margin: 0 0.3em;
+  opacity: 0.7;
+}
+
+/* Decorative display faces read badly in capitals with tracking. */
+[data-font="script"] .clock-day,
+[data-font="hand"] .clock-day {
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.clock-chip {
+  min-height: var(--tap);
+  min-width: var(--tap);
+  padding: 0 0.6em;
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+}
+
+/* ---------- controls: quiet text buttons along the top ---------- */
+
+.clock-controls {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 2px;
+}
+
+.clock-control {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+  min-height: var(--tap);
+  min-width: var(--tap);
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.clock-control:hover {
+  color: var(--fg);
+  background: var(--surface);
+}
+
+.clock-control[aria-pressed="true"],
+.clock-control[aria-expanded="true"] {
+  color: var(--accent-text);
+}
+
+/* Readouts (in edit mode) and Look (while open) fill with the accent. */
+.clock-control--fills[aria-pressed="true"],
+.clock-control--fills[aria-expanded="true"] {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+/* Icon-only (the window buttons): square, named by aria-label and a tooltip. */
+.clock-control--icon {
+  justify-content: center;
+  width: var(--tap);
+  padding: 0;
+}
+
+/* ---------- stage ---------- */
+
+.clock-stage {
+  grid-area: stage;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  text-align: center;
+}
+
+.clock-title {
+  font-family: var(--font-display);
+  font-size: calc(var(--type-segment) * var(--display-scale));
+  font-weight: var(--display-weight);
+  letter-spacing: var(--display-tracking);
+  line-height: 1.15;
+}
+
+.clock-title__dot,
+.clock-title__tag {
+  color: var(--muted);
+}
+
+.clock-title__dot {
+  margin: 0 0.25em;
+}
+
+/* ---------- Readouts ---------- */
+
+.clock-readout {
+  position: relative;
+}
+
+.clock-readout__face {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 0;
+  padding: 0 0.12em;
+  border: 0;
+  border-radius: var(--radius);
+  background: none;
+  color: var(--digits);
+}
+
+button.clock-readout__face {
+  cursor: pointer;
+}
+
+/* The sizing rule's unit count: digits, plus colons at --colon-units each,
+   plus small letters at 0.42 each (the page sets --d, --c and --u). */
+.clock-readout__value {
+  --units: calc(var(--d, 4) + var(--c, 1) * var(--colon-units) + var(--u, 0) * 0.42);
+  font-family: var(--font-digits);
+  font-weight: var(--digits-weight);
+  font-variant-numeric: tabular-nums lining-nums;
+  letter-spacing: var(--digits-tracking);
+  white-space: nowrap;
+  line-height: 0.95;
+}
+
+/* Units and AM/PM are small and muted. Clock seconds are not: they are
+   digits like the rest, at the same size and weight. */
+.clock-unit {
+  margin: 0 0.1em 0 0.04em;
+  font-size: 0.42em;
+  letter-spacing: 0;
+  color: var(--muted);
+}
+
+.clock-readout__caption {
+  margin-top: 0.25em;
+  font-size: var(--type-caption);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* As tall as --type-digits, but capped so the value fits the width. */
+.clock-readout--big .clock-readout__value {
+  font-size: min(var(--type-digits), calc(var(--fit-w) * 0.94 * var(--digits-fit) / (var(--units) * var(--glyph-em))));
+}
+
+.clock-readout--small .clock-readout__value {
+  font-size: var(--type-small);
+  line-height: 1;
+}
+
+.clock-readout--small .clock-readout__caption {
+  font-size: calc(var(--type-caption) * 0.85);
+}
+
+/* The running timer in the big spot (plain until ticket 22's ring). */
+.clock-readout--timer .clock-readout__value {
+  font-size: min(24vh, calc(var(--fit-w) / 9));
+}
+
+/* Below (the default): small Readouts in one centred row under the big one,
+   with hairline dividers. */
+.clock-readouts {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.clock-smalls {
+  display: flex;
+  justify-content: center;
+  gap: 0 clamp(16px, 4vw, 80px);
+  margin-top: var(--gap-md);
+}
+
+.clock-smalls > * + * {
+  border-left: 1px solid var(--line-soft);
+  padding-left: clamp(16px, 4vw, 80px);
+}
+
+/* Beside: on a wide display, the small Readouts stack to the right of the
+   big one. The big one keeps 60% of the width for its size cap. */
+@media (min-aspect-ratio: 4/3) and (min-width: 761px) and (min-height: 521px) {
+  .clock-readouts.has-smalls {
+    flex-direction: row;
+    gap: clamp(24px, 4vw, 80px);
+    --fit-w: calc(var(--usable-w) * 0.6);
+  }
+
+  .clock-readouts.has-smalls .clock-smalls {
+    flex-direction: column;
+    align-items: center;
+    gap: var(--gap-md);
+    margin-top: 0;
+    padding-left: clamp(24px, 4vw, 80px);
+    border-left: 1px solid var(--line-soft);
+  }
+
+  .clock-readouts.has-smalls .clock-smalls > * + * {
+    border-left: 0;
+    padding-left: 0;
+  }
+
+  .clock-readouts.has-smalls .clock-readout--small .clock-readout__value {
+    font-size: clamp(26px, 9.5vh, 112px);
+  }
+
+  /* With the Look sheet open beside the clock there is no room for both
+     (ticket 21 sets .has-sheet). */
+  .has-sheet .clock-readouts.has-smalls {
+    flex-direction: column;
+    --fit-w: var(--usable-w);
+  }
+
+  .has-sheet .clock-readouts.has-smalls .clock-smalls {
+    flex-direction: row;
+    margin-top: var(--gap-md);
+    padding-left: 0;
+    border-left: 0;
+  }
+}
+
+/* Edit mode: each Readout gets a remove button; an Add slot follows. */
+.clock-readout.is-editing .clock-readout__face {
+  outline: 1.5px dashed var(--line);
+  outline-offset: 6px;
+}
+
+.clock-readout.is-editing .clock-readout__face:focus-visible {
+  outline: var(--focus-width) solid var(--focus);
+}
+
+/* Remove: a labelled pill under the Readout, so it never covers digits and
+   works the same for touch, mouse and keyboard. */
+.clock-readout.is-editing {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s2);
+}
+
+.clock-readout__remove {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s1);
+  min-height: var(--tap);
+  padding: 0 var(--s4) 0 var(--s3);
+  border: 1.5px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--fg);
+  font-size: var(--type-ui-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.clock-readout-add {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s1);
+  min-width: 140px;
+  min-height: calc(var(--type-small) * 1.3);
+  padding: var(--s2) var(--s4);
+  border: 1.5px dashed var(--line);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--muted);
+  font-size: var(--type-ui-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.clock-readout-add .clock-icon {
+  width: 1.8em;
+  height: 1.8em;
+}
+
+.clock-smalls > .clock-readout-add {
+  border-left: 1.5px dashed var(--line);
+}
+
+/* While editing, the big Readout steps down to make room for the buttons;
+   editing is a teacher moment, not a projected one. */
+.clock-screen.is-editing {
+  --type-digits: 24vh;
+}
+
+.is-editing .clock-readout--big {
+  margin-top: var(--gap-sm);
+}
+
+.clock-edit-note {
+  margin-top: var(--gap-sm);
+  font-size: var(--type-ui-sm);
+  color: var(--muted);
+}
+
+/* ---------- up next, lines ---------- */
+
+.clock-next,
+.clock-line {
+  margin-top: var(--gap-sm);
+  font-size: var(--type-line);
+}
+
+.clock-next__label {
+  font-size: 0.6em;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent-text);
+  margin-right: 0.4em;
+  vertical-align: 0.15em;
+}
+
+.clock-next__at {
+  color: var(--muted);
+  margin-left: 0.3em;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.clock-line {
+  color: var(--muted);
+}
+
+/* ---------- bottom row: the bar's place and the window buttons ---------- */
+
+.clock-bottom {
+  grid-area: bottom;
+  display: flex;
+  align-items: flex-end;
+  gap: var(--gap-md);
+  min-height: var(--tap);
+}
+
+.clock-bar-slot {
+  flex: 1;
+  min-width: 0;
+}
+
+.clock-corner {
+  display: flex;
+  gap: 2px;
+  margin-left: auto;
+  flex: none;
+}
+
+/* ======================= plain panels and prompts ======================= */
+
+/* The timer's and the settings' controls, opened from the top bar: a plain
+   panel on the right until tickets 22 and 19 design them. */
+.clock-panel {
+  position: fixed;
+  z-index: 10;
+  top: calc(var(--edge-y) + var(--tap) + var(--s2));
+  right: var(--edge-x);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--s2);
+  width: min(400px, calc(100vw - 2 * var(--edge-x)));
+  max-height: calc(100vh - var(--edge-y) * 2 - var(--tap) - var(--s2));
+  overflow: auto;
+  padding: var(--s4);
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--fg);
+  box-shadow: var(--shadow);
+}
+
+/* Below the "Simulated time" banner too, when it shows. */
+.clock-screen.is-simulated ~ .clock-panel {
+  top: calc(var(--edge-y) + var(--tap) + var(--s2) + 40px);
+  max-height: calc(100vh - var(--edge-y) * 2 - var(--tap) - var(--s2) - 40px);
+}
+
+.clock-panel input,
+.clock-panel select {
+  background: var(--input-bg);
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+
+.clock-panel button,
+.clock-prompt button,
+.clock-sound-prompt button,
+.clock-ringing-card button {
+  min-height: var(--tap);
+  padding: 0 var(--s4);
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--fg);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* First visit: ask the Division (ticket 18 designs it). */
+.clock-prompt {
+  position: fixed;
+  z-index: 20;
+  inset: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-content: center;
+  justify-content: center;
+  gap: var(--s4);
+  padding: var(--s5);
+  background: color-mix(in srgb, var(--bg) 94%, transparent);
+  font-size: var(--type-ui-2xl);
+  text-align: center;
+}
+
+.clock-prompt p {
+  width: 100%;
+}
+
+/* What's transient sits bottom centre, over the bar, never over the digits. */
+.clock-sound-prompt,
+.clock-ringing-card {
+  position: fixed;
+  z-index: 9;
+  left: 50%;
+  bottom: calc(var(--edge-y) + var(--s2));
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  max-width: calc(100vw - 32px);
+  padding: var(--s2) var(--s2) var(--s2) var(--s4);
+  border: 1.5px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--fg);
+  box-shadow: var(--shadow);
+}
+
+.clock-sound-prompt:has(> button[hidden]) {
+  padding-right: var(--s4);
 }
 
 /* Ringing: the screen flashes once a second, well under the 3 flashes a
-   second WCAG 2.3.1 allows. Each flash also draws a thick outline, so colour
-   isn't the only signal; the "Ringing: …" banner says what rang. */
+   second WCAG 2.3.1 allows. Each flash also draws a thick frame, so colour
+   isn't the only signal; the ringing card says what rang. */
 .clock-ringing--flash {
-  animation: clock-flash 1s step-end infinite;
+  animation: clock-flash 1s step-end infinite; /* --flash-period */
 }
 
 @keyframes clock-flash {
   0% {
-    background: #fff3b0;
-    outline: 0.75rem solid #92400e;
-    outline-offset: -0.75rem;
+    background: var(--ring-wash);
+    outline: 14px solid var(--ring);
+    outline-offset: -14px;
   }
   50% {
     background: transparent;
@@ -34,18 +642,244 @@
   }
 }
 
-/* Reduced motion: the same highlight, held steady. */
+/* Reduced motion: the same frame and wash, held steady. */
 .clock-ringing--steady {
-  background: #fff3b0;
-  outline: 0.75rem solid #92400e;
-  outline-offset: -0.75rem;
+  background: var(--ring-wash);
+  outline: 14px solid var(--ring);
+  outline-offset: -14px;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .clock-ringing--flash {
     animation: none;
-    background: #fff3b0;
-    outline: 0.75rem solid #92400e;
-    outline-offset: -0.75rem;
+    background: var(--ring-wash);
+    outline: 14px solid var(--ring);
+    outline-offset: -14px;
+  }
+}
+
+/* ======================= breakpoints ======================= */
+
+/* compact: control labels collapse to icons (the names stay as accessible names) */
+@media (max-width: 760px), (max-height: 520px) {
+  .clock-control__label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .clock-control {
+    justify-content: center;
+    padding: 0;
+  }
+}
+
+/* short: laptop corner (480x320), landscape phone */
+@media (max-height: 520px) {
+  .clock-screen {
+    --edge-y: 6px;
+    --edge-x: 12px;
+    --type-digits: 40vh;
+    row-gap: 4px;
+    padding: 6px 12px 4px;
+  }
+
+  .clock-top {
+    min-height: 36px;
+  }
+
+  .clock-control,
+  .clock-chip {
+    min-height: 36px;
+    min-width: 36px;
+  }
+
+  .clock-control--icon {
+    width: 36px;
+  }
+
+  .clock-top__end {
+    gap: 4px;
+  }
+
+  .clock-chip {
+    font-size: 13px;
+  }
+
+  .clock-day {
+    font-size: 12px;
+  }
+
+  .clock-banner {
+    padding: 2px var(--s2);
+    font-size: 12px;
+  }
+
+  /* The bar is hidden here; the window buttons float in the corner. */
+  .clock-bar-slot {
+    display: none;
+  }
+
+  .clock-bottom {
+    position: absolute;
+    right: 12px;
+    bottom: 4px;
+    min-height: 0;
+  }
+
+  .clock-title {
+    font-size: calc(clamp(15px, 6.5vh, 40px) * var(--display-scale));
+  }
+
+  .clock-readout__caption {
+    font-size: 11px;
+  }
+
+  .clock-next,
+  .clock-line {
+    margin-top: 2px;
+    font-size: clamp(14px, 5.5vh, 30px);
+  }
+
+  .clock-smalls {
+    margin-top: 4px;
+  }
+
+  .clock-readout--small .clock-readout__value {
+    font-size: clamp(18px, 8vh, 40px);
+  }
+
+  .clock-readout--small .clock-readout__caption {
+    font-size: 10px;
+  }
+
+  .clock-sound-prompt,
+  .clock-ringing-card {
+    bottom: 8px;
+    padding: 4px 4px 4px 12px;
+  }
+
+  /* Editing: the Readouts sit in one row, everything else steps away. */
+  .clock-screen.is-editing {
+    --type-digits: 22vh;
+  }
+
+  .is-editing .clock-readouts,
+  .is-editing .clock-smalls {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 8px 12px;
+  }
+
+  .is-editing .clock-next,
+  .is-editing .clock-line,
+  .is-editing .clock-edit-note {
+    display: none;
+  }
+
+  .is-editing .clock-title {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+
+  .is-editing .clock-smalls {
+    margin-top: 0;
+  }
+
+  .is-editing .clock-smalls > * + * {
+    padding-left: 12px;
+  }
+
+  .is-editing .clock-readout--big {
+    margin-top: 0;
+  }
+
+  .is-editing .clock-readout-add {
+    min-width: 88px;
+    min-height: 0;
+    align-self: stretch;
+    padding: 4px 8px;
+  }
+}
+
+/* narrow: phone, portrait */
+@media (max-width: 520px) and (min-height: 521px) {
+  .clock-screen {
+    --edge-y: 16px;
+    --edge-x: 16px;
+    padding: 16px 16px 12px;
+    row-gap: 12px;
+  }
+
+  /* Controls take the first row, the Day Label the second. */
+  .clock-top {
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+
+  .clock-top__end {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .clock-controls {
+    flex: 1;
+    justify-content: space-between;
+  }
+
+  .clock-day {
+    order: 2;
+    width: 100%;
+    text-align: center;
+  }
+
+  .clock-title {
+    font-size: calc(26px * var(--display-scale));
+  }
+
+  .clock-next {
+    font-size: 22px;
+  }
+
+  .clock-next__label {
+    display: block;
+    margin: 0 0 4px;
+  }
+
+  .clock-line {
+    font-size: 18px;
+  }
+
+  .clock-smalls {
+    gap: 16px;
+  }
+
+  .clock-smalls > * + * {
+    padding-left: 16px;
+  }
+
+  .clock-readout--small .clock-readout__value {
+    font-size: 34px;
+  }
+
+  /* No Document Picture-in-Picture on phones, so no Mini player button. */
+  .clock-control--mini {
+    display: none;
+  }
+
+  .clock-sound-prompt,
+  .clock-ringing-card {
+    left: 16px;
+    right: 16px;
+    bottom: 16px;
+    transform: none;
   }
 }
