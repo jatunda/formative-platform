@@ -93,7 +93,8 @@
  *   recent first: the timer's quick picks.
  * - `showSeconds`: clock times and countdowns show seconds (a countdown's
  *   last minute and the timer always do).
- * - `dayStrip`: show the strip of the day's Segments.
+ * - `dayStrip`: the bar along the bottom shows the whole day (true) or just
+ *   this Segment (false). See `day-bar.js`.
  * - `theme`: the theme's id (`themes.js`); `fontSwap` / `paletteSwap` swap its
  *   font or palette for another pre-checked one (null keeps the theme's own).
  * - `flipped`: false follows the theme (its palette's own light or dark

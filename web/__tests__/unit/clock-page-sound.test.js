@@ -3,6 +3,7 @@ import { initClockApp } from '../../clock/clock.js';
 import { SETTINGS_KEY } from '../../clock/clock-storage.js';
 import { createFakeStorage } from '../helpers/fake-storage.js';
 import { createFakeSoundPlayer } from '../helpers/fake-sound-player.js';
+import { field, setValue } from '../helpers/clock-dom.js';
 
 /** A real clock the test moves by hand; the page's ticks come from fake timers. */
 function fakeRealClock(date) {
@@ -20,10 +21,9 @@ const mount = () => document.getElementById('clockApp');
 const pageText = () => mount().textContent.replace(/\s+/g, ' ');
 const button = (name) => [...mount().querySelectorAll('button')]
   .find((b) => (b.getAttribute('aria-label') ?? b.textContent.trim()) === name && !b.closest('[hidden]'));
-/** Open the Settings panel from the top bar, where the sound settings are. */
+/** Open the Settings drawer from the top bar, where the sound settings are. */
 const openSettings = () => button('Settings').click();
-const checkbox = (name) =>
-  [...mount().querySelectorAll('label')].find((l) => l.textContent.trim() === name).querySelector('input');
+const checkbox = (name) => field(name);
 const saved = (storage) => JSON.parse(storage.getItem(SETTINGS_KEY));
 const ringing = () => mount().querySelector('[aria-label="Ringing"]');
 
@@ -85,7 +85,7 @@ describe('School Clock sound', () => {
 
     it('says the tab must stay open for sounds', () => {
       open();
-      expect(pageText()).toContain('Keep this tab open for sounds to play');
+      expect(pageText()).toContain('Keep this tab open for Bells and Alarms to play. Minimised is fine.');
     });
   });
 
@@ -343,13 +343,16 @@ describe('School Clock sound', () => {
     it('previews each voice', () => {
       open();
       openSettings();
-      for (const name of ['Chime', 'School bell', 'Beep', 'Buzzer']) button(`Preview ${name}`).click();
+      for (const sound of ['chime', 'schoolBell', 'beep', 'buzzer']) {
+        setValue('Bell sound', sound);
+        button('Preview Bell sound').click();
+      }
       expect(player.played.map((p) => p.sound)).toEqual(['chime', 'schoolBell', 'beep', 'buzzer']);
     });
 
     it('chooses the Bells sound, which is saved and used for the coming Bells', () => {
       open({ sound: { state: 'running' } });
-      const select = [...mount().querySelectorAll('label')].find((l) => l.textContent.startsWith('Bell sound')).querySelector('select');
+      const select = field('Bell sound');
       expect(select.value).toBe('schoolBell');
 
       select.value = 'chime';
