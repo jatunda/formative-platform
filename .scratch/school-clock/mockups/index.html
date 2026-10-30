@@ -24,6 +24,13 @@
         box-shadow: 0 2px 10px rgb(0 0 0 / 0.06);
       }
       .direction__head { display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; }
+      .final {
+        margin-top: 32px;
+        padding: 24px;
+        border-radius: 14px;
+        background: #fff;
+        box-shadow: 0 0 0 3px #1f6fd1;
+      }
       .pitch { max-width: 900px; margin: 10px 0 18px; }
       .gallery { display: flex; flex-wrap: wrap; gap: 18px; align-items: flex-start; }
       figure { margin: 0; }
@@ -56,8 +63,20 @@
       switcher in its bottom-left corner, or address a state directly, e.g. <code>a/index.html#passing&amp;theme=light</code>.
       Add <code>&amp;clock=24</code> for the 24-hour time setting. Full-size screenshots: run
       <code>node .scratch/school-clock/mockups/shoot.mjs</code> and look in <code>shots/</code> (not committed). Notes from the
-      self-review are in <code>REVIEW.md</code>.
+      self-review are in <code>REVIEW.md</code>. The design reference built from Eric's pick (ticket 03) comes first, in
+      <code>final/</code>.
     </p>
+
+    <section class="final">
+      <div class="direction__head"><h2>Design reference (ticket 03)</h2><a href="final/index.html#period">Open the design reference</a><a href="final/DESIGN.md">Design notes</a><a href="final/REVIEW.md">Self-review</a></div>
+      <p class="pitch">
+        Eric's mix from ticket 02: A's layout, B's Day Strip (a setting), C's ring around a running timer only, a seconds
+        setting, and 15 themes shown as previews only. The default is the dark muted blue "Slate" theme. This is what
+        tickets 15 and 17–23 build against. Every state has its own URL, e.g.
+        <code>final/index.html#timer&amp;mode=light&amp;theme=team&amp;seconds=off&amp;strip=off&amp;clock=24</code>.
+      </p>
+      <div class="gallery" id="final-gallery"></div>
+    </section>
 
     <section class="direction" data-dir="a">
       <div class="direction__head"><h2>A · Monument</h2><a href="a/index.html#period">Open A</a></div>
@@ -96,6 +115,26 @@
     </section>
 
     <script>
+      // The design reference's frames.
+      for (const [state, w, h, s, label] of [
+        ['period', 1920, 1080, 0.2, 'In a Period · 1920×1080'],
+        ['readouts&mode=light', 1920, 1080, 0.2, 'Several Readouts · light'],
+        ['timer', 1920, 1080, 0.2, 'Timer with its ring'],
+        ['after', 1920, 1080, 0.2, 'After school · Next School Day strip'],
+        ['look', 1920, 1080, 0.2, 'Theme picker'],
+        ['period&theme=team', 1920, 1080, 0.2, 'A theme: navy and orange'],
+        ['period&theme=bloom&mode=light', 1920, 1080, 0.2, 'A theme: blush pink with flowers'],
+        ['period', 390, 844, 0.4, 'Phone'],
+        ['period', 480, 320, 0.5, 'Laptop corner'],
+        ['mini', 320, 180, 0.75, 'Mini player'],
+      ]) {
+        const fig = document.createElement('figure');
+        fig.innerHTML = `<div class="frame" style="width:${w * s}px;height:${h * s}px">
+            <iframe src="final/index.html#${state}&shot=1" title="Design reference: ${label}" width="${w}" height="${h}" style="width:${w}px;height:${h}px;transform:scale(${s})" loading="lazy" tabindex="-1"></iframe>
+          </div><figcaption><a href="final/index.html#${state}">${label}</a></figcaption>`;
+        document.getElementById('final-gallery').append(fig);
+      }
+
       // [state, width, height, scale, label]
       const FRAMES = [
         ['period', 1920, 1080, 0.2, 'In a Period · 1920×1080'],
