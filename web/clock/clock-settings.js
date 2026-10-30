@@ -91,6 +91,12 @@
  *   `timerEndsAt` is null). See `timer.js`.
  * - `recentDurations`: the last 3 distinct custom timer durations (ms), most
  *   recent first: the timer's quick picks.
+ * - `showSeconds`: clock times and countdowns show seconds (a countdown's
+ *   last minute and the timer always do).
+ * - `dayStrip`: show the strip of the day's Segments.
+ * - `theme`: the theme's id; `fontSwap` / `paletteSwap` swap its font or
+ *   palette for another pre-checked one (null keeps the theme's own).
+ * - `colorScheme`: the theme's light or dark version, or the device's ('auto').
  * The rest are the RingSettings fields.
  * @typedef {{
  *   division: Division | null,
@@ -103,8 +109,16 @@
  *   timerPausedMs: number | null,
  *   timerSound: SoundName,
  *   recentDurations: number[],
+ *   showSeconds: boolean,
+ *   dayStrip: boolean,
+ *   theme: string,
+ *   fontSwap: string | null,
+ *   paletteSwap: string | null,
+ *   colorScheme: ColorScheme,
  * }} ClockSettings
  */
+
+/** @typedef {'light' | 'dark' | 'auto'} ColorScheme */
 
 /** The Block Days shortcut: Bell Schedules with long (~85-minute) Periods. */
 export const BLOCK_DAYS = Object.freeze(['even', 'odd', 'lateStartEven', 'hsSuperSeminar']);

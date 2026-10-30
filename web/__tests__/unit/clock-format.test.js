@@ -84,3 +84,31 @@ describe('formatLongDuration', () => {
     expect(formatLongDuration(ms)).toBe(text);
   });
 });
+
+describe('durations with seconds off', () => {
+  const SEC = 1000;
+  const MIN = 60 * SEC;
+  const HOUR = 60 * MIN;
+  it.each([
+    [42 * MIN + 59 * SEC, '42 min'],
+    [MIN, '1 min'],
+    [HOUR + 5 * MIN + 30 * SEC, '1h 05m'],
+    [23 * HOUR + 59 * MIN + 59 * SEC, '23h 59m'],
+  ])('shows %i ms as whole minutes, rounded down: %s', (ms, text) => {
+    expect(formatDuration(ms, { seconds: false })).toBe(text);
+    expect(formatLongDuration(ms, { seconds: false })).toBe(text);
+  });
+
+  it('still shows seconds in the last minute', () => {
+    expect(formatDuration(59 * SEC + 999, { seconds: false })).toBe('0:59');
+    expect(formatLongDuration(5 * SEC, { seconds: false })).toBe('0:05');
+  });
+
+  it('leaves a day or more as days and hours', () => {
+    expect(formatLongDuration(2 * 24 * HOUR + 14 * HOUR + 59 * MIN, { seconds: false })).toBe('2d 14h');
+  });
+
+  it('shows seconds by default', () => {
+    expect(formatDuration(42 * MIN + 17 * SEC)).toBe('42:17');
+  });
+});

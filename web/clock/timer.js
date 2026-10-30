@@ -114,6 +114,20 @@ export function settleTimer(timer, now) {
 }
 
 /**
+ * The timer's time left in words, always with seconds: "4:59 left",
+ * "Paused · 4:00 left", or '' with no timer. Rounded up, so a 5 min timer
+ * reads 5:00 when it starts and 0:00 as it rings.
+ * @param {TimerState} timer @param {number} now epoch ms
+ * @returns {string}
+ */
+export function timerText(timer, now) {
+  const { status, remainingMs } = timerStatus(timer, now);
+  if (remainingMs === null) return '';
+  const left = `${formatDuration(Math.ceil(remainingMs / SECOND) * SECOND)} left`;
+  return status === 'paused' ? `Paused · ${left}` : left;
+}
+
+/**
  * Where the timer stands at `now`.
  * @param {TimerState} timer @param {number} now epoch ms
  * @returns {{ status: 'idle' | 'running' | 'paused', remainingMs: number | null }}
