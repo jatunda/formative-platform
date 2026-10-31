@@ -93,7 +93,7 @@
 
 .clock-fieldset__actions .clock-btn[aria-pressed="true"] {
   border-color: var(--accent);
-  color: var(--accent-text);
+  background: var(--accent-soft);
 }
 
 .clock-schedule-checks {
@@ -120,8 +120,18 @@
   gap: var(--s2);
 }
 
+.clock-time-row .clock-input--num {
+  width: 3.5em;
+  font-size: var(--type-ui-xl);
+}
+
+.clock-segmented--ampm .clock-segment {
+  white-space: nowrap;
+}
+
 .clock-time-row__colon {
-  padding-bottom: var(--s3);
+  padding-bottom: var(--s2);
+  font-size: var(--type-ui-xl);
   font-weight: 700;
 }
 
@@ -220,6 +230,6 @@
   }
 
   .clock-segmented--ampm {
-    min-width: 0;
+    min-width: 112px;
   }
 }
