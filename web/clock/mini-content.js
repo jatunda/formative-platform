@@ -1,11 +1,11 @@
 // @ts-check
 // What the School Clock's mini player shows, in words: a head line (the
-// current Segment with its Period Label, or "Timer"), the big Readout, and a
-// foot (how far through the Segment, up next, or the time left in the Segment
-// under a timer). Pure: the page's moment, settings and big Readout give it.
+// current Segment with its Period Label, or "Timer of 5:00"), the big Readout,
+// and a foot (how far through the Segment, up next, or the timer's bar and the
+// time left in the Segment under a timer). Pure: the page's moment, settings and big Readout give it.
 // What's ringing is the mini player's own overlay on top of this.
 import { displayText } from './display-text.js';
-import { formatClockTime, formatSegmentName } from './format.js';
+import { formatClockTime, formatDuration, formatSegmentName } from './format.js';
 import { readoutParts, readoutText } from './readouts.js';
 
 const SECOND = 1000;
@@ -15,11 +15,10 @@ const SECOND = 1000;
 /**
  * @typedef {{ kind: 'progress', label: string, percent: number, text: string }
  *   | { kind: 'next', name: string }
- *   | { kind: 'line', text: string }
  *   | { kind: 'none' }} MiniFoot
- * - `progress`: the just-this-Segment bar ("Period 3 progress", 93) and "ends 11:15 AM";
- * - `next`: "Up next" and the next Segment's name, with its Period Label;
- * - `line`: words only ("42:17 left in Period 3" under a timer).
+ * - `progress`: the just-this-Segment bar ("Period 3 progress", 93) and "ends 11:15 AM",
+ *   or under a timer its own bar ("Timer progress", the share left) and "42:17 left in Period 3";
+ * - `next`: "Up next" and the next Segment's name, with its Period Label.
  */
 
 /**
@@ -33,10 +32,11 @@ const SECOND = 1000;
  *   moment: import('./clock-model.js').Moment | null,
  *   settings: { use24Hour: boolean, showSeconds: boolean, periodLabels: Record<string, string> },
  *   big: Parts,
- *   timer: { remainingMs: number, paused: boolean } | null,
+ *   timer: { remainingMs: number, paused: boolean, totalMs: number | null, progress: number } | null,
  * }} state `moment` is null before a Division is chosen; `big` is the page's
  *   big Readout (ignored while `timer` shows); `timer` while one runs, is
- *   paused or has just rung.
+ *   paused or has just rung, with the length it was started with (null if
+ *   unknown) and the share of it left, 0–1.
  * @returns {MiniContent}
  */
 export function miniContent({ now, moment, settings, big, timer }) {
@@ -49,17 +49,22 @@ export function miniContent({ now, moment, settings, big, timer }) {
     : big;
   return {
     timer: Boolean(timer),
-    head: timer ? (timer.paused ? 'Timer · paused' : 'Timer') : segmentHead,
+    head: timer ? timerHead(timer) : segmentHead,
     readout,
-    foot: footFor(moment, settings, options, Boolean(timer)),
+    foot: footFor(moment, settings, options, timer),
   };
+}
+
+/** "Timer of 5:00", or "Timer of 5:00 · paused". @param {{ paused: boolean, totalMs: number | null }} timer */
+function timerHead({ paused, totalMs }) {
+  return `Timer${totalMs ? ` of ${formatDuration(totalMs)}` : ''}${paused ? ' · paused' : ''}`;
 }
 
 /**
  * @param {import('./clock-model.js').Moment | null} moment
  * @param {{ use24Hour: boolean, periodLabels: Record<string, string> }} settings
  * @param {{ use24Hour: boolean, seconds: boolean }} options
- * @param {boolean} timer
+ * @param {{ progress: number } | null} timer
  * @returns {MiniFoot}
  */
 function footFor(moment, settings, options, timer) {
@@ -67,7 +72,12 @@ function footFor(moment, settings, options, timer) {
     const current = /** @type {import('./clock-model.js').TimedSegment} */ (moment.current);
     const left = /** @type {number} */ (moment.timeLeftMs);
     if (timer) {
-      return { kind: 'line', text: `${readoutText({ kind: 'duration', ms: left, caption: 'left', long: false }, options)} in ${current.name}` };
+      return {
+        kind: 'progress',
+        label: 'Timer progress',
+        percent: Math.round(timer.progress * 100),
+        text: `${readoutText({ kind: 'duration', ms: left, caption: 'left', long: false }, options)} in ${current.name}`,
+      };
     }
     const elapsed = /** @type {number} */ (moment.timeElapsedMs);
     return {

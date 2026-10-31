@@ -1,7 +1,7 @@
 // The School Clock's mini player: an always-on-top window (Document
 // Picture-in-Picture, where it exists) laid out to the design reference: a
-// head line (the Segment, "Timer", or what's ringing), the big Readout, and a
-// foot (the Segment's bar and end, up next, or Dismiss while something
+// head line (the Segment, "Timer of 5:00", or what's ringing), the big Readout, and a
+// foot (the Segment's or timer's bar and words, up next, or Dismiss while something
 // rings). The page works out what to show (mini-content.js); this draws it
 // while the window is open. The window loads the page's tokens, themes and
 // components and mirrors the look attributes on the page's <html>, so it
@@ -135,7 +135,7 @@ export function createMiniPlayer({ pictureInPicture, onOpen, onDismiss, page = d
     mini.readoutCaption.textContent = readout.caption === 'now' ? '' : ` ${readout.caption}`;
     const kind = ringing === null ? foot.kind : 'dismiss';
     mini.progress.hidden = kind !== 'progress';
-    mini.sub.hidden = kind !== 'progress' && kind !== 'line';
+    mini.sub.hidden = kind !== 'progress';
     mini.next.hidden = kind !== 'next';
     mini.dismiss.hidden = kind !== 'dismiss';
     if (foot.kind === 'progress') {
@@ -143,7 +143,7 @@ export function createMiniPlayer({ pictureInPicture, onOpen, onDismiss, page = d
       mini.progress.setAttribute('aria-valuenow', String(foot.percent));
       mini.fill.style.width = `${foot.percent}%`;
     }
-    if (foot.kind === 'progress' || foot.kind === 'line') mini.sub.textContent = foot.text;
+    if (foot.kind === 'progress') mini.sub.textContent = foot.text;
     if (foot.kind === 'next') mini.nextName.textContent = foot.name;
   }
 

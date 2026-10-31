@@ -226,20 +226,23 @@ describe('School Clock fullscreen, mini player and feedback', () => {
       expect(footText()).toMatch(/^Up next Period 1/);
     });
 
-    it('shows a running timer as the big Readout, with the time left in the Segment underneath', async () => {
+    it('shows a running timer as the big Readout, of its length, with its bar and the time left in the Segment', async () => {
       open();
       button('Timer').click();
       button('5 min', picker()).click();
       await openMini();
-      expect(head()).toBe('Timer');
+      expect(head()).toBe('Timer of 5:00');
       expect(readout()).toBe('5:00 left');
       expect(footText()).toBe('3:00 left in Period 3');
+      expect(progress().getAttribute('aria-label')).toBe('Timer progress');
+      expect(progress().getAttribute('aria-valuenow')).toBe('100');
       expect(miniMain().classList.contains('has-timer')).toBe(true);
 
-      advance(SEC);
-      expect(readout()).toBe('4:59 left');
+      advance(60 * SEC);
+      expect(readout()).toBe('4:00 left');
+      expect(progress().getAttribute('aria-valuenow')).toBe('80');
       button('Pause', timerRing()).click();
-      expect(head()).toBe('Timer · paused');
+      expect(head()).toBe('Timer of 5:00 · paused');
 
       button('Cancel', timerRing()).click();
       expect(head()).toBe('Period 3');

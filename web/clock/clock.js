@@ -31,7 +31,7 @@ import { createAlarmEditor } from './alarm-editor.js';
 import { DIVISIONS, FEEDBACK_HREF, createSettingsDrawer } from './settings-drawer.js';
 import { applyLook, createLookSheet, decorations } from './look-sheet.js';
 import { BELL_SECONDS, ALARM_MAX_SECONDS, SOUND_NAMES, createSoundPlayer } from './sound.js';
-import { cancelTimer, pauseTimer, resumeTimer, settleTimer, timerRingView, timerStatus, timerText } from './timer.js';
+import { cancelTimer, pauseTimer, resumeTimer, settleTimer, timerProgress, timerRingView, timerStatus, timerText } from './timer.js';
 import { createTimerPicker } from './timer-picker.js';
 import { createTimerRing } from './timer-ring.js';
 
@@ -460,8 +460,10 @@ export function initClockApp({
    */
   function renderMini(now, moment, big) {
     const { status, remainingMs } = timerStatus(settings, now.getTime());
-    let timer = remainingMs === null ? null : { remainingMs, paused: status === 'paused' };
-    if (!timer && timerRinging) timer = { remainingMs: 0, paused: false };
+    let timer = remainingMs === null ? null : {
+      remainingMs, paused: status === 'paused', totalMs: settings.timerTotalMs ?? null, progress: timerProgress(settings, now.getTime()),
+    };
+    if (!timer && timerRinging) timer = { remainingMs: 0, paused: false, totalMs: rangTotalMs, progress: 0 };
     mini.show(miniContent({ now, moment, settings, big, timer }));
   }
   function renderMiniRinging() {
