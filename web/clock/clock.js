@@ -643,7 +643,7 @@ export function initClockApp({
     const withTimer = timer !== '' || timerRinging;
     mainScreen.classList.toggle('has-timer', withTimer);
     if (withTimer) timerRing.show(timerRingView(settings, now.getTime(), { rangTotalMs }));
-    const values = layout.readouts.map(({ mode }) => readoutValue(mode, moment, now));
+    const values = layout.readouts.map(({ mode }) => readoutValue(mode, moment, now, settings.periodLabels));
     const parts = values.map((value) => readoutParts(value, options));
     // Beside the ring, the old main Readout's time left names its Segment
     // (the heading steps aside for the ring).

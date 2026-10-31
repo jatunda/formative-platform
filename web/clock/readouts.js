@@ -8,7 +8,7 @@
 // current time either way. So a Readout keeps its place in the cycle as the
 // day moves between in-school and Off-Hours.
 
-import { formatClockTime, formatDuration, formatLongDuration, formatShortDate } from './format.js';
+import { formatClockTime, formatDuration, formatLongDuration, formatSegmentName, formatShortDate } from './format.js';
 
 /** @typedef {'countdown' | 'countup' | 'clock'} ReadoutMode */
 
@@ -50,9 +50,10 @@ export function defaultMode(moment) {
  * @param {ReadoutMode} mode
  * @param {import('./clock-model.js').Moment} moment `describeMoment(now, ...)`
  * @param {Date} now
+ * @param {Record<string, string>} [periodLabels] Period name -> label, for the Period a Passing Period leads to
  * @returns {ReadoutValue}
  */
-export function readoutValue(mode, moment, now) {
+export function readoutValue(mode, moment, now, periodLabels = {}) {
   /** @type {ReadoutValue} */
   const time = { kind: 'time', at: now };
   /** @type {(ms: number | null, caption: string, long?: boolean) => ReadoutValue} */
@@ -64,7 +65,10 @@ export function readoutValue(mode, moment, now) {
       : duration(moment.timeElapsedMs, 'since start');
   }
   // With no Segment to count up from, a Passing Period shows what's left of it either way.
-  if (moment.state === 'passing') return duration(moment.timeLeftMs, `until ${/** @type {import('./clock-model.js').TimedSegment} */ (moment.upNext).name}`);
+  if (moment.state === 'passing') {
+    const next = /** @type {import('./clock-model.js').TimedSegment} */ (moment.upNext);
+    return duration(moment.timeLeftMs, `until ${formatSegmentName(next, periodLabels)}`);
+  }
   if (mode === 'countup') return duration(moment.sinceSchoolEndedMs, 'since school ended', true);
   const first = moment.nextSchoolDay?.firstSegment.start;
   const caption = moment.state === 'beforeSchool' || !first ? 'until school starts' : `until ${formatShortDate(first)}`;
