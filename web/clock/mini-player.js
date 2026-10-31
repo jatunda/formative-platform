@@ -44,7 +44,7 @@ export function createMiniPlayer({ pictureInPicture, onOpen, onDismiss }) {
     const doc = win.document;
     doc.title = 'School Clock';
     // The page's tokens then its components, so the window follows the theme.
-    for (const href of ['/clock/tokens.css', '/clock/clock.css']) {
+    for (const href of ['/clock/tokens.css', '/clock/themes.css', '/clock/clock.css']) {
       const stylesheet = doc.createElement('link');
       stylesheet.rel = 'stylesheet';
       stylesheet.href = href;
@@ -84,6 +84,10 @@ export function createMiniPlayer({ pictureInPicture, onOpen, onDismiss }) {
     button,
     show({ readout, status, upNext }) {
       if (!mini) return;
+      // The page's look (look-sheet.js puts it on <html>), redone with every render.
+      for (const name of ['data-mode', 'data-palette', 'data-font']) {
+        mini.win.document.documentElement.setAttribute(name, document.documentElement.getAttribute(name));
+      }
       mini.readout.textContent = readout;
       mini.status.textContent = status;
       mini.upNext.textContent = upNext;

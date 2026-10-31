@@ -42,7 +42,8 @@
   align-self: stretch;
   min-height: 0;
   container-type: size;
-  --ring-d: min(100cqh, 56vw);
+  /* No wider than the stage allows (the Look sheet narrows it), leaving room for the side column. */
+  --ring-d: min(100cqh, 56vw, 60cqw);
 }
 
 .clock-readouts.has-timer .clock-smalls {
