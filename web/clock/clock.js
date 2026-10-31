@@ -14,7 +14,6 @@ import { createSettingsStore } from './clock-storage.js';
 import { createClockSource } from './clock-source.js';
 import { createDayBarView } from './day-bar-view.js';
 import { describeBar } from './day-bar.js';
-import { displayText } from './display-text.js';
 import { el } from './dom.js';
 import { formatClockTime, formatSegmentName, formatShortDate } from './format.js';
 import { icon } from './icons.js';
@@ -25,6 +24,7 @@ import { addReadout, canAddReadout, createLayoutStore, cycleReadout, newLayout, 
 import { readoutParts, readoutValue } from './readouts.js';
 import { TEST_RING_WORDS, nextRingLines, ringWords } from './ring-words.js';
 import { createReadoutsView } from './readouts-view.js';
+import { createStageTextView } from './stage-text-view.js';
 import { SCHOOL_YEARS } from './school-years.js';
 import { createWakeLockKeeper, detectCapabilities } from './screen.js';
 import { createAlarmEditor } from './alarm-editor.js';
@@ -427,12 +427,12 @@ export function initClockApp({
   // (the bar, then the window buttons).
   const dayBar = createDayBarView();
   const banner = el('p', { className: 'clock-banner' });
-  const dayLine = el('p', { className: 'clock-day' });
-  const heading = el('h1', { className: 'clock-title' });
-  const underLine = el('p');
-  const stage = el('section', { className: 'clock-stage', 'aria-label': 'Clock' }, [heading, readoutsView.element, underLine, editNote]);
+  const stageText = createStageTextView();
+  const stage = el('section', { className: 'clock-stage', 'aria-label': 'Clock' }, [
+    stageText.heading, readoutsView.element, stageText.underLine, editNote,
+  ]);
   const top = el('header', { className: 'clock-top' }, [
-    dayLine,
+    stageText.day,
     el('div', { className: 'clock-top__end' }, [
       el('nav', { className: 'clock-controls', 'aria-label': 'Clock controls' },
         [timerControl, bellsControl, readoutsControl,
@@ -510,7 +510,7 @@ export function initClockApp({
     banner.replaceChildren(icon('clock'), el('span', {
       textContent: `Simulated time · ${formatShortDate(now)}, ${text.now(now)} · this tab only`,
     }));
-    renderStageText(now, moment);
+    stageText.show(now, moment, settings);
     renderMini(now, moment, renderReadouts(now, moment));
     renderBar(now, moment, text);
     drawer.showRings(chosen ? nextRingLines(now, schoolYears, settings, text) : []);
@@ -527,44 +527,6 @@ export function initClockApp({
       ? describeBar(now, moment, schoolYears, { division: settings.division, dayStrip: settings.dayStrip, periodLabels: settings.periodLabels })
       : null;
     dayBar.show(bar, (date) => text.time(date));
-  }
-
-  /** "All Day · Tue, Oct 27", with the dot spaced apart. @param {string} day */
-  function showDay(day) {
-    const [label, date] = day.split(' · ');
-    dayLine.replaceChildren(...(date ? [
-      label, ' ', el('span', { className: 'clock-day__dot', 'aria-hidden': 'true', textContent: '·' }), ' ', date,
-    ] : [label]));
-  }
-
-  /**
-   * The Day Label, the heading and the line under the Readouts.
-   * @param {Date} now @param {import('./clock-model.js').Moment | null} moment
-   */
-  function renderStageText(now, moment) {
-    if (!moment) {
-      showDay(formatShortDate(now));
-      heading.replaceChildren(el('span', { className: 'visually-hidden', textContent: 'School Clock' }));
-      underLine.replaceChildren();
-      return;
-    }
-    const words = displayText(now, moment, settings);
-    showDay(words.day);
-    heading.replaceChildren(words.title, ...(words.tag ? [
-      ' ', el('span', { className: 'clock-title__dot', 'aria-hidden': 'true', textContent: '·' }), ' ',
-      el('span', { className: 'clock-title__tag', textContent: words.tag }),
-    ] : []));
-    if (words.upNext) {
-      underLine.className = 'clock-next';
-      underLine.replaceChildren(
-        el('span', { className: 'clock-next__label', textContent: 'Up next' }), ' ',
-        el('span', { textContent: words.upNext.name }), ' ',
-        el('span', { className: 'clock-next__at', textContent: words.upNext.at }),
-      );
-    } else {
-      underLine.className = 'clock-line';
-      underLine.textContent = words.line ?? '';
-    }
   }
 
   /**
