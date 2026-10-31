@@ -89,6 +89,8 @@
  * - `volume`: 0–1, for every sound.
  * - `timerPausedMs`: a paused timer's time left (null unless paused; then
  *   `timerEndsAt` is null). See `timer.js`.
+ * - `timerTotalMs`: the length the timer was started with (its ring's whole),
+ *   or null with no timer.
  * - `recentDurations`: the last 3 distinct custom timer durations (ms), most
  *   recent first: the timer's quick picks.
  * - `showSeconds`: clock times and countdowns show seconds (a countdown's
@@ -107,6 +109,7 @@
  *   volume: number,
  *   timerEndsAt: number | null,
  *   timerPausedMs: number | null,
+ *   timerTotalMs: number | null,
  *   timerSound: SoundName,
  *   recentDurations: number[],
  *   showSeconds: boolean,

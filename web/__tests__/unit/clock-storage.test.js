@@ -41,7 +41,7 @@ describe('clock settings store', () => {
     const settings = {
       division: 'MS', use24Hour: true, periodLabels: { 'Period 3': 'AP CSA', Seminar: 'Advisory' },
       bells: { on: false, sound: 'chime' }, alarms: [clockAlarm, onceAlarm, periodAlarm],
-      volume: 0.25, timerEndsAt: 1793000000000, timerPausedMs: null, timerSound: 'buzzer',
+      volume: 0.25, timerEndsAt: 1793000000000, timerPausedMs: null, timerTotalMs: 300000, timerSound: 'buzzer',
       recentDurations: [450000, 900000],
       showSeconds: false, dayStrip: false, theme: 'chalkboard', fontSwap: 'serif-1', paletteSwap: 'ocean',
       colorScheme: 'light',
@@ -84,6 +84,13 @@ describe('clock settings store', () => {
     ['to the 3 most recent', [1000, 2000, 3000, 4000], [1000, 2000, 3000]],
   ])('keeps the quick picks %s', (_, saved, kept) => {
     expect(storeHolding({ recentDurations: saved }).load().recentDurations).toEqual(kept);
+  });
+
+  it("keeps a timer's length only while there is a timer, and only when it is a length", () => {
+    expect(DEFAULT_SETTINGS.timerTotalMs).toBeNull();
+    expect(storeHolding({ timerPausedMs: 180000, timerTotalMs: 300000 }).load().timerTotalMs).toBe(300000);
+    expect(storeHolding({ timerTotalMs: 300000 }).load().timerTotalMs).toBeNull();
+    expect(storeHolding({ timerEndsAt: 1793000000000, timerTotalMs: 'x' }).load().timerTotalMs).toBeNull();
   });
 
   it.each([0, -1000, 'soon'])('defaults a paused timer of %s', (saved) => {

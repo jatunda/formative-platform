@@ -5,9 +5,11 @@
 // throttled tab or a sleeping laptop never makes it drift.
 
 /**
- * The timer fields of `ClockSettings`. At most one is non-null: `timerEndsAt`
- * (epoch ms) while it runs, `timerPausedMs` (time left) while it's paused.
- * @typedef {{ timerEndsAt: number | null, timerPausedMs: number | null }} TimerState
+ * The timer fields of `ClockSettings`. At most one of the first two is
+ * non-null: `timerEndsAt` (epoch ms) while it runs, `timerPausedMs` (time
+ * left) while it's paused. `timerTotalMs` is the length it was started with
+ * (the ring's whole), kept through pauses; null or missing when unknown.
+ * @typedef {{ timerEndsAt: number | null, timerPausedMs: number | null, timerTotalMs?: number | null }} TimerState
  */
 
 import { formatDuration } from './format.js';
@@ -60,10 +62,35 @@ export function parseDuration(text) {
   } else {
     return { ok: false, error: 'Type minutes (like 7) or minutes:seconds (like 7:30).' };
   }
-  ms = Math.round(ms / SECOND) * SECOND;
-  if (ms < SECOND) return { ok: false, error: 'The timer needs at least 1 second.' };
-  if (ms > MAX_DURATION_MS) return { ok: false, error: 'The timer can run for 24 hours at most.' };
-  return { ok: true, ms };
+  return inRange(ms);
+}
+
+/**
+ * A duration rounded to whole seconds, if a timer can run that long.
+ * @param {number} ms
+ * @returns {{ ok: true, ms: number } | { ok: false, error: string }}
+ */
+function inRange(ms) {
+  const rounded = Math.round(ms / SECOND) * SECOND;
+  if (rounded < SECOND) return { ok: false, error: 'The timer needs at least 1 second.' };
+  if (rounded > MAX_DURATION_MS) return { ok: false, error: 'The timer can run for 24 hours at most.' };
+  return { ok: true, ms: rounded };
+}
+
+/**
+ * The picker's custom row: a Minutes field and a Seconds field. With the
+ * seconds left empty, the minutes field takes anything `parseDuration` does
+ * ("7", "1.5", "7:30"); with seconds, the minutes are whole (or empty, for 0).
+ * @param {string} minutes @param {string} seconds
+ * @returns {{ ok: true, ms: number } | { ok: false, error: string }}
+ */
+export function parseMinutesSeconds(minutes, seconds) {
+  const m = minutes.trim();
+  const s = seconds.trim();
+  if (s === '') return m === '' ? { ok: false, error: 'Type the minutes (and seconds) to time.' } : parseDuration(m);
+  if (!/^\d{1,2}$/.test(s) || Number(s) > 59) return { ok: false, error: 'Seconds go from 0 to 59.' };
+  if (!/^\d*$/.test(m)) return { ok: false, error: 'Use whole minutes with seconds, like 7 : 30.' };
+  return inRange(Number(m) * MINUTE + Number(s) * SECOND);
 }
 
 /**
@@ -72,7 +99,7 @@ export function parseDuration(text) {
  * @returns {TimerState}
  */
 export function startTimer(durationMs, now) {
-  return { timerEndsAt: now + durationMs, timerPausedMs: null };
+  return { timerEndsAt: now + durationMs, timerPausedMs: null, timerTotalMs: durationMs };
 }
 
 /**
@@ -83,7 +110,7 @@ export function startTimer(durationMs, now) {
  */
 export function pauseTimer(timer, now) {
   if (timer.timerEndsAt === null) return timer;
-  return { timerEndsAt: null, timerPausedMs: Math.max(0, timer.timerEndsAt - now) };
+  return { timerEndsAt: null, timerPausedMs: Math.max(0, timer.timerEndsAt - now), timerTotalMs: timer.timerTotalMs ?? null };
 }
 
 /**
@@ -94,12 +121,12 @@ export function pauseTimer(timer, now) {
  */
 export function resumeTimer(timer, now) {
   if (timer.timerPausedMs === null) return timer;
-  return startTimer(timer.timerPausedMs, now);
+  return { ...startTimer(timer.timerPausedMs, now), timerTotalMs: timer.timerTotalMs ?? null };
 }
 
 /** No timer at all. @returns {TimerState} */
 export function cancelTimer() {
-  return { timerEndsAt: null, timerPausedMs: null };
+  return { timerEndsAt: null, timerPausedMs: null, timerTotalMs: null };
 }
 
 /**
@@ -136,4 +163,43 @@ export function timerStatus(timer, now) {
   if (timer.timerEndsAt !== null) return { status: 'running', remainingMs: Math.max(0, timer.timerEndsAt - now) };
   if (timer.timerPausedMs !== null) return { status: 'paused', remainingMs: timer.timerPausedMs };
   return { status: 'idle', remainingMs: null };
+}
+
+/**
+ * The share of the timer's length still left, 0–1, for its ring: exact (not
+ * rounded to the second), so the ring moves a little every tick. Full when the
+ * length is unknown; 0 with no timer.
+ * @param {TimerState} timer @param {number} now epoch ms
+ */
+export function timerProgress(timer, now) {
+  const { remainingMs } = timerStatus(timer, now);
+  if (remainingMs === null) return 0;
+  const total = timer.timerTotalMs;
+  if (!total) return 1;
+  return Math.min(1, Math.max(0, remainingMs / total));
+}
+
+/**
+ * What the timer's ring shows: the time left (always with seconds, rounded
+ * up), the length it was started with, the share left, and the digits'
+ * accessible name. `rangTotalMs` is the length of a timer that has rung and
+ * is gone (it shows 0:00 until dismissed).
+ * @param {TimerState} timer @param {number} now epoch ms
+ * @param {{ rangTotalMs?: number | null }} [rung]
+ * @returns {{ status: 'running' | 'paused' | 'done', left: string, total: string | null, progress: number, label: string }}
+ */
+export function timerRingView(timer, now, { rangTotalMs = null } = {}) {
+  const { status, remainingMs } = timerStatus(timer, now);
+  const done = status === 'idle';
+  const totalMs = done ? rangTotalMs : timer.timerTotalMs;
+  const left = formatDuration(done ? 0 : Math.ceil(remainingMs / SECOND) * SECOND);
+  const total = totalMs ? formatDuration(totalMs) : null;
+  const state = { running: '', paused: 'paused, ', idle: "time's up, " }[status];
+  return {
+    status: done ? 'done' : status,
+    left,
+    total,
+    progress: done ? 0 : timerProgress(timer, now),
+    label: `Timer, ${state}${left} left${total ? ` of ${total}` : ''}`,
+  };
 }
