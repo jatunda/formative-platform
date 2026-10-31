@@ -129,6 +129,36 @@ describe('School Clock Alarm editor', () => {
       expect([inForm('Hour').value, inForm('Minute').value]).toEqual(['15', '20']);
     });
 
+    it('follows a switch to or from 24-hour time while its form is open, keeping the time typed', () => {
+      open();
+      button('Clock Alarm', section()).click();
+      setValue('Hour', '3', form());
+      setValue('Minute', '20', form());
+      field('PM', form()).click();
+
+      toggle('24-hour time');
+
+      expect(inForm('AM')).toBeUndefined();
+      expect([inForm('Hour').value, inForm('Minute').value]).toEqual(['15', '20']);
+
+      toggle('24-hour time');
+
+      expect([inForm('Hour').value, inForm('Minute').value]).toEqual(['3', '20']);
+      expect(inForm('PM').checked).toBe(true);
+      button('Save Alarm', form()).click();
+      expect(saved(storage).alarms[0].time).toBe('15:20');
+    });
+
+    it('leaves a time it cannot read as typed when 24-hour time is switched', () => {
+      open();
+      button('Clock Alarm', section()).click();
+      setValue('Hour', '99', form());
+      toggle('24-hour time');
+      expect(inForm('Hour').value).toBe('99');
+      button('Save Alarm', form()).click();
+      expect(form().querySelector('[role="alert"]').textContent).toBe('Enter a time from 00:00 to 23:59.');
+    });
+
     it('opens a morning time as two-digit 24-hour', () => {
       open({ settings: { use24Hour: true, alarms: [CLOCK_ALARM] } });
       button('Edit Morning duty').click();

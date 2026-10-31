@@ -36,7 +36,12 @@ function segmented(name, groupLabel, options, chosen, onChange) {
   });
   const group = el('div', { className: 'clock-segmented', role: 'radiogroup', 'aria-label': groupLabel },
     inputs.map(({ label }) => label));
-  return { group, value: () => inputs.find(({ input }) => input.checked)?.input.value };
+  return {
+    group,
+    value: () => inputs.find(({ input }) => input.checked)?.input.value,
+    /** @param {string} value */
+    choose: (value) => { for (const { input } of inputs) input.checked = input.value === value; },
+  };
 }
 
 /** A checkbox with its words beside it. @param {string} words @param {boolean} checked */
@@ -116,7 +121,8 @@ export function createAlarmEditor({ settings, update, play, now, schoolYears }) 
 
   /**
    * The open form: which Alarm it edits (null for a new one), its element, and
-   * how to bring its Period checklist's labels up to date.
+   * how to bring it up to date with the settings (a Period Alarm's Period
+   * labels, a Clock Alarm's 12/24-hour time).
    * @type {{ id: string | null, kind: 'clock' | 'period', form: HTMLFormElement, relabel: () => void } | null}
    */
   let editing = null;
@@ -212,7 +218,7 @@ export function createAlarmEditor({ settings, update, play, now, schoolYears }) 
 
   /** @param {ClockAlarm | null} alarm */
   function clockForm(alarm) {
-    const use24Hour = settings().use24Hour;
+    let use24Hour = settings().use24Hour;
     const parts = alarm ? timeFields(alarm.time, use24Hour) : { hour: '', minute: '', pm: false };
     /** @param {string} words @param {string} value */
     const timeField = (words, value) => {
@@ -232,15 +238,31 @@ export function createAlarmEditor({ settings, update, play, now, schoolYears }) 
     some.input.checked = (alarm?.bellSchedules ?? null) !== null;
     schedules.element.hidden = !some.input.checked;
 
+    const timeRow = el('div', { className: 'clock-time-row' }, [
+      hour.label, el('span', { className: 'clock-time-row__colon', 'aria-hidden': 'true', textContent: ':' }), minute.label,
+      ...(use24Hour ? [] : [ampm.group]),
+    ]);
+    const readTime = () => parseTime(hour.input.value, minute.input.value, use24Hour ? null : ampm.value() === 'pm');
+    /** 24-hour time switched while the form is open: show the time typed the new way (as typed, if it can't be read). */
+    const followClock = () => {
+      if (settings().use24Hour === use24Hour) return;
+      const time = readTime();
+      use24Hour = settings().use24Hour;
+      if (use24Hour) ampm.group.remove();
+      else timeRow.append(ampm.group);
+      if (time === null) return;
+      const fields = timeFields(time, use24Hour);
+      hour.input.value = fields.hour;
+      minute.input.value = fields.minute;
+      ampm.choose(fields.pm ? 'pm' : 'am');
+    };
+
     const form = formFrame(alarm, 'clock', [
-      fieldset('Time', [el('div', { className: 'clock-time-row' }, [
-        hour.label, el('span', { className: 'clock-time-row__colon', 'aria-hidden': 'true', textContent: ':' }), minute.label,
-        ...(use24Hour ? [] : [ampm.group]),
-      ])]),
+      fieldset('Time', [timeRow]),
       fieldset('Repeats', [repeat.group]),
       fieldset('Bell Schedules', [some.label, schedules.element]),
     ], (base) => {
-      const time = parseTime(hour.input.value, minute.input.value, use24Hour ? null : ampm.value() === 'pm');
+      const time = readTime();
       if (time === null) return use24Hour ? 'Enter a time from 00:00 to 23:59.' : 'Enter a time from 1:00 to 12:59.';
       const bellSchedules = some.input.checked ? schedules.value() : null;
       if (bellSchedules?.length === 0) return 'Tick at least one Bell Schedule.';
@@ -249,7 +271,7 @@ export function createAlarmEditor({ settings, update, play, now, schoolYears }) 
         ? { ...base, kind, bellSchedules, time, repeat: 'once', date: onceDate(time, now()) }
         : { ...base, kind, bellSchedules, time, repeat: 'everySchoolDay' };
     });
-    return { form, relabel: () => {} };
+    return { form, relabel: followClock };
   }
 
   /** @param {PeriodAlarm | null} alarm */
