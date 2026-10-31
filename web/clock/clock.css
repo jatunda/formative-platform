@@ -852,6 +852,10 @@ button.clock-readout__face {
     margin: 0;
   }
 
+  .clock-screen:has(> .clock-bottom > .clock-sound-prompt:not([hidden])) {
+    --type-digits: 34vh;
+  }
+
   .clock-title {
     font-size: calc(clamp(15px, 6.5vh, 40px) * var(--display-scale));
   }
@@ -860,10 +864,16 @@ button.clock-readout__face {
     font-size: 11px;
   }
 
+  /* Kept clear of the floating window buttons, which reach 98px in from
+     the right edge (two 36px buttons, their 2px gap, the row's 24px inset),
+     plus 6px, on both sides so the line stays centred; a long one wraps. */
   .clock-next,
   .clock-line {
+    max-width: calc(100vw - 2 * (24px + 2 * 36px + 2px + 6px));
     margin-top: 2px;
     font-size: clamp(14px, 5.5vh, 30px);
+    line-height: 1.2;
+    text-wrap: balance;
   }
 
   .clock-smalls {
