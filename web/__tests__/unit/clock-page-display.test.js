@@ -5,6 +5,7 @@ import { SETTINGS_KEY } from '../../clock/clock-storage.js';
 import { createFakeStorage } from '../helpers/fake-storage.js';
 import { createFakeSoundPlayer } from '../helpers/fake-sound-player.js';
 import { createFakePictureInPicture } from '../helpers/fake-screen.js';
+import { field, toggle } from '../helpers/clock-dom.js';
 
 const SEC = 1000;
 const MIN = 60 * SEC;
@@ -14,13 +15,8 @@ const isShown = (node) => !node.closest('[hidden]');
 /** A visible button by its accessible name (its aria-label, else its text). */
 const button = (name, root = mount()) => [...root.querySelectorAll('button')]
   .find((b) => (b.getAttribute('aria-label') ?? b.textContent.replace(/\s+/g, ' ').trim()) === name && isShown(b));
-const checkbox = (name) =>
-  [...mount().querySelectorAll('label')].find((l) => l.textContent.trim() === name).querySelector('input');
-const toggle = (name) => {
-  const box = checkbox(name);
-  box.checked = !box.checked;
-  box.dispatchEvent(new Event('change'));
-};
+/** A setting's switch in the Settings drawer, by its name. */
+const checkbox = (name) => field(name);
 const readouts = () => [...mount().querySelectorAll('.clock-readout')].map((r) => ({
   text: r.querySelector('.clock-readout__face').textContent.replace(/\s+/g, ' ').trim(),
   big: r.classList.contains('clock-readout--big'),
@@ -129,23 +125,12 @@ describe('School Clock display preferences', () => {
     });
   });
 
-  describe('the Day Strip setting', () => {
-    it('is on by default, and turning it off is saved and survives a reload', () => {
-      open({ when: at(10, 32) });
-      expect(checkbox('Day Strip').checked).toBe(true);
-      toggle('Day Strip');
-      expect(saved(storage).dayStrip).toBe(false);
-      open();
-      expect(checkbox('Day Strip').checked).toBe(false);
-    });
-
-    it('leaves the look preferences it does not show as they were saved', () => {
-      withSettings({ theme: 'chalkboard', fontSwap: 'serif-1', paletteSwap: 'ocean', colorScheme: 'auto' });
-      open({ when: at(10, 32) });
-      toggle('Day Strip');
-      expect(saved(storage)).toMatchObject({
-        dayStrip: false, theme: 'chalkboard', fontSwap: 'serif-1', paletteSwap: 'ocean', colorScheme: 'auto',
-      });
+  it('leaves the look preferences the Settings drawer does not show as they were saved', () => {
+    withSettings({ dayStrip: false, theme: 'chalkboard', fontSwap: 'serif-1', paletteSwap: 'ocean', colorScheme: 'auto' });
+    open({ when: at(10, 32) });
+    toggle('Show seconds');
+    expect(saved(storage)).toMatchObject({
+      showSeconds: false, dayStrip: false, theme: 'chalkboard', fontSwap: 'serif-1', paletteSwap: 'ocean', colorScheme: 'auto',
     });
   });
 
@@ -154,7 +139,7 @@ describe('School Clock display preferences', () => {
     const small = (text) => ({ text, big: false });
     const tapReadout = (i) => mount().querySelectorAll('button.clock-readout__face')[i].click();
     const savedLayouts = () => [tabStorage, storage].map((area) => area.getItem(LAYOUT_KEY));
-    const ringing = () => mount().querySelector('[aria-label="Ringing"]');
+    const ringing = () => mount().querySelector('[role="alertdialog"]');
 
     /** In Period 3, a layout of time left (big) and the current time. */
     function openWithTwoReadouts() {

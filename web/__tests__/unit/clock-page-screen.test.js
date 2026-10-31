@@ -11,7 +11,7 @@ const mount = () => document.getElementById('clockApp');
 const button = (name, root = mount()) => [...root.querySelectorAll('button')]
   .find((b) => (b.getAttribute('aria-label') ?? b.textContent.trim()) === name && !b.closest('[hidden]'));
 const bigReadout = () => mount().querySelector('.clock-readout--big .clock-readout__face').textContent.replace(/\s+/g, ' ').trim();
-const ringing = () => mount().querySelector('[aria-label="Ringing"]');
+const ringing = () => mount().querySelector('[role="alertdialog"]');
 /** Let the capability promises (fullscreen, wake lock, PiP) settle. */
 const settle = async () => { for (let i = 0; i < 5; i += 1) await Promise.resolve(); };
 

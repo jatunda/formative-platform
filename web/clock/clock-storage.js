@@ -119,13 +119,22 @@ function parseSettings(saved) {
 /**
  * The settings saved in `storage` (localStorage on the real page; a fake in tests).
  * @param {import('../storage.js').StorageLike} storage
- * @returns {{ load: () => ClockSettings, save: (settings: ClockSettings) => void }}
- *   `save` never throws: if storage is full or blocked the change just isn't kept.
+ * @returns {{ load: () => ClockSettings, save: (settings: ClockSettings) => boolean }}
+ *   `save` never throws: if storage is full or blocked the change just isn't
+ *   kept, and it returns false (so the page can say so).
  */
 export function createSettingsStore(storage) {
   const adapter = createStorageAdapter(SETTINGS_KEY, storage, { quiet: true });
+  const writer = createStorageAdapter(SETTINGS_KEY, storage);
   return {
     load: () => parseSettings(adapter.load()),
-    save: (settings) => adapter.save(settings),
+    save: (settings) => {
+      try {
+        writer.save(settings);
+        return true;
+      } catch {
+        return false;
+      }
+    },
   };
 }

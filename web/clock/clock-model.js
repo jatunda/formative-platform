@@ -160,6 +160,19 @@ function planDay(day, schoolYears, division) {
 }
 
 /**
+ * The Segments of the School Day on `day`'s date for `division` ([] when that
+ * date isn't a School Day).
+ * @param {Date} day
+ * @param {SchoolYear[]} schoolYears
+ * @param {Division} division
+ * @returns {TimedSegment[]}
+ */
+export function segmentsOn(day, schoolYears, division) {
+  const plan = planDay(localMidnight(isoDate(day)), schoolYears, division);
+  return plan.kind === 'school' ? plan.segments : [];
+}
+
+/**
  * The soonest School Day on or after `day` whose first Segment starts after `t`.
  * @param {Date} day
  * @param {number} t
