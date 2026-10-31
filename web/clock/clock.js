@@ -28,8 +28,9 @@ import { SCHOOL_YEARS } from './school-years.js';
 import { createWakeLockKeeper, detectCapabilities } from './screen.js';
 import { DIVISIONS, FEEDBACK_HREF, createSettingsDrawer } from './settings-drawer.js';
 import { BELL_SECONDS, ALARM_MAX_SECONDS, SOUND_NAMES, createSoundPlayer } from './sound.js';
-import { cancelTimer, settleTimer, timerText } from './timer.js';
-import { createTimerPanel } from './timer-panel.js';
+import { cancelTimer, pauseTimer, resumeTimer, settleTimer, timerRingView, timerText } from './timer.js';
+import { createTimerPicker } from './timer-picker.js';
+import { createTimerRing } from './timer-ring.js';
 
 const TICK_MS = 1000;
 /** How far ahead (real time) rings are handed to the sound player: past the
@@ -190,7 +191,9 @@ export function initClockApp({
   let lastTick = new Date(clock.now());
   // Simulated time affects only this tab: its timer lives in memory, and the
   // real timer saved by other tabs is neither loaded, cleared nor overwritten.
-  const savedTimer = { timerEndsAt: settings.timerEndsAt, timerPausedMs: settings.timerPausedMs };
+  const savedTimer = {
+    timerEndsAt: settings.timerEndsAt, timerPausedMs: settings.timerPausedMs, timerTotalMs: settings.timerTotalMs,
+  };
   if (clock.simulated) settings = { ...settings, ...cancelTimer() };
   // Saving can fail (storage full or blocked): the page says so once, and
   // carries on with the change in memory.
@@ -262,6 +265,8 @@ export function initClockApp({
   let ringingWhat = null;
   /** The timer has rung and is still ringing: it keeps the big Readout until then. */
   let timerRinging = false;
+  /** The length of the timer that rang (its ring shows 0:00 of it until then). */
+  let rangTotalMs = null;
   const ringCard = createRingCard({ onDismiss: () => dismiss() });
   /** @param {import('./ring-words.js').RingWords} words @param {boolean} untilDismissed */
   function startRinging(words, untilDismissed) {
@@ -303,7 +308,22 @@ export function initClockApp({
   // removing) belongs to this tab's page only and is never saved.
   let lastMoment = null;
   let editing = false;
+  const timerRing = createTimerRing({
+    onPause: () => {
+      updateSettings(pauseTimer(settings, clock.now()));
+      timerRing.focus('resume');
+    },
+    onResume: () => {
+      updateSettings(resumeTimer(settings, clock.now()));
+      timerRing.focus('pause');
+    },
+    onCancel: () => {
+      updateSettings(cancelTimer());
+      timerControl.focus();
+    },
+  });
   const readoutsView = createReadoutsView({
+    timerFace: timerRing.element,
     onCycle: (i) => changeLayout(cycleReadout(layout, i)),
     onRemove: (i) => {
       changeLayout(removeReadout(layout, i));
@@ -343,27 +363,6 @@ export function initClockApp({
     const button = el('button', { type: 'button', className: 'clock-control', ...props }, [icon(iconName), text]);
     return Object.assign(button, { setLabel: (to) => { text.textContent = to; } });
   };
-  /** @type {{ panel: HTMLElement, button: HTMLElement }[]} */
-  const panels = [];
-  /** A plain panel the top bar opens and closes. @param {HTMLElement} panel @param {string} id */
-  function panelToggle(panel, id, label, iconName) {
-    panel.id = id;
-    panel.hidden = true;
-    panel.classList.add('clock-panel');
-    const button = topControl(label, iconName, {
-      'aria-controls': id, 'aria-expanded': 'false',
-      onclick: () => showPanel(panel.hidden ? panel : null),
-    });
-    panels.push({ panel, button });
-    return button;
-  }
-  /** Show one panel (or none), closing the others. @param {HTMLElement | null} shownPanel */
-  function showPanel(shownPanel) {
-    for (const { panel, button } of panels) {
-      panel.hidden = panel !== shownPanel;
-      button.setAttribute('aria-expanded', String(!panel.hidden));
-    }
-  }
   const bellsControl = topControl('Bells', 'bell', {
     onclick: () => updateSettings({ bells: { ...settings.bells, on: !settings.bells.on } }),
   });
@@ -387,10 +386,19 @@ export function initClockApp({
   showSoundState();
   soundPlayer.setVolume(settings.volume);
 
-  // The classroom timer.
-  const timerPanel = createTimerPanel({ settings: () => settings, now: () => clock.now(), update: updateSettings });
-
-  const timerControl = panelToggle(timerPanel.section, 'clock-timer-panel', 'Timer', 'timer');
+  // The classroom timer's picker (its ring is in the big spot).
+  const timerPicker = createTimerPicker({
+    settings: () => settings,
+    now: () => clock.now(),
+    update: updateSettings,
+    behind: () => [...mount.children].filter((node) => !timerPicker.elements.includes(node) && !ringCard.elements.includes(node)),
+    onChange: (open) => timerControl.setAttribute('aria-expanded', String(open)),
+    onStarted: () => timerRing.focus('pause'),
+  });
+  const timerControl = topControl('Timer', 'timer', {
+    'aria-controls': timerPicker.dialog.id, 'aria-expanded': 'false', 'aria-haspopup': 'dialog',
+    onclick: () => timerPicker.open(timerControl),
+  });
 
   // The Settings drawer (what the clock does), over the rest of the page.
   const drawer = createSettingsDrawer({
@@ -407,7 +415,6 @@ export function initClockApp({
   });
   /** @param {HTMLElement} from @param {{ atDivision?: boolean }} [options] */
   function openSettings(from, options) {
-    showPanel(null);
     drawer.open(from, options);
   }
   const settingsControl = topControl('Settings', 'gear', {
@@ -489,7 +496,7 @@ export function initClockApp({
   ]);
   mount.replaceChildren(
     mainScreen, ...ringCard.elements, soundPrompt.element, saveError.element,
-    timerPanel.section, ...drawer.elements, divisionPrompt.element,
+    ...timerPicker.elements, ...drawer.elements, divisionPrompt.element,
   );
 
   /**
@@ -511,7 +518,10 @@ export function initClockApp({
       for (const ring of rang) {
         if (ring.at.getTime() < staleBefore) continue;
         startRinging(ringWords(ring, text), ringsUntilDismissed(ring));
-        if (ring.source === 'timer') timerRinging = true;
+        if (ring.source === 'timer') {
+          timerRinging = true;
+          rangTotalMs = ring.totalMs;
+        }
       }
       const alarms = alarmsAfterRinging(settings.alarms, rang, { simulated: clock.simulated });
       if (alarms !== settings.alarms) {
@@ -532,7 +542,6 @@ export function initClockApp({
     mainScreen.toggleAttribute('inert', !chosen);
     divisionPrompt.show(!chosen);
     showSoundState();
-    timerPanel.render(now);
     drawer.render();
     bellsControl.setAttribute('aria-pressed', String(settings.bells.on));
     for (const control of [timerControl, bellsControl, settingsControl, divisionChip]) control.hidden = !chosen;
@@ -614,8 +623,9 @@ export function initClockApp({
     readoutsControl.hidden = timeOnly;
     if (timeOnly) {
       editing = false;
+      mainScreen.classList.remove('has-timer');
       const parts = readoutParts({ kind: 'time', at: now }, options);
-      readoutsView.show({ count: 1, cyclable: false, timer: false, editing: false, canAdd: false }, [parts], '');
+      readoutsView.show({ count: 1, cyclable: false, timer: false, editing: false, canAdd: false }, [parts]);
       showEditing();
       return parts.amount;
     }
@@ -626,11 +636,18 @@ export function initClockApp({
     }
     const timer = timerText(settings, now.getTime());
     const withTimer = timer !== '' || timerRinging;
+    mainScreen.classList.toggle('has-timer', withTimer);
+    if (withTimer) timerRing.show(timerRingView(settings, now.getTime(), { rangTotalMs }));
     const values = layout.readouts.map(({ mode }) => readoutValue(mode, moment, now));
+    const parts = values.map((value) => readoutParts(value, options));
+    // Beside the ring, the old main Readout's time left names its Segment
+    // (the heading steps aside for the ring).
+    if (withTimer && moment.state === 'segment' && parts[0].caption === 'left') {
+      parts[0] = { ...parts[0], caption: `left in ${textFor(settings).name(moment.current)}` };
+    }
     readoutsView.show(
       { count: values.length, cyclable: true, timer: withTimer, editing, canAdd: canAddReadout(layout) },
-      values.map((value) => readoutParts(value, options)),
-      timer || "Time's up",
+      parts,
     );
     showEditing();
     return withTimer ? (timer || "Time's up") : readoutText(values[0], options);
@@ -664,6 +681,7 @@ export function initClockApp({
     wakeLock.release();
     mini.close();
     drawer.destroy();
+    timerPicker.destroy();
     soundPlayer.close();
     if (destroyActiveApp === destroy) destroyActiveApp = null;
   }

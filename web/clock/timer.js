@@ -192,7 +192,7 @@ export function timerRingView(timer, now, { rangTotalMs = null } = {}) {
   const { status, remainingMs } = timerStatus(timer, now);
   const done = status === 'idle';
   const totalMs = done ? rangTotalMs : timer.timerTotalMs;
-  const left = formatDuration(done ? 0 : Math.ceil(remainingMs / SECOND) * SECOND);
+  const left = formatDuration(done ? 0 : Math.ceil(/** @type {number} */ (remainingMs) / SECOND) * SECOND);
   const total = totalMs ? formatDuration(totalMs) : null;
   const state = { running: '', paused: 'paused, ', idle: "time's up, " }[status];
   return {

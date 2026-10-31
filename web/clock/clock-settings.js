@@ -70,13 +70,14 @@
 /**
  * Everything "rings in a window" reads. `division` defaults to HS.
  * `timerEndsAt` is the running classroom timer's end (epoch ms), or
- * null/missing when none is running; `timerSound` is its voice (beep when
- * missing).
+ * null/missing when none is running, and `timerTotalMs` its length (for the
+ * ring card); `timerSound` is its voice (beep when missing).
  * @typedef {{
  *   division?: Division,
  *   bells: BellsSettings,
  *   alarms: Alarm[],
  *   timerEndsAt?: number | null,
+ *   timerTotalMs?: number | null,
  *   timerSound?: SoundName,
  * }} RingSettings
  */

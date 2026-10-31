@@ -177,7 +177,13 @@ describe('ringsInWindow: the timer', () => {
     const endsAt = new Date(2026, 9, 31, 10, 4, 30).getTime(); // a Saturday
     const settings = { ...withAlarms(), timerEndsAt: endsAt, timerSound: 'buzzer' };
     const rings = ringsInWindow(new Date(2026, 9, 31, 10, 0), new Date(2026, 9, 31, 10, 5), SCHOOL_YEARS, settings);
-    expect(rings).toEqual([{ at: new Date(endsAt), source: 'timer', sound: 'buzzer' }]);
+    expect(rings).toEqual([{ at: new Date(endsAt), source: 'timer', sound: 'buzzer', totalMs: null }]);
+  });
+
+  it('carries the length the timer was started with', () => {
+    const endsAt = tue(10, 0).getTime();
+    const settings = { ...withAlarms(), timerEndsAt: endsAt, timerTotalMs: 5 * 60 * 1000 };
+    expect(ringsInWindow(tue(9, 0), tue(11, 0), SCHOOL_YEARS, settings)[0].totalMs).toBe(5 * 60 * 1000);
   });
 
   it('defaults to the beep, and is outside a window that ends at its end time', () => {

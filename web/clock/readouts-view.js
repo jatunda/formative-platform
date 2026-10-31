@@ -1,6 +1,6 @@
 // The Readouts on the School Clock's main screen: one big Readout and up to
 // two small ones (beside it on a wide display, below it otherwise), the
-// timer in the big spot while it runs, and edit mode's Remove buttons and
+// timer's ring (timer-ring.js) in the big spot while it shows, and edit mode's Remove buttons and
 // Add slot. The page says what to show; this draws it. It rebuilds only when
 // the arrangement changes (so focus survives the ticks) and otherwise just
 // rewrites the values.
@@ -11,25 +11,25 @@ import { icon } from './icons.js';
  * @typedef {{ count: number, cyclable: boolean, timer: boolean, editing: boolean, canAdd: boolean }} Arrangement
  * - `count`: how many Readouts (the layout's, or 1 for the plain time);
  * - `cyclable`: whether they're the layout's (buttons that cycle) or just the time;
- * - `timer`: the timer takes the big spot, and every Readout is a small one;
+ * - `timer`: the timer's ring takes the big spot, and every Readout is a small one;
  * - `editing`: edit mode, with Remove buttons (when there's more than one) and the Add slot (when `canAdd`).
  * @typedef {ReturnType<typeof import('./readouts.js').readoutParts>} Parts
  */
 
 /**
- * @param {{ onCycle: (index: number) => void, onRemove: (index: number) => void, onAdd: () => void }} actions
- * @returns {{ element: HTMLElement, show: (arrangement: Arrangement, readouts: Parts[], timer: string) => void,
+ * @param {{ onCycle: (index: number) => void, onRemove: (index: number) => void, onAdd: () => void,
+ *   timerFace: HTMLElement }} actions `timerFace` is the timer's ring, which the page keeps up to date
+ * @returns {{ element: HTMLElement, show: (arrangement: Arrangement, readouts: Parts[]) => void,
  *   focusReadout: (index: number) => void, focusRemove: (index: number) => boolean }}
  *   `focusRemove` focuses the Remove button at `index` (or the last one), and says whether there was one.
  */
-export function createReadoutsView({ onCycle, onRemove, onAdd }) {
+export function createReadoutsView({ onCycle, onRemove, onAdd, timerFace }) {
   const element = el('div', { className: 'clock-readouts' });
   let built = '';
   /** @type {{ face: HTMLElement, value: HTMLElement, caption: HTMLElement, removeName: HTMLElement | null }[]} */
   let shown = [];
   /** @type {HTMLButtonElement[]} */
   let removeButtons = [];
-  const timerValue = el('span', { className: 'clock-readout__value' });
 
   /** @param {Arrangement} arrangement */
   function build({ count, cyclable, timer, editing, canAdd }) {
@@ -56,11 +56,7 @@ export function createReadoutsView({ onCycle, onRemove, onAdd }) {
       const className = `clock-readout ${big ? 'clock-readout--big' : 'clock-readout--small'}${editing ? ' is-editing' : ''}`;
       return el('div', { className }, children);
     };
-    const big = timer
-      ? el('div', { className: 'clock-readout clock-readout--big clock-readout--timer' }, [
-        el('div', { className: 'clock-readout__face' }, [timerValue]),
-      ])
-      : readoutBlock(shown[0], 0, true);
+    const big = timer ? timerFace : readoutBlock(shown[0], 0, true);
     const smalls = shown.map((readout, i) => [readout, i]).slice(timer ? 0 : 1)
       .map(([readout, i]) => readoutBlock(readout, i, false));
     if (editing && canAdd) {
@@ -69,6 +65,7 @@ export function createReadoutsView({ onCycle, onRemove, onAdd }) {
       ]));
     }
     element.classList.toggle('has-smalls', smalls.length > 0);
+    element.classList.toggle('has-timer', timer);
     element.replaceChildren(big, ...(smalls.length ? [el('div', { className: 'clock-smalls' }, smalls)] : []));
   }
 
@@ -82,7 +79,7 @@ export function createReadoutsView({ onCycle, onRemove, onAdd }) {
 
   return {
     element,
-    show(arrangement, readouts, timer) {
+    show(arrangement, readouts) {
       const key = JSON.stringify(arrangement);
       if (key !== built) {
         built = key;
@@ -94,7 +91,6 @@ export function createReadoutsView({ onCycle, onRemove, onAdd }) {
         readout.caption.textContent = parts.caption;
         if (readout.removeName) readout.removeName.textContent = ` Readout: ${parts.caption}`;
       });
-      timerValue.textContent = timer;
     },
     focusReadout(index) {
       shown[index].face.focus();
