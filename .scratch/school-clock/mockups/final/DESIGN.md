@@ -254,7 +254,7 @@ Everything transient (ring card, sound prompt, toasts) sits **bottom centre, ove
   - **Wide screens:** bottom centre, filled with `--ring` and text in `--on-ring`. It shows the kind line, the title (display face, 30px), the detail ("5 min before the end of Period 3") and a large Dismiss button (`--on-ring` fill).
   - **Compact screens:** the detail line goes. **Short screens:** one line: "Ringing · Wrap-up time [Dismiss]".
   - It is an `alertdialog` that takes focus. Escape dismisses it. The page announces the ring once through a live region.
-- **Sound prompt:** a pill, bottom centre, with a muted-speaker icon, "Sound is off", the note "Keep this tab open for Bells and Alarms" in small muted text, and a "Turn sound on" accent button. On short screens the note goes.
+- **Sound prompt:** a pill, bottom centre, with a muted-speaker icon, "Sound is off", the note "Keep this tab open for Bells and Alarms" in small muted text, and a "Turn sound on" accent button. On short screens the note goes. **Built (ticket 04):** it isn't an overlay on the real page, because it stays until clicked: it takes its own line in the bottom row, above the bar (beside the window buttons when no bar shows; on short screens left of them; on a phone under them), so the stage and the bar make room and it covers nothing. While a toast shows it steps out of sight, keeping its room.
 - **First visit:** a near-solid scrim (`--bg` at 94%) behind a dialog that asks "Which Division are you with?". It offers two large choices (MS / HS) and shows the feedback link.
 - **"Pick a theme" hint:**
   - a pill with an accent border, "Pick a theme" and a 44px dismiss button;

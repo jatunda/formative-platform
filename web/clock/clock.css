@@ -74,10 +74,15 @@ body {
   fill: currentColor;
 }
 
+/* The negative margin keeps a hidden line that sits after the page (the ring
+   announcement) from making the page 1px taller than the window. */
 .visually-hidden {
   position: absolute;
   width: 1px;
   height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
   overflow: hidden;
   clip: rect(0 0 0 0);
   white-space: nowrap;
@@ -502,20 +507,41 @@ button.clock-readout__face {
 
 /* ---------- bottom row: the bar's place and the window buttons ---------- */
 
+/* The "turn sound on" prompt, while it shows, gets its own line above the
+   bar (ticket 04): the row grows to make room, so the prompt covers nothing
+   (the bar, the timer ring, the window buttons). */
 .clock-bottom {
   grid-area: bottom;
-  display: flex;
-  align-items: flex-end;
-  gap: var(--gap-md);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "prompt prompt" "bar corner";
+  align-items: end;
+  column-gap: var(--gap-md);
   min-height: var(--tap);
 }
 
 .clock-bar-slot {
-  flex: 1;
+  grid-area: bar;
   min-width: 0;
 }
 
+/* With no bar showing (the timer has the big spot, Experience Week, ...),
+   the prompt shares the window buttons' line, still centred on the page. */
+.clock-bottom:not(:has(.clock-bar:not([hidden]))) {
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  grid-template-areas: ". prompt corner";
+}
+
+.clock-bottom:not(:has(.clock-bar:not([hidden]))) > .clock-sound-prompt {
+  margin: 0;
+}
+
+.clock-bottom:not(:has(.clock-bar:not([hidden]))) > .clock-bar-slot {
+  display: none;
+}
+
 .clock-corner {
+  grid-area: corner;
   display: flex;
   gap: 2px;
   margin-left: auto;
@@ -813,6 +839,19 @@ button.clock-readout__face {
     min-height: 0;
   }
 
+  /* While the sound prompt shows, the row is back in the flow: the prompt
+     takes the free width, left of the window buttons, and the stage makes
+     room for it. */
+  .clock-bottom:has(> .clock-sound-prompt:not([hidden])) {
+    position: static;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "prompt corner";
+  }
+
+  .clock-bottom:has(> .clock-sound-prompt:not([hidden])) > .clock-sound-prompt {
+    margin: 0;
+  }
+
   .clock-title {
     font-size: calc(clamp(15px, 6.5vh, 40px) * var(--display-scale));
   }
@@ -966,11 +1005,23 @@ button.clock-readout__face {
     justify-content: flex-start;
   }
 
+  /* The window button under the bar on the right; the sound prompt, while
+     it shows, across the bottom under them. */
   .clock-bottom {
-    flex-direction: column;
+    grid-template-rows: minmax(0, 1fr) auto auto;
+    grid-template-areas: "bar bar" ". corner" "prompt prompt";
     align-items: stretch;
     gap: 8px;
     min-height: 0;
+  }
+
+  .clock-bottom:not(:has(.clock-bar:not([hidden]))) {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "bar bar" ". corner" "prompt prompt";
+  }
+
+  .clock-bottom:not(:has(.clock-bar:not([hidden]))) > .clock-sound-prompt {
+    margin: 0;
   }
 
   .clock-bar-slot,
@@ -1205,17 +1256,16 @@ button.clock-readout__face {
   font-weight: 600;
 }
 
-/* Sound prompt: a pill with a short note. */
+/* Sound prompt: a pill with a short note, centred on its own line in the
+   bottom row (see "bottom row" above). */
 .clock-sound-prompt {
-  position: fixed;
-  z-index: 9;
-  bottom: calc(var(--edge-y) + var(--s2));
-  left: 50%;
-  transform: translateX(-50%);
+  grid-area: prompt;
+  justify-self: center;
+  margin-bottom: var(--gap-sm);
   display: flex;
   align-items: center;
   gap: var(--s3);
-  max-width: calc(100vw - 32px);
+  max-width: 100%;
   padding: var(--s2) var(--s2) var(--s2) var(--s4);
   border: 1.5px solid var(--accent);
   border-radius: 999px;
@@ -1254,7 +1304,13 @@ button.clock-readout__face {
 }
 
 /* Toasts: bottom centre over the bar. An error has a heavy left border and
-   a warning icon, so it isn't told apart by colour alone. */
+   a warning icon, so it isn't told apart by colour alone. While one shows,
+   the sound prompt steps out of sight (keeping its room, so nothing moves),
+   so a toast never covers it. */
+#clockApp:has(.clock-toast:not([hidden])) .clock-sound-prompt {
+  visibility: hidden;
+}
+
 .clock-toast {
   position: fixed;
   z-index: 9;
@@ -1404,12 +1460,12 @@ button.clock-readout__face {
 /* short: one line ("Ringing · Wrap-up time [Dismiss]"); the sound note goes. */
 @media (max-height: 520px) {
   .clock-ring-card,
-  .clock-sound-prompt,
   .clock-toast {
     bottom: 8px;
   }
 
   .clock-sound-prompt {
+    margin-bottom: 0;
     padding: 4px 4px 4px 12px;
   }
 
@@ -1470,12 +1526,17 @@ button.clock-readout__face {
 /* narrow: phone, portrait. Overlays sit across the bottom. */
 @media (max-width: 520px) and (min-height: 521px) {
   .clock-ring-card,
-  .clock-sound-prompt,
   .clock-toast {
     left: 16px;
     right: 16px;
     bottom: 16px;
     transform: none;
+  }
+
+  .clock-sound-prompt {
+    justify-self: stretch;
+    margin-bottom: 0;
+    padding-left: var(--s3);
   }
 
   .clock-ring-card {

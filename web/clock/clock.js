@@ -352,8 +352,8 @@ export function initClockApp({
     type: 'button', className: 'clock-chip', onclick: () => openSettings(divisionChip, { atDivision: true }),
   });
 
-  // Turning sound on (browsers need one click after every load): bottom
-  // centre, over the bar.
+  // Turning sound on (browsers need one click after every load): in the
+  // bottom row, which makes room for it, so it covers nothing.
   const soundPrompt = createSoundPrompt({ onTurnOn: () => soundPlayer.resume() });
   function showSoundState() {
     // It waits for the first-visit question, and steps aside for a ring.
@@ -491,12 +491,13 @@ export function initClockApp({
   const bottom = el('footer', { className: 'clock-bottom' }, [
     el('div', { className: 'clock-bar-slot' }, [dayBar.element]),
     el('div', { className: 'clock-corner', role: 'group', 'aria-label': 'Window' }, [mini.button, fullscreenButton]),
+    soundPrompt.element,
   ]);
   const mainScreen = el('main', { className: clock.simulated ? 'clock-screen is-simulated' : 'clock-screen' }, [
     ...(clock.simulated ? [banner] : []), ...decorations(), top, stage, bottom,
   ]);
   mount.replaceChildren(
-    mainScreen, ...ringCard.elements, soundPrompt.element, saveError.element,
+    mainScreen, ...ringCard.elements, saveError.element,
     ...timerPicker.elements, ...drawer.elements, ...lookSheet.elements, divisionPrompt.element,
   );
 
