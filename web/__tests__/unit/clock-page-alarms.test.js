@@ -149,6 +149,17 @@ describe('School Clock Alarm editor', () => {
       expect(saved(storage).alarms[0].time).toBe('15:20');
     });
 
+    it('turns a morning 24-hour time into 12-hour with AM when 24-hour time is switched off', () => {
+      open({ settings: { use24Hour: true } });
+      button('Clock Alarm', section()).click();
+      setValue('Hour', '07', form());
+      setValue('Minute', '05', form());
+      toggle('24-hour time');
+      expect([inForm('Hour').value, inForm('Minute').value]).toEqual(['7', '05']);
+      expect(inForm('AM').checked).toBe(true);
+      expect(inForm('PM').checked).toBe(false);
+    });
+
     it('leaves a time it cannot read as typed when 24-hour time is switched', () => {
       open();
       button('Clock Alarm', section()).click();
