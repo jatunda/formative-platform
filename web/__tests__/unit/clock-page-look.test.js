@@ -18,13 +18,21 @@ const look = () => ({
   font: html().getAttribute('data-font'),
   deco: html().getAttribute('data-deco'),
 });
-const sheet = () => mount().querySelector('[role="dialog"][aria-label="Look"], [role="dialog"][aria-labelledby]');
+/** The dialog named "Look". */
+const sheet = () => [...mount().querySelectorAll('[role="dialog"]')]
+  .find((d) => document.getElementById(d.getAttribute('aria-labelledby'))?.textContent === 'Look');
+/** A label's text as a screen reader hears it (without its aria-hidden parts). */
+const heardName = (label) => {
+  const copy = label.cloneNode(true);
+  copy.querySelectorAll('[aria-hidden="true"]').forEach((n) => n.remove());
+  return copy.textContent.replace(/\s+/g, ' ').trim();
+};
 /** The radios of one group in the Look sheet ("Theme", "Font", "Colours"), with their names. */
 const radios = (group) => {
   const fieldset = [...sheet().querySelectorAll('fieldset')]
     .find((f) => f.querySelector('legend').textContent === group);
   return [...fieldset.querySelectorAll('input[type="radio"]')].map((input) => ({
-    input, name: input.closest('label').textContent.replace(/\s+/g, ' ').trim(),
+    input, name: heardName(input.closest('label')),
   }));
 };
 const choose = (group, name) => {
@@ -105,7 +113,7 @@ describe('School Clock look', () => {
   describe('the Look sheet', () => {
     it('opens from Look in the top bar, between Readouts and Settings, as a dialog that takes focus', () => {
       open();
-      const names = [...mount().querySelectorAll('.clock-controls button')].map(nameOf);
+      const names = [...mount().querySelectorAll('.clock-controls .clock-control')].map(nameOf);
       expect(names.indexOf('Look')).toBe(names.indexOf('Readouts') + 1);
       expect(names.indexOf('Settings')).toBe(names.indexOf('Look') + 1);
       expect(button('Look').getAttribute('aria-haspopup')).toBe('dialog');
@@ -135,20 +143,22 @@ describe('School Clock look', () => {
       expect(document.activeElement).toBe(button('Look'));
 
       openLook();
-      mount().querySelector('.clock-stage').dispatchEvent(new Event('pointerdown', { bubbles: true }));
+      // The sheet's scrim is clear: the clock shows through it, and a click on it closes the sheet.
+      mount().querySelector('.clock-look-scrim').click();
       expect(sheet().hidden).toBe(true);
+      expect(document.activeElement).toBe(button('Look'));
       // Clicking inside it doesn't.
       openLook();
-      sheet().dispatchEvent(new Event('pointerdown', { bubbles: true }));
+      sheet().click();
       expect(sheet().hidden).toBe(false);
     });
 
     it('keeps focus inside: Tab from the last control goes to the first, Shift+Tab from the first to the last', () => {
       open();
       openLook();
-      const focusable = [...sheet().querySelectorAll('button, input')].filter((n) => isShown(n));
-      const first = focusable[0];
-      const last = focusable.at(-1);
+      // A radio group is one stop (its chosen radio); the last stop is the chosen colour.
+      const first = button('Close Look');
+      const last = radios('Colours').find((r) => r.input.checked).input;
       last.focus();
       key(last, 'Tab');
       expect(document.activeElement).toBe(first);
@@ -164,11 +174,11 @@ describe('School Clock look', () => {
       expect(button('Done')).toBeDefined();
     });
 
-    it('closes the plain panels when it opens', () => {
+    it('closes the plain timer panel when it opens', () => {
       open();
-      button('Settings').click();
+      button('Timer').click();
       openLook();
-      expect(mount().querySelector('[aria-label="Settings"]').hidden).toBe(true);
+      expect(mount().querySelector('[aria-label="Timer"]').hidden).toBe(true);
     });
 
     it('has the place for the bar setting (whole day / just this Segment)', () => {
@@ -235,15 +245,15 @@ describe('School Clock look', () => {
       openLook();
       expect(radios('Font')).toHaveLength(13);
       expect(radios('Colours')).toHaveLength(15);
-      expect(radios('Font').find((r) => r.input.checked).name).toBe("Clean sans (the theme's own)");
-      expect(radios('Colours').find((r) => r.input.checked).name).toBe("Slate blue and sky blue (the theme's own)");
+      expect(radios('Font').find((r) => r.input.checked).name).toBe("Clean sans (the theme’s own)");
+      expect(radios('Colours').find((r) => r.input.checked).name).toBe("Slate blue and sky blue (the theme’s own)");
     });
 
     it('swaps the font and the palette, keeps the flip, saves, and can go back to the theme\'s own', () => {
       withSettings({ theme: 'bloom', flipped: true });
       open();
       openLook();
-      expect(button("Use the theme's own font and colours")).toBeUndefined();
+      expect(button('Use the theme’s own font and colours')).toBeUndefined();
       choose('Font', 'Monospace');
       choose('Colours', 'Navy and orange');
       expect(look()).toEqual({ mode: 'light', palette: 'team', font: 'mono', deco: 'flowers' });
@@ -254,7 +264,7 @@ describe('School Clock look', () => {
       open();
       expect(look()).toMatchObject({ palette: 'team', font: 'mono' });
       openLook();
-      button("Use the theme's own font and colours").click();
+      button('Use the theme’s own font and colours').click();
       expect(look()).toEqual({ mode: 'dark', palette: 'blush', font: 'script', deco: 'flowers' });
       expect(saved(storage)).toMatchObject({ fontSwap: null, paletteSwap: null, flipped: true });
     });
@@ -266,7 +276,7 @@ describe('School Clock look', () => {
     it('shows after the Division prompt on a first visit, and goes once a theme is picked', () => {
       firstVisit();
       open();
-      expect(hint()).toBeUndefined();
+      expect(hint() && isShown(hint())).toBeFalsy();
       button('High School').click();
       expect(isShown(hint())).toBe(true);
       expect(button('Look').classList.contains('is-hinted')).toBe(true);

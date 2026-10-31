@@ -19,6 +19,7 @@ describe('the theme set', () => {
     expect(PALETTES.filter((p) => p.native === 'dark')).toHaveLength(8);
     expect(nativeMode('paper')).toBe('light');
     expect(nativeMode('team')).toBe('dark');
+    expect(nativeMode('ocean')).toBe('dark');
   });
 
   it('names each theme by its look, never by who it is for', () => {

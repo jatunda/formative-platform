@@ -77,10 +77,22 @@ describe('School Clock hosting', () => {
     const css = readFileSync(resolve(clockDir, 'tokens.css'), 'utf8');
     expect(css).toContain('--bg: #1e2836;');
     // The components name no colour of their own: every colour is a token.
-    for (const sheet of ['clock.css', 'settings-drawer.css']) {
+    const themes = html.indexOf('<link rel="stylesheet" href="/clock/themes.css" />');
+    expect(themes).toBeGreaterThan(tokens);
+    for (const sheet of ['clock.css', 'settings-drawer.css', 'look-sheet.css']) {
       const components = readFileSync(resolve(clockDir, sheet), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
       expect(components).not.toMatch(/#[0-9a-f]{3,8}\b|rgb\(/i);
-      expect(html.indexOf(`/clock/${sheet}`)).toBeGreaterThan(tokens);
+      expect(html.indexOf(`/clock/${sheet}`)).toBeGreaterThan(themes);
+    }
+  });
+
+  it('downloads no font: every theme uses system font stacks, and nothing loads from another server', () => {
+    const html = readFileSync(resolve(clockDir, 'index.html'), 'utf8');
+    expect(html).not.toMatch(/https?:\/\//);
+    const files = readdirSync(clockDir);
+    expect(files.filter((f) => /\.(woff2?|ttf|otf|eot)$/i.test(f))).toEqual([]);
+    for (const sheet of files.filter((f) => f.endsWith('.css'))) {
+      expect(readFileSync(resolve(clockDir, sheet), 'utf8')).not.toMatch(/@font-face|@import|url\(/i);
     }
   });
 
