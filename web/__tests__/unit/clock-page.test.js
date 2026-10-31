@@ -70,21 +70,6 @@ describe('School Clock page', () => {
     expect(pageText()).not.toContain('Simulated time');
   });
 
-  it('opens the timer from the top bar and closes it again', () => {
-    app = start({ realNow: fakeRealClock(new Date(2026, 9, 27, 10, 32, 0)).now });
-    const panel = () => document.querySelector('#clockApp section[aria-label="Timer"]');
-    expect(panel().hidden).toBe(true);
-
-    control('Timer').click();
-    expect(panel().hidden).toBe(false);
-    expect(control('Timer').getAttribute('aria-expanded')).toBe('true');
-    expect(control('Timer').getAttribute('aria-controls')).toBe(panel().id);
-
-    control('Timer').click();
-    expect(panel().hidden).toBe(true);
-    expect(control('Timer').getAttribute('aria-expanded')).toBe('false');
-  });
-
   it('has no plain time line duplicating a current-time Readout', () => {
     const real = fakeRealClock(new Date(2026, 9, 27, 10, 32, 0));
     app = start({ realNow: real.now });

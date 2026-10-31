@@ -123,7 +123,7 @@ describe('School Clock look', () => {
       expect(sheet().hidden).toBe(false);
       expect(sheet().getAttribute('aria-modal')).toBe('true');
       expect(sheet().contains(document.activeElement)).toBe(true);
-      expect(mount().querySelector('.clock-controls button[aria-haspopup="dialog"]').getAttribute('aria-expanded')).toBe('true');
+      expect(button('Look').getAttribute('aria-expanded')).toBe('true');
       // The clock stays visible beside it: no scrim, and the stage makes room.
       expect(mount().querySelector('.clock-screen').classList.contains('has-sheet')).toBe(true);
       expect(isShown(mount().querySelector('.clock-stage'))).toBe(true);
@@ -172,13 +172,6 @@ describe('School Clock look', () => {
       openLook();
       key(document.activeElement, 'Escape');
       expect(button('Done')).toBeDefined();
-    });
-
-    it('closes the plain timer panel when it opens', () => {
-      open();
-      button('Timer').click();
-      openLook();
-      expect(mount().querySelector('[aria-label="Timer"]').hidden).toBe(true);
     });
 
     it('has the place for the bar setting (whole day / just this Segment)', () => {

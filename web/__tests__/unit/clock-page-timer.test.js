@@ -7,12 +7,45 @@ import { createFakeSoundPlayer } from '../helpers/fake-sound-player.js';
 const SEC = 1000;
 const MIN = 60 * SEC;
 const mount = () => document.getElementById('clockApp');
-const timerSection = () => mount().querySelector('[aria-label="Timer"]');
-const timerText = () => timerSection().textContent.replace(/\s+/g, ' ');
-const visibleButtons = (root) => [...root.querySelectorAll('button')].filter((b) => !b.closest('[hidden]'));
-const timerButton = (name) => visibleButtons(timerSection()).find((b) => b.textContent === name);
-const quickPicks = () =>
-  visibleButtons(timerSection().querySelector('[aria-label="Quick picks"]')).map((b) => b.textContent);
+const isShown = (node) => !node.closest('[hidden]');
+const nameOf = (node) => node.getAttribute('aria-label') ?? node.textContent.replace(/\s+/g, ' ').trim();
+const visibleButtons = (root) => [...root.querySelectorAll('button')].filter(isShown);
+const buttonIn = (root, name) => visibleButtons(root).find((b) => nameOf(b) === name);
+const timerControl = () => buttonIn(mount().querySelector('.clock-top'), 'Timer');
+
+/** The picker: a dialog named "Start a timer". */
+const picker = () => {
+  const dialog = mount().querySelector('[role="dialog"][aria-labelledby="clock-picker-title"]');
+  expect(dialog.querySelector('#clock-picker-title').textContent).toBe('Start a timer');
+  return dialog;
+};
+const pickerOpen = () => isShown(picker());
+/** A picker button, opening the picker with the Timer control first if it's closed. */
+const pick = (name) => {
+  if (!pickerOpen()) timerControl().click();
+  buttonIn(picker(), name).click();
+};
+const field = (label) => [...picker().querySelectorAll('label')]
+  .find((l) => l.textContent.trim().startsWith(label)).querySelector('input');
+function typeDuration(minutes, seconds = '') {
+  if (!pickerOpen()) timerControl().click();
+  field('Minutes').value = minutes;
+  field('Seconds').value = seconds;
+  picker().querySelector('form').requestSubmit();
+}
+const quickPicks = () => {
+  if (!pickerOpen()) timerControl().click();
+  const group = picker().querySelector('[role="group"][aria-labelledby="clock-picker-recent"]');
+  return isShown(group) ? visibleButtons(group).map(nameOf) : [];
+};
+
+/** The running timer in the big spot: its ring, digits and buttons. */
+const ring = () => mount().querySelector('.clock-stage [role="group"][aria-label="Timer"]');
+const ringShown = () => Boolean(ring()) && isShown(ring());
+const digits = () => ring().querySelector('[role="timer"]');
+const ringButton = (name) => buttonIn(ring(), name);
+/** The arc's length: the share of time left, out of 100. */
+const arc = () => Number.parseFloat(ring().querySelector('.clock-ring__arc').getAttribute('stroke-dasharray'));
 const ringing = () => mount().querySelector('[role="alertdialog"]');
 const saved = (storage) => JSON.parse(storage.getItem(SETTINGS_KEY));
 
@@ -33,19 +66,13 @@ describe('School Clock classroom timer', () => {
       realNow: () => t, storage, tabStorage: createFakeStorage(), soundPlayer: player,
       prefersReducedMotion: () => false, search,
     });
-    // The timer's controls open from the top bar's Timer control.
-    [...mount().querySelectorAll('button')].find((b) => b.textContent.trim() === 'Timer' && !b.hidden)?.click();
   }
   /** Time passes and the page ticks as usual. */
   const advance = (ms) => { t += ms; vi.advanceTimersByTime(ms); };
   /** Time passes with the page closed (or asleep): no ticks. */
   const jump = (ms) => { t += ms; };
-
-  function typeDuration(text) {
-    const input = timerSection().querySelector('input');
-    input.value = text;
-    timerSection().querySelector('form').requestSubmit();
-  }
+  const press = (key, options = {}) =>
+    document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, ...options }));
 
   beforeEach(() => {
     vi.useFakeTimers();
@@ -60,92 +87,171 @@ describe('School Clock classroom timer', () => {
     vi.useRealTimers();
   });
 
-  it('is on the main screen with the 1, 2, 5 and 10 minute presets', () => {
-    open();
-    for (const name of ['1 min', '2 min', '5 min', '10 min']) expect(timerButton(name)).toBeDefined();
-    expect(timerButton('Pause')).toBeUndefined();
-    expect(timerButton('Cancel')).toBeUndefined();
+  describe('the picker', () => {
+    it('opens from the Timer control in one tap, with the 1, 2, 5 and 10 minute presets', () => {
+      open();
+      expect(pickerOpen()).toBe(false);
+      expect(timerControl().getAttribute('aria-expanded')).toBe('false');
+      timerControl().click();
+      expect(pickerOpen()).toBe(true);
+      expect(picker().getAttribute('aria-modal')).toBe('true');
+      expect(timerControl().getAttribute('aria-expanded')).toBe('true');
+      expect(visibleButtons(picker().querySelector('[aria-label="Presets"]')).map(nameOf))
+        .toEqual(['1 min', '2 min', '5 min', '10 min']);
+      expect(document.activeElement).toBe(buttonIn(picker(), '1 min'));
+    });
+
+    it('closes with Escape or Close, and hands focus back to the Timer control', () => {
+      open();
+      timerControl().click();
+      press('Escape');
+      expect(pickerOpen()).toBe(false);
+      expect(document.activeElement).toBe(timerControl());
+
+      timerControl().click();
+      buttonIn(picker(), 'Close').click();
+      expect(pickerOpen()).toBe(false);
+      expect(timerControl().getAttribute('aria-expanded')).toBe('false');
+      expect(saved(storage).timerEndsAt ?? null).toBeNull();
+    });
+
+    it('keeps Tab inside it while open', () => {
+      open();
+      timerControl().click();
+      buttonIn(picker(), 'Start').focus();
+      press('Tab');
+      expect(document.activeElement).toBe(buttonIn(picker(), 'Close'));
+    });
+
+    it('is hidden until a Division is chosen', () => {
+      storage = createFakeStorage();
+      open();
+      expect(timerControl()).toBeUndefined();
+      expect(pickerOpen()).toBe(false);
+    });
   });
 
-  it('is hidden until a Division is chosen', () => {
-    storage = createFakeStorage();
+  it('a preset starts at once from the current time, closes the picker and is saved as its end and length', () => {
     open();
-    expect(timerSection().hidden).toBe(true);
-  });
-
-  it('a preset starts counting down from the current time and is saved as its end time', () => {
-    open();
-    timerButton('5 min').click();
-    expect(timerText()).toContain('5:00 left');
-    expect(saved(storage)).toMatchObject({ timerEndsAt: START + 5 * MIN, timerPausedMs: null });
+    pick('5 min');
+    expect(pickerOpen()).toBe(false);
+    expect(digits().textContent).toBe('5:00');
+    expect(saved(storage)).toMatchObject({ timerEndsAt: START + 5 * MIN, timerPausedMs: null, timerTotalMs: 5 * MIN });
+    // Keyboard users land on the ring's first button.
+    expect(document.activeElement).toBe(ringButton('Pause'));
 
     advance(90 * SEC);
-    expect(timerText()).toContain('3:30 left');
+    expect(digits().textContent).toBe('3:30');
+  });
+
+  describe('the ring', () => {
+    it('names the time left and the length, and is a timer that is never live', () => {
+      open();
+      pick('5 min');
+      advance(48 * SEC);
+      expect(digits().getAttribute('aria-label')).toBe('Timer, 4:12 left of 5:00');
+      expect(digits().getAttribute('aria-live')).toBe('off');
+      expect(ring().textContent).toContain('Timer');
+      expect(ring().textContent).toContain('of 5:00');
+    });
+
+    it('shows the share of time left, a little less every tick', () => {
+      open();
+      pick('5 min');
+      expect(arc()).toBe(100);
+      advance(48 * SEC);
+      expect(arc()).toBeCloseTo(84, 1);
+      advance(SEC);
+      expect(arc()).toBeCloseTo((251 / 300) * 100, 1);
+    });
+
+    it('is only there while a timer runs, is paused or rings', () => {
+      open();
+      expect(ringShown()).toBe(false);
+      pick('1 min');
+      expect(ringShown()).toBe(true);
+      ringButton('Cancel').click();
+      expect(ringShown()).toBe(false);
+    });
   });
 
   it('a running timer survives a reload and is still counting', () => {
     open();
-    timerButton('5 min').click();
+    pick('5 min');
     jump(2 * MIN);
     open();
-    expect(timerText()).toContain('3:00 left');
+    expect(digits().textContent).toBe('3:00');
+    expect(arc()).toBeCloseTo(60, 1);
     advance(SEC);
-    expect(timerText()).toContain('2:59 left');
+    expect(digits().textContent).toBe('2:59');
   });
 
   it('pausing holds the time left, through a reload; resuming carries on from it', () => {
     open();
-    timerButton('5 min').click();
+    pick('5 min');
     advance(MIN);
-    timerButton('Pause').click();
-    expect(saved(storage)).toMatchObject({ timerEndsAt: null, timerPausedMs: 4 * MIN });
+    ringButton('Pause').click();
+    expect(saved(storage)).toMatchObject({ timerEndsAt: null, timerPausedMs: 4 * MIN, timerTotalMs: 5 * MIN });
+    expect(document.activeElement).toBe(ringButton('Resume'));
 
     advance(10 * MIN);
     open();
-    expect(timerText()).toContain('Paused · 4:00 left');
-    expect(timerButton('Pause')).toBeUndefined();
+    expect(digits().textContent).toBe('4:00');
+    expect(digits().getAttribute('aria-label')).toBe('Timer, paused, 4:00 left of 5:00');
+    expect(ring().textContent).toContain('Paused');
+    expect(arc()).toBeCloseTo(80, 1);
+    expect(ringButton('Pause')).toBeUndefined();
 
-    timerButton('Resume').click();
+    ringButton('Resume').click();
+    expect(document.activeElement).toBe(ringButton('Pause'));
     advance(30 * SEC);
-    expect(timerText()).toContain('3:30 left');
+    expect(digits().textContent).toBe('3:30');
+    expect(arc()).toBeCloseTo(70, 1);
     expect(saved(storage).timerEndsAt).toBe(START + 11 * MIN + 4 * MIN);
   });
 
-  it('cancelling clears the timer, and it never rings', () => {
+  it('cancelling clears the timer, and it never rings; focus goes back to the Timer control', () => {
     open();
-    timerButton('1 min').click();
-    timerButton('Cancel').click();
-    expect(saved(storage)).toMatchObject({ timerEndsAt: null, timerPausedMs: null });
-    expect(timerText()).not.toContain('left');
+    pick('1 min');
+    ringButton('Cancel').click();
+    expect(saved(storage)).toMatchObject({ timerEndsAt: null, timerPausedMs: null, timerTotalMs: null });
+    expect(document.activeElement).toBe(timerControl());
     advance(2 * MIN);
     expect(ringing().hidden).toBe(true);
   });
 
   it('starting another timer replaces the running one', () => {
     open();
-    timerButton('10 min').click();
-    timerButton('2 min').click();
-    expect(timerText()).toContain('2:00 left');
+    pick('10 min');
+    pick('2 min');
+    expect(digits().textContent).toBe('2:00');
+    expect(arc()).toBe(100);
   });
 
   describe('at its end', () => {
-    it('rings until dismissed, then the timer is gone', () => {
+    it('rings until dismissed, naming the timer\'s length; the ring shows 0:00 and empties, then goes', () => {
       open();
-      timerButton('1 min').click();
+      pick('1 min');
       advance(MIN + SEC);
       expect(ringing().hidden).toBe(false);
       expect(ringing().textContent).toContain('Ringing · Timer');
+      expect(ringing().textContent).toContain('1:00 timer');
       expect(saved(storage)).toMatchObject({ timerEndsAt: null });
-      expect(timerText()).not.toContain('left');
+      expect(digits().textContent).toBe('0:00');
+      expect(digits().getAttribute('aria-label')).toBe("Timer, time's up, 0:00 left of 1:00");
+      expect(arc()).toBe(0);
+      expect(ringButton('Pause')).toBeUndefined();
+      expect(ringButton('Cancel')).toBeUndefined();
 
-      visibleButtons(ringing()).find((b) => b.textContent === 'Dismiss').click();
+      buttonIn(ringing(), 'Dismiss').click();
       expect(player.dismissals).toBe(1);
       expect(ringing().hidden).toBe(true);
+      expect(ringShown()).toBe(false);
     });
 
     it('stops ringing on screen after 60 seconds', () => {
       open();
-      timerButton('1 min').click();
+      pick('1 min');
       advance(MIN + SEC);
       advance(59 * SEC);
       expect(ringing().hidden).toBe(false);
@@ -155,23 +261,23 @@ describe('School Clock classroom timer', () => {
 
     it('is handed to the sound engine ahead of time, with the timer sound, repeating', async () => {
       open({ sound: { time: 50 } });
-      visibleButtons(mount()).find((b) => b.textContent === 'Turn sound on').click();
+      buttonIn(mount(), 'Turn sound on').click();
       await Promise.resolve();
-      timerButton('2 min').click();
+      pick('2 min');
       expect(player.scheduled).toContainEqual({
         key: `${START + 2 * MIN}|timer|`, at: 50 + 120, sound: 'beep', repeat: true,
       });
 
-      timerButton('Pause').click();
-      expect(player.scheduled.some((ring) => ring.key.includes('timer'))).toBe(false);
+      ringButton('Pause').click();
+      expect(player.scheduled.some((r) => r.key.includes('timer'))).toBe(false);
     });
 
     it('a timer that ended while the page was closed is cleared without ringing', () => {
       open();
-      timerButton('1 min').click();
+      pick('1 min');
       jump(5 * MIN);
       open();
-      expect(timerText()).not.toContain('left');
+      expect(ringShown()).toBe(false);
       expect(saved(storage).timerEndsAt).toBeNull();
       advance(SEC);
       expect(ringing().hidden).toBe(true);
@@ -185,85 +291,97 @@ describe('School Clock classroom timer', () => {
     it('runs, pauses and rings in memory only, never saving the timer; quick picks still save', () => {
       open({ search: SIMULATED });
       typeDuration('3');
-      expect(timerText()).toContain('3:00 left');
+      expect(digits().textContent).toBe('3:00');
       expect(saved(storage)).toMatchObject({ timerEndsAt: null, timerPausedMs: null, recentDurations: [3 * MIN] });
 
       advance(MIN);
-      timerButton('Pause').click();
-      expect(timerText()).toContain('Paused · 2:00 left');
+      ringButton('Pause').click();
+      expect(digits().getAttribute('aria-label')).toBe('Timer, paused, 2:00 left of 3:00');
       expect(saved(storage)).toMatchObject({ timerEndsAt: null, timerPausedMs: null });
 
-      timerButton('Resume').click();
+      ringButton('Resume').click();
       advance(2 * MIN + SEC);
       expect(ringing().textContent).toContain('Ringing · Timer');
-      expect(saved(storage)).toMatchObject({ timerEndsAt: null, timerPausedMs: null });
+      expect(saved(storage)).toMatchObject({ timerEndsAt: null, timerPausedMs: null, timerTotalMs: null });
 
       open();
-      expect(timerText()).not.toContain('left');
+      expect(ringShown()).toBe(false);
     });
 
     it('neither loads nor clears a real timer saved by another tab', () => {
-      // A real timer ending at 10:45 — already in the past for the simulated 13:00 clock.
+      // A real 10 min timer ending at 10:45 — already in the past for the simulated 13:00 clock.
       storage = createFakeStorage({
-        [SETTINGS_KEY]: JSON.stringify({ division: 'HS', timerEndsAt: START + 5 * MIN }),
+        [SETTINGS_KEY]: JSON.stringify({ division: 'HS', timerEndsAt: START + 5 * MIN, timerTotalMs: 10 * MIN }),
       });
       open({ search: SIMULATED });
-      expect(timerText()).not.toContain('left');
+      expect(ringShown()).toBe(false);
       advance(2 * SEC);
       expect(ringing().hidden).toBe(true);
-      timerButton('1 min').click();
+      pick('1 min');
       advance(MIN + SEC);
       expect(ringing().textContent).toContain('Ringing · Timer');
-      expect(saved(storage).timerEndsAt).toBe(START + 5 * MIN);
+      expect(saved(storage)).toMatchObject({ timerEndsAt: START + 5 * MIN, timerTotalMs: 10 * MIN });
 
       t = START;
       open();
-      expect(timerText()).toContain('5:00 left');
+      expect(digits().getAttribute('aria-label')).toBe('Timer, 5:00 left of 10:00');
     });
   });
 
-  describe('a custom duration', () => {
-    it('starts a timer of that length', () => {
+  describe('a custom time', () => {
+    it('starts a timer of its minutes and seconds', () => {
       open();
-      typeDuration('7:30');
-      expect(timerText()).toContain('7:30 left');
+      typeDuration('7', '30');
+      expect(pickerOpen()).toBe(false);
+      expect(digits().getAttribute('aria-label')).toBe('Timer, 7:30 left of 7:30');
       expect(saved(storage).timerEndsAt).toBe(START + 7.5 * MIN);
     });
 
-    it('says what is wrong and starts nothing when it is not a duration', () => {
+    it('says what is wrong, marks the field and starts nothing when it is not a time', () => {
       open();
-      typeDuration('soon');
-      expect(timerText()).toContain('Type minutes (like 7) or minutes:seconds (like 7:30).');
+      typeDuration('5', '75');
+      expect(pickerOpen()).toBe(true);
+      expect(picker().textContent).toContain('Seconds go from 0 to 59.');
+      expect(field('Seconds').getAttribute('aria-invalid')).toBe('true');
       expect(saved(storage).timerEndsAt ?? null).toBeNull();
 
+      typeDuration('soon');
+      expect(picker().textContent).toContain('Type minutes (like 7) or minutes:seconds (like 7:30).');
+      expect(field('Minutes').getAttribute('aria-invalid')).toBe('true');
+      expect(field('Seconds').hasAttribute('aria-invalid')).toBe(false);
+
       typeDuration('3');
-      expect(timerText()).not.toContain('Type minutes');
+      expect(ringShown()).toBe(true);
+      timerControl().click();
+      expect(picker().textContent).not.toContain('Type minutes');
+      expect(field('Minutes').hasAttribute('aria-invalid')).toBe(false);
+      expect(field('Minutes').value).toBe('');
     });
 
     it('the last 3 distinct ones are quick picks, most recent first, kept across reloads', () => {
       open();
       expect(quickPicks()).toEqual([]);
-      for (const text of ['3', '7:30', '15', '3']) typeDuration(text);
-      expect(quickPicks()).toEqual(['3 min', '15 min', '7:30']);
+      for (const [m, s] of [['3', ''], ['7', '30'], ['15', ''], ['3', '00']]) typeDuration(m, s);
+      expect(quickPicks()).toEqual(['3:00', '15:00', '7:30']);
       typeDuration('20');
-      expect(quickPicks()).toEqual(['20 min', '3 min', '15 min']);
+      expect(quickPicks()).toEqual(['20:00', '3:00', '15:00']);
 
       open();
-      expect(quickPicks()).toEqual(['20 min', '3 min', '15 min']);
+      expect(quickPicks()).toEqual(['20:00', '3:00', '15:00']);
     });
 
     it('a quick pick starts its timer and moves to the front', () => {
       open();
-      typeDuration('7:30');
+      typeDuration('7', '30');
       typeDuration('15');
-      visibleButtons(timerSection()).find((b) => b.textContent === '7:30').click();
-      expect(timerText()).toContain('7:30 left');
-      expect(quickPicks()).toEqual(['7:30', '15 min']);
+      pick('7:30');
+      expect(digits().textContent).toBe('7:30');
+      expect(quickPicks()).toEqual(['7:30', '15:00']);
     });
 
     it('presets are not added as quick picks', () => {
       open();
-      timerButton('5 min').click();
+      pick('5 min');
       typeDuration('5');
       expect(quickPicks()).toEqual([]);
     });

@@ -4,6 +4,8 @@
 // rings ("5 min before the end of Period 3"). The same words are announced
 // once to screen readers.
 
+import { formatDuration } from './format.js';
+
 /** @typedef {{ kind: string, title: string, detail: string }} RingWords */
 
 /**
@@ -36,7 +38,7 @@ export function ringWords(ring, text) {
       return { kind: 'Period Alarm', title: ring.alarm.label || period, detail: when };
     }
     default:
-      return { kind: 'Timer', title: 'Time is up', detail: '' };
+      return { kind: 'Timer', title: 'Time is up', detail: ring.totalMs ? `${formatDuration(ring.totalMs)} timer` : '' };
   }
 }
 

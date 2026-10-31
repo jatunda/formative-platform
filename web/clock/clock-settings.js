@@ -70,13 +70,14 @@
 /**
  * Everything "rings in a window" reads. `division` defaults to HS.
  * `timerEndsAt` is the running classroom timer's end (epoch ms), or
- * null/missing when none is running; `timerSound` is its voice (beep when
- * missing).
+ * null/missing when none is running, and `timerTotalMs` its length (for the
+ * ring card); `timerSound` is its voice (beep when missing).
  * @typedef {{
  *   division?: Division,
  *   bells: BellsSettings,
  *   alarms: Alarm[],
  *   timerEndsAt?: number | null,
+ *   timerTotalMs?: number | null,
  *   timerSound?: SoundName,
  * }} RingSettings
  */
@@ -89,6 +90,8 @@
  * - `volume`: 0–1, for every sound.
  * - `timerPausedMs`: a paused timer's time left (null unless paused; then
  *   `timerEndsAt` is null). See `timer.js`.
+ * - `timerTotalMs`: the length the timer was started with (its ring's whole),
+ *   or null with no timer.
  * - `recentDurations`: the last 3 distinct custom timer durations (ms), most
  *   recent first: the timer's quick picks.
  * - `showSeconds`: clock times and countdowns show seconds (a countdown's
@@ -111,6 +114,7 @@
  *   volume: number,
  *   timerEndsAt: number | null,
  *   timerPausedMs: number | null,
+ *   timerTotalMs: number | null,
  *   timerSound: SoundName,
  *   recentDurations: number[],
  *   showSeconds: boolean,

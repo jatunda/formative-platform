@@ -64,6 +64,13 @@ describe('School Clock hosting', () => {
     });
   });
 
+  it('eases the timer ring between ticks, but steps it under reduced motion', () => {
+    const css = readFileSync(resolve(clockDir, 'timer.css'), 'utf8');
+    expect(css).toMatch(/\.clock-ring__arc\s*\{[^}]*transition:\s*stroke-dasharray var\(--ring-tick\) linear/);
+    const reduced = css.slice(css.indexOf('@media (prefers-reduced-motion: reduce)') + 1);
+    expect(reduced).toMatch(/^[^@]*\.clock-ring__arc\s*\{[^}]*transition:\s*none/);
+  });
+
   it('keeps the page background in fullscreen', () => {
     const css = readFileSync(resolve(clockDir, 'clock.css'), 'utf8');
     // Without a background a fullscreen element shows the black backdrop through it.
@@ -81,7 +88,7 @@ describe('School Clock hosting', () => {
     // The components name no colour of their own: every colour is a token.
     const themes = html.indexOf('<link rel="stylesheet" href="/clock/themes.css" />');
     expect(themes).toBeGreaterThan(tokens);
-    for (const sheet of ['clock.css', 'settings-drawer.css', 'look-sheet.css', 'alarm-editor.css']) {
+    for (const sheet of ['clock.css', 'settings-drawer.css', 'timer.css', 'look-sheet.css', 'alarm-editor.css']) {
       const components = readFileSync(resolve(clockDir, sheet), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
       expect(components).not.toMatch(/#[0-9a-f]{3,8}\b|rgb\(/i);
       expect(html.indexOf(`/clock/${sheet}`)).toBeGreaterThan(themes);

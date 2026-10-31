@@ -6,7 +6,7 @@ import { createFakeSoundPlayer } from '../helpers/fake-sound-player.js';
 import { accessibleName, field, isShown, setValue, toggle } from '../helpers/clock-dom.js';
 
 const mount = () => document.getElementById('clockApp');
-const drawer = () => mount().querySelector('[role="dialog"][aria-labelledby]');
+const drawer = () => mount().querySelector('#clock-settings');
 const section = () => document.getElementById('clock-settings-alarms');
 /** A shown button in the drawer by its accessible name. */
 const button = (name, root = mount()) => [...root.querySelectorAll('button')]

@@ -166,7 +166,9 @@ describe('School Clock fullscreen, mini player and feedback', () => {
       .map((c) => c.textContent).join(' ').replace(/\s+/g, ' ').trim();
     const progress = () => [...foot().querySelectorAll('[role="progressbar"]')].find((b) => !b.closest('[hidden]'));
     const miniMain = () => mini().querySelector('main');
-    const timerSection = () => mount().querySelector('[aria-label="Timer"]');
+    /** The timer picker, and the running timer's ring in the big spot. */
+    const picker = () => mount().querySelector('[role="dialog"][aria-labelledby="clock-picker-title"]');
+    const timerRing = () => mount().querySelector('.clock-stage [role="group"][aria-label="Timer"]');
 
     async function openMini() {
       button('Mini player').click();
@@ -227,7 +229,7 @@ describe('School Clock fullscreen, mini player and feedback', () => {
     it('shows a running timer as the big Readout, with the time left in the Segment underneath', async () => {
       open();
       button('Timer').click();
-      button('5 min', timerSection()).click();
+      button('5 min', picker()).click();
       await openMini();
       expect(head()).toBe('Timer');
       expect(readout()).toBe('5:00 left');
@@ -236,10 +238,10 @@ describe('School Clock fullscreen, mini player and feedback', () => {
 
       advance(SEC);
       expect(readout()).toBe('4:59 left');
-      button('Pause', timerSection()).click();
+      button('Pause', timerRing()).click();
       expect(head()).toBe('Timer · paused');
 
-      button('Cancel', timerSection()).click();
+      button('Cancel', timerRing()).click();
       expect(head()).toBe('Period 3');
       expect(miniMain().classList.contains('has-timer')).toBe(false);
     });
@@ -247,7 +249,7 @@ describe('School Clock fullscreen, mini player and feedback', () => {
     it('keeps up next under a timer during a Passing Period', async () => {
       open({ when: at(11, 16) });
       button('Timer').click();
-      button('1 min', timerSection()).click();
+      button('1 min', picker()).click();
       await openMini();
       expect(readout()).toBe('1:00 left');
       expect(footText()).toBe('Up next Period 4');

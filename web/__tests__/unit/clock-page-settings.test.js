@@ -9,7 +9,7 @@ const SEC = 1000;
 const mount = () => document.getElementById('clockApp');
 /** A shown button by its accessible name. */
 const button = (name) => [...mount().querySelectorAll('button')].find((b) => accessibleName(b) === name && isShown(b));
-const drawer = () => mount().querySelector('[role="dialog"][aria-labelledby]');
+const drawer = () => mount().querySelector('[role="dialog"][aria-labelledby="clock-settings-title"]');
 const drawerOpen = () => isShown(drawer());
 const saved = (storage) => JSON.parse(storage.getItem(SETTINGS_KEY));
 const stageText = () => mount().querySelector('.clock-stage').textContent.replace(/\s+/g, ' ').trim();
@@ -88,7 +88,7 @@ describe('School Clock settings drawer', () => {
       expect(document.activeElement).toBe(button('Settings'));
 
       button('Settings').click();
-      mount().querySelector('.clock-scrim').click();
+      drawer().previousElementSibling.click(); // its scrim
       expect(drawerOpen()).toBe(false);
     });
 
@@ -125,14 +125,6 @@ describe('School Clock settings drawer', () => {
       button('Readouts').focus();
       press('Tab', { shiftKey: true });
       expect(document.activeElement).toBe(stops.at(-1));
-    });
-
-    it('closes the timer panel when it opens', () => {
-      open();
-      button('Timer').click();
-      button('Settings').click();
-      expect(isShown(mount().querySelector('[aria-label="Timer"]'))).toBe(false);
-      expect(button('Timer').getAttribute('aria-expanded')).toBe('false');
     });
 
     it('opens at the Division from the Division chip, with focus on the chosen Division, and returns focus to the chip', () => {

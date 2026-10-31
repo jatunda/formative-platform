@@ -25,6 +25,7 @@ export const DEFAULT_SETTINGS = Object.freeze(/** @type {ClockSettings} */ ({
   volume: 0.8,
   timerEndsAt: null,
   timerPausedMs: null,
+  timerTotalMs: null,
   timerSound: 'beep',
   recentDurations: [],
   showSeconds: true,
@@ -86,6 +87,8 @@ function parseSettings(saved) {
   const bells = s.bells;
   const timerEndsAt = isFiniteNumber(s.timerEndsAt) ? s.timerEndsAt : d.timerEndsAt;
   const isPositive = (v) => isFiniteNumber(v) && v > 0;
+  // One timer at a time: a running one wins over a paused one.
+  const timerPausedMs = timerEndsAt === null && isPositive(s.timerPausedMs) ? s.timerPausedMs : d.timerPausedMs;
   return {
     division: s.division === 'MS' || s.division === 'HS' ? s.division : d.division,
     use24Hour: typeof s.use24Hour === 'boolean' ? s.use24Hour : d.use24Hour,
@@ -95,8 +98,9 @@ function parseSettings(saved) {
     alarms: Array.isArray(s.alarms) ? s.alarms.filter(isAlarm) : [],
     volume: isFiniteNumber(s.volume) && s.volume >= 0 && s.volume <= 1 ? s.volume : d.volume,
     timerEndsAt,
-    // One timer at a time: a running one wins over a paused one.
-    timerPausedMs: timerEndsAt === null && isPositive(s.timerPausedMs) ? s.timerPausedMs : d.timerPausedMs,
+    timerPausedMs,
+    timerTotalMs: (timerEndsAt !== null || timerPausedMs !== null) && isPositive(s.timerTotalMs)
+      ? s.timerTotalMs : d.timerTotalMs,
     timerSound: isSound(s.timerSound) ? s.timerSound : d.timerSound,
     recentDurations: Array.isArray(s.recentDurations)
       ? s.recentDurations.filter(isPositive).slice(0, QUICK_PICKS) : [],
