@@ -1,6 +1,7 @@
 // The Settings drawer: what the clock does (Division, time text, sound,
 // Period Labels, the day's coming rings, About). How it looks is the Look
-// sheet's. It's a modal dialog from the right over a scrim, built once (so
+// sheet's (ticket 21); until then a last Bottom bar section holds the bar's
+// setting. It's a modal dialog from the right over a scrim, built once (so
 // typing a Period Label survives the ticks); each render brings its controls
 // in step with the settings, which the top bar can change too.
 //
@@ -139,8 +140,20 @@ export function createSettingsDrawer({ settings, update, play, testRing, behind,
   ]);
   about.classList.add('clock-drawer__section--quiet');
 
+  // For now only: the bar's setting moves to the Look sheet (ticket 21),
+  // which takes this section out. Whole day is the saved dayStrip on, just
+  // this Segment off.
+  const barChoices = /** @type {[string, boolean][]} */ ([['Whole day', true], ['Just this Segment', false]]).map(([name, on]) => {
+    const input = el('input', { type: 'radio', name: `${ID}-bar`, onchange: () => update({ dayStrip: on }) });
+    return { on, input, label: el('label', {}, [input, ` ${name}`]) };
+  });
+  const bar = drawerSection('bar', 'Bottom bar', [
+    el('div', { className: 'clock-bar-setting', role: 'radiogroup', 'aria-labelledby': `${ID}-bar-title` },
+      barChoices.map(({ label }) => label)),
+  ]);
+
   // In order. Alarms (ticket 15) goes after `labels`.
-  const sections = [division, time, sound, labels, today, about];
+  const sections = [division, time, sound, labels, today, about, bar];
 
   const closeButton = el('button', {
     type: 'button', className: 'clock-btn clock-btn--icon', 'aria-label': 'Close settings', title: 'Close settings',
@@ -169,6 +182,7 @@ export function createSettingsDrawer({ settings, update, play, testRing, behind,
     volumeValue.textContent = `${percent}%`;
     bellSound.select.value = s.bells.sound;
     timerSound.select.value = s.timerSound;
+    for (const { on, input } of barChoices) input.checked = s.dayStrip === on;
   }
   render();
 

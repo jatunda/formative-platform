@@ -4,9 +4,9 @@
    look by setting data-mode / data-palette / data-font / data-deco on <html>;
    nothing here names a colour or a face.
 
-   The plain panels (timer, settings) only get what keeps them usable on the
-   themed page; tickets 19 and 22 design them. The overlays (ticket 18) have
-   their own section at the end, with their own breakpoints. The bar's place (.clock-bar-slot) is ticket 20's. */
+   The plain timer panel only gets what keeps it usable on the themed page;
+   ticket 22 designs it. The overlays (ticket 18) have their own section at
+   the end, with their own breakpoints. */
 
 *,
 *::before,
@@ -528,6 +528,223 @@ button.clock-readout__face {
   flex: none;
 }
 
+/* ---------- the bar: whole day or just this Segment ---------- */
+
+.clock-bar {
+  position: relative;
+  min-width: 0;
+}
+
+.clock-bar__heading {
+  margin-bottom: 0.3em;
+  font-size: var(--type-strip-small);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.clock-bar--next .clock-bar__heading::before {
+  content: "\2192  ";
+}
+
+/* Room above the track for the Now marker, and below it for the times. */
+.clock-bar__day {
+  position: relative;
+  padding-top: 12px;
+  padding-bottom: calc(var(--type-strip-small) * 1.6);
+}
+
+.clock-bar__track {
+  position: relative;
+  height: max(36px, 7vh);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.clock-bar--segment .clock-bar__track {
+  height: max(32px, 5.5vh);
+}
+
+.clock-bar__seg {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  container-type: inline-size;
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-size: var(--type-strip);
+  line-height: 1.1;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.clock-bar__text {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  height: 100%;
+  padding: 0 0.6em;
+}
+
+.clock-bar--segment .clock-bar__text {
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.5em;
+}
+
+.clock-bar--segment .clock-bar__label::before {
+  content: "\00B7  ";
+}
+
+/* Breaks are hatched with a dashed edge, Assemblies dotted: pattern, not colour. */
+.clock-bar__seg[data-kind="break"] {
+  background: repeating-linear-gradient(-45deg, var(--bg) 0 6px, var(--hatch) 6px 12px);
+  border-style: dashed;
+}
+
+.clock-bar__seg[data-kind="assembly"] {
+  background: var(--bg);
+  border-style: dotted;
+  border-width: 2.5px;
+}
+
+/* On whole day a Passing Period is the gap between two blocks: no box of
+   its own and no time (the blocks either side show it). On just this
+   Segment it's a bordered block of its own. */
+.clock-bar--day .clock-bar__seg[data-kind="passing"] {
+  border: 0;
+  background: transparent;
+}
+
+.clock-bar--day .clock-bar__seg[data-kind="passing"] .clock-bar__time {
+  display: none;
+}
+
+.clock-bar--segment .clock-bar__seg[data-kind="passing"] {
+  background: var(--bg);
+}
+
+.clock-bar__name {
+  font-weight: 700;
+}
+
+.clock-bar__label {
+  font-size: 0.85em;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Full names where they fit ("Period 3", "Nutrition"), short ones where they
+   don't ("P3", "Nutr."), smaller still in a sliver, and none in a gap. The
+   short form is never cut further: "Nutrition" never reads "Nut". */
+.clock-bar__short {
+  display: none;
+}
+
+@container (max-width: 6.5em) {
+  .clock-bar__long {
+    display: none;
+  }
+
+  .clock-bar__short {
+    display: inline;
+  }
+}
+
+@container (max-width: 3.6em) {
+  .clock-bar__text {
+    padding: 0 0.2em;
+  }
+
+  .clock-bar__name {
+    font-size: 0.8em;
+  }
+
+  .clock-bar__label {
+    display: none;
+  }
+}
+
+@container (max-width: 2em) {
+  .clock-bar__name {
+    visibility: hidden;
+  }
+}
+
+.clock-bar__time,
+.clock-bar__end {
+  position: absolute;
+  font-size: var(--type-strip-small);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.clock-bar__time {
+  top: calc(100% + 0.5vh);
+  left: 0;
+}
+
+.clock-bar__end {
+  right: 0;
+  bottom: 0;
+}
+
+.clock-bar__seg[data-state="past"] {
+  background: transparent;
+  border-color: var(--line-soft);
+  color: var(--muted);
+}
+
+.clock-bar__seg[data-state="past"][data-kind="break"] {
+  border-color: var(--line);
+}
+
+/* The current block (or the Passing Period's gap) fills left to right: a
+   soft wash over the elapsed part and a solid accent rule along the bottom
+   on its track. During a Passing Period the next block is highlighted. */
+.clock-bar__seg[data-state="now"],
+.clock-bar__seg[data-state="next"] {
+  border: 3px solid var(--accent);
+}
+
+.clock-bar--day .clock-bar__seg[data-kind="passing"][data-state="now"] {
+  border: 0;
+}
+
+.clock-bar__fill {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background:
+    linear-gradient(var(--accent), var(--accent)) left bottom / var(--done, 0%) 5px no-repeat,
+    linear-gradient(var(--track), var(--track)) left bottom / 100% 5px no-repeat,
+    linear-gradient(to right, var(--accent-soft) var(--done, 0%), transparent var(--done, 0%));
+}
+
+/* The Now marker: a thin notch above the track, so it never crosses text. */
+.clock-bar__now {
+  position: absolute;
+  top: 0;
+  width: 0;
+  height: 0;
+  margin-left: -7px;
+  border: 7px solid transparent;
+  border-bottom: 0;
+  border-top: 10px solid var(--fg);
+}
+
+/* The agenda list is the phone's whole day (see the narrow breakpoint). */
+.clock-agenda {
+  display: none;
+}
+
 /* ======================= plain panels and prompts ======================= */
 
 /* The timer's controls, opened from the top bar: a plain panel on the right
@@ -787,6 +1004,120 @@ button.clock-readout__face {
   /* No Document Picture-in-Picture on phones, so no Mini player button. */
   .clock-control--mini {
     display: none;
+  }
+
+  /* Whole day becomes an agenda list that scrolls on its own; the window
+     button sits under it on the right. Just this Segment stays the bar. */
+  .clock-screen:has(.clock-bar--day:not([hidden])) {
+    grid-template-rows: auto auto minmax(0, 1fr);
+  }
+
+  .clock-screen.is-simulated:has(.clock-bar--day:not([hidden])) {
+    grid-template-rows: auto auto auto minmax(0, 1fr);
+  }
+
+  .clock-screen:has(.clock-bar--day:not([hidden])) .clock-stage {
+    justify-content: flex-start;
+  }
+
+  .clock-bottom {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    min-height: 0;
+  }
+
+  .clock-bar-slot,
+  .clock-bar--day {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .clock-bar__heading {
+    margin-bottom: 6px;
+    font-size: 12px;
+  }
+
+  .clock-bar--day .clock-bar__day {
+    display: none;
+  }
+
+  .clock-agenda {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    overflow: auto;
+    border-top: 1px solid var(--line-soft);
+    list-style: none;
+  }
+
+  .clock-agenda__row {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 14px;
+    min-height: 36px;
+    padding: 0 8px;
+    border-bottom: 1px solid var(--line-soft);
+    font-size: 16px;
+  }
+
+  .clock-agenda__time {
+    flex: none;
+    width: 4.6em;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums lining-nums;
+  }
+
+  .clock-agenda__row[data-state="past"] {
+    color: var(--muted);
+  }
+
+  .clock-agenda__row[data-state="now"],
+  .clock-agenda__row[data-state="next"] {
+    border: 3px solid var(--accent);
+    border-radius: var(--radius-sm);
+    font-weight: 700;
+  }
+
+  .clock-agenda__row[data-state="now"] {
+    background: var(--accent-soft);
+  }
+
+  /* Breaks and Assemblies: italic plus a word, not just colour. */
+  .clock-agenda__row[data-kind="break"] .clock-agenda__name,
+  .clock-agenda__row[data-kind="assembly"] .clock-agenda__name {
+    font-style: italic;
+  }
+
+  .clock-agenda__kind {
+    font-style: normal;
+    color: var(--muted);
+  }
+
+  .clock-agenda__pill {
+    margin-left: auto;
+    padding: 1px 8px;
+    border-radius: 99px;
+    background: var(--fg);
+    color: var(--bg);
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .clock-agenda__row[data-state="next"] .clock-agenda__pill {
+    background: transparent;
+    color: var(--accent-text);
+    border: 1.5px solid var(--accent);
+  }
+
+  .clock-corner {
+    justify-content: flex-end;
   }
 }
 
