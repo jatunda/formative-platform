@@ -6,8 +6,8 @@
 //
 // The drawer is one scrolling column of sections, each made by
 // `drawerSection()`. A new feature adds a section to `sections` below; it
-// never restructures the drawer. The Alarms section (ticket 15) goes between
-// Period Labels and Next rings today.
+// never restructures the drawer. The Alarms section is `alarm-editor.js`'s,
+// made by the page and handed in.
 import { LABELLED_PERIODS } from './clock-settings.js';
 import { el } from './dom.js';
 import { icon } from './icons.js';
@@ -53,7 +53,7 @@ export function switchControl(id, name, hint, onChange) {
  * A voice choice ("Bell sound") with a Preview that plays the voice chosen.
  * @param {string} name @param {(sound: string) => void} onChange @param {(sound: string) => void} preview
  */
-function soundChoice(name, onChange, preview) {
+export function soundChoice(name, onChange, preview) {
   const select = el('select', { className: 'clock-input', onchange: () => onChange(select.value) },
     SOUNDS.map((sound) => el('option', { value: sound, textContent: SOUND_NAMES[sound] })));
   const row = el('div', { className: 'clock-field-row' }, [
@@ -72,12 +72,14 @@ function soundChoice(name, onChange, preview) {
  * @param {{ settings: () => import('./clock-settings.js').ClockSettings,
  *   update: (change: Partial<import('./clock-settings.js').ClockSettings>) => void,
  *   play: (sound: import('./clock-settings.js').SoundName) => void,
- *   testRing: () => void, behind: () => Element[], onChange: (open: boolean) => void }} options
+ *   testRing: () => void, behind: () => Element[], onChange: (open: boolean) => void,
+ *   alarms: { section: HTMLElement, render: () => void } }} options
  *   `settings` gives the current settings and `update` saves a change (and redraws the page);
  *   `play` previews a voice and `testRing` rings the Bells' sound now; `behind` gives the page
- *   parts made inert while the drawer is open, and `onChange` hears it open and close.
+ *   parts made inert while the drawer is open, and `onChange` hears it open and close;
+ *   `alarms` is the Alarms section (`alarm-editor.js`).
  */
-export function createSettingsDrawer({ settings, update, play, testRing, behind, onChange }) {
+export function createSettingsDrawer({ settings, update, play, testRing, behind, onChange, alarms }) {
   const divisionInputs = DIVISIONS.map(([key, name]) => {
     const input = el('input', {
       type: 'radio', name: `${ID}-division`, value: key, onchange: () => update({ division: key }),
@@ -139,8 +141,8 @@ export function createSettingsDrawer({ settings, update, play, testRing, behind,
   ]);
   about.classList.add('clock-drawer__section--quiet');
 
-  // In order. Alarms (ticket 15) goes after `labels`.
-  const sections = [division, time, sound, labels, today, about];
+  // In order.
+  const sections = [division, time, sound, labels, alarms.section, today, about];
 
   const closeButton = el('button', {
     type: 'button', className: 'clock-btn clock-btn--icon', 'aria-label': 'Close settings', title: 'Close settings',
@@ -169,6 +171,7 @@ export function createSettingsDrawer({ settings, update, play, testRing, behind,
     volumeValue.textContent = `${percent}%`;
     bellSound.select.value = s.bells.sound;
     timerSound.select.value = s.timerSound;
+    alarms.render();
   }
   render();
 

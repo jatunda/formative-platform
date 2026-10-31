@@ -88,7 +88,7 @@ describe('School Clock hosting', () => {
     // The components name no colour of their own: every colour is a token.
     const themes = html.indexOf('<link rel="stylesheet" href="/clock/themes.css" />');
     expect(themes).toBeGreaterThan(tokens);
-    for (const sheet of ['clock.css', 'settings-drawer.css', 'timer.css', 'look-sheet.css']) {
+    for (const sheet of ['clock.css', 'settings-drawer.css', 'timer.css', 'look-sheet.css', 'alarm-editor.css']) {
       const components = readFileSync(resolve(clockDir, sheet), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
       expect(components).not.toMatch(/#[0-9a-f]{3,8}\b|rgb\(/i);
       expect(html.indexOf(`/clock/${sheet}`)).toBeGreaterThan(themes);

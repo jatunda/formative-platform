@@ -1,0 +1,235 @@
+/* The Settings drawer's Alarms section (alarm-editor.js): the Alarm list,
+   the editor form and the Undo toast. Builds on settings-drawer.css's
+   controls and clock.css's toast; colours, sizes and spacing are the design
+   tokens. */
+
+.clock-btn--accent {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.clock-btn--accent:hover {
+  background: var(--accent);
+  filter: brightness(1.08);
+}
+
+/* The list: name and summary, Edit, on/off. */
+.clock-alarm-list {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  list-style: none;
+}
+
+.clock-alarm-item {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  padding: var(--s2) 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.clock-alarm-item--editing {
+  display: block;
+  border-bottom: 0;
+}
+
+.clock-alarm-item__text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.clock-alarm-item__name {
+  font-weight: 600;
+}
+
+.clock-alarm-item .clock-btn--small {
+  align-self: center;
+}
+
+.clock-switch--bare {
+  min-width: 52px;
+}
+
+/* The editor: a raised card with an accent border. */
+.clock-alarm-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s5);
+  padding: var(--s4);
+  border: 1.5px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+
+.clock-alarm-form h4 {
+  margin: 0;
+  font-size: var(--type-ui-lg);
+}
+
+.clock-fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.clock-fieldset legend {
+  margin-bottom: var(--s2);
+  padding: 0;
+  font-weight: 700;
+}
+
+.clock-fieldset__actions {
+  display: flex;
+  gap: var(--s2);
+}
+
+.clock-fieldset__actions .clock-btn[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.clock-schedule-checks {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+}
+
+.clock-field--inline {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--s3);
+}
+
+.clock-input--num {
+  width: 4.5em;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.clock-time-row {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--s2);
+}
+
+.clock-time-row .clock-input--num {
+  width: 3.5em;
+  font-size: var(--type-ui-xl);
+}
+
+.clock-segmented--ampm .clock-segment {
+  white-space: nowrap;
+}
+
+.clock-time-row__colon {
+  padding-bottom: var(--s2);
+  font-size: var(--type-ui-xl);
+  font-weight: 700;
+}
+
+.clock-segmented--ampm {
+  min-width: 140px;
+  margin-left: var(--s2);
+}
+
+.clock-segmented--3 .clock-segment {
+  font-size: var(--type-ui-sm);
+}
+
+/* Checkboxes: a box that fills with the accent and shows a tick. */
+.clock-checks {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: var(--s4);
+}
+
+.clock-check {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  min-height: var(--tap);
+  cursor: pointer;
+}
+
+.clock-check input {
+  appearance: none;
+  flex: none;
+  display: grid;
+  place-content: center;
+  width: 22px;
+  height: 22px;
+  margin: 0;
+  border: 2px solid var(--line);
+  border-radius: 6px;
+  background: var(--input-bg);
+  cursor: pointer;
+}
+
+.clock-check input::after {
+  content: "";
+  width: 11px;
+  height: 6px;
+  border-bottom: 2.5px solid var(--on-accent);
+  border-left: 2.5px solid var(--on-accent);
+  opacity: 0;
+  transform: translateY(-1px) rotate(-45deg);
+}
+
+.clock-check input:checked {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.clock-check input:checked::after {
+  opacity: 1;
+}
+
+.clock-check input:focus-visible {
+  outline: var(--focus-width) solid var(--focus);
+  outline-offset: 2px;
+}
+
+.clock-form-error {
+  padding-left: var(--s3);
+  border-left: 4px solid var(--fg);
+  font-weight: 600;
+}
+
+.clock-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--s2);
+}
+
+.clock-form-actions--start {
+  justify-content: flex-start;
+}
+
+.clock-form-actions--split {
+  justify-content: space-between;
+}
+
+/* "Alarm deleted · Undo": ticket 18's toast (bottom centre), inside the
+   drawer so it can be reached while the rest of the page is inert. */
+.clock-alarm-toast .clock-btn--small {
+  align-self: center;
+}
+
+@media (max-width: 520px) {
+  .clock-checks {
+    grid-template-columns: 1fr;
+  }
+
+  .clock-segmented--ampm {
+    min-width: 112px;
+  }
+}

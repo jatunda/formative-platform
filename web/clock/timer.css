@@ -1,8 +1,9 @@
 /* School Clock: the classroom timer's ring and picker (timer-ring.js,
    timer-picker.js), built to the design reference's "Timer: ring and picker"
    (.scratch/school-clock/mockups/final/, DESIGN.md). Like clock.css it names
-   no colour or face: every one is a token. Loaded after settings-drawer.css,
-   whose buttons and fields (.clock-btn, .clock-field, .clock-input) it uses. */
+   no colour or face: every one is a token. Uses settings-drawer.css's buttons
+   and fields (.clock-btn, .clock-field, .clock-input) and alarm-editor.css's
+   .clock-btn--accent. */
 
 /* ======================= the ring in the big spot ======================= */
 
@@ -171,17 +172,6 @@
   display: flex;
   gap: var(--s3);
   margin-top: 1cqh;
-}
-
-.clock-btn--accent {
-  border-color: var(--accent);
-  background: var(--accent);
-  color: var(--on-accent);
-}
-
-.clock-btn--accent:hover {
-  background: var(--accent);
-  filter: brightness(1.08);
 }
 
 /* ======================= the picker ======================= */

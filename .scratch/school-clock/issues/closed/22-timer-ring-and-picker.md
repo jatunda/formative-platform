@@ -47,3 +47,9 @@ Spec: `.scratch/school-clock/spec.md` (Implementation Decisions: Look; user stor
   - The "Sound is off" prompt (18) sits bottom centre and can cover the bottom of the ring until sound is turned on, as transient overlays do by design.
   - The page is 1px taller than the viewport at 1920×1080. That was already so before this ticket.
 
+
+**After merging 15, 18–21:**
+
+- Tests that took the first `[role="dialog"]` to be the Settings drawer (the drawer, Look and Alarm tests) now name the drawer, because the picker comes before it on the page. The Look test "closes the plain timer panel" is gone along with the panel.
+- `.clock-btn--accent` now comes from `alarm-editor.css`, and `timer.css` no longer repeats it.
+- With the Look sheet open the ring is at most 60% of the stage's width, so it shrinks beside the sheet. Re-checked: 0 axe violations with the timer and the Look sheet both open.
