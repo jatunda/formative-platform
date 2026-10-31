@@ -1,5 +1,5 @@
 // @ts-check
-// The School Clock theme set (ticket 21): which palette, font and decoration
+// The School Clock theme set: which palette, font and decoration
 // each theme uses, each palette's own mode, and the look descriptions the
 // Look sheet uses as accessible names. Colour and font values live in
 // tokens.css (the default) and themes.css; the page applies a look by setting
@@ -165,7 +165,7 @@ export function pickPalette(settings, id) {
 }
 
 /**
- * Ticket 16 saved `colorScheme: 'light' | 'dark' | 'auto'`; it is now a flip.
+ * An earlier version saved `colorScheme: 'light' | 'dark' | 'auto'`; it is now a flip.
  * 'auto' (or nothing) follows the theme; 'light' or 'dark' follows it when it
  * is the saved look's own mode and is flipped otherwise, so the clock looks
  * as it did.

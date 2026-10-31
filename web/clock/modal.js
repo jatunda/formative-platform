@@ -1,7 +1,8 @@
-// A modal dialog on the School Clock page (the Settings drawer): shown over a
-// scrim, with the rest of the page inert behind it. Focus moves into it when
-// it opens and Tab wraps around inside it; Escape, the scrim or `close()`
-// closes it, and focus goes back to the button that opened it.
+// A modal dialog on the School Clock page (the Settings drawer, the Look
+// sheet, the timer picker): shown over a scrim, with the rest of the page
+// inert behind it. Focus moves into it when it opens and Tab wraps around
+// inside it; Escape, the scrim or `close()` closes it, and focus goes back to
+// the button that opened it.
 
 /** What Tab can land on (a radio group is one stop: its checked radio). */
 const TABBABLE = 'button, a[href], input, select, textarea, [tabindex]:not([tabindex="-1"])';

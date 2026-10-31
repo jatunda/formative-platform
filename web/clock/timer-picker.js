@@ -4,6 +4,7 @@
 // Built once (so typing survives the ticks). Pause, resume and cancel are on
 // the ring (timer-ring.js), not here. The timer itself is plain data in the
 // settings (timer.js).
+import { closeButton } from './controls.js';
 import { el } from './dom.js';
 import { formatDuration } from './format.js';
 import { icon } from './icons.js';
@@ -97,10 +98,7 @@ export function createTimerPicker({ settings, now, update, behind, onChange, onS
   }, [
     el('div', { className: 'clock-picker__head' }, [
       el('h2', { id: `${ID}-title`, textContent: 'Start a timer' }),
-      el('button', {
-        type: 'button', className: 'clock-btn clock-btn--icon', 'aria-label': 'Close', title: 'Close',
-        onclick: () => modal.close(),
-      }, [icon('close')]),
+      closeButton('Close', () => modal.close()),
     ]),
     presets, recentLabel, recent, form, error,
   ]);

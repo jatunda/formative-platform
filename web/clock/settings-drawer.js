@@ -5,68 +5,15 @@
 // in step with the settings, which the top bar can change too.
 //
 // The drawer is one scrolling column of sections, each made by
-// `drawerSection()`. A new feature adds a section to `sections` below; it
+// `drawerSection()` (controls.js). A new feature adds a section to `sections` below; it
 // never restructures the drawer. The Alarms section is `alarm-editor.js`'s,
 // made by the page and handed in.
-import { LABELLED_PERIODS } from './clock-settings.js';
+import { DIVISIONS, LABELLED_PERIODS } from './clock-settings.js';
+import { closeButton, drawerSection, feedbackLink, soundChoice, switchControl } from './controls.js';
 import { el } from './dom.js';
-import { icon } from './icons.js';
 import { createModal } from './modal.js';
-import { SOUNDS, SOUND_NAMES } from './sound.js';
 
 const ID = 'clock-settings';
-export const DIVISIONS = [['MS', 'Middle School'], ['HS', 'High School']];
-export const FEEDBACK_HREF = `mailto:erich@villagechristian.org?subject=${encodeURIComponent('Clock feedback')}`;
-
-/**
- * One section of the drawer: an uppercase heading that names it, then its
- * controls. Its id is `clock-settings-<key>`.
- * @param {string} key @param {string} title @param {(Node | string)[]} children
- */
-export function drawerSection(key, title, children) {
-  const id = `${ID}-${key}`;
-  return el('section', { className: 'clock-drawer__section', id, 'aria-labelledby': `${id}-title` }, [
-    el('h3', { id: `${id}-title`, textContent: title }),
-    ...children,
-  ]);
-}
-
-/**
- * An on/off switch named `name`, with an optional hint under the name.
- * @param {string} id @param {string} name @param {string} hint @param {(on: boolean) => void} onChange
- */
-export function switchControl(id, name, hint, onChange) {
-  const hintText = el('span', { className: 'clock-hint', id: `${id}-hint`, textContent: hint });
-  const input = el('input', {
-    type: 'checkbox', role: 'switch', id, 'aria-labelledby': `${id}-name`, 'aria-describedby': hintText.id,
-    onchange: () => onChange(input.checked),
-  });
-  const label = el('label', { className: 'clock-switch' }, [
-    el('span', { className: 'clock-switch__text' }, [el('span', { id: `${id}-name`, textContent: name }), hintText]),
-    input,
-    el('span', { className: 'clock-switch__track', 'aria-hidden': 'true' }),
-  ]);
-  return { label, input, hint: hintText };
-}
-
-/**
- * A voice choice ("Bell sound") with a Preview that plays the voice chosen.
- * @param {string} name @param {(sound: string) => void} onChange @param {(sound: string) => void} preview
- */
-export function soundChoice(name, onChange, preview) {
-  const select = el('select', { className: 'clock-input', onchange: () => onChange(select.value) },
-    SOUNDS.map((sound) => el('option', { value: sound, textContent: SOUND_NAMES[sound] })));
-  const row = el('div', { className: 'clock-field-row' }, [
-    el('label', { className: 'clock-field' }, [
-      el('span', { className: 'clock-field__label', textContent: name }),
-      el('span', { className: 'clock-select' }, [select]),
-    ]),
-    el('button', {
-      type: 'button', className: 'clock-btn', 'aria-label': `Preview ${name}`, onclick: () => preview(select.value),
-    }, [icon('play'), 'Preview']),
-  ]);
-  return { row, select };
-}
 
 /**
  * @param {{ settings: () => import('./clock-settings.js').ClockSettings,
@@ -137,21 +84,19 @@ export function createSettingsDrawer({ settings, update, play, testRing, behind,
 
   const about = drawerSection('about', 'About', [
     el('p', { className: 'clock-note', textContent: 'The mini player works in Chrome and Edge on a computer.' }),
-    el('a', { className: 'clock-feedback', href: FEEDBACK_HREF, textContent: 'Feedback? Email Eric' }),
+    feedbackLink(),
   ]);
   about.classList.add('clock-drawer__section--quiet');
 
   // In order.
   const sections = [division, time, sound, labels, alarms.section, today, about];
 
-  const closeButton = el('button', {
-    type: 'button', className: 'clock-btn clock-btn--icon', 'aria-label': 'Close settings', title: 'Close settings',
-    onclick: () => modal.close(),
-  }, [icon('close')]);
   const dialog = el('div', {
     className: 'clock-drawer', id: ID, role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': `${ID}-title`,
   }, [
-    el('div', { className: 'clock-drawer__head' }, [el('h2', { id: `${ID}-title`, textContent: 'Settings' }), closeButton]),
+    el('div', { className: 'clock-drawer__head' }, [
+      el('h2', { id: `${ID}-title`, textContent: 'Settings' }), closeButton('Close settings', () => modal.close()),
+    ]),
     el('div', { className: 'clock-drawer__body' }, sections),
   ]);
   const scrim = el('div', { className: 'clock-scrim', 'aria-hidden': 'true' });
@@ -188,7 +133,6 @@ export function createSettingsDrawer({ settings, update, play, testRing, behind,
       // The chip that opens it at the Division only shows once one is chosen.
       modal.open(from, atDivision ? divisionInputs.find(({ input }) => input.checked).input : undefined);
     },
-    isOpen: modal.isOpen,
     /** The day's coming rings as lines of text; with none, the section hides. @param {string[]} lines */
     showRings(lines) {
       today.hidden = lines.length === 0;

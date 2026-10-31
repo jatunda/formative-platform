@@ -28,7 +28,7 @@ import { createStageTextView } from './stage-text-view.js';
 import { SCHOOL_YEARS } from './school-years.js';
 import { createWakeLockKeeper, detectCapabilities } from './screen.js';
 import { createAlarmEditor } from './alarm-editor.js';
-import { DIVISIONS, FEEDBACK_HREF, createSettingsDrawer } from './settings-drawer.js';
+import { createSettingsDrawer } from './settings-drawer.js';
 import { applyLook, createLookSheet, decorations } from './look-sheet.js';
 import { BELL_SECONDS, ALARM_MAX_SECONDS, createSoundPlayer } from './sound.js';
 import { cancelTimer, pauseTimer, resumeTimer, settleTimer, timerProgress, timerRingView, timerStatus, timerText } from './timer.js';
@@ -228,9 +228,7 @@ export function initClockApp({
   }
 
   // First visit: ask the Division once, in a dialog that takes focus.
-  const divisionPrompt = createDivisionPrompt({
-    divisions: DIVISIONS, feedbackHref: FEEDBACK_HREF, onChoose: (division) => updateSettings({ division }),
-  });
+  const divisionPrompt = createDivisionPrompt({ onChoose: (division) => updateSettings({ division }) });
 
   // The Readouts, redrawn only when their arrangement changes. The big one
   // is the layout's first, or the timer while it's running, paused or

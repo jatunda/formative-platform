@@ -218,7 +218,7 @@
   justify-content: space-between;
 }
 
-/* "Alarm deleted · Undo": ticket 18's toast (bottom centre), inside the
+/* "Alarm deleted · Undo": the overlays' toast (bottom centre), inside the
    drawer so it can be reached while the rest of the page is inert. */
 .clock-alarm-toast .clock-btn--small {
   align-self: center;

@@ -5,14 +5,12 @@
 // reduced motion, where it steps. The digits are a timer (never live) whose
 // accessible name says the time left and the length. Built once, so focus
 // on its buttons survives the ticks.
-import { el } from './dom.js';
+import { SVG_NS, el } from './dom.js';
 import { icon } from './icons.js';
-
-const SVG = 'http://www.w3.org/2000/svg';
 
 /** An SVG circle on the ring's 100-unit box. @param {string} className */
 function circle(className) {
-  const node = document.createElementNS(SVG, 'circle');
+  const node = document.createElementNS(SVG_NS, 'circle');
   for (const [name, value] of Object.entries({ class: className, cx: '50', cy: '50', r: '48', pathLength: '100' })) {
     node.setAttribute(name, value);
   }
@@ -25,7 +23,7 @@ function circle(className) {
  *   focus: (name: 'pause' | 'resume') => void }}
  */
 export function createTimerRing({ onPause, onResume, onCancel }) {
-  const svg = document.createElementNS(SVG, 'svg');
+  const svg = document.createElementNS(SVG_NS, 'svg');
   svg.setAttribute('class', 'clock-ring__svg');
   svg.setAttribute('viewBox', '0 0 100 100');
   svg.setAttribute('aria-hidden', 'true');

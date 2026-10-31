@@ -127,6 +127,9 @@
  * }} ClockSettings
  */
 
+/** The Divisions a teacher can be with: key and full name. @type {readonly (readonly [Division, string])[]} */
+export const DIVISIONS = Object.freeze([['MS', 'Middle School'], ['HS', 'High School']]);
+
 /** The Block Days shortcut: Bell Schedules with long (~85-minute) Periods. */
 export const BLOCK_DAYS = Object.freeze(['even', 'odd', 'lateStartEven', 'hsSuperSeminar']);
 

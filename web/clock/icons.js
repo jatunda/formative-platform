@@ -1,7 +1,7 @@
 // The School Clock's line icons (from the design reference): 24-unit SVGs
 // drawn in the text colour, always decorative (the control names itself).
 
-const SVG = 'http://www.w3.org/2000/svg';
+import { SVG_NS } from './dom.js';
 
 /** Each icon's SVG shapes, as markup. */
 const PATHS = {
@@ -35,7 +35,7 @@ const PATHS = {
  * @returns {SVGSVGElement}
  */
 export function icon(name) {
-  const svg = document.createElementNS(SVG, 'svg');
+  const svg = document.createElementNS(SVG_NS, 'svg');
   svg.setAttribute('class', 'clock-icon');
   svg.setAttribute('viewBox', '0 0 24 24');
   svg.setAttribute('aria-hidden', 'true');

@@ -1,4 +1,4 @@
-// The Look sheet (ticket 21): how the clock looks. A compact dialog under the
+// The Look sheet: how the clock looks. A compact dialog under the
 // top bar on the right (a bottom sheet on small screens) that keeps the clock
 // visible beside it, so every choice previews live on the real clock. It holds,
 // in order: the theme previews, the flip switch, the bar's whole day / just
@@ -10,10 +10,10 @@
 // it and focus returns to Look. Its scrim is clear (no dimming), so clicking
 // the clock closes it too. Every name is a look description from themes.js,
 // never who a theme is for.
-import { el } from './dom.js';
+import { closeButton, fieldset, switchControl } from './controls.js';
+import { SVG_NS, el } from './dom.js';
 import { icon } from './icons.js';
 import { createModal } from './modal.js';
-import { switchControl } from './settings-drawer.js';
 import {
   FONTS, PALETTES, THEMES, lookAttributes, lookParts, nativeMode, otherMode, pickFont, pickPalette, pickTheme, themeLook,
 } from './themes.js';
@@ -21,7 +21,6 @@ import {
 /** @typedef {import('./clock-settings.js').ClockSettings} ClockSettings */
 
 const ID = 'clock-look';
-const SVG = 'http://www.w3.org/2000/svg';
 const OWN = ' (the theme’s own)';
 
 /** The flowers decoration (from the design reference), drawn in --deco / --deco-2. */
@@ -35,7 +34,7 @@ const FLOWERS = [
 
 /** A decorative flowers drawing. @param {string} className */
 function flowers(className) {
-  const svg = document.createElementNS(SVG, 'svg');
+  const svg = document.createElementNS(SVG_NS, 'svg');
   svg.setAttribute('class', className);
   svg.setAttribute('viewBox', '0 0 180 180');
   svg.setAttribute('aria-hidden', 'true');
@@ -66,10 +65,9 @@ export function applyLook(root, settings) {
 }
 
 /** A radio group's fieldset. @param {string} legend @param {string} className @param {Node[]} children */
-const group = (legend, className, children) => el('fieldset', { className: `clock-look__group ${className}` }, [
-  el('legend', { className: 'clock-look__legend', textContent: legend }),
-  ...children,
-]);
+const group = (legend, className, children) => fieldset(legend, children, {
+  className: `clock-look__group ${className}`, legendClass: 'clock-look__legend',
+});
 
 /**
  * @param {{ settings: () => ClockSettings, update: (change: Partial<ClockSettings>) => void,
@@ -143,14 +141,12 @@ export function createLookSheet({ settings, update, behind, onChange }) {
     },
   });
 
-  const closeButton = el('button', {
-    type: 'button', className: 'clock-btn clock-btn--icon', 'aria-label': 'Close Look', title: 'Close Look',
-    onclick: () => modal.close(),
-  }, [icon('close')]);
   const dialog = el('div', {
     className: 'clock-look', id: ID, role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': `${ID}-title`,
   }, [
-    el('div', { className: 'clock-look__head' }, [el('h2', { id: `${ID}-title`, textContent: 'Look' }), closeButton]),
+    el('div', { className: 'clock-look__head' }, [
+      el('h2', { id: `${ID}-title`, textContent: 'Look' }), closeButton('Close Look', () => modal.close()),
+    ]),
     el('div', { className: 'clock-look__body' }, [
       group('Theme', 'clock-look__themes', [el('div', { className: 'clock-theme-grid' }, themeInputs.map(({ label }) => label))]),
       flip.label,
@@ -213,7 +209,6 @@ export function createLookSheet({ settings, update, behind, onChange }) {
       modal.open(from, themeInputs.find(({ input }) => input.checked).input);
       render();
     },
-    isOpen: modal.isOpen,
     destroy: modal.destroy,
   };
 }

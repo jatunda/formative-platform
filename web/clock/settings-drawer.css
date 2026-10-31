@@ -6,7 +6,7 @@
    uppercase h3 and a hairline between). A new feature adds a section; it
    never restructures the drawer. The form controls here (.clock-switch,
    .clock-segmented, .clock-field, .clock-input, .clock-select, .clock-range,
-   .clock-btn) are the design's, ready for the Alarm editor (15) too. */
+   .clock-btn) are the design's, shared with the Alarm editor and the Look sheet. */
 
 .clock-scrim {
   position: fixed;

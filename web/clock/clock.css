@@ -1,10 +1,10 @@
 /* School Clock: the main screen, built to the design reference
    (.scratch/school-clock/mockups/final/, DESIGN.md). Every colour, face,
-   size and gap is a token from tokens.css, so a theme (ticket 21) swaps the
+   size and gap is a token from tokens.css, so a theme (themes.css) swaps the
    look by setting data-mode / data-palette / data-font / data-deco on <html>;
    nothing here names a colour or a face.
 
-   The timer's ring and picker are in timer.css. The overlays (ticket 18) have their own section at
+   The timer's ring and picker are in timer.css. The overlays have their own section at
    the end, with their own breakpoints. */
 
 *,
@@ -112,7 +112,7 @@ body {
   padding: var(--edge-y) var(--edge-x);
   row-gap: var(--gap-sm);
   /* The width the Readouts may use: the screen, less the Look sheet while
-     it is open beside the clock (ticket 21 sets --sheet-w). */
+     it is open beside the clock (look-sheet.css sets --sheet-w under .has-sheet). */
   --sheet-w: 0px;
   --usable-w: calc(100vw - 2 * var(--edge-x) - var(--sheet-w));
   --fit-w: var(--usable-w);
@@ -385,8 +385,8 @@ button.clock-readout__face {
     font-size: clamp(26px, 9.5vh, 112px);
   }
 
-  /* With the Look sheet open beside the clock there is no room for both
-     (ticket 21 sets .has-sheet). */
+  /* With the Look sheet open beside the clock (.has-sheet) there is no
+     room for both. */
   .has-sheet .clock-readouts.has-smalls {
     flex-direction: column;
     --fit-w: var(--usable-w);
@@ -508,7 +508,7 @@ button.clock-readout__face {
 /* ---------- bottom row: the bar's place and the window buttons ---------- */
 
 /* The "turn sound on" prompt, while it shows, gets its own line above the
-   bar (ticket 04): the row grows to make room, so the prompt covers nothing
+   bar: the row grows to make room, so the prompt covers nothing
    (the bar, the timer ring, the window buttons). */
 .clock-bottom {
   grid-area: bottom;
@@ -1130,7 +1130,7 @@ button.clock-readout__face {
 
 /* ======================= overlays ======================= */
 
-/* What appears on top of the main screen (ticket 18; DESIGN.md, Overlays).
+/* What appears on top of the main screen (DESIGN.md, Overlays).
    Everything transient (the ring card, the sound prompt, toasts) sits bottom
    centre, over the bar, never over the digits: the top belongs to the
    controls. A ring shows over everything, the Settings drawer included. */

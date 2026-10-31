@@ -6,10 +6,10 @@
 // and how Alarms ring is the clock model's (`ringsInWindow`); this only edits
 // the saved list.
 import { BLOCK_DAYS, DEFAULT_ALARM_PERIODS, LABELLED_PERIODS } from './clock-settings.js';
+import { drawerSection, fieldset, soundChoice, switchControl } from './controls.js';
 import { el } from './dom.js';
 import { formatSegmentName } from './format.js';
 import { icon } from './icons.js';
-import { drawerSection, soundChoice, switchControl } from './settings-drawer.js';
 import {
   alarmHint, alarmName, isBlockDays, nextAlarmId, onceDate, parseMinutes, parseTime, bellScheduleChoices, timeFields,
 } from './alarm-text.js';
@@ -50,13 +50,6 @@ function check(words, checked) {
   const text = el('span', { textContent: words });
   return { input, text, label: el('label', { className: 'clock-check' }, [input, text]) };
 }
-
-/**
- * A titled group of controls. @param {string} legend @param {(Node | string)[]} children
- */
-const fieldset = (legend, children) => el('fieldset', { className: 'clock-fieldset' }, [
-  el('legend', { textContent: legend }), ...children,
-]);
 
 /**
  * The Bell Schedules checklist with its Block Days / Every Bell Schedule

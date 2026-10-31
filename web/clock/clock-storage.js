@@ -106,11 +106,11 @@ function parseSettings(saved) {
       ? s.recentDurations.filter(isPositive).slice(0, QUICK_PICKS) : [],
     showSeconds: typeof s.showSeconds === 'boolean' ? s.showSeconds : d.showSeconds,
     dayStrip: typeof s.dayStrip === 'boolean' ? s.dayStrip : d.dayStrip,
-    // Ticket 16's 'default' theme (and any id the set doesn't have) is the default.
+    // The earlier 'default' theme (and any id the set doesn't have) is the default.
     theme: isTheme(s.theme) ? s.theme : d.theme,
     fontSwap: isFont(s.fontSwap) ? s.fontSwap : d.fontSwap,
     paletteSwap: isPalette(s.paletteSwap) ? s.paletteSwap : d.paletteSwap,
-    // Ticket 16 saved light / dark / auto as `colorScheme`; it becomes the flip.
+    // An earlier version saved light / dark / auto as `colorScheme`; it becomes the flip.
     flipped: typeof s.flipped === 'boolean' ? s.flipped : migrateFlipped(s),
     themeHint: typeof s.themeHint === 'boolean' ? s.themeHint : d.themeHint,
   };

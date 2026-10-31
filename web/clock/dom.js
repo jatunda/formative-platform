@@ -1,5 +1,8 @@
 // A tiny DOM helper shared by the School Clock's page modules.
 
+/** The SVG namespace, for document.createElementNS. */
+export const SVG_NS = 'http://www.w3.org/2000/svg';
+
 /**
  * A DOM element: `props` are set as properties, except hyphenated names
  * ('aria-label'), which are set as attributes.

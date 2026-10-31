@@ -3,6 +3,8 @@
 // "turn sound on" prompt, the ringing flash and ring card, and the error
 // toast. Each owns its markup and its focus; the page controller decides
 // when each shows.
+import { DIVISIONS } from './clock-settings.js';
+import { feedbackLink } from './controls.js';
 import { el } from './dom.js';
 import { icon } from './icons.js';
 import { ringAnnouncement } from './ring-words.js';
@@ -33,12 +35,12 @@ function giveFocusBack(box, returnTo) {
 /**
  * The first-visit question: a dialog over a near-solid scrim with one large
  * choice per Division and the feedback link. It takes focus when shown.
- * @param {{ divisions: [string, string][], feedbackHref: string, onChoose: (division: string) => void }} options
+ * @param {{ onChoose: (division: string) => void }} options
  */
-export function createDivisionPrompt({ divisions, feedbackHref, onChoose }) {
+export function createDivisionPrompt({ onChoose }) {
   // The big "MS" / "HS" is drawn by CSS (with empty alt text), so each
   // choice is named by its full name alone.
-  const choices = divisions.map(([key, name]) => el('button', {
+  const choices = DIVISIONS.map(([key, name]) => el('button', {
     type: 'button', className: 'clock-choice', 'data-short': key, onclick: () => onChoose(key),
   }, [name]));
   const dialog = el('div', {
@@ -51,7 +53,7 @@ export function createDivisionPrompt({ divisions, feedbackHref, onChoose }) {
       textContent: "The clock follows your Division's bell times. You can switch any time.",
     }),
     el('div', { className: 'clock-first__choices' }, choices),
-    el('a', { className: 'clock-feedback', href: feedbackHref, textContent: 'Feedback? Email Eric' }),
+    feedbackLink(),
   ]);
   const element = el('div', { className: 'clock-overlay', hidden: true }, [
     el('div', { className: 'clock-first-scrim', 'aria-hidden': 'true' }),
