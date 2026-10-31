@@ -127,7 +127,8 @@ export function createMiniPlayer({ pictureInPicture, onOpen, onDismiss, page = d
     const { head, readout, foot, timer } = content;
     mini.main.classList.toggle('has-timer', timer);
     mini.main.classList.toggle('is-ringing', ringing !== null);
-    mini.bell.hidden = ringing === null;
+    // An SVG has no hidden property: set the attribute.
+    mini.bell.toggleAttribute('hidden', ringing === null);
     mini.headText.textContent = ringing === null ? head : `Ringing · ${ringing}`;
     writeValue(mini.readoutValue, readout);
     // The time needs no caption; a length of time keeps its own for screen readers.

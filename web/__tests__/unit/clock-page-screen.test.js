@@ -280,9 +280,12 @@ describe('School Clock fullscreen, mini player and feedback', () => {
       open();
       await openMini();
       expect(button('Dismiss', mini())).toBeUndefined();
+      const bell = () => mini().querySelector('h1 svg');
+      expect(bell().hasAttribute('hidden')).toBe(true);
 
       advance(3 * 60 * SEC + SEC); // just past 11:15, the Bell at the end of Period 3
       expect(head()).toBe('Ringing · Period 3 ends');
+      expect(bell().hasAttribute('hidden')).toBe(false);
       expect(miniMain().classList.contains('is-ringing')).toBe(true);
       // A plain, enabled button in the tab order, which the ticks leave in place (so focus stays on it).
       const dismiss = button('Dismiss', mini());
@@ -298,6 +301,7 @@ describe('School Clock fullscreen, mini player and feedback', () => {
       expect(ringing().hidden).toBe(true);
       expect(button('Dismiss', mini())).toBeUndefined();
       expect(head()).toBe('Passing Period');
+      expect(bell().hasAttribute('hidden')).toBe(true);
       expect(miniMain().classList.contains('is-ringing')).toBe(false);
     });
 
