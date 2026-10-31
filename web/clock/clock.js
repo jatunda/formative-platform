@@ -23,14 +23,14 @@ import { createMiniPlayer } from './mini-player.js';
 import { createDivisionPrompt, createErrorToast, createRingCard, createSoundPrompt } from './overlays.js';
 import { addReadout, canAddReadout, createLayoutStore, cycleReadout, newLayout, removeReadout } from './readout-layout.js';
 import { readoutParts, readoutValue } from './readouts.js';
-import { TEST_RING_WORDS, ringWords } from './ring-words.js';
+import { TEST_RING_WORDS, nextRingLines, ringWords } from './ring-words.js';
 import { createReadoutsView } from './readouts-view.js';
 import { SCHOOL_YEARS } from './school-years.js';
 import { createWakeLockKeeper, detectCapabilities } from './screen.js';
 import { createAlarmEditor } from './alarm-editor.js';
 import { DIVISIONS, FEEDBACK_HREF, createSettingsDrawer } from './settings-drawer.js';
 import { applyLook, createLookSheet, decorations } from './look-sheet.js';
-import { BELL_SECONDS, ALARM_MAX_SECONDS, SOUND_NAMES, createSoundPlayer } from './sound.js';
+import { BELL_SECONDS, ALARM_MAX_SECONDS, createSoundPlayer } from './sound.js';
 import { cancelTimer, pauseTimer, resumeTimer, settleTimer, timerProgress, timerRingView, timerStatus, timerText } from './timer.js';
 import { createTimerPicker } from './timer-picker.js';
 import { createTimerRing } from './timer-ring.js';
@@ -63,38 +63,6 @@ function textFor(settings) {
   };
 }
 
-/** @param {import('./clock-settings.js').PeriodAnchor} anchor */
-function anchorText(anchor) {
-  if (anchor.from === 'start') return `minute ${anchor.minutes}`;
-  if (anchor.from === 'end') return `${anchor.minutes} min before the end`;
-  return 'halfway';
-}
-
-/**
- * What rang, in words: "Bell · Period 2 ends, Nutrition starts".
- * @param {import('./clock-model.js').Ring} ring
- * @param {ReturnType<typeof textFor>} text
- */
-function ringSourceText(ring, text) {
-  const labelled = (alarm, words) => (alarm.label ? `${alarm.label} · ${words}` : words);
-  switch (ring.source) {
-    case 'bell': {
-      const parts = [];
-      if (ring.ends) parts.push(`${text.name(ring.ends)} ends`);
-      if (ring.starts) parts.push(`${text.name(ring.starts)} starts`);
-      return `Bell · ${parts.join(', ')}`;
-    }
-    case 'clockAlarm': {
-      const repeat = ring.alarm.repeat === 'once' ? 'once' : 'every School Day';
-      return `Clock Alarm · ${ring.alarm.label ? `${ring.alarm.label}, ${repeat}` : repeat}`;
-    }
-    case 'periodAlarm':
-      return `Period Alarm · ${labelled(ring.alarm, `${text.name(ring.period)}, ${anchorText(ring.alarm.anchor)}`)}`;
-    default:
-      return 'Timer';
-  }
-}
-
 /**
  * A name for one ring that stays the same each time the window is redone, so
  * the sound player can tell a ring it already has from a new one.
@@ -116,22 +84,6 @@ function browserPrefersReducedMotion() {
 /** The browser's sound player (silent where there's no Web Audio). */
 function browserSoundPlayer() {
   return createSoundPlayer({ AudioContextClass: globalThis.AudioContext ?? globalThis.webkitAudioContext });
-}
-
-/**
- * The "Next rings today" lines: every ring from `now` to midnight, with its
- * time, what rings and its sound.
- * @param {Date} now
- * @param {object[]} schoolYears
- * @param {import('./clock-settings.js').RingSettings} ringSettings
- * @param {ReturnType<typeof textFor>} text
- */
-function nextRingLines(now, schoolYears, ringSettings, text) {
-  const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
-  return ringsInWindow(now, midnight, schoolYears, ringSettings).map((ring) => {
-    const time = text.time(ring.at, { seconds: ring.at.getSeconds() !== 0 });
-    return `${time} · ${ringSourceText(ring, text)} · ${SOUND_NAMES[ring.sound]}`;
-  });
 }
 
 /**

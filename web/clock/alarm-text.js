@@ -5,6 +5,7 @@
 // and turning what was typed (hour, minute, minutes) into an Alarm's fields.
 import { BLOCK_DAYS } from './clock-settings.js';
 import { formatClockTime, formatShortDate } from './format.js';
+import { anchorText, repeatText } from './ring-words.js';
 import { SOUND_NAMES } from './sound.js';
 
 /** @typedef {import('./clock-settings.js').Alarm} Alarm */
@@ -70,12 +71,11 @@ export function periodsText(periods) {
   return [...parts, ...periods.filter((p) => !/^Period \d+$/.test(p))].join(', ');
 }
 
-/** Where a Period Alarm rings, in words. @param {PeriodAnchor} anchor */
-export function anchorText(anchor) {
-  if (anchor.from === 'start') return `Minute ${anchor.minutes}`;
-  if (anchor.from === 'end') return `${anchor.minutes} min before the end`;
-  return 'Halfway';
-}
+/** Where a Period Alarm rings, starting the line: "Minute 5", "Halfway". @param {PeriodAnchor} anchor */
+const anchorHint = (anchor) => {
+  const words = anchorText(anchor);
+  return words[0].toUpperCase() + words.slice(1);
+};
 
 /** A "HH:MM" time of day as the page writes clock times. @param {string} time @param {boolean} use24Hour */
 const timeText = (time, use24Hour) => {
@@ -98,8 +98,8 @@ const localDate = (date) => {
 export function alarmHint(alarm, { use24Hour, choices }) {
   const when = alarm.kind === 'clock'
     ? [timeText(alarm.time, use24Hour),
-      alarm.repeat === 'once' ? `once, ${formatShortDate(localDate(/** @type {string} */ (alarm.date)))}` : 'every School Day']
-    : [anchorText(alarm.anchor), periodsText(alarm.periods)];
+      alarm.repeat === 'once' ? `once, ${formatShortDate(localDate(/** @type {string} */ (alarm.date)))}` : repeatText(alarm)]
+    : [anchorHint(alarm.anchor), periodsText(alarm.periods)];
   return [...when, bellSchedulesText(alarm.bellSchedules, choices), SOUND_NAMES[alarm.sound]].filter(Boolean).join(' · ');
 }
 
