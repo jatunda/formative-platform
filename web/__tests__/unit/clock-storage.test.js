@@ -43,27 +43,48 @@ describe('clock settings store', () => {
       bells: { on: false, sound: 'chime' }, alarms: [clockAlarm, onceAlarm, periodAlarm],
       volume: 0.25, timerEndsAt: 1793000000000, timerPausedMs: null, timerSound: 'buzzer',
       recentDurations: [450000, 900000],
-      showSeconds: false, dayStrip: false, theme: 'chalkboard', fontSwap: 'serif-1', paletteSwap: 'ocean',
-      colorScheme: 'light',
+      showSeconds: false, dayStrip: false, theme: 'bloom', fontSwap: 'mono', paletteSwap: 'team',
+      flipped: true, themeHint: false,
     };
     createSettingsStore(storage).save(settings);
     expect(createSettingsStore(storage).load()).toEqual(settings);
   });
 
-  it('starts with seconds on, the Day Strip on and the dark default theme, with no swaps', () => {
+  it('starts with seconds on, the Day Strip on and the dark default theme in its own version, with no swaps', () => {
     expect(DEFAULT_SETTINGS).toMatchObject({
-      showSeconds: true, dayStrip: true, theme: 'default', fontSwap: null, paletteSwap: null, colorScheme: 'dark',
+      showSeconds: true, dayStrip: true, theme: 'slate', fontSwap: null, paletteSwap: null, flipped: false,
+      themeHint: true,
     });
   });
 
-  it.each(['light', 'dark', 'auto'])('keeps the %s colour scheme', (colorScheme) => {
-    expect(storeHolding({ colorScheme }).load().colorScheme).toBe(colorScheme);
+  describe("ticket 16's look settings", () => {
+    it('turn its "default" theme into the default theme, and drop swaps the theme set does not have', () => {
+      expect(storeHolding({ theme: 'default', fontSwap: 'serif-1', paletteSwap: 'ocean' }).load())
+        .toMatchObject({ theme: 'slate', fontSwap: null, paletteSwap: null });
+    });
+
+    it.each([
+      ['auto', 'slate', false], ['dark', 'default', false], ['light', 'default', true], ['light', 'paper', false],
+      ['dark', 'paper', true],
+    ])('turn colorScheme %s on theme %s into flipped: %s, and stop saving it', (colorScheme, theme, flipped) => {
+      const storage = createFakeStorage({ [SETTINGS_KEY]: JSON.stringify({ colorScheme, theme }) });
+      const store = createSettingsStore(storage);
+      const settings = store.load();
+      expect(settings.flipped).toBe(flipped);
+      expect(settings).not.toHaveProperty('colorScheme');
+      store.save(settings);
+      expect(JSON.parse(storage.getItem(SETTINGS_KEY))).not.toHaveProperty('colorScheme');
+    });
+
+    it('keep a saved flip over an old colorScheme', () => {
+      expect(storeHolding({ colorScheme: 'light', flipped: false }).load().flipped).toBe(false);
+    });
   });
 
   it('defaults each display preference that is corrupt', () => {
     const settings = storeHolding({
       division: 'HS', showSeconds: 'no', dayStrip: 0, theme: '', fontSwap: 5, paletteSwap: { id: 'x' },
-      colorScheme: 'sepia',
+      colorScheme: 'sepia', flipped: 'yes', themeHint: null,
     }).load();
     expect(settings).toEqual({ ...DEFAULT_SETTINGS, division: 'HS' });
   });
@@ -143,8 +164,12 @@ describe('clock settings store', () => {
     expect(storeHolding({ alarms: [clockAlarm, bad, periodAlarm] }).load().alarms).toEqual([clockAlarm, periodAlarm]);
   });
 
-  it('does not throw when saving fails (storage full or blocked)', () => {
+  it('does not throw when saving fails (storage full or blocked), and says it failed', () => {
     const full = { getItem: () => null, setItem: () => { throw new Error('QuotaExceededError'); } };
-    expect(() => createSettingsStore(full).save(DEFAULT_SETTINGS)).not.toThrow();
+    expect(createSettingsStore(full).save(DEFAULT_SETTINGS)).toBe(false);
+  });
+
+  it('says a save worked', () => {
+    expect(createSettingsStore(createFakeStorage()).save(DEFAULT_SETTINGS)).toBe(true);
   });
 });

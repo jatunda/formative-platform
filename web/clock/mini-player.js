@@ -3,17 +3,17 @@
 // head line (the Segment, "Timer", or what's ringing), the big Readout, and a
 // foot (the Segment's bar and end, up next, or Dismiss while something
 // rings). The page works out what to show (mini-content.js); this draws it
-// while the window is open. The window loads the page's stylesheets and
-// mirrors the theme attributes on the page's <html>, so it follows the
-// teacher's theme as it changes.
+// while the window is open. The window loads the page's tokens, themes and
+// components and mirrors the look attributes on the page's <html>, so it
+// follows the teacher's theme as it changes.
 import { el } from './dom.js';
 import { icon } from './icons.js';
 import { writeValue } from './readouts-view.js';
 
 /** The mini player's starting size (the user can resize it; it scales up). */
 const MINI_PLAYER_SIZE = { width: 320, height: 180 };
-/** Its own layout, after the page's tokens and components. */
-const MINI_PLAYER_CSS = '/clock/mini-player.css';
+/** The page's tokens, themes and components, then the mini player's own layout. */
+const STYLESHEETS = ['/clock/tokens.css', '/clock/themes.css', '/clock/clock.css', '/clock/mini-player.css'];
 
 /** @typedef {import('./mini-content.js').MiniContent} MiniContent */
 
@@ -22,7 +22,7 @@ const MINI_PLAYER_CSS = '/clock/mini-player.css';
  *   onOpen: () => void, onDismiss: () => void, page?: Document }} options
  *   `onOpen` runs once a window has opened (the page fills it in); `onDismiss`
  *   when its Dismiss button is pressed. `page` is the document whose
- *   stylesheets and theme it follows.
+ *   look (its <html> data-* attributes) it follows.
  * @returns {{ button: HTMLElement, show: (content: MiniContent) => void,
  *   showRinging: (what: string | null) => void, close: () => void }}
  *   `button` opens and closes it (hidden where the browser has no
@@ -56,8 +56,7 @@ export function createMiniPlayer({ pictureInPicture, onOpen, onDismiss, page = d
     }
     const doc = win.document;
     doc.title = 'School Clock';
-    const hrefs = [...page.querySelectorAll('link[rel="stylesheet"]')].map((link) => link.href);
-    for (const href of [...hrefs, new URL(MINI_PLAYER_CSS, page.baseURI).href]) {
+    for (const href of STYLESHEETS) {
       const stylesheet = doc.createElement('link');
       stylesheet.rel = 'stylesheet';
       stylesheet.href = href;
@@ -123,6 +122,8 @@ export function createMiniPlayer({ pictureInPicture, onOpen, onDismiss, page = d
   /** Draw the latest content, with what's ringing on top of it. */
   function draw() {
     if (!mini || !content) return;
+    // At once, too, so a render that changed the look shows it right away.
+    mini.theme.copy();
     const { head, readout, foot, timer } = content;
     mini.main.classList.toggle('has-timer', timer);
     mini.main.classList.toggle('is-ringing', ringing !== null);
@@ -163,7 +164,8 @@ export function createMiniPlayer({ pictureInPicture, onOpen, onDismiss, page = d
  * Keep `target`'s data-* attributes (the theme: data-mode, data-palette,
  * data-font, data-deco) and lang the same as `source`'s, from now on.
  * @param {HTMLElement} source @param {HTMLElement} target
- * @returns {MutationObserver} disconnect it to stop
+ * @returns {{ copy: () => void, disconnect: () => void }} `copy` brings it
+ *   up to date now (it also follows by itself); `disconnect` stops it
  */
 function followTheme(source, target) {
   const copy = () => {
@@ -177,5 +179,5 @@ function followTheme(source, target) {
   copy();
   const observer = new MutationObserver(copy);
   observer.observe(source, { attributes: true });
-  return observer;
+  return { copy, disconnect: () => observer.disconnect() };
 }

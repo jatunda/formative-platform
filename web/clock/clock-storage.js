@@ -6,6 +6,7 @@
 // cross-tab storage events: open tabs never change each other.
 import { createStorageAdapter } from '../storage.js';
 import { SOUNDS } from './sound.js';
+import { DEFAULT_THEME, isFont, isPalette, isTheme, migrateFlipped } from './themes.js';
 import { QUICK_PICKS } from './timer.js';
 
 /** @typedef {import('./clock-settings.js').ClockSettings} ClockSettings */
@@ -28,17 +29,13 @@ export const DEFAULT_SETTINGS = Object.freeze(/** @type {ClockSettings} */ ({
   recentDurations: [],
   showSeconds: true,
   dayStrip: true,
-  // Ticket 02's default: a dark muted blue look (ticket 21 names the theme set).
-  theme: 'default',
+  // The dark muted blue theme, in its own version.
+  theme: DEFAULT_THEME,
   fontSwap: null,
   paletteSwap: null,
-  colorScheme: 'dark',
+  flipped: false,
+  themeHint: true,
 }));
-
-/** @type {readonly import('./clock-settings.js').ColorScheme[]} */
-const COLOR_SCHEMES = Object.freeze(['light', 'dark', 'auto']);
-/** A theme, font or palette id: the set itself isn't known until ticket 21. @param {unknown} v */
-const isId = (v) => typeof v === 'string' && v !== '';
 
 /** @param {unknown} v @returns {v is Record<string, any>} */
 const isObject = (v) => typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -105,23 +102,35 @@ function parseSettings(saved) {
       ? s.recentDurations.filter(isPositive).slice(0, QUICK_PICKS) : [],
     showSeconds: typeof s.showSeconds === 'boolean' ? s.showSeconds : d.showSeconds,
     dayStrip: typeof s.dayStrip === 'boolean' ? s.dayStrip : d.dayStrip,
-    theme: isId(s.theme) ? s.theme : d.theme,
-    fontSwap: isId(s.fontSwap) ? s.fontSwap : d.fontSwap,
-    paletteSwap: isId(s.paletteSwap) ? s.paletteSwap : d.paletteSwap,
-    colorScheme: COLOR_SCHEMES.includes(s.colorScheme) ? s.colorScheme : d.colorScheme,
+    // Ticket 16's 'default' theme (and any id the set doesn't have) is the default.
+    theme: isTheme(s.theme) ? s.theme : d.theme,
+    fontSwap: isFont(s.fontSwap) ? s.fontSwap : d.fontSwap,
+    paletteSwap: isPalette(s.paletteSwap) ? s.paletteSwap : d.paletteSwap,
+    // Ticket 16 saved light / dark / auto as `colorScheme`; it becomes the flip.
+    flipped: typeof s.flipped === 'boolean' ? s.flipped : migrateFlipped(s),
+    themeHint: typeof s.themeHint === 'boolean' ? s.themeHint : d.themeHint,
   };
 }
 
 /**
  * The settings saved in `storage` (localStorage on the real page; a fake in tests).
  * @param {import('../storage.js').StorageLike} storage
- * @returns {{ load: () => ClockSettings, save: (settings: ClockSettings) => void }}
- *   `save` never throws: if storage is full or blocked the change just isn't kept.
+ * @returns {{ load: () => ClockSettings, save: (settings: ClockSettings) => boolean }}
+ *   `save` never throws: if storage is full or blocked the change just isn't
+ *   kept, and it returns false (so the page can say so).
  */
 export function createSettingsStore(storage) {
   const adapter = createStorageAdapter(SETTINGS_KEY, storage, { quiet: true });
+  const writer = createStorageAdapter(SETTINGS_KEY, storage);
   return {
     load: () => parseSettings(adapter.load()),
-    save: (settings) => adapter.save(settings),
+    save: (settings) => {
+      try {
+        writer.save(settings);
+        return true;
+      } catch {
+        return false;
+      }
+    },
   };
 }

@@ -1,0 +1,402 @@
+/* School Clock: the Settings drawer (settings-drawer.js), built to the design
+   reference's "Settings drawer" (.scratch/school-clock/mockups/final/,
+   DESIGN.md). Like clock.css it names no colour or face: every one is a token.
+
+   One scrolling column of sections (.clock-drawer__section, each with an
+   uppercase h3 and a hairline between). A new feature adds a section; it
+   never restructures the drawer. The form controls here (.clock-switch,
+   .clock-segmented, .clock-field, .clock-input, .clock-select, .clock-range,
+   .clock-btn) are the design's, ready for the Alarm editor (15) too. */
+
+.clock-scrim {
+  position: fixed;
+  z-index: 30;
+  inset: 0;
+  background: var(--scrim);
+}
+
+.clock-drawer {
+  position: fixed;
+  z-index: 31;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  width: min(480px, 100vw);
+  border-left: 1px solid var(--line-soft);
+  background: var(--surface);
+  color: var(--fg);
+  font-family: var(--font-ui);
+  box-shadow: var(--shadow);
+  animation: clock-drawer-in 0.18s ease-out;
+}
+
+@keyframes clock-drawer-in {
+  from {
+    transform: translateX(24px);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .clock-drawer {
+    animation: none;
+  }
+}
+
+.clock-drawer__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--s3) var(--s3) var(--s3) var(--s5);
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.clock-drawer__head h2 {
+  font-size: var(--type-ui-xl);
+}
+
+.clock-drawer__body {
+  flex: 1;
+  overflow: auto;
+  padding: 0 var(--s5) var(--s6);
+}
+
+.clock-drawer__section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+  padding: var(--s5) 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.clock-drawer__section:last-child {
+  border-bottom: 0;
+}
+
+.clock-drawer__section h3 {
+  margin: 0;
+  font-size: var(--type-ui-xs);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.clock-drawer :where(p, ul) {
+  margin: 0;
+}
+
+/* Buttons. */
+.clock-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s2);
+  min-height: var(--tap);
+  padding: 0 var(--s4);
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--fg);
+  font-family: var(--font-ui);
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.clock-btn:hover {
+  background: var(--surface-2);
+}
+
+.clock-btn--small {
+  align-self: flex-start;
+  min-height: 36px;
+  padding: 0 var(--s3);
+  font-size: var(--type-ui-sm);
+}
+
+.clock-btn--icon {
+  flex: none;
+  width: var(--tap);
+  padding: 0;
+  border-color: transparent;
+  background: transparent;
+}
+
+/* Fields. */
+.clock-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s1);
+  min-width: 0;
+}
+
+.clock-field__label {
+  font-size: var(--type-ui-sm);
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.clock-field__value {
+  color: var(--fg);
+}
+
+.clock-field-row {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--s3);
+}
+
+.clock-field-row > .clock-field {
+  flex: 1;
+}
+
+.clock-input {
+  appearance: none;
+  width: 100%;
+  min-height: var(--tap);
+  padding: 0 var(--s3);
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--input-bg);
+  color: var(--fg);
+  font: inherit;
+}
+
+.clock-input::placeholder {
+  color: var(--muted);
+}
+
+.clock-select {
+  position: relative;
+  display: block;
+}
+
+.clock-select::after {
+  content: "";
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--fg);
+  border-bottom: 2px solid var(--fg);
+  transform: translateY(-70%) rotate(45deg);
+  pointer-events: none;
+}
+
+.clock-select .clock-input {
+  padding-right: 36px;
+}
+
+.clock-select option {
+  background: var(--surface);
+  color: var(--fg);
+}
+
+/* A choice of a few (Division): one bordered row; the chosen one fills with
+   the accent and gets a tick, so it isn't shown by colour alone. */
+.clock-segmented {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 3px;
+  padding: 3px;
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--input-bg);
+}
+
+.clock-segment {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 0 var(--s2);
+  border-radius: calc(var(--radius-sm) - 3px);
+  font-weight: 600;
+  text-align: center;
+  cursor: pointer;
+}
+
+.clock-segment input {
+  appearance: none;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  border-radius: inherit;
+  cursor: pointer;
+}
+
+.clock-segment span {
+  position: relative;
+  pointer-events: none;
+}
+
+.clock-segment:has(input:checked) {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.clock-segment:has(input:checked) span::before {
+  content: "✓ ";
+}
+
+.clock-segment input:focus-visible {
+  outline: var(--focus-width) solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* An on/off switch: the name (and a hint) on the left, the track on the
+   right. The input lies invisibly over the track; its focus ring is drawn
+   round the track. */
+.clock-switch {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s4);
+  min-height: var(--tap);
+  cursor: pointer;
+}
+
+.clock-switch__text {
+  display: flex;
+  flex-direction: column;
+  font-weight: 600;
+}
+
+.clock-switch input {
+  position: absolute;
+  right: 0;
+  width: 52px;
+  height: 32px;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.clock-switch__track {
+  flex: none;
+  position: relative;
+  width: 52px;
+  height: 32px;
+  border: 2px solid var(--line);
+  border-radius: 16px;
+  background: var(--input-bg);
+}
+
+.clock-switch__track::after {
+  content: "";
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--muted);
+  transition: transform 0.15s;
+}
+
+.clock-switch input:checked + .clock-switch__track {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.clock-switch input:checked + .clock-switch__track::after {
+  transform: translateX(20px);
+  background: var(--on-accent);
+}
+
+.clock-switch input:focus-visible + .clock-switch__track {
+  outline: var(--focus-width) solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* Volume. --val is the filled share, set by the page. */
+.clock-range {
+  appearance: none;
+  width: 100%;
+  height: var(--tap);
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.clock-range::-webkit-slider-runnable-track {
+  height: 8px;
+  border-radius: 4px;
+  background: linear-gradient(to right, var(--accent) var(--val), var(--line) var(--val));
+}
+
+.clock-range::-webkit-slider-thumb {
+  appearance: none;
+  width: 26px;
+  height: 26px;
+  margin-top: -9px;
+  border: 3px solid var(--accent);
+  border-radius: 50%;
+  background: var(--surface);
+}
+
+.clock-range::-moz-range-track {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--line);
+}
+
+.clock-range::-moz-range-progress {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--accent);
+}
+
+.clock-range::-moz-range-thumb {
+  width: 22px;
+  height: 22px;
+  border: 3px solid var(--accent);
+  border-radius: 50%;
+  background: var(--surface);
+}
+
+.clock-range:focus-visible {
+  outline: var(--focus-width) solid var(--focus);
+  outline-offset: 2px;
+}
+
+.clock-hint,
+.clock-note {
+  color: var(--muted);
+  font-size: var(--type-ui-sm);
+  font-weight: 400;
+}
+
+.clock-labels-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--s3);
+}
+
+.clock-rings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s1);
+  padding: 0;
+  list-style: none;
+  font-size: var(--type-ui-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.clock-feedback {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap);
+  font-size: var(--type-ui-sm);
+  font-weight: 600;
+}

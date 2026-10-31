@@ -11,7 +11,7 @@ const mount = () => document.getElementById('clockApp');
 const button = (name, root = mount()) => [...root.querySelectorAll('button')]
   .find((b) => (b.getAttribute('aria-label') ?? b.textContent.trim()) === name && !b.closest('[hidden]'));
 const bigReadout = () => mount().querySelector('.clock-readout--big .clock-readout__face').textContent.replace(/\s+/g, ' ').trim();
-const ringing = () => mount().querySelector('[aria-label="Ringing"]');
+const ringing = () => mount().querySelector('[role="alertdialog"]');
 /** Let the capability promises (fullscreen, wake lock, PiP) settle. */
 const settle = async () => { for (let i = 0; i < 5; i += 1) await Promise.resolve(); };
 
@@ -202,7 +202,7 @@ describe('School Clock fullscreen, mini player and feedback', () => {
       expect(readout()).toBe(bigReadout());
       expect(readout()).not.toBe('2:59 left');
 
-      advance(3 * 60 * SEC); // into the Passing Period
+      advance(3 * 60 * SEC + 5 * SEC); // into the Passing Period, after its Bell
       expect(head()).toBe('Passing Period');
       expect(footText()).toBe('Up next Period 4');
       expect(progress()).toBeUndefined();
@@ -265,7 +265,8 @@ describe('School Clock fullscreen, mini player and feedback', () => {
       open({ when: new Date(2031, 0, 6, 10, 0) });
       await openMini();
       expect(readout()).toBe('10:00:00 AM');
-      expect(miniText()).not.toMatch(/Period|Up next|school/);
+      expect(head()).not.toMatch(/Period|school/);
+      expect(footText()).toBe('');
     });
 
     it('shows the Day Label on a day off', async () => {
@@ -281,14 +282,16 @@ describe('School Clock fullscreen, mini player and feedback', () => {
       expect(button('Dismiss', mini())).toBeUndefined();
 
       advance(3 * 60 * SEC + SEC); // just past 11:15, the Bell at the end of Period 3
-      expect(head()).toBe('Ringing · Bell · Period 3 ends');
+      expect(head()).toBe('Ringing · Period 3 ends');
       expect(miniMain().classList.contains('is-ringing')).toBe(true);
+      // A plain, enabled button in the tab order, which the ticks leave in place (so focus stays on it).
       const dismiss = button('Dismiss', mini());
       expect(dismiss.tagName).toBe('BUTTON');
-      dismiss.focus();
-      expect(pip.window.document.activeElement).toBe(dismiss);
+      expect(dismiss.disabled).toBe(false);
+      expect(dismiss.tabIndex).toBe(0);
       advance(SEC);
-      expect(pip.window.document.activeElement).toBe(dismiss); // the ticks leave it in place
+      expect(button('Dismiss', mini())).toBe(dismiss);
+      expect(dismiss.isConnected).toBe(true);
       dismiss.click();
 
       expect(player.dismissals).toBe(1);
@@ -298,39 +301,42 @@ describe('School Clock fullscreen, mini player and feedback', () => {
       expect(miniMain().classList.contains('is-ringing')).toBe(false);
     });
 
-    it("loads the page's stylesheets and its own, and follows the page's theme as it changes", async () => {
+    it("loads the page's tokens, themes and components, then its own layout", async () => {
+      open();
+      await openMini();
+      expect([...pip.window.document.querySelectorAll('link[rel="stylesheet"]')].map((l) => l.getAttribute('href')))
+        .toEqual(['/clock/tokens.css', '/clock/themes.css', '/clock/clock.css', '/clock/mini-player.css']);
+    });
+
+    it("follows every data-* attribute on the page's <html> as it changes, until it closes", async () => {
+      // Attributes the page itself doesn't set, so only the mini player moves them.
       const html = document.documentElement;
-      document.head.innerHTML = '<link rel="stylesheet" href="/clock/tokens.css"><link rel="stylesheet" href="/clock/clock.css">';
-      html.setAttribute('data-mode', 'dark');
-      html.setAttribute('data-palette', 'slate');
+      html.setAttribute('data-sample', 'one');
+      html.setAttribute('lang', 'en');
+      html.setAttribute('title', 'not part of the look');
       try {
         open();
         await openMini();
-        const doc = pip.window.document;
-        expect([...doc.querySelectorAll('link[rel="stylesheet"]')].map((l) => new URL(l.href).pathname))
-          .toEqual(['/clock/tokens.css', '/clock/clock.css', '/clock/mini-player.css']);
-        expect({ ...doc.documentElement.dataset }).toEqual({ mode: 'dark', palette: 'slate' });
+        const look = pip.window.document.documentElement;
+        expect(look.dataset.sample).toBe('one');
+        expect(look.getAttribute('lang')).toBe('en');
+        expect(look.hasAttribute('title')).toBe(false);
 
-        html.setAttribute('data-mode', 'light');
-        html.setAttribute('data-font', 'serif');
-        html.removeAttribute('data-palette');
+        html.setAttribute('data-sample', 'two');
+        html.setAttribute('data-other', 'yes');
         await settle();
-        expect({ ...doc.documentElement.dataset }).toEqual({ mode: 'light', font: 'serif' });
-      } finally {
-        document.head.innerHTML = '';
-        for (const name of ['data-mode', 'data-palette', 'data-font']) html.removeAttribute(name);
-      }
-    });
+        expect(look.dataset).toMatchObject({ sample: 'two', other: 'yes' });
+        html.removeAttribute('data-other');
+        await settle();
+        expect(look.dataset.other).toBeUndefined();
 
-    it('stops following the theme once closed', async () => {
-      open();
-      await openMini();
-      const doc = pip.window.document;
-      button('Close mini player').click();
-      document.documentElement.setAttribute('data-mode', 'light');
-      await settle();
-      expect(doc.documentElement.dataset.mode).toBeUndefined();
-      document.documentElement.removeAttribute('data-mode');
+        button('Close mini player').click();
+        html.setAttribute('data-sample', 'three');
+        await settle();
+        expect(look.dataset.sample).toBe('two');
+      } finally {
+        for (const name of ['data-sample', 'data-other', 'lang', 'title']) html.removeAttribute(name);
+      }
     });
 
     it('closes from its button on the main page, and the button can open it again', async () => {

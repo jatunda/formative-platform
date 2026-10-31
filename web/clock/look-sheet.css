@@ -1,0 +1,420 @@
+/* School Clock: the Look sheet, the "Pick a theme" hint and the decorations
+   (look-sheet.js), built to the design reference's "Look sheet" and "Theme
+   set" (.scratch/school-clock/mockups/final/, DESIGN.md). Like clock.css it
+   names no colour or face: every one is a token. Each theme preview and
+   swatch carries its own data-palette / data-font / data-mode, so the tokens
+   it uses are that look's. The switch, the segmented choice and .clock-btn
+   are the Settings drawer's (settings-drawer.css). */
+
+/* ======================= the decorations' place ======================= */
+
+/* The decorations sit behind everything on the main screen. (No
+   specificity, so a part's own position, like the short screen's floating
+   window buttons, wins.) */
+:where(.clock-screen > :not(.clock-deco)) {
+  position: relative;
+  z-index: 1;
+}
+
+/* The top bar (with the hint hanging under Look) stays above the stage. */
+:where(.clock-screen > .clock-top) {
+  z-index: 2;
+}
+
+/* ======================= the Look button and the hint ======================= */
+
+.clock-look-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+/* While the hint shows, the Look button wears the hint's accent outline. */
+.clock-control.is-hinted {
+  box-shadow: inset 0 0 0 1.5px var(--accent);
+}
+
+/* "Pick a theme": a small pill under the Look button, first visit only. */
+.clock-look-hint {
+  position: absolute;
+  top: calc(100% + 12px);
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--s1);
+  padding: 0 0 0 var(--s4);
+  border: 1.5px solid var(--accent);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--fg);
+  font-size: var(--type-ui-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: var(--shadow);
+}
+
+.clock-look-hint::after {
+  content: "";
+  position: absolute;
+  bottom: 100%;
+  right: 16px;
+  border: 8px solid transparent;
+  border-bottom-color: var(--accent);
+}
+
+.clock-look-hint__close {
+  display: grid;
+  place-items: center;
+  width: var(--tap);
+  height: var(--tap);
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--fg);
+  cursor: pointer;
+}
+
+/* ======================= the sheet ======================= */
+
+/* No dimming: the clock stays in full view and reflows beside the sheet
+   (--sheet-w), so every change previews live. The clear scrim only catches
+   a click on the clock, which closes the sheet. */
+.clock-look-scrim {
+  position: fixed;
+  z-index: 10;
+  inset: 0;
+}
+
+.clock-screen.has-sheet {
+  --sheet-w: calc(min(400px, 40vw) + var(--s4));
+}
+
+.clock-screen.has-sheet > .clock-stage,
+.clock-screen.has-sheet > .clock-bottom {
+  margin-right: var(--sheet-w);
+}
+
+.clock-look {
+  position: fixed;
+  z-index: 11;
+  top: calc(var(--edge-y) + var(--tap) + var(--s2));
+  right: var(--edge-x);
+  display: flex;
+  flex-direction: column;
+  width: min(400px, 40vw);
+  max-height: calc(100vh - var(--edge-y) * 2 - var(--tap) - var(--s2));
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--fg);
+  font-family: var(--font-ui);
+  box-shadow: var(--shadow);
+}
+
+/* Below the "Simulated time" banner too, when it shows. */
+.clock-screen.is-simulated ~ .clock-look {
+  top: calc(var(--edge-y) + var(--tap) + var(--s2) + 40px);
+  max-height: calc(100vh - var(--edge-y) * 2 - var(--tap) - var(--s2) - 40px);
+}
+
+.clock-look__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--s1) var(--s1) var(--s1) var(--s4);
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.clock-look__head h2 {
+  font-size: var(--type-ui-lg);
+}
+
+.clock-look__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s4);
+  overflow: auto;
+  padding: var(--s3) var(--s4) var(--s4);
+}
+
+.clock-look__group {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.clock-look__legend {
+  margin-bottom: var(--s2);
+  padding: 0;
+  font-weight: 700;
+}
+
+.clock-look__body > .clock-btn {
+  align-self: flex-start;
+}
+
+/* ---------- theme previews: three per row ---------- */
+
+.clock-theme-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--s2);
+}
+
+.clock-theme-tile {
+  position: relative;
+  display: block;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.clock-theme-tile input,
+.clock-swatch input {
+  appearance: none;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.clock-theme-tile__preview {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  height: 64px;
+  overflow: hidden;
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.clock-theme-tile:has(input:checked) .clock-theme-tile__preview {
+  outline: 3px solid var(--fg);
+  outline-offset: 2px;
+}
+
+.clock-theme-tile:has(input:focus-visible) .clock-theme-tile__preview,
+.clock-swatch:has(input:focus-visible) > span:first-of-type {
+  outline: var(--focus-width) solid var(--focus);
+  outline-offset: 3px;
+}
+
+.clock-theme-tile__label {
+  font-family: var(--font-display);
+  font-size: calc(12px * var(--display-scale));
+  font-weight: var(--display-weight);
+  color: var(--muted);
+}
+
+.clock-theme-tile__digits {
+  font-family: var(--font-digits);
+  font-size: 24px;
+  font-weight: var(--digits-weight);
+  font-variant-numeric: tabular-nums lining-nums;
+  letter-spacing: var(--digits-tracking);
+  line-height: 1;
+  color: var(--digits);
+}
+
+.clock-theme-tile__bar {
+  width: 60%;
+  height: 4px;
+  margin-top: 4px;
+  border-radius: 2px;
+  background: var(--track);
+}
+
+.clock-theme-tile__bar span {
+  display: block;
+  width: 40%;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--accent);
+}
+
+.clock-theme-tile__deco {
+  position: absolute;
+  top: -10px;
+  right: -14px;
+  width: 44px;
+  opacity: 0.6;
+}
+
+.clock-theme-tile__check {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  display: none;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--fg);
+  color: var(--bg);
+}
+
+.clock-theme-tile__check .clock-icon {
+  width: 16px;
+  height: 16px;
+  stroke-width: 3;
+}
+
+.clock-theme-tile:has(input:checked) .clock-theme-tile__check {
+  display: grid;
+}
+
+/* ---------- swap lists: font faces and palette dots ---------- */
+
+.clock-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2);
+}
+
+.clock-swatch {
+  position: relative;
+  display: inline-flex;
+  cursor: pointer;
+}
+
+.clock-swatch__face {
+  display: inline-flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 4px;
+  min-width: 64px;
+  min-height: var(--tap);
+  padding: 6px 8px 0;
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--fg);
+  font-size: 18px;
+}
+
+.clock-swatch__aa {
+  font-family: var(--font-display);
+  font-size: calc(1em * var(--display-scale));
+}
+
+.clock-swatch__num {
+  font-family: var(--font-digits);
+  font-weight: var(--digits-weight);
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.clock-swatch__dot {
+  position: relative;
+  display: block;
+  width: var(--tap);
+  height: var(--tap);
+  border: 1.5px solid var(--line);
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--bg) 0 50%, var(--accent) 50% 100%);
+}
+
+.clock-swatch__dot span {
+  position: absolute;
+  inset: 14px;
+  border-radius: 50%;
+  background: var(--fg);
+}
+
+/* The chosen one: an outline and (for fonts) a tick, not colour alone. */
+.clock-swatch:has(input:checked) .clock-swatch__face,
+.clock-swatch:has(input:checked) .clock-swatch__dot {
+  outline: 3px solid var(--fg);
+  outline-offset: 2px;
+}
+
+.clock-swatch--palette:has(input:checked) .clock-swatch__dot {
+  outline-color: var(--accent);
+}
+
+.clock-swatch:has(input:checked) .clock-swatch__face::after {
+  content: "✓";
+  margin-left: 2px;
+  font-family: var(--font-ui);
+  font-size: 14px;
+}
+
+/* ======================= breakpoints ======================= */
+
+/* compact: a bottom sheet, five previews per row. */
+@media (max-width: 760px), (max-height: 520px) {
+  .clock-screen.has-sheet {
+    --sheet-w: 0px;
+  }
+
+  .clock-look,
+  .clock-screen.is-simulated ~ .clock-look {
+    top: auto;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: auto;
+    max-height: 56vh;
+    border-radius: var(--radius) var(--radius) 0 0;
+  }
+
+  .clock-theme-grid {
+    grid-template-columns: repeat(5, 1fr);
+  }
+}
+
+/* short (the laptop corner): the hint would cover the title, so it sits in
+   the bottom-left corner. */
+@media (max-height: 520px) {
+  .clock-look-hint {
+    position: fixed;
+    top: auto;
+    right: auto;
+    left: 12px;
+    bottom: 6px;
+  }
+
+  .clock-look-hint::after {
+    display: none;
+  }
+
+  .clock-look,
+  .clock-screen.is-simulated ~ .clock-look {
+    max-height: 70vh;
+  }
+}
+
+/* narrow (a phone): the hint in the free bottom-left corner, three previews
+   per row, and the clock keeps the top of the screen above the sheet. */
+@media (max-width: 520px) and (min-height: 521px) {
+  .clock-look-hint {
+    position: fixed;
+    top: auto;
+    right: auto;
+    left: 16px;
+    bottom: 12px;
+  }
+
+  .clock-look-hint::after {
+    display: none;
+  }
+
+  .clock-theme-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .clock-screen.has-sheet {
+    padding-bottom: 56vh;
+  }
+
+  .clock-screen.has-sheet > .clock-bottom {
+    display: none;
+  }
+}

@@ -37,28 +37,30 @@ describe('School Clock hosting', () => {
 
   describe('the ringing flash', () => {
     const css = readFileSync(resolve(clockDir, 'clock.css'), 'utf8');
+    const tokens = readFileSync(resolve(clockDir, 'tokens.css'), 'utf8');
     const rule = (selector) => {
       const match = new RegExp(`${selector.replace(/[.-]/g, '\\$&')}\\s*\\{([^}]*)\\}`).exec(css);
       return match ? match[1] : '';
     };
 
     it('flashes fewer than 3 times a second (WCAG 2.3.1)', () => {
-      const animation = /animation:\s*clock-flash\s+([\d.]+)(m?s)/.exec(rule('.clock-ringing--flash'));
+      const animation = /animation:\s*clock-ring-pulse\s+var\(--flash-period\)\s+steps\(1/
+        .exec(rule('.clock-ringing--flash .clock-ring-flash'));
       expect(animation).not.toBeNull();
-      const seconds = Number(animation[1]) / (animation[2] === 'ms' ? 1000 : 1);
+      const period = /--flash-period:\s*([\d.]+)(m?s)/.exec(tokens);
+      const seconds = Number(period[1]) / (period[2] === 'ms' ? 1000 : 1);
       // One flash per animation cycle.
       expect(1 / seconds).toBeLessThan(3);
     });
 
     it('is a steady highlight under reduced motion, not a flash', () => {
-      expect(rule('.clock-ringing--steady')).not.toMatch(/animation/);
-      expect(rule('.clock-ringing--steady')).toMatch(/outline/);
-      const reduced = css.slice(css.indexOf('@media (prefers-reduced-motion: reduce)'));
-      expect(reduced).toMatch(/\.clock-ringing--flash\s*\{[^}]*animation:\s*none/);
+      expect(rule('.clock-ring-flash')).not.toMatch(/animation/);
+      const reduced = css.slice(css.lastIndexOf('@media (prefers-reduced-motion: reduce)'));
+      expect(reduced).toMatch(/\.clock-ringing--flash \.clock-ring-flash\s*\{[^}]*animation:\s*none/);
     });
 
-    it('is more than a colour change: it also draws a thick outline', () => {
-      expect(css).toMatch(/@keyframes clock-flash[^@]*outline/);
+    it('is more than a colour change: it also draws a thick frame', () => {
+      expect(rule('.clock-ring-flash')).toMatch(/box-shadow:\s*inset 0 0 0 var\(--ring-width, 14px\)/);
     });
   });
 
@@ -77,8 +79,32 @@ describe('School Clock hosting', () => {
     const css = readFileSync(resolve(clockDir, 'tokens.css'), 'utf8');
     expect(css).toContain('--bg: #1e2836;');
     // The components name no colour of their own: every colour is a token.
-    const components = readFileSync(resolve(clockDir, 'clock.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
-    expect(components).not.toMatch(/#[0-9a-f]{3,8}\b|rgb\(/i);
+    const themes = html.indexOf('<link rel="stylesheet" href="/clock/themes.css" />');
+    expect(themes).toBeGreaterThan(tokens);
+    for (const sheet of ['clock.css', 'settings-drawer.css', 'look-sheet.css']) {
+      const components = readFileSync(resolve(clockDir, sheet), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+      expect(components).not.toMatch(/#[0-9a-f]{3,8}\b|rgb\(/i);
+      expect(html.indexOf(`/clock/${sheet}`)).toBeGreaterThan(themes);
+    }
+  });
+
+  it('downloads no font: every theme uses system font stacks, and nothing loads from another server', () => {
+    const html = readFileSync(resolve(clockDir, 'index.html'), 'utf8');
+    expect(html).not.toMatch(/https?:\/\//);
+    const files = readdirSync(clockDir);
+    expect(files.filter((f) => /\.(woff2?|ttf|otf|eot)$/i.test(f))).toEqual([]);
+    for (const sheet of files.filter((f) => f.endsWith('.css'))) {
+      expect(readFileSync(resolve(clockDir, sheet), 'utf8')).not.toMatch(/@font-face|@import|url\(/i);
+    }
+  });
+
+  it("styles the mini player's window from the same tokens, with stylesheets that exist and name no colour", () => {
+    const source = readFileSync(resolve(clockDir, 'mini-player.js'), 'utf8');
+    const sheets = [...source.matchAll(/'\/clock\/([\w-]+\.css)'/g)].map((m) => m[1]);
+    expect(sheets).toEqual(['tokens.css', 'themes.css', 'clock.css', 'mini-player.css']);
+    for (const sheet of sheets) expect(existsSync(resolve(clockDir, sheet))).toBe(true);
+    const css = readFileSync(resolve(clockDir, 'mini-player.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+    expect(css).not.toMatch(/#[0-9a-f]{3,8}\b|rgb\(/i);
   });
 
   it('ships no audio files: every sound is generated in the browser', () => {
