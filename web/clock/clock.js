@@ -354,9 +354,9 @@ export function initClockApp({
   };
   document.addEventListener('keydown', onKeyDown);
 
-  // The top bar's controls: quiet text buttons with icons. The plain timer
-  // panel is restyled by ticket 22; Settings opens the drawer
-  // (settings-drawer.js); Look (21) slots in between Readouts and Settings.
+  // The top bar's controls: quiet text buttons with icons. Timer opens the
+  // picker (timer-picker.js); Settings opens the drawer (settings-drawer.js);
+  // Look (21) slots in between Readouts and Settings.
   /** @param {string} label @param {Parameters<typeof icon>[0]} iconName @param {object} props */
   const topControl = (label, iconName, props) => {
     const text = el('span', { className: 'clock-control__label', textContent: label });

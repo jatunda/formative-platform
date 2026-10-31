@@ -1,0 +1,395 @@
+/* School Clock: the classroom timer's ring and picker (timer-ring.js,
+   timer-picker.js), built to the design reference's "Timer: ring and picker"
+   (.scratch/school-clock/mockups/final/, DESIGN.md). Like clock.css it names
+   no colour or face: every one is a token. Loaded after settings-drawer.css,
+   whose buttons and fields (.clock-btn, .clock-field, .clock-input) it uses. */
+
+/* ======================= the ring in the big spot ======================= */
+
+/* The ring takes the top bar's row too: a circle leaves the corners, where
+   the Day Label and the controls sit, free. The heading and the line under
+   the Readouts step aside (the first small Readout names the Segment). */
+.clock-screen.has-timer .clock-stage {
+  grid-row: top-start / stage-end;
+}
+
+.clock-screen.has-timer .clock-top {
+  position: relative;
+  z-index: 2;
+  align-self: start;
+}
+
+.clock-screen.has-timer .clock-title {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.clock-screen.has-timer .clock-next,
+.clock-screen.has-timer .clock-line {
+  display: none;
+}
+
+/* Ring in the middle, the other Readouts in a column to its right. */
+.clock-readouts.has-timer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  flex: 1;
+  align-self: stretch;
+  min-height: 0;
+  container-type: size;
+  --ring-d: min(100cqh, 56vw);
+}
+
+.clock-readouts.has-timer .clock-smalls {
+  grid-column: 3;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--gap-md);
+  margin-top: 0;
+  padding-left: 0;
+  border-left: 0;
+}
+
+.clock-readouts.has-timer .clock-smalls > * + * {
+  border-left: 0;
+  padding-left: 0;
+}
+
+.clock-readouts.has-timer .clock-readout--small .clock-readout__value {
+  font-size: clamp(24px, 7vh, 84px);
+}
+
+.clock-ring {
+  grid-column: 2;
+  position: relative;
+  width: var(--ring-d);
+  height: var(--ring-d);
+  container-type: size;
+}
+
+.clock-ring__svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.clock-ring__track,
+.clock-ring__arc {
+  fill: none;
+  stroke-width: 2.4;
+}
+
+.clock-ring__track {
+  stroke: var(--track);
+}
+
+/* The share of time left, from 12 o'clock; it eases between ticks. */
+.clock-ring__arc {
+  stroke: var(--accent);
+  stroke-linecap: round;
+  transition: stroke-dasharray var(--ring-tick) linear;
+}
+
+/* Empty: no dot left at 12 by the round cap. */
+.clock-ring__arc.is-empty {
+  visibility: hidden;
+}
+
+/* Paused: the arc greys and the track goes dashed, and the title says
+   "Paused" with a pause icon, so it isn't colour alone. */
+.clock-ring.is-paused .clock-ring__arc {
+  stroke: var(--line);
+}
+
+.clock-ring.is-paused .clock-ring__track {
+  stroke: var(--line);
+  stroke-dasharray: 1.4 1.4;
+}
+
+/* Reduced motion: the ring steps once a second and never animates. */
+@media (prefers-reduced-motion: reduce) {
+  .clock-ring__arc {
+    transition: none;
+  }
+}
+
+.clock-ring__inner {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.2cqh;
+}
+
+.clock-ring__title {
+  display: flex;
+  align-items: center;
+  gap: 0.4em;
+  font-family: var(--font-display);
+  font-size: calc(5cqh * var(--display-scale));
+  font-weight: 600;
+  line-height: 1.15;
+  color: var(--accent-text);
+}
+
+.clock-ring__title .clock-icon {
+  width: 0.8em;
+  height: 0.8em;
+}
+
+.clock-ring__of {
+  color: var(--muted);
+  font-family: var(--font-ui);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Fills about 80-90% of the ring's width across the middle, but no taller
+   than the ring's chord allows (narrow faces would otherwise poke out). */
+.clock-ring__digits {
+  --units: calc(var(--d, 3) + var(--c, 1) * var(--colon-units));
+  font-family: var(--font-digits);
+  font-size: min(calc(90cqw * var(--digits-fit) / (var(--units) * var(--glyph-em))), 40cqh);
+  font-weight: var(--digits-weight);
+  font-variant-numeric: tabular-nums lining-nums;
+  letter-spacing: var(--digits-tracking);
+  line-height: 0.95;
+  color: var(--digits);
+  white-space: nowrap;
+}
+
+.clock-ring__actions {
+  display: flex;
+  gap: var(--s3);
+  margin-top: 1cqh;
+}
+
+.clock-btn--accent {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.clock-btn--accent:hover {
+  background: var(--accent);
+  filter: brightness(1.08);
+}
+
+/* ======================= the picker ======================= */
+
+/* A 520px dialog over the scrim (the drawer's), above it. */
+.clock-picker {
+  z-index: 31;
+  font-family: var(--font-ui);
+}
+
+.clock-picker__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--s4);
+}
+
+.clock-picker__head h2 {
+  font-size: var(--type-ui-xl);
+}
+
+.clock-picker__grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--s3);
+}
+
+/* Four square presets: the number large, "min" small and muted. */
+.clock-preset {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1;
+  min-height: 72px;
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  color: var(--fg);
+  cursor: pointer;
+}
+
+.clock-preset:hover {
+  border-color: var(--accent);
+}
+
+.clock-preset__num {
+  font-family: var(--font-digits);
+  font-size: 34px;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.clock-preset__unit {
+  font-size: var(--type-ui-sm);
+  color: var(--muted);
+}
+
+.clock-picker__sub {
+  margin: var(--s5) 0 var(--s2);
+  font-size: var(--type-ui-sm);
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.clock-picker__recent {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2);
+}
+
+.clock-pill {
+  min-height: var(--tap);
+  min-width: 72px;
+  padding: 0 var(--s4);
+  border: 1.5px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--fg);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums lining-nums;
+  cursor: pointer;
+}
+
+.clock-pill:hover {
+  background: var(--surface-2);
+}
+
+/* The custom row, under a hairline: Minutes : Seconds, then Start. */
+.clock-picker__custom {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--s2);
+  margin-top: var(--s5);
+  padding-top: var(--s5);
+  border-top: 1px solid var(--line-soft);
+}
+
+.clock-picker__time {
+  width: 4.5em;
+  text-align: center;
+  font-size: var(--type-ui-xl);
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.clock-picker__time[aria-invalid="true"] {
+  border-color: var(--fg);
+  border-width: 2.5px;
+}
+
+.clock-picker__colon {
+  padding-bottom: 8px;
+  font-size: var(--type-ui-xl);
+  font-weight: 700;
+}
+
+.clock-picker__custom .clock-btn {
+  margin-left: auto;
+}
+
+.clock-picker__error {
+  margin-top: var(--s3);
+  font-size: var(--type-ui-sm);
+  font-weight: 600;
+}
+
+.clock-picker__error:empty {
+  display: none;
+}
+
+/* ======================= breakpoints ======================= */
+
+/* short: laptop corner (480x320). The controls span the top row, so the
+   ring keeps to the stage. */
+@media (max-height: 520px) {
+  .clock-screen.has-timer .clock-stage {
+    grid-row: stage;
+  }
+
+  .clock-readouts.has-timer {
+    --ring-d: min(100cqh, 60vw);
+  }
+
+  .clock-ring__actions .clock-btn {
+    min-height: 32px;
+    padding: 0 10px;
+    font-size: 13px;
+  }
+
+  .clock-readouts.has-timer .clock-readout--small .clock-readout__value {
+    font-size: clamp(18px, 8vh, 36px);
+  }
+
+  .clock-readouts.has-timer .clock-smalls {
+    gap: 8px;
+  }
+
+  .clock-picker {
+    padding: var(--s3) var(--s4);
+  }
+
+  .clock-picker__head {
+    margin-bottom: var(--s2);
+  }
+
+  .clock-preset {
+    aspect-ratio: auto;
+    min-height: 56px;
+  }
+
+  .clock-picker__sub {
+    margin-top: var(--s3);
+  }
+
+  .clock-picker__custom {
+    margin-top: var(--s3);
+    padding-top: var(--s3);
+  }
+}
+
+/* narrow: phone, portrait. Ring on top, the other Readouts under it. */
+@media (max-width: 520px) and (min-height: 521px) {
+  .clock-screen.has-timer .clock-stage {
+    grid-row: stage;
+    justify-content: flex-start;
+  }
+
+  .clock-readouts.has-timer {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: 16px;
+    container-type: normal;
+    --ring-d: min(88vw, 52vh);
+  }
+
+  .clock-readouts.has-timer .clock-smalls {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 16px;
+  }
+
+  .clock-readouts.has-timer .clock-readout--small .clock-readout__value {
+    font-size: 34px;
+  }
+
+  .clock-picker__custom {
+    flex-wrap: wrap;
+  }
+}

@@ -4,8 +4,7 @@
    look by setting data-mode / data-palette / data-font / data-deco on <html>;
    nothing here names a colour or a face.
 
-   The plain timer panel only gets what keeps it usable on the themed page;
-   ticket 22 designs it. The overlays (ticket 18) have their own section at
+   The timer's ring and picker are in timer.css. The overlays (ticket 18) have their own section at
    the end, with their own breakpoints. */
 
 *,
@@ -332,11 +331,6 @@ button.clock-readout__face {
 
 .clock-readout--small .clock-readout__caption {
   font-size: calc(var(--type-caption) * 0.85);
-}
-
-/* The running timer in the big spot (plain until ticket 22's ring). */
-.clock-readout--timer .clock-readout__value {
-  font-size: min(24vh, calc(var(--fit-w) / 9));
 }
 
 /* Below (the default): small Readouts in one centred row under the big one,
@@ -743,54 +737,6 @@ button.clock-readout__face {
 /* The agenda list is the phone's whole day (see the narrow breakpoint). */
 .clock-agenda {
   display: none;
-}
-
-/* ======================= plain panels and prompts ======================= */
-
-/* The timer's controls, opened from the top bar: a plain panel on the right
-   until ticket 22 designs them. (Settings is a drawer: settings-drawer.css.) */
-.clock-panel {
-  position: fixed;
-  z-index: 10;
-  top: calc(var(--edge-y) + var(--tap) + var(--s2));
-  right: var(--edge-x);
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--s2);
-  width: min(400px, calc(100vw - 2 * var(--edge-x)));
-  max-height: calc(100vh - var(--edge-y) * 2 - var(--tap) - var(--s2));
-  overflow: auto;
-  padding: var(--s4);
-  border: 1.5px solid var(--line);
-  border-radius: var(--radius);
-  background: var(--surface);
-  color: var(--fg);
-  box-shadow: var(--shadow);
-}
-
-/* Below the "Simulated time" banner too, when it shows. */
-.clock-screen.is-simulated ~ .clock-panel {
-  top: calc(var(--edge-y) + var(--tap) + var(--s2) + 40px);
-  max-height: calc(100vh - var(--edge-y) * 2 - var(--tap) - var(--s2) - 40px);
-}
-
-.clock-panel input,
-.clock-panel select {
-  background: var(--input-bg);
-  border: 1.5px solid var(--line);
-  border-radius: var(--radius-sm);
-}
-
-.clock-panel button {
-  min-height: var(--tap);
-  padding: 0 var(--s4);
-  border: 1.5px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: var(--surface-2);
-  color: var(--fg);
-  font-weight: 600;
-  cursor: pointer;
 }
 
 /* The overlays (first visit, sound, ringing, toasts) are at the end. */

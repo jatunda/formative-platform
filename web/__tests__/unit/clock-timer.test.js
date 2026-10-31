@@ -121,8 +121,13 @@ describe('the classroom timer', () => {
       expect(timerProgress(cancelTimer(), t0)).toBe(0);
     });
 
-    it('is full when the length is unknown (a timer saved before the ring)', () => {
-      expect(timerProgress({ timerEndsAt: t0 + MIN, timerPausedMs: null }, t0 + 10 * SEC)).toBe(1);
+    it('is full when the length is unknown (a timer saved before the ring), through a pause and resume', () => {
+      const old = { timerEndsAt: t0 + MIN, timerPausedMs: null };
+      expect(timerProgress(old, t0 + 10 * SEC)).toBe(1);
+      const paused = pauseTimer(old, t0 + 10 * SEC);
+      expect(paused.timerTotalMs).toBeNull();
+      expect(resumeTimer(paused, t0 + MIN).timerTotalMs).toBeNull();
+      expect(timerProgress(resumeTimer(paused, t0 + MIN), t0 + MIN)).toBe(1);
     });
 
     it('says what the ring shows: running, paused, and rung', () => {
