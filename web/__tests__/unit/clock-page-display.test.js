@@ -246,7 +246,7 @@ describe('School Clock display preferences', () => {
       button('2 min', timerSection()).click();
       button('Mini player').click();
       await settle();
-      expect(pip.window.document.querySelector('.clock-mini-readout').textContent).toBe('2:00 left');
+      expect(pip.window.document.querySelector('.clock-mini__readout').textContent).toBe('2:00 left');
     });
   });
 });

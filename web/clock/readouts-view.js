@@ -17,6 +17,18 @@ import { icon } from './icons.js';
  */
 
 /**
+ * Write a Readout's value into `node`: letters small, and the glyph counts
+ * for the size rule. The mini player writes its big Readout the same way.
+ * @param {HTMLElement} node @param {Parts} parts
+ */
+export function writeValue(node, { pieces, glyphs }) {
+  node.replaceChildren(...pieces.map(({ text, small }) => (small ? el('span', { className: 'clock-unit', textContent: text }) : text)));
+  node.style.setProperty('--d', String(glyphs.digits));
+  node.style.setProperty('--c', String(glyphs.colons));
+  node.style.setProperty('--u', String(glyphs.letters));
+}
+
+/**
  * @param {{ onCycle: (index: number) => void, onRemove: (index: number) => void, onAdd: () => void }} actions
  * @returns {{ element: HTMLElement, show: (arrangement: Arrangement, readouts: Parts[], timer: string) => void,
  *   focusReadout: (index: number) => void, focusRemove: (index: number) => boolean }}
@@ -70,14 +82,6 @@ export function createReadoutsView({ onCycle, onRemove, onAdd }) {
     }
     element.classList.toggle('has-smalls', smalls.length > 0);
     element.replaceChildren(big, ...(smalls.length ? [el('div', { className: 'clock-smalls' }, smalls)] : []));
-  }
-
-  /** Write a Readout's value: letters small, and the glyph counts for the size rule. @param {HTMLElement} node @param {Parts} parts */
-  function writeValue(node, { pieces, glyphs }) {
-    node.replaceChildren(...pieces.map(({ text, small }) => (small ? el('span', { className: 'clock-unit', textContent: text }) : text)));
-    node.style.setProperty('--d', String(glyphs.digits));
-    node.style.setProperty('--c', String(glyphs.colons));
-    node.style.setProperty('--u', String(glyphs.letters));
   }
 
   return {

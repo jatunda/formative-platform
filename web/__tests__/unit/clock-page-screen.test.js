@@ -158,7 +158,15 @@ describe('School Clock fullscreen, mini player and feedback', () => {
 
   describe('the mini player', () => {
     const mini = () => pip.window.document.body;
-    const miniText = () => mini().textContent.replace(/\s+/g, ' ');
+    const miniText = () => mini().textContent.replace(/\s+/g, ' ').trim();
+    const head = () => mini().querySelector('h1').textContent.trim();
+    const readout = () => mini().querySelector('.clock-mini__readout').textContent;
+    const foot = () => mini().querySelector('.clock-mini__foot');
+    const footText = () => [...foot().children].filter((c) => !c.hidden)
+      .map((c) => c.textContent).join(' ').replace(/\s+/g, ' ').trim();
+    const progress = () => [...foot().querySelectorAll('[role="progressbar"]')].find((b) => !b.closest('[hidden]'));
+    const miniMain = () => mini().querySelector('main');
+    const timerSection = () => mount().querySelector('[aria-label="Timer"]');
 
     async function openMini() {
       button('Mini player').click();
@@ -170,13 +178,17 @@ describe('School Clock fullscreen, mini player and feedback', () => {
       expect(button('Mini player')).toBeUndefined();
     });
 
-    it('opens a small window with the big Readout, the current Segment and up next', async () => {
-      open();
+    it('opens a 320 × 180 window with the Segment and its Period Label, the big Readout, and when the Segment ends', async () => {
+      open({ settings: { division: 'HS', periodLabels: { 'Period 3': 'AP CSA' } } });
       await openMini();
       expect(pip.windows).toHaveLength(1);
-      expect(miniText()).toContain('3:00 left');
-      expect(miniText()).toContain('Period 3 · HS');
-      expect(miniText()).toContain('Up next: Period 4 at 11:20 AM');
+      expect(pip.window.size).toEqual({ width: 320, height: 180 });
+      expect(head()).toBe('Period 3 · AP CSA');
+      expect(readout()).toBe('3:00 left');
+      // 42 of Period 3's 45 minutes have gone.
+      expect(progress().getAttribute('aria-label')).toBe('Period 3 progress');
+      expect(progress().getAttribute('aria-valuenow')).toBe('93');
+      expect(footText()).toBe('ends 11:15 AM');
     });
 
     it('follows the main page every tick, from the same state', async () => {
@@ -184,56 +196,141 @@ describe('School Clock fullscreen, mini player and feedback', () => {
       await openMini();
       advance(SEC);
       expect(bigReadout()).toBe('2:59 left');
-      expect(miniText()).toContain('2:59 left');
+      expect(readout()).toBe('2:59 left');
 
       mount().querySelector('.clock-readout--big .clock-readout__face').click();
-      expect(miniText()).toContain(bigReadout());
-      expect(miniText()).not.toContain('2:59 left');
+      expect(readout()).toBe(bigReadout());
+      expect(readout()).not.toBe('2:59 left');
 
       advance(3 * 60 * SEC); // into the Passing Period
-      expect(miniText()).toContain('Passing Period');
-      expect(miniText()).toContain('Up next: Period 4 at 11:20 AM');
+      expect(head()).toBe('Passing Period');
+      expect(footText()).toBe('Up next Period 4');
+      expect(progress()).toBeUndefined();
     });
 
-    it('uses the same Period labels and time format as the main page', async () => {
-      open({ settings: { division: 'HS', use24Hour: true, periodLabels: { 'Period 4': 'AP CSA' } } });
+    it('uses the same Period Labels, time format and seconds setting as the main page', async () => {
+      open({ settings: { division: 'HS', use24Hour: true, showSeconds: false, periodLabels: { 'Period 4': 'AP CSA' } } });
       await openMini();
-      expect(miniText()).toContain('Up next: Period 4 · AP CSA at 11:20');
-      expect(miniText()).not.toContain('AM');
+      expect(footText()).toBe('ends 11:15');
+      expect(readout()).toBe('3 min left');
+      advance(4 * 60 * SEC); // 11:16, in the Passing Period
+      expect(footText()).toBe('Up next Period 4 · AP CSA');
+    });
+
+    it('shows what comes first before school', async () => {
+      open({ when: at(7, 50) });
+      await openMini();
+      expect(head()).toBe('Before school');
+      expect(footText()).toMatch(/^Up next Period 1/);
+    });
+
+    it('shows a running timer as the big Readout, with the time left in the Segment underneath', async () => {
+      open();
+      button('Timer').click();
+      button('5 min', timerSection()).click();
+      await openMini();
+      expect(head()).toBe('Timer');
+      expect(readout()).toBe('5:00 left');
+      expect(footText()).toBe('3:00 left in Period 3');
+      expect(miniMain().classList.contains('has-timer')).toBe(true);
+
+      advance(SEC);
+      expect(readout()).toBe('4:59 left');
+      button('Pause', timerSection()).click();
+      expect(head()).toBe('Timer · paused');
+
+      button('Cancel', timerSection()).click();
+      expect(head()).toBe('Period 3');
+      expect(miniMain().classList.contains('has-timer')).toBe(false);
+    });
+
+    it('keeps up next under a timer during a Passing Period', async () => {
+      open({ when: at(11, 16) });
+      button('Timer').click();
+      button('1 min', timerSection()).click();
+      await openMini();
+      expect(readout()).toBe('1:00 left');
+      expect(footText()).toBe('Up next Period 4');
     });
 
     it('shows just the time before a Division is chosen', async () => {
       open({ settings: {} });
       await openMini();
-      expect(miniText()).toContain('11:12:00 AM');
-      expect(miniText()).not.toContain('Up next');
+      expect(readout()).toBe('11:12:00 AM');
+      expect(head()).toBe('');
+      expect(footText()).toBe('');
     });
 
     it('shows just the time on a date the clock knows nothing about', async () => {
       open({ when: new Date(2031, 0, 6, 10, 0) });
       await openMini();
-      expect(mini().querySelector('.clock-mini-readout').textContent).toBe('10:00:00 AM');
+      expect(readout()).toBe('10:00:00 AM');
       expect(miniText()).not.toMatch(/Period|Up next|school/);
     });
 
     it('shows the Day Label on a day off', async () => {
       open({ when: new Date(2026, 9, 31, 12, 0) });
       await openMini();
-      expect(miniText()).toContain('Weekend');
+      expect(head()).toBe('Weekend');
+      expect(footText()).toBe('');
     });
 
-    it('has a dismiss button while something rings, which stops the ring', async () => {
+    it('says what rings, with a Dismiss button reachable by keyboard that stops the ring', async () => {
       open();
       await openMini();
       expect(button('Dismiss', mini())).toBeUndefined();
 
       advance(3 * 60 * SEC + SEC); // just past 11:15, the Bell at the end of Period 3
-      expect(miniText()).toContain('Ringing: Bell');
-      button('Dismiss', mini()).click();
+      expect(head()).toBe('Ringing · Bell · Period 3 ends');
+      expect(miniMain().classList.contains('is-ringing')).toBe(true);
+      const dismiss = button('Dismiss', mini());
+      expect(dismiss.tagName).toBe('BUTTON');
+      dismiss.focus();
+      expect(pip.window.document.activeElement).toBe(dismiss);
+      advance(SEC);
+      expect(pip.window.document.activeElement).toBe(dismiss); // the ticks leave it in place
+      dismiss.click();
 
       expect(player.dismissals).toBe(1);
       expect(ringing().hidden).toBe(true);
       expect(button('Dismiss', mini())).toBeUndefined();
+      expect(head()).toBe('Passing Period');
+      expect(miniMain().classList.contains('is-ringing')).toBe(false);
+    });
+
+    it("loads the page's stylesheets and its own, and follows the page's theme as it changes", async () => {
+      const html = document.documentElement;
+      document.head.innerHTML = '<link rel="stylesheet" href="/clock/tokens.css"><link rel="stylesheet" href="/clock/clock.css">';
+      html.setAttribute('data-mode', 'dark');
+      html.setAttribute('data-palette', 'slate');
+      try {
+        open();
+        await openMini();
+        const doc = pip.window.document;
+        expect([...doc.querySelectorAll('link[rel="stylesheet"]')].map((l) => new URL(l.href).pathname))
+          .toEqual(['/clock/tokens.css', '/clock/clock.css', '/clock/mini-player.css']);
+        expect({ ...doc.documentElement.dataset }).toEqual({ mode: 'dark', palette: 'slate' });
+
+        html.setAttribute('data-mode', 'light');
+        html.setAttribute('data-font', 'serif');
+        html.removeAttribute('data-palette');
+        await settle();
+        expect({ ...doc.documentElement.dataset }).toEqual({ mode: 'light', font: 'serif' });
+      } finally {
+        document.head.innerHTML = '';
+        for (const name of ['data-mode', 'data-palette', 'data-font']) html.removeAttribute(name);
+      }
+    });
+
+    it('stops following the theme once closed', async () => {
+      open();
+      await openMini();
+      const doc = pip.window.document;
+      button('Close mini player').click();
+      document.documentElement.setAttribute('data-mode', 'light');
+      await settle();
+      expect(doc.documentElement.dataset.mode).toBeUndefined();
+      document.documentElement.removeAttribute('data-mode');
     });
 
     it('closes from its button on the main page, and the button can open it again', async () => {
@@ -257,7 +354,7 @@ describe('School Clock fullscreen, mini player and feedback', () => {
       expect(pip.windows).toHaveLength(2);
       expect(button('Close mini player')).toBeDefined();
       advance(SEC);
-      expect(miniText()).toContain('2:59 left');
+      expect(readout()).toBe('2:59 left');
     });
 
     it('stops updating once the user closes it', async () => {
