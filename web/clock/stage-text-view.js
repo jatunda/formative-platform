@@ -22,7 +22,7 @@ export function createStageTextView() {
   /**
    * Show the words for `moment` (null before a Division is chosen: just the date).
    * @param {Date} now @param {import('./clock-model.js').Moment | null} moment
-   * @param {{ use24Hour: boolean, periodLabels: Record<string, string> }} settings
+   * @param {{ use24Hour: boolean, showSeconds: boolean, periodLabels: Record<string, string> }} settings
    */
   function show(now, moment, settings) {
     if (!moment) {

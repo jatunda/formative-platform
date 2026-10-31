@@ -26,10 +26,10 @@ import { formatClockTime, formatDate, formatLongDuration, formatSegmentName, for
  * The main screen's words at `now`.
  * @param {Date} now
  * @param {Moment} moment `describeMoment(now, ...)`
- * @param {{ use24Hour: boolean, periodLabels: Record<string, string> }} settings
+ * @param {{ use24Hour: boolean, showSeconds: boolean, periodLabels: Record<string, string> }} settings
  * @returns {DisplayText}
  */
-export function displayText(now, moment, { use24Hour, periodLabels }) {
+export function displayText(now, moment, { use24Hour, showSeconds, periodLabels }) {
   const date = formatShortDate(now);
   const schoolDay = `${moment.dayLabel} · ${date}`;
   /** @param {Date} at */
@@ -37,8 +37,8 @@ export function displayText(now, moment, { use24Hour, periodLabels }) {
   const next = moment.upNext ? { name: formatSegmentName(moment.upNext, periodLabels), at: time(moment.upNext.start) } : null;
   // Off-Hours always have a Next School Day, except a Summer before next year is known.
   const back = moment.nextSchoolDay ? formatShortDate(moment.nextSchoolDay.firstSegment.start) : '';
-  // How long until it starts, in days and hours (Off-Hours lines never show seconds).
-  const startsIn = () => `starts in ${formatLongDuration(/** @type {number} */ (moment.untilNextSchoolDayMs), { seconds: false })}`;
+  // How long until it starts, following the seconds setting like the countdown Readouts.
+  const startsIn = () => `starts in ${formatLongDuration(/** @type {number} */ (moment.untilNextSchoolDayMs), { seconds: showSeconds })}`;
   const nextDayLabel = () => /** @type {import('./clock-model.js').NextSchoolDay} */ (moment.nextSchoolDay).dayLabel;
   /** @type {(fields: Partial<DisplayText>) => DisplayText} */
   const text = (fields) => ({ day: date, title: '', tag: '', upNext: null, line: null, ...fields });

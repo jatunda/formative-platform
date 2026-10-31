@@ -117,7 +117,7 @@ describe('School Clock page', () => {
     expect(dayText()).toBe('All Day · Tue, Oct 27');
     expect(headingText()).toBe('After school');
     expect(readoutTexts()).toEqual(['50:00 since school ended']);
-    expect(displayText()).toContain('Next: Wed, Oct 28 · Even Day · starts in 16h 30m');
+    expect(displayText()).toContain('Next: Wed, Oct 28 · Even Day · starts in 16:30:00');
   });
 
   it('says it is before school, and when the first Segment starts', () => {

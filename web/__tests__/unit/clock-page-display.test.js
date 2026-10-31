@@ -99,9 +99,13 @@ describe('School Clock display preferences', () => {
       expect(readouts()[0].text).toBe('0:55 left');
     });
 
-    it('Off-Hours lines never show them; days and hours stay as they are', () => {
+    it('Off-Hours lines show them like the countdown Readouts; days and hours stay as they are', () => {
       open({ when: at(16, 0, 0) });
-      expect(displayText()).toContain('starts in 16h 30m');
+      expect(displayText()).toContain('starts in 16:30:00');
+      advance(5 * SEC);
+      expect(displayText()).toContain('starts in 16:29:55');
+      open({ when: new Date(2026, 9, 23, 16, 0).getTime() }); // Friday: back on Monday
+      expect(displayText()).toContain('starts in 2d 16h');
     });
 
     it('when off, Off-Hours Readouts drop them too, but days and hours stay as they are', () => {
