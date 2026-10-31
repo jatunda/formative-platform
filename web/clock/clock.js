@@ -28,6 +28,7 @@ import { SCHOOL_YEARS } from './school-years.js';
 import { createWakeLockKeeper, detectCapabilities } from './screen.js';
 import { createAlarmEditor } from './alarm-editor.js';
 import { DIVISIONS, FEEDBACK_HREF, createSettingsDrawer } from './settings-drawer.js';
+import { applyLook, createLookSheet, decorations } from './look-sheet.js';
 import { BELL_SECONDS, ALARM_MAX_SECONDS, SOUND_NAMES, createSoundPlayer } from './sound.js';
 import { cancelTimer, settleTimer, timerText } from './timer.js';
 import { createTimerPanel } from './timer-panel.js';
@@ -415,6 +416,25 @@ export function initClockApp({
     showPanel(null);
     drawer.open(from, options);
   }
+  // The Look sheet (how it looks), beside the clock so it previews live.
+  const lookSheet = createLookSheet({
+    settings: () => settings,
+    update: updateSettings,
+    behind: () => [...mount.children].filter((node) => !lookSheet.elements.includes(node)),
+    onChange: (open) => {
+      lookControl.setAttribute('aria-expanded', String(open));
+      mainScreen.classList.toggle('has-sheet', open);
+      render(new Date(clock.now()));
+    },
+  });
+  const lookControl = topControl('Look', 'look', {
+    'aria-controls': lookSheet.dialog.id, 'aria-expanded': 'false', 'aria-haspopup': 'dialog',
+    onclick: () => {
+      showPanel(null);
+      lookSheet.open(lookControl);
+    },
+  });
+  lookControl.classList.add('clock-control--fills');
   const settingsControl = topControl('Settings', 'gear', {
     'aria-controls': drawer.dialog.id, 'aria-expanded': 'false', 'aria-haspopup': 'dialog',
     onclick: () => openSettings(settingsControl),
@@ -481,7 +501,8 @@ export function initClockApp({
     dayLine,
     el('div', { className: 'clock-top__end' }, [
       el('nav', { className: 'clock-controls', 'aria-label': 'Clock controls' },
-        [timerControl, bellsControl, readoutsControl, settingsControl]),
+        [timerControl, bellsControl, readoutsControl,
+          el('span', { className: 'clock-look-wrap' }, [lookControl, lookSheet.hint]), settingsControl]),
       divisionChip,
     ]),
   ]);
@@ -490,11 +511,11 @@ export function initClockApp({
     el('div', { className: 'clock-corner', role: 'group', 'aria-label': 'Window' }, [mini.button, fullscreenButton]),
   ]);
   const mainScreen = el('main', { className: clock.simulated ? 'clock-screen is-simulated' : 'clock-screen' }, [
-    ...(clock.simulated ? [banner] : []), top, stage, bottom,
+    ...(clock.simulated ? [banner] : []), ...decorations(), top, stage, bottom,
   ]);
   mount.replaceChildren(
     mainScreen, ...ringCard.elements, soundPrompt.element, saveError.element,
-    timerPanel.section, ...drawer.elements, divisionPrompt.element,
+    timerPanel.section, ...drawer.elements, ...lookSheet.elements, divisionPrompt.element,
   );
 
   /**
@@ -539,8 +560,11 @@ export function initClockApp({
     showSoundState();
     timerPanel.render(now);
     drawer.render();
+    applyLook(document.documentElement, settings);
+    lookSheet.render();
+    lookControl.classList.toggle('is-hinted', !lookSheet.hint.hidden);
     bellsControl.setAttribute('aria-pressed', String(settings.bells.on));
-    for (const control of [timerControl, bellsControl, settingsControl, divisionChip]) control.hidden = !chosen;
+    for (const control of [timerControl, bellsControl, lookControl, settingsControl, divisionChip]) control.hidden = !chosen;
     divisionChip.replaceChildren(
       el('span', { className: 'visually-hidden', textContent: 'Division: ' }),
       String(settings.division),
@@ -669,6 +693,7 @@ export function initClockApp({
     wakeLock.release();
     mini.close();
     drawer.destroy();
+    lookSheet.destroy();
     soundPlayer.close();
     if (destroyActiveApp === destroy) destroyActiveApp = null;
   }

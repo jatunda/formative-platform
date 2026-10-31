@@ -126,11 +126,11 @@ describe('School Clock display preferences', () => {
   });
 
   it('leaves the look preferences the Settings drawer does not show as they were saved', () => {
-    withSettings({ dayStrip: false, theme: 'chalkboard', fontSwap: 'serif-1', paletteSwap: 'ocean', colorScheme: 'auto' });
+    withSettings({ dayStrip: false, theme: 'bloom', fontSwap: 'mono', paletteSwap: 'team', flipped: true });
     open({ when: at(10, 32) });
     toggle('Show seconds');
     expect(saved(storage)).toMatchObject({
-      showSeconds: false, dayStrip: false, theme: 'chalkboard', fontSwap: 'serif-1', paletteSwap: 'ocean', colorScheme: 'auto',
+      showSeconds: false, dayStrip: false, theme: 'bloom', fontSwap: 'mono', paletteSwap: 'team', flipped: true,
     });
   });
 
