@@ -102,6 +102,14 @@ describe('School Clock page', () => {
     expect(displayText()).toContain('Up next Period 3 10:30 AM');
   });
 
+  it('names the Period coming up in a Passing Period by its Period Label', () => {
+    const real = fakeRealClock(new Date(2026, 9, 27, 10, 27, 20));
+    app = start({ realNow: real.now, settings: { periodLabels: { 'Period 3': 'AP CSA' } } });
+
+    expect(readoutTexts()).toEqual(['2:40 until Period 3 · AP CSA']);
+    expect(displayText()).toContain('Up next Period 3 · AP CSA 10:30 AM');
+  });
+
   it('says it is after school, for how long, and when the Next School Day starts', () => {
     const real = fakeRealClock(new Date(2026, 9, 27, 16, 0, 0));
     app = start({ realNow: real.now });
@@ -126,7 +134,7 @@ describe('School Clock page', () => {
     app = start({ realNow: real.now });
     expect(headingText()).toBe('Weekend');
     expect(dayText()).toBe('Sat, Oct 31');
-    expect(displayText()).toContain('Back Mon, Nov 2 · All Day');
+    expect(displayText()).toContain('Back Mon, Nov 2 · All Day · starts in 1d 23h');
   });
 
   it('on a day off, names it, counts down to the Next School Day, and can count since school ended', () => {
@@ -138,7 +146,7 @@ describe('School Clock page', () => {
     expect(headingText()).toBe('Thanksgiving Break');
     expect(dayText()).toBe('Wed, Nov 25');
     expect(readoutTexts()).toEqual(['4d 22h until Mon, Nov 30']);
-    expect(displayText()).toContain('Back Mon, Nov 30 · All Day');
+    expect(displayText()).toContain('Back Mon, Nov 30 · All Day · starts in 4d 22h');
     document.querySelector('#clockApp .clock-readout__face').click();
     expect(readoutTexts()).toEqual(['5d 18h since school ended']);
   });
@@ -157,7 +165,7 @@ describe('School Clock page', () => {
     app = start({ realNow: real.now });
     expect(headingText()).toBe('HS Experience Week');
     expect(dayText()).toBe('Wed, Jan 20');
-    expect(displayText()).toContain('Enjoy the trips · back Mon, Jan 25');
+    expect(displayText()).toContain('Enjoy the trips · back Mon, Jan 25 · starts in 4d 22h');
   });
 
   describe('Summer', () => {
