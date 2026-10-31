@@ -77,3 +77,7 @@ An Alarm that rings at a point within a Period: counted from its start ("at minu
 
 **Bells**:
 The built-in sounds at the start and end of every Period and Break (not Assemblies), turned on or off as a whole. Where one Segment ends exactly as the next begins, they ring once. Unlike a Period Alarm, Bells also cover Breaks.
+
+**Theme**:
+A look for the clock: a palette plus a font, sometimes with a decoration. Every palette has its own (native) light or dark version, which the Theme shows unless the teacher flips it to the other one. A teacher can swap a Theme's font or palette for another from the pre-checked lists. Themes are named only by what they look like ("Navy and orange, bold condensed"), never by who they're for.
+_Avoid_: light/dark/auto mode as a separate setting — a Theme owns its mode.
