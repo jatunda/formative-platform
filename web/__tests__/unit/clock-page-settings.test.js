@@ -153,11 +153,11 @@ describe('School Clock settings drawer', () => {
   });
 
   describe('its sections', () => {
-    it('are, in order: Division, Time, Sound, Period Labels, Next rings today, About, each headed and named', () => {
+    it('are, in order: Division, Time, Sound, Period Labels, Alarms, Next rings today, About, each headed and named', () => {
       open();
       const sections = [...drawer().querySelectorAll('section')];
       expect(sections.map((s) => accessibleName(s))).toEqual(
-        ['Division', 'Time', 'Sound', 'Period Labels', 'Next rings today', 'About']);
+        ['Division', 'Time', 'Sound', 'Period Labels', 'Alarms', 'Next rings today', 'About']);
       for (const section of sections) {
         expect(section.querySelector('h3').textContent).toBe(accessibleName(section));
         expect(section.id).toMatch(/^clock-settings-/);
