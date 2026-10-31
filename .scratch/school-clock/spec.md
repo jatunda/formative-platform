@@ -119,6 +119,7 @@ A public page at `mrhsieh.app/clock` that any teacher can bookmark. No login. It
 61. As a teacher, I want Bells to ring once where one Segment ends exactly as the next begins, so that there's no double ring.
 62. As a teacher, I want Bells to play a short sound (about 3 seconds) that stops on its own, so that I don't have to dismiss them.
 63. As a teacher, I want the Bells toggle one tap away from the main screen, so that I can turn them on for the day quickly.
+84. As a teacher, I want the option of Bells at the end of each Assembly (never its start), so that my room hears when Chapel, Convocation or a Pep Rally is over. (A follow-up, numbered after the rest so earlier numbers stay put.)
 
 ### Ringing
 
@@ -185,6 +186,8 @@ A public page at `mrhsieh.app/clock` that any teacher can bookmark. No login. It
 - **Clock model (deep pure module, `// @ts-check`).** The single place every rule lives. Two queries over (time, School Year registry, device settings):
   - **Describe a moment**: the Day Label; the state (in a Segment, Passing Period, Off-Hours before or after school, day off, Experience Week, Summer, or unknown date); the current Segment with its Period Label and its start/end; up next; the Next School Day and its first Segment's start; the end of the previous School Day; the day count of Summer, and the next first day if known. Readout values are derived from this.
   - **Rings in a window**: every ring (Bell, Clock Alarm, Period Alarm, timer end) in a half-open time range, each with its source and sound. Scoping by Division, Bell Schedule and Period selection is applied, and Bells at a shared Segment edge are merged into one.
+
+  - **Bells at the end of Assemblies** (follow-up). A saved setting inside the Bells settings, `bells.assemblyEnds`, default off (missing or corrupt → off, so earlier saves behave as before). When on, and only while Bells are on, Bells also ring at each Assembly's end, never its start; that end merges into one ring with any Bell edge at the same moment (Convocation ending as Nutrition starts). The switch "Bell when an Assembly ends" sits under the Bells switch in the drawer's Sound section.
 
   All times use the device's local time zone with wall-clock Segment times, so daylight-saving changes (e.g. 11/1/26) need no special handling beyond building dates in local time.
 - **School Day rules in the model:**

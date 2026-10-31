@@ -399,13 +399,14 @@ function clockAlarmTime(alarm, day, plan) {
 }
 
 /**
- * The Bells of one School Day: start and end of every Period and Break, one
- * per moment.
+ * The Bells of one School Day: start and end of every Period and Break (and,
+ * with `assemblyEnds`, the end of every Assembly, never its start), one per
+ * moment.
  * @param {TimedSegment[]} segments
- * @param {SoundName} sound
+ * @param {import('./clock-settings.js').BellsSettings} bells
  * @returns {BellRing[]}
  */
-function bellsOf(segments, sound) {
+function bellsOf(segments, { sound, assemblyEnds }) {
   /** @type {Map<number, BellRing>} */
   const byTime = new Map();
   const at = (/** @type {Date} */ date) => {
@@ -414,7 +415,10 @@ function bellsOf(segments, sound) {
     return /** @type {BellRing} */ (byTime.get(t));
   };
   for (const s of segments) {
-    if (s.kind === 'assembly') continue;
+    if (s.kind === 'assembly') {
+      if (assemblyEnds) at(s.end).ends = s;
+      continue;
+    }
     at(s.start).starts = s;
     at(s.end).ends = s;
   }
@@ -454,7 +458,7 @@ export function ringsInWindow(start, end, schoolYears, settings) {
   const rings = [];
   for (let day = localMidnight(isoDate(start)); day.getTime() < to; day = addDays(day, 1)) {
     const plan = planDay(day, schoolYears, division);
-    if (plan.kind === 'school' && settings.bells.on) rings.push(...bellsOf(plan.segments, settings.bells.sound));
+    if (plan.kind === 'school' && settings.bells.on) rings.push(...bellsOf(plan.segments, settings.bells));
     for (const alarm of settings.alarms) {
       if (!alarm.enabled) continue;
       if (alarm.kind === 'clock') {

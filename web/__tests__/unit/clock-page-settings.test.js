@@ -212,6 +212,25 @@ describe('School Clock settings drawer', () => {
       expect(field('Bells').checked).toBe(true);
     });
 
+    it('Bell when an Assembly ends: an off-by-default switch, saved, and followed by Next rings today', () => {
+      // Wed 10/28/26, HS Even Day: Chapel 10:15–10:55, then Period 4 at 11:00.
+      open({ when: new Date(2026, 9, 28, 10, 30) });
+      const ringLines = () => [...drawer().querySelectorAll('#clock-settings-today li')].map((li) => li.textContent);
+      const assemblyEnds = () => field('Bell when an Assembly ends');
+      expect(assemblyEnds().getAttribute('role')).toBe('switch');
+      expect(assemblyEnds().checked).toBe(false);
+      expect(ringLines()[0]).toBe('11:00 AM · Bell · Period 4 starts · School bell');
+
+      toggle('Bell when an Assembly ends');
+
+      expect(saved(storage).bells).toEqual({ on: true, sound: 'schoolBell', assemblyEnds: true });
+      expect(assemblyEnds().checked).toBe(true);
+      expect(ringLines().slice(0, 2)).toEqual([
+        '10:55 AM · Bell · Chapel ends · School bell',
+        '11:00 AM · Bell · Period 4 starts · School bell',
+      ]);
+    });
+
     it('Volume: a slider showing its value, saved, and set on the player at once', () => {
       open({ settings: { volume: 0.7 } });
       const value = () => drawer().querySelector('.clock-field__value').textContent;
@@ -234,7 +253,7 @@ describe('School Clock settings drawer', () => {
       button('Preview Bell sound').click();
       button('Preview Timer sound').click();
 
-      expect(saved(storage).bells).toEqual({ on: true, sound: 'chime' });
+      expect(saved(storage).bells).toEqual({ on: true, sound: 'chime', assemblyEnds: false });
       expect(saved(storage).timerSound).toBe('buzzer');
       expect(player.played.map((p) => p.sound)).toEqual(['chime', 'buzzer']);
       expect(drawer().textContent).toContain('3:10 PM · Bell · Period 7 ends · Chime');

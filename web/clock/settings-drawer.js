@@ -46,6 +46,9 @@ export function createSettingsDrawer({ settings, update, play, testRing, behind,
 
   const bells = switchControl(`${ID}-bells`, 'Bells', 'Start and end of every Period and Break',
     (on) => update({ bells: { ...settings().bells, on } }));
+  const assemblyEnds = switchControl(`${ID}-assembly-ends`, 'Bell when an Assembly ends',
+    'Chapel, Convocation and Pep Rally. Never when one starts.',
+    (on) => update({ bells: { ...settings().bells, assemblyEnds: on } }));
   const volumeValue = el('span', { className: 'clock-field__value' });
   const volume = el('input', {
     type: 'range', className: 'clock-range', min: '0', max: '100', step: '5', 'aria-labelledby': `${ID}-volume-name`,
@@ -55,6 +58,7 @@ export function createSettingsDrawer({ settings, update, play, testRing, behind,
   const timerSound = soundChoice('Timer sound', (sound) => update({ timerSound: sound }), play);
   const sound = drawerSection('sound', 'Sound', [
     bells.label,
+    assemblyEnds.label,
     el('label', { className: 'clock-field' }, [
       el('span', { className: 'clock-field__label' }, [el('span', { id: `${ID}-volume-name`, textContent: 'Volume' }), ' ', volumeValue]),
       volume,
@@ -110,6 +114,7 @@ export function createSettingsDrawer({ settings, update, play, testRing, behind,
     use24Hour.input.checked = s.use24Hour;
     use24Hour.hint.textContent = s.use24Hour ? 'Clock times show as 13:05.' : 'Clock times show as 1:05.';
     bells.input.checked = s.bells.on;
+    assemblyEnds.input.checked = s.bells.assemblyEnds === true;
     const percent = Math.round(s.volume * 100);
     volume.value = String(percent);
     volume.style.setProperty('--val', `${percent}%`);

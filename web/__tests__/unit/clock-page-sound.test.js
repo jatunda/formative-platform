@@ -358,7 +358,7 @@ describe('School Clock sound', () => {
       select.value = 'chime';
       select.dispatchEvent(new Event('change'));
 
-      expect(saved(storage).bells).toEqual({ on: true, sound: 'chime' });
+      expect(saved(storage).bells).toEqual({ on: true, sound: 'chime', assemblyEnds: false });
       expect(player.scheduled[0].sound).toBe('chime');
     });
   });

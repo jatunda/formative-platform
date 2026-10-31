@@ -39,6 +39,31 @@ describe('ringsInWindow: Bells', () => {
     expect(times(rings)).toEqual([wed(10, 10), wed(11, 0)]);
   });
 
+  it('with Assembly-end Bells on, rings when an Assembly ends but never when it starts', () => {
+    const settings = { ...BELLS_ONLY, bells: { ...BELLS_ONLY.bells, assemblyEnds: true } };
+    const rings = ringsInWindow(wed(10, 0), wed(11, 30), SCHOOL_YEARS, settings);
+    expect(times(rings)).toEqual([wed(10, 10), wed(10, 55), wed(11, 0)]);
+    expect(rings[1].ends.name).toBe('Chapel');
+    expect(rings[1].starts).toBe(null);
+  });
+
+  it('merges an Assembly\'s end into the Bell already there (Convocation 10:00–10:40, then Nutrition)', () => {
+    const nov11 = (h, m) => new Date(2026, 10, 11, h, m);
+    const on = { ...BELLS_ONLY, bells: { ...BELLS_ONLY.bells, assemblyEnds: true } };
+    const rings = ringsInWindow(nov11(9, 56), nov11(10, 50), SCHOOL_YEARS, on);
+    expect(times(rings)).toEqual([nov11(10, 40)]);
+    expect(rings[0].ends.name).toBe('Convocation');
+    expect(rings[0].starts.name).toBe('Nutrition');
+    // Off (the default): the same Bell, for Nutrition only.
+    const [off] = ringsInWindow(nov11(9, 56), nov11(10, 50), SCHOOL_YEARS, BELLS_ONLY);
+    expect(off.ends).toBe(null);
+  });
+
+  it('Assembly-end Bells ring nothing with Bells off', () => {
+    const settings = { bells: { on: false, sound: 'schoolBell', assemblyEnds: true }, alarms: [] };
+    expect(ringsInWindow(wed(10, 0), wed(11, 30), SCHOOL_YEARS, settings)).toEqual([]);
+  });
+
   it('follows the Division: MS Even Day has Period 4 before Chapel', () => {
     const rings = ringsInWindow(wed(10, 0), wed(11, 50), SCHOOL_YEARS, { ...BELLS_ONLY, division: 'MS' });
     expect(times(rings)).toEqual([wed(10, 10), wed(10, 15), wed(11, 40)]);

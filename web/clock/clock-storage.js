@@ -20,7 +20,7 @@ export const DEFAULT_SETTINGS = Object.freeze(/** @type {ClockSettings} */ ({
   division: null,
   use24Hour: false,
   periodLabels: {},
-  bells: { on: true, sound: 'schoolBell' },
+  bells: { on: true, sound: 'schoolBell', assemblyEnds: false },
   alarms: [],
   volume: 0.8,
   timerEndsAt: null,
@@ -94,7 +94,7 @@ function parseSettings(saved) {
     use24Hour: typeof s.use24Hour === 'boolean' ? s.use24Hour : d.use24Hour,
     periodLabels,
     bells: isObject(bells) && typeof bells.on === 'boolean' && isSound(bells.sound)
-      ? { on: bells.on, sound: bells.sound } : { ...d.bells },
+      ? { on: bells.on, sound: bells.sound, assemblyEnds: bells.assemblyEnds === true } : { ...d.bells },
     alarms: Array.isArray(s.alarms) ? s.alarms.filter(isAlarm) : [],
     volume: isFiniteNumber(s.volume) && s.volume >= 0 && s.volume <= 1 ? s.volume : d.volume,
     timerEndsAt,

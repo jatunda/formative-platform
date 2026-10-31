@@ -12,8 +12,9 @@
  */
 
 /**
- * The built-in Bells, turned on or off as a whole.
- * @typedef {{ on: boolean, sound: SoundName }} BellsSettings
+ * The built-in Bells, turned on or off as a whole. `assemblyEnds`: they also
+ * ring when an Assembly ends (never when one starts); off when missing.
+ * @typedef {{ on: boolean, sound: SoundName, assemblyEnds?: boolean }} BellsSettings
  */
 
 /**

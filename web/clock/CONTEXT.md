@@ -76,7 +76,7 @@ An Alarm that rings at a fixed time of day, either once or on every School Day.
 An Alarm that rings at a point within a Period: counted from its start ("at minute 40"), back from its end ("5 minutes before the end"), or at its halfway point. Applies only to Periods (never Breaks or Assemblies), optionally narrowed to chosen Periods and chosen Bell Schedules (e.g. Block Days only). Repeats on every Period it applies to.
 
 **Bells**:
-The built-in sounds at the start and end of every Period and Break (not Assemblies), turned on or off as a whole. Where one Segment ends exactly as the next begins, they ring once. Unlike a Period Alarm, Bells also cover Breaks.
+The built-in sounds at the start and end of every Period and Break, turned on or off as a whole. An Assembly gets no Bells unless the teacher turns on the option to ring at an Assembly's end (never its start). Where one Segment ends exactly as the next begins, they ring once. Unlike a Period Alarm, Bells also cover Breaks.
 
 **Theme**:
 A look for the clock: a palette plus a font, sometimes with a decoration. Every palette has its own (native) light or dark version, which the Theme shows unless the teacher flips it to the other one. A teacher can swap a Theme's font or palette for another from the pre-checked lists. Themes are named only by what they look like ("Navy and orange, bold condensed"), never by who they're for.

@@ -40,7 +40,7 @@ describe('clock settings store', () => {
     const storage = createFakeStorage();
     const settings = {
       division: 'MS', use24Hour: true, periodLabels: { 'Period 3': 'AP CSA', Seminar: 'Advisory' },
-      bells: { on: false, sound: 'chime' }, alarms: [clockAlarm, onceAlarm, periodAlarm],
+      bells: { on: false, sound: 'chime', assemblyEnds: true }, alarms: [clockAlarm, onceAlarm, periodAlarm],
       volume: 0.25, timerEndsAt: 1793000000000, timerPausedMs: null, timerTotalMs: 300000, timerSound: 'buzzer',
       recentDurations: [450000, 900000],
       showSeconds: false, dayStrip: false, theme: 'bloom', fontSwap: 'mono', paletteSwap: 'team',
@@ -145,6 +145,17 @@ describe('clock settings store', () => {
   it('defaults Period Labels and Alarms that are not the right container', () => {
     const settings = storeHolding({ division: 'HS', periodLabels: ['AP CSA'], alarms: { a: clockAlarm } }).load();
     expect(settings).toEqual({ ...DEFAULT_SETTINGS, division: 'HS' });
+  });
+
+  it('starts with Bells not ringing at the end of Assemblies', () => {
+    expect(DEFAULT_SETTINGS.bells.assemblyEnds).toBe(false);
+  });
+
+  it.each([
+    ['missing (an earlier save)', { on: false, sound: 'chime' }],
+    ['not a boolean', { on: false, sound: 'chime', assemblyEnds: 'yes' }],
+  ])('keeps the Bells but turns Assembly-end Bells off when that field is %s', (_, bells) => {
+    expect(storeHolding({ bells }).load().bells).toEqual({ on: false, sound: 'chime', assemblyEnds: false });
   });
 
   it('defaults Bells that are missing a field', () => {
