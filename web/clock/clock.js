@@ -361,7 +361,7 @@ export function initClockApp({
   const lookSheet = createLookSheet({
     settings: () => settings,
     update: updateSettings,
-    behind: () => behindAll(lookSheet.elements),
+    behind: () => behindAll(lookSheet.elements, ringCard.elements),
     onChange: (open) => {
       lookControl.setAttribute('aria-expanded', String(open));
       mainScreen.classList.toggle('has-sheet', open);

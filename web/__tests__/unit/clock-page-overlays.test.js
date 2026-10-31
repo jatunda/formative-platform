@@ -122,6 +122,31 @@ describe('School Clock overlays', () => {
       expect(document.activeElement).toBe(testRing);
     });
 
+    it('shows over the Look sheet, where Dismiss can be reached and works', () => {
+      open({ when: at(11, 9, 58), settings: { alarms: [wrapUp] } });
+      button('Look').click();
+      advance(3 * SEC);
+      expect(ringCard().closest('[inert]')).toBeNull();
+      expect(ringCard().contains(document.activeElement)).toBe(true);
+      button('Dismiss', ringCard()).click();
+      expect(visible(ringCard())).toBe(false);
+      expect(player.dismissals).toBe(1);
+    });
+
+    it('with the Look sheet open, a first Escape closes the sheet and a second dismisses the ring', () => {
+      open({ when: at(11, 9, 58), settings: { alarms: [wrapUp] } });
+      button('Look').click();
+      advance(3 * SEC);
+      const look = () => mount().querySelector('[role="dialog"][aria-labelledby="clock-look-title"]');
+      expect(visible(look())).toBe(true);
+      keyDown('Escape');
+      expect(visible(look())).toBe(false);
+      expect(visible(ringCard())).toBe(true);
+      keyDown('Escape');
+      expect(visible(ringCard())).toBe(false);
+      expect(player.dismissals).toBe(1);
+    });
+
     it('takes focus when it shows, and gives it back when dismissed', () => {
       open({ when: at(11, 9, 59), settings: { alarms: [wrapUp] } });
       byId('outside').focus();
