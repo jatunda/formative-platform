@@ -302,7 +302,7 @@ describe('School Clock page', () => {
 
   describe('next rings today', () => {
     const ringLines = () =>
-      [...document.querySelectorAll('#clockApp li')].map((li) => li.textContent);
+      [...document.querySelectorAll('#clock-settings-today li')].map((li) => li.textContent);
 
     it('lists every upcoming ring of the saved Bells and Alarms with its time, source and sound', () => {
       const settings = {

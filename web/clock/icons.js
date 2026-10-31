@@ -18,6 +18,8 @@ const PATHS = {
   plus: '<path d="M12 5v14M5 12h14"/>',
   play: '<path d="M8 5l11 7-11 7z"/>',
   clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+  trash: '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>',
 };
 
 /**

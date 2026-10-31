@@ -22,6 +22,7 @@ import { readoutParts, readoutText, readoutValue } from './readouts.js';
 import { createReadoutsView } from './readouts-view.js';
 import { SCHOOL_YEARS } from './school-years.js';
 import { createWakeLockKeeper, detectCapabilities } from './screen.js';
+import { createAlarmEditor } from './alarm-editor.js';
 import { createSettingsDrawer } from './settings-drawer.js';
 import { BELL_SECONDS, ALARM_MAX_SECONDS, SOUND_NAMES, createSoundPlayer } from './sound.js';
 import { cancelTimer, settleTimer, timerText } from './timer.js';
@@ -392,6 +393,10 @@ export function initClockApp({
     },
     behind: () => [...mount.children].filter((node) => !drawer.elements.includes(node)),
     onChange: (open) => settingsControl.setAttribute('aria-expanded', String(open)),
+    alarms: createAlarmEditor({
+      settings: () => settings, update: updateSettings, play: (sound) => soundPlayer.play(sound),
+      now: () => new Date(clock.now()), schoolYears,
+    }),
   });
   /** @param {HTMLElement} from @param {{ atDivision?: boolean }} [options] */
   function openSettings(from, options) {
