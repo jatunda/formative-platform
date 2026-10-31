@@ -125,16 +125,8 @@ function parseSettings(saved) {
  */
 export function createSettingsStore(storage) {
   const adapter = createStorageAdapter(SETTINGS_KEY, storage, { quiet: true });
-  const writer = createStorageAdapter(SETTINGS_KEY, storage);
   return {
     load: () => parseSettings(adapter.load()),
-    save: (settings) => {
-      try {
-        writer.save(settings);
-        return true;
-      } catch {
-        return false;
-      }
-    },
+    save: (settings) => adapter.save(settings),
   };
 }

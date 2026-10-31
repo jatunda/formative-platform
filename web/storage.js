@@ -11,10 +11,10 @@
  * @param {{ quiet?: boolean }} [options] - `quiet`: never throw. A storage
  *   that can't be read loads as nothing saved, and a value that can't be
  *   written just isn't kept (the caller carries on with it in memory).
- * @returns {{load: () => any, save: (value: any) => void}}
+ * @returns {{load: () => any, save: (value: any) => boolean}}
  *   `load` returns null when nothing is saved or the data is corrupt; `save`
- *   writes the value as JSON. Otherwise storage errors (blocked, quota)
- *   propagate to the caller.
+ *   writes the value as JSON and says whether it was kept (false only when
+ *   quiet). Otherwise storage errors (blocked, quota) propagate to the caller.
  */
 export function createStorageAdapter(key, storage = localStorage, { quiet = false } = {}) {
   /** @template T @param {() => T} action @param {T} fallback @returns {T} */
@@ -37,7 +37,10 @@ export function createStorageAdapter(key, storage = localStorage, { quiet = fals
       }
     },
     save(value) {
-      attempt(() => storage.setItem(key, JSON.stringify(value)), undefined);
+      return attempt(() => {
+        storage.setItem(key, JSON.stringify(value));
+        return true;
+      }, false);
     },
   };
 }

@@ -40,6 +40,11 @@ describe('createStorageAdapter', () => {
   it('when quiet, an unreadable storage loads as nothing saved and a failed save is dropped', () => {
     const adapter = createStorageAdapter('k', blocked, { quiet: true });
     expect(adapter.load()).toBeNull();
-    expect(() => adapter.save({})).not.toThrow();
+    expect(adapter.save({})).toBe(false);
+  });
+
+  it('save says whether the value was kept', () => {
+    expect(createStorageAdapter('k', sessionStorage, { quiet: true }).save({ a: 1 })).toBe(true);
+    expect(createStorageAdapter('k', sessionStorage).save({ a: 1 })).toBe(true);
   });
 });
