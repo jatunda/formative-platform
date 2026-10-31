@@ -262,7 +262,7 @@ describe('School Clock settings drawer', () => {
       button('Settings').click();
       button('Test ring').click();
       expect(player.played).toEqual([{ sound: 'schoolBell', repeat: false }]);
-      expect(mount().querySelector('[aria-label="Ringing"]').hidden).toBe(false);
+      expect(mount().querySelector('[role="alertdialog"]').hidden).toBe(false);
       advance(4 * SEC);
     });
 

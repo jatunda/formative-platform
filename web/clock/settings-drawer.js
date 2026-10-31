@@ -15,8 +15,8 @@ import { createModal } from './modal.js';
 import { SOUNDS, SOUND_NAMES } from './sound.js';
 
 const ID = 'clock-settings';
-const DIVISIONS = [['MS', 'Middle School'], ['HS', 'High School']];
-const FEEDBACK_HREF = `mailto:erich@villagechristian.org?subject=${encodeURIComponent('Clock feedback')}`;
+export const DIVISIONS = [['MS', 'Middle School'], ['HS', 'High School']];
+export const FEEDBACK_HREF = `mailto:erich@villagechristian.org?subject=${encodeURIComponent('Clock feedback')}`;
 
 /**
  * One section of the drawer: an uppercase heading that names it, then its

@@ -13,7 +13,7 @@ const visibleButtons = (root) => [...root.querySelectorAll('button')].filter((b)
 const timerButton = (name) => visibleButtons(timerSection()).find((b) => b.textContent === name);
 const quickPicks = () =>
   visibleButtons(timerSection().querySelector('[aria-label="Quick picks"]')).map((b) => b.textContent);
-const ringing = () => mount().querySelector('[aria-label="Ringing"]');
+const ringing = () => mount().querySelector('[role="alertdialog"]');
 const saved = (storage) => JSON.parse(storage.getItem(SETTINGS_KEY));
 
 // Tue 2026-10-27, 10:40, in Period 3 of an All Day.
@@ -134,7 +134,7 @@ describe('School Clock classroom timer', () => {
       timerButton('1 min').click();
       advance(MIN + SEC);
       expect(ringing().hidden).toBe(false);
-      expect(ringing().textContent).toContain('Ringing: Timer');
+      expect(ringing().textContent).toContain('Ringing · Timer');
       expect(saved(storage)).toMatchObject({ timerEndsAt: null });
       expect(timerText()).not.toContain('left');
 
@@ -195,7 +195,7 @@ describe('School Clock classroom timer', () => {
 
       timerButton('Resume').click();
       advance(2 * MIN + SEC);
-      expect(ringing().textContent).toContain('Ringing: Timer');
+      expect(ringing().textContent).toContain('Ringing · Timer');
       expect(saved(storage)).toMatchObject({ timerEndsAt: null, timerPausedMs: null });
 
       open();
@@ -213,7 +213,7 @@ describe('School Clock classroom timer', () => {
       expect(ringing().hidden).toBe(true);
       timerButton('1 min').click();
       advance(MIN + SEC);
-      expect(ringing().textContent).toContain('Ringing: Timer');
+      expect(ringing().textContent).toContain('Ringing · Timer');
       expect(saved(storage).timerEndsAt).toBe(START + 5 * MIN);
 
       t = START;

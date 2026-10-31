@@ -139,7 +139,7 @@ describe('School Clock display preferences', () => {
     const small = (text) => ({ text, big: false });
     const tapReadout = (i) => mount().querySelectorAll('button.clock-readout__face')[i].click();
     const savedLayouts = () => [tabStorage, storage].map((area) => area.getItem(LAYOUT_KEY));
-    const ringing = () => mount().querySelector('[aria-label="Ringing"]');
+    const ringing = () => mount().querySelector('[role="alertdialog"]');
 
     /** In Period 3, a layout of time left (big) and the current time. */
     function openWithTwoReadouts() {

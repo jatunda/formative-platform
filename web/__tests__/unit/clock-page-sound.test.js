@@ -25,7 +25,7 @@ const button = (name) => [...mount().querySelectorAll('button')]
 const openSettings = () => button('Settings').click();
 const checkbox = (name) => field(name);
 const saved = (storage) => JSON.parse(storage.getItem(SETTINGS_KEY));
-const ringing = () => mount().querySelector('[aria-label="Ringing"]');
+const ringing = () => mount().querySelector('[role="alertdialog"]');
 
 // Tue 2026-10-27 is an All Day: Period 3 ends 11:15, Period 4 runs 11:20–12:05.
 const at = (h, m, s = 0) => new Date(2026, 9, 27, h, m, s);
@@ -198,7 +198,7 @@ describe('School Clock sound', () => {
 
       expect(mount().classList.contains('clock-ringing--flash')).toBe(true);
       expect(ringing().hidden).toBe(false);
-      expect(ringing().textContent).toContain('Bell · Period 3 ends');
+      expect(ringing().textContent).toContain('Period 3 ends');
 
       real.advance(3 * SEC);
       expect(mount().classList.contains('clock-ringing')).toBe(false);
@@ -299,7 +299,7 @@ describe('School Clock sound', () => {
         real.jump(3 * SEC);
         real.advance(SEC);
         expect(ringing().hidden).toBe(false);
-        expect(ringing().textContent).toContain('Bell · Period 3 ends');
+        expect(ringing().textContent).toContain('Period 3 ends');
       });
 
       it('drops a missed ring from the sound schedule, even when the audio clock slept too', () => {

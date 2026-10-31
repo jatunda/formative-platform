@@ -203,7 +203,7 @@ describe('School Clock bar', () => {
       open({ when: at(10, 39) });
       expect(bar()).toBeNull();
       advance(6 * MIN);
-      mount().querySelector('[aria-label="Ringing"] button').click();
+      mount().querySelector('[role="alertdialog"] button').click();
       expect(bar()).not.toBeNull();
     });
   });
