@@ -227,7 +227,6 @@ export function initClockApp({
     render(new Date(clock.now()));
   }
 
-
   // First visit: ask the Division once, in a dialog that takes focus.
   const divisionPrompt = createDivisionPrompt({
     divisions: DIVISIONS, feedbackHref: FEEDBACK_HREF, onChoose: (division) => updateSettings({ division }),
@@ -287,21 +286,35 @@ export function initClockApp({
   document.addEventListener('keydown', onKeyDown);
 
   // The top bar's controls: quiet text buttons with icons. Timer opens the
-  // picker (timer-picker.js); Settings opens the drawer (settings-drawer.js);
-  // Look (21) slots in between Readouts and Settings.
+  // picker (timer-picker.js), Look the sheet (look-sheet.js) and Settings the
+  // drawer (settings-drawer.js).
   /** @param {string} label @param {Parameters<typeof icon>[0]} iconName @param {object} props */
   const topControl = (label, iconName, props) => {
     const text = el('span', { className: 'clock-control__label', textContent: label });
     const button = el('button', { type: 'button', className: 'clock-control', ...props }, [icon(iconName), text]);
     return Object.assign(button, { setLabel: (to) => { text.textContent = to; } });
   };
+  /**
+   * A top-bar control that opens a dialog, handing it the control to return focus to.
+   * @param {string} label @param {Parameters<typeof icon>[0]} iconName
+   * @param {{ dialog: HTMLElement, open: (from: HTMLElement) => void }} panel
+   */
+  const dialogControl = (label, iconName, panel) => {
+    const control = topControl(label, iconName, {
+      'aria-controls': panel.dialog.id, 'aria-expanded': 'false', 'aria-haspopup': 'dialog',
+      onclick: () => panel.open(control),
+    });
+    return control;
+  };
+  /** The page's top-level nodes outside the given panels' (what a panel makes inert). @param {Node[][]} panels */
+  const behindAll = (...panels) => [...mount.children].filter((node) => !panels.some((elements) => elements.includes(node)));
   const bellsControl = topControl('Bells', 'bell', {
     onclick: () => updateSettings({ bells: { ...settings.bells, on: !settings.bells.on } }),
   });
   const readoutsControl = topControl('Readouts', 'readouts', { onclick: () => setEditing(!editing) });
   readoutsControl.classList.add('clock-control--fills');
   const divisionChip = el('button', {
-    type: 'button', className: 'clock-chip', onclick: () => openSettings(divisionChip, { atDivision: true }),
+    type: 'button', className: 'clock-chip', onclick: () => drawer.open(divisionChip, { atDivision: true }),
   });
 
   // Turning sound on (browsers need one click after every load): in the
@@ -323,14 +336,11 @@ export function initClockApp({
     settings: () => settings,
     now: () => clock.now(),
     update: updateSettings,
-    behind: () => [...mount.children].filter((node) => !timerPicker.elements.includes(node) && !ringCard.elements.includes(node)),
+    behind: () => behindAll(timerPicker.elements, ringCard.elements),
     onChange: (open) => timerControl.setAttribute('aria-expanded', String(open)),
     onStarted: () => timerRing.focus('pause'),
   });
-  const timerControl = topControl('Timer', 'timer', {
-    'aria-controls': timerPicker.dialog.id, 'aria-expanded': 'false', 'aria-haspopup': 'dialog',
-    onclick: () => timerPicker.open(timerControl),
-  });
+  const timerControl = dialogControl('Timer', 'timer', timerPicker);
 
   // The Settings drawer (what the clock does), over the rest of the page.
   const drawer = createSettingsDrawer({
@@ -342,37 +352,27 @@ export function initClockApp({
       startRinging(TEST_RING_WORDS, false);
     },
     // A ring shows over the drawer too, so it can be seen, heard and dismissed.
-    behind: () => [...mount.children].filter((node) => !drawer.elements.includes(node) && !ringCard.elements.includes(node)),
+    behind: () => behindAll(drawer.elements, ringCard.elements),
     onChange: (open) => settingsControl.setAttribute('aria-expanded', String(open)),
     alarms: createAlarmEditor({
       settings: () => settings, update: updateSettings, play: (sound) => soundPlayer.play(sound),
       now: () => new Date(clock.now()), schoolYears,
     }),
   });
-  /** @param {HTMLElement} from @param {{ atDivision?: boolean }} [options] */
-  function openSettings(from, options) {
-    drawer.open(from, options);
-  }
   // The Look sheet (how it looks), beside the clock so it previews live.
   const lookSheet = createLookSheet({
     settings: () => settings,
     update: updateSettings,
-    behind: () => [...mount.children].filter((node) => !lookSheet.elements.includes(node)),
+    behind: () => behindAll(lookSheet.elements),
     onChange: (open) => {
       lookControl.setAttribute('aria-expanded', String(open));
       mainScreen.classList.toggle('has-sheet', open);
       render(new Date(clock.now()));
     },
   });
-  const lookControl = topControl('Look', 'look', {
-    'aria-controls': lookSheet.dialog.id, 'aria-expanded': 'false', 'aria-haspopup': 'dialog',
-    onclick: () => lookSheet.open(lookControl),
-  });
+  const lookControl = dialogControl('Look', 'look', lookSheet);
   lookControl.classList.add('clock-control--fills');
-  const settingsControl = topControl('Settings', 'gear', {
-    'aria-controls': drawer.dialog.id, 'aria-expanded': 'false', 'aria-haspopup': 'dialog',
-    onclick: () => openSettings(settingsControl),
-  });
+  const settingsControl = dialogControl('Settings', 'gear', drawer);
 
   // Fullscreen for projecting: the screen is kept awake for as long as it
   // lasts (however it ends), where the browser allows a wake lock.
@@ -511,7 +511,7 @@ export function initClockApp({
       textContent: `Simulated time · ${formatShortDate(now)}, ${text.now(now)} · this tab only`,
     }));
     stageText.show(now, moment, settings);
-    renderMini(now, moment, renderReadouts(now, moment));
+    renderMini(now, moment, renderReadouts(now, moment, text));
     renderBar(now, moment, text);
     drawer.showRings(chosen ? nextRingLines(now, schoolYears, settings, text) : []);
   }
@@ -533,11 +533,11 @@ export function initClockApp({
    * Show the Readouts for `moment`: the tab's layout (with the timer in the
    * big spot while it shows), or just the time before a Division is chosen
    * or on a date the clock knows nothing about.
-   * @param {Date} now @param {import('./clock-model.js').Moment | null} moment
+   * @param {Date} now @param {import('./clock-model.js').Moment | null} moment @param {ReturnType<typeof textFor>} text
    * @returns {import('./mini-content.js').Parts} the big Readout (the layout's first, under a timer too)
    */
-  function renderReadouts(now, moment) {
-    const options = textFor(settings).readout;
+  function renderReadouts(now, moment, text) {
+    const options = text.readout;
     const timeOnly = !moment || moment.state === 'unknown';
     readoutsControl.hidden = timeOnly;
     if (timeOnly) {
@@ -562,7 +562,7 @@ export function initClockApp({
     // Beside the ring, the old main Readout's time left names its Segment
     // (the heading steps aside for the ring).
     if (withTimer && moment.state === 'segment' && parts[0].caption === 'left') {
-      parts[0] = { ...parts[0], caption: `left in ${textFor(settings).name(moment.current)}` };
+      parts[0] = { ...parts[0], caption: `left in ${text.name(moment.current)}` };
     }
     readoutsView.show(
       { count: values.length, cyclable: true, timer: withTimer, editing, canAdd: canAddReadout(layout) },
