@@ -153,11 +153,11 @@ describe('School Clock settings drawer', () => {
   });
 
   describe('its sections', () => {
-    it('are, in order: Division, Time, Sound, Period Labels, Alarms, Next rings today and About, each headed and named', () => {
+    it('are, in order: Division, Time, Sound, Period Labels, Alarms, Next rings today, About and (until the Look sheet, ticket 21) Bottom bar, each headed and named', () => {
       open();
       const sections = [...drawer().querySelectorAll('section')];
       expect(sections.map((s) => accessibleName(s))).toEqual(
-        ['Division', 'Time', 'Sound', 'Period Labels', 'Alarms', 'Next rings today', 'About']);
+        ['Division', 'Time', 'Sound', 'Period Labels', 'Alarms', 'Next rings today', 'About', 'Bottom bar']);
       for (const section of sections) {
         expect(section.querySelector('h3').textContent).toBe(accessibleName(section));
         expect(section.id).toMatch(/^clock-settings-/);
@@ -262,7 +262,7 @@ describe('School Clock settings drawer', () => {
       button('Settings').click();
       button('Test ring').click();
       expect(player.played).toEqual([{ sound: 'schoolBell', repeat: false }]);
-      expect(mount().querySelector('[aria-label="Ringing"]').hidden).toBe(false);
+      expect(mount().querySelector('[role="alertdialog"]').hidden).toBe(false);
       advance(4 * SEC);
     });
 

@@ -109,7 +109,7 @@ export function createAlarmEditor({ settings, update, play, now, schoolYears }) 
   }, [icon('plus'), 'Period Alarm']);
   const toastText = el('span', { textContent: 'Alarm deleted' });
   const undo = el('button', { type: 'button', className: 'clock-btn clock-btn--small', textContent: 'Undo' });
-  const toast = el('div', { className: 'clock-alarm-toast', role: 'status', hidden: true }, [icon('check'), toastText, undo]);
+  const toast = el('div', { className: 'clock-toast clock-alarm-toast', role: 'status', hidden: true }, [icon('check'), toastText, undo]);
   const section = drawerSection('alarms', 'Alarms', [
     list, newSlot, el('div', { className: 'clock-form-actions clock-form-actions--start' }, [addClock, addPeriod]), toast,
   ]);

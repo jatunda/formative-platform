@@ -4,9 +4,9 @@
    look by setting data-mode / data-palette / data-font / data-deco on <html>;
    nothing here names a colour or a face.
 
-   The plain panels and prompts at the end (timer, settings, first visit,
-   sound, ringing) only get what keeps them usable on the themed page; tickets
-   18, 19 and 22 design them. The bar's place (.clock-bar-slot) is ticket 20's. */
+   The plain timer panel only gets what keeps it usable on the themed page;
+   ticket 22 designs it. The overlays (ticket 18) have their own section at
+   the end, with their own breakpoints. */
 
 *,
 *::before,
@@ -528,6 +528,223 @@ button.clock-readout__face {
   flex: none;
 }
 
+/* ---------- the bar: whole day or just this Segment ---------- */
+
+.clock-bar {
+  position: relative;
+  min-width: 0;
+}
+
+.clock-bar__heading {
+  margin-bottom: 0.3em;
+  font-size: var(--type-strip-small);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.clock-bar--next .clock-bar__heading::before {
+  content: "\2192  ";
+}
+
+/* Room above the track for the Now marker, and below it for the times. */
+.clock-bar__day {
+  position: relative;
+  padding-top: 12px;
+  padding-bottom: calc(var(--type-strip-small) * 1.6);
+}
+
+.clock-bar__track {
+  position: relative;
+  height: max(36px, 7vh);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.clock-bar--segment .clock-bar__track {
+  height: max(32px, 5.5vh);
+}
+
+.clock-bar__seg {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  container-type: inline-size;
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-size: var(--type-strip);
+  line-height: 1.1;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.clock-bar__text {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  height: 100%;
+  padding: 0 0.6em;
+}
+
+.clock-bar--segment .clock-bar__text {
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.5em;
+}
+
+.clock-bar--segment .clock-bar__label::before {
+  content: "\00B7  ";
+}
+
+/* Breaks are hatched with a dashed edge, Assemblies dotted: pattern, not colour. */
+.clock-bar__seg[data-kind="break"] {
+  background: repeating-linear-gradient(-45deg, var(--bg) 0 6px, var(--hatch) 6px 12px);
+  border-style: dashed;
+}
+
+.clock-bar__seg[data-kind="assembly"] {
+  background: var(--bg);
+  border-style: dotted;
+  border-width: 2.5px;
+}
+
+/* On whole day a Passing Period is the gap between two blocks: no box of
+   its own and no time (the blocks either side show it). On just this
+   Segment it's a bordered block of its own. */
+.clock-bar--day .clock-bar__seg[data-kind="passing"] {
+  border: 0;
+  background: transparent;
+}
+
+.clock-bar--day .clock-bar__seg[data-kind="passing"] .clock-bar__time {
+  display: none;
+}
+
+.clock-bar--segment .clock-bar__seg[data-kind="passing"] {
+  background: var(--bg);
+}
+
+.clock-bar__name {
+  font-weight: 700;
+}
+
+.clock-bar__label {
+  font-size: 0.85em;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Full names where they fit ("Period 3", "Nutrition"), short ones where they
+   don't ("P3", "Nutr."), smaller still in a sliver, and none in a gap. The
+   short form is never cut further: "Nutrition" never reads "Nut". */
+.clock-bar__short {
+  display: none;
+}
+
+@container (max-width: 6.5em) {
+  .clock-bar__long {
+    display: none;
+  }
+
+  .clock-bar__short {
+    display: inline;
+  }
+}
+
+@container (max-width: 3.6em) {
+  .clock-bar__text {
+    padding: 0 0.2em;
+  }
+
+  .clock-bar__name {
+    font-size: 0.8em;
+  }
+
+  .clock-bar__label {
+    display: none;
+  }
+}
+
+@container (max-width: 2em) {
+  .clock-bar__name {
+    visibility: hidden;
+  }
+}
+
+.clock-bar__time,
+.clock-bar__end {
+  position: absolute;
+  font-size: var(--type-strip-small);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.clock-bar__time {
+  top: calc(100% + 0.5vh);
+  left: 0;
+}
+
+.clock-bar__end {
+  right: 0;
+  bottom: 0;
+}
+
+.clock-bar__seg[data-state="past"] {
+  background: transparent;
+  border-color: var(--line-soft);
+  color: var(--muted);
+}
+
+.clock-bar__seg[data-state="past"][data-kind="break"] {
+  border-color: var(--line);
+}
+
+/* The current block (or the Passing Period's gap) fills left to right: a
+   soft wash over the elapsed part and a solid accent rule along the bottom
+   on its track. During a Passing Period the next block is highlighted. */
+.clock-bar__seg[data-state="now"],
+.clock-bar__seg[data-state="next"] {
+  border: 3px solid var(--accent);
+}
+
+.clock-bar--day .clock-bar__seg[data-kind="passing"][data-state="now"] {
+  border: 0;
+}
+
+.clock-bar__fill {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background:
+    linear-gradient(var(--accent), var(--accent)) left bottom / var(--done, 0%) 5px no-repeat,
+    linear-gradient(var(--track), var(--track)) left bottom / 100% 5px no-repeat,
+    linear-gradient(to right, var(--accent-soft) var(--done, 0%), transparent var(--done, 0%));
+}
+
+/* The Now marker: a thin notch above the track, so it never crosses text. */
+.clock-bar__now {
+  position: absolute;
+  top: 0;
+  width: 0;
+  height: 0;
+  margin-left: -7px;
+  border: 7px solid transparent;
+  border-bottom: 0;
+  border-top: 10px solid var(--fg);
+}
+
+/* The agenda list is the phone's whole day (see the narrow breakpoint). */
+.clock-agenda {
+  display: none;
+}
+
 /* ======================= plain panels and prompts ======================= */
 
 /* The timer's controls, opened from the top bar: a plain panel on the right
@@ -565,10 +782,7 @@ button.clock-readout__face {
   border-radius: var(--radius-sm);
 }
 
-.clock-panel button,
-.clock-prompt button,
-.clock-sound-prompt button,
-.clock-ringing-card button {
+.clock-panel button {
   min-height: var(--tap);
   padding: 0 var(--s4);
   border: 1.5px solid var(--line);
@@ -579,84 +793,7 @@ button.clock-readout__face {
   cursor: pointer;
 }
 
-/* First visit: ask the Division (ticket 18 designs it). */
-.clock-prompt {
-  position: fixed;
-  z-index: 20;
-  inset: 0;
-  display: flex;
-  flex-wrap: wrap;
-  align-content: center;
-  justify-content: center;
-  gap: var(--s4);
-  padding: var(--s5);
-  background: color-mix(in srgb, var(--bg) 94%, transparent);
-  font-size: var(--type-ui-2xl);
-  text-align: center;
-}
-
-.clock-prompt p {
-  width: 100%;
-}
-
-/* What's transient sits bottom centre, over the bar, never over the digits. */
-.clock-sound-prompt,
-.clock-ringing-card {
-  position: fixed;
-  z-index: 9;
-  left: 50%;
-  bottom: calc(var(--edge-y) + var(--s2));
-  transform: translateX(-50%);
-  display: flex;
-  align-items: center;
-  gap: var(--s3);
-  max-width: calc(100vw - 32px);
-  padding: var(--s2) var(--s2) var(--s2) var(--s4);
-  border: 1.5px solid var(--accent);
-  border-radius: var(--radius);
-  background: var(--surface);
-  color: var(--fg);
-  box-shadow: var(--shadow);
-}
-
-.clock-sound-prompt:has(> button[hidden]) {
-  padding-right: var(--s4);
-}
-
-/* Ringing: the screen flashes once a second, well under the 3 flashes a
-   second WCAG 2.3.1 allows. Each flash also draws a thick frame, so colour
-   isn't the only signal; the ringing card says what rang. */
-.clock-ringing--flash {
-  animation: clock-flash 1s step-end infinite; /* --flash-period */
-}
-
-@keyframes clock-flash {
-  0% {
-    background: var(--ring-wash);
-    outline: 14px solid var(--ring);
-    outline-offset: -14px;
-  }
-  50% {
-    background: transparent;
-    outline: none;
-  }
-}
-
-/* Reduced motion: the same frame and wash, held steady. */
-.clock-ringing--steady {
-  background: var(--ring-wash);
-  outline: 14px solid var(--ring);
-  outline-offset: -14px;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .clock-ringing--flash {
-    animation: none;
-    background: var(--ring-wash);
-    outline: 14px solid var(--ring);
-    outline-offset: -14px;
-  }
-}
+/* The overlays (first visit, sound, ringing, toasts) are at the end. */
 
 /* ======================= breakpoints ======================= */
 
@@ -754,12 +891,6 @@ button.clock-readout__face {
 
   .clock-readout--small .clock-readout__caption {
     font-size: 10px;
-  }
-
-  .clock-sound-prompt,
-  .clock-ringing-card {
-    bottom: 8px;
-    padding: 4px 4px 4px 12px;
   }
 
   /* Editing: the Readouts sit in one row, everything else steps away. */
@@ -875,11 +1006,539 @@ button.clock-readout__face {
     display: none;
   }
 
+  /* Whole day becomes an agenda list that scrolls on its own; the window
+     button sits under it on the right. Just this Segment stays the bar. */
+  .clock-screen:has(.clock-bar--day:not([hidden])) {
+    grid-template-rows: auto auto minmax(0, 1fr);
+  }
+
+  .clock-screen.is-simulated:has(.clock-bar--day:not([hidden])) {
+    grid-template-rows: auto auto auto minmax(0, 1fr);
+  }
+
+  .clock-screen:has(.clock-bar--day:not([hidden])) .clock-stage {
+    justify-content: flex-start;
+  }
+
+  .clock-bottom {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    min-height: 0;
+  }
+
+  .clock-bar-slot,
+  .clock-bar--day {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .clock-bar__heading {
+    margin-bottom: 6px;
+    font-size: 12px;
+  }
+
+  .clock-bar--day .clock-bar__day {
+    display: none;
+  }
+
+  .clock-agenda {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    overflow: auto;
+    border-top: 1px solid var(--line-soft);
+    list-style: none;
+  }
+
+  .clock-agenda__row {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 14px;
+    min-height: 36px;
+    padding: 0 8px;
+    border-bottom: 1px solid var(--line-soft);
+    font-size: 16px;
+  }
+
+  .clock-agenda__time {
+    flex: none;
+    width: 4.6em;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums lining-nums;
+  }
+
+  .clock-agenda__row[data-state="past"] {
+    color: var(--muted);
+  }
+
+  .clock-agenda__row[data-state="now"],
+  .clock-agenda__row[data-state="next"] {
+    border: 3px solid var(--accent);
+    border-radius: var(--radius-sm);
+    font-weight: 700;
+  }
+
+  .clock-agenda__row[data-state="now"] {
+    background: var(--accent-soft);
+  }
+
+  /* Breaks and Assemblies: italic plus a word, not just colour. */
+  .clock-agenda__row[data-kind="break"] .clock-agenda__name,
+  .clock-agenda__row[data-kind="assembly"] .clock-agenda__name {
+    font-style: italic;
+  }
+
+  .clock-agenda__kind {
+    font-style: normal;
+    color: var(--muted);
+  }
+
+  .clock-agenda__pill {
+    margin-left: auto;
+    padding: 1px 8px;
+    border-radius: 99px;
+    background: var(--fg);
+    color: var(--bg);
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .clock-agenda__row[data-state="next"] .clock-agenda__pill {
+    background: transparent;
+    color: var(--accent-text);
+    border: 1.5px solid var(--accent);
+  }
+
+  .clock-corner {
+    justify-content: flex-end;
+  }
+}
+
+/* ======================= overlays ======================= */
+
+/* What appears on top of the main screen (ticket 18; DESIGN.md, Overlays).
+   Everything transient (the ring card, the sound prompt, toasts) sits bottom
+   centre, over the bar, never over the digits: the top belongs to the
+   controls. A ring shows over everything, the Settings drawer included. */
+
+.clock-overlay-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s2);
+  min-height: var(--tap);
+  padding: 0 var(--s4);
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--fg);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.clock-overlay-btn:hover {
+  background: var(--surface-2);
+}
+
+.clock-overlay-btn--accent {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.clock-overlay-btn--accent:hover {
+  background: var(--accent);
+  filter: brightness(1.08);
+}
+
+.clock-overlay-btn--big {
+  min-height: 56px;
+  padding: 0 var(--s6);
+  font-size: 20px;
+}
+
+.clock-overlay-btn--icon {
+  flex: none;
+  width: var(--tap);
+  padding: 0;
+  border-color: transparent;
+  background: transparent;
+}
+
+/* First visit: a near-solid scrim behind the Division question. */
+.clock-first-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  background: var(--bg);
+  opacity: 0.94;
+}
+
+.clock-dialog {
+  position: fixed;
+  z-index: 21;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(520px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+  padding: var(--s5);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--fg);
+  box-shadow: var(--shadow);
+}
+
+.clock-first {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  padding: var(--s6);
+  text-align: center;
+}
+
+.clock-first h2 {
+  font-size: var(--type-ui-2xl);
+  line-height: 1.2;
+}
+
+.clock-first__desc {
+  margin: var(--s3) 0 var(--s5);
+  color: var(--muted);
+}
+
+.clock-first__choices {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--s4);
+}
+
+.clock-choice {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s1);
+  padding: var(--s5) var(--s3);
+  border: 2px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  color: var(--fg);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.clock-choice:hover {
+  border-color: var(--accent);
+}
+
+.clock-choice::before {
+  content: attr(data-short) / "";
+  font-size: 44px;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--accent-text);
+}
+
+.clock-first .clock-feedback {
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap);
+  margin-top: var(--s4);
+  font-size: var(--type-ui-sm);
+  font-weight: 600;
+}
+
+/* Sound prompt: a pill with a short note. */
+.clock-sound-prompt {
+  position: fixed;
+  z-index: 9;
+  bottom: calc(var(--edge-y) + var(--s2));
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  max-width: calc(100vw - 32px);
+  padding: var(--s2) var(--s2) var(--s2) var(--s4);
+  border: 1.5px solid var(--accent);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--fg);
+  box-shadow: var(--shadow);
+}
+
+/* No button (no sound in this browser): even padding all round. */
+.clock-sound-prompt:has(> button[hidden]) {
+  padding-right: var(--s4);
+}
+
+.clock-sound-prompt > .clock-icon {
+  color: var(--accent-text);
+}
+
+.clock-sound-prompt__text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.clock-sound-prompt__main {
+  font-weight: 700;
+}
+
+.clock-sound-prompt__note {
+  font-size: var(--type-ui-sm);
+  color: var(--muted);
+}
+
+.clock-sound-prompt .clock-overlay-btn {
+  border-radius: 999px;
+}
+
+/* Toasts: bottom centre over the bar. An error has a heavy left border and
+   a warning icon, so it isn't told apart by colour alone. */
+.clock-toast {
+  position: fixed;
+  z-index: 9;
+  left: 50%;
+  bottom: calc(var(--edge-y) + var(--s2));
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  max-width: calc(100vw - 32px);
+  padding: var(--s2) var(--s2) var(--s2) var(--s4);
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--fg);
+  box-shadow: var(--shadow);
+  font-weight: 600;
+}
+
+.clock-toast > .clock-icon {
+  color: var(--accent-text);
+}
+
+.clock-toast--error {
+  border-color: var(--fg);
+  border-left-width: 6px;
+}
+
+.clock-toast--error > .clock-icon {
+  color: var(--fg);
+}
+
+/* Ringing: an inset frame and a wash over the whole screen. It flashes once
+   per second (on 0.5 s, off 0.5 s; WCAG 2.3.1 allows 3) and holds steady
+   under reduced motion. The ring card names the ring in text with a bell
+   icon, so colour is never the only signal. */
+.clock-ring-flash {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  pointer-events: none;
+  box-shadow: inset 0 0 0 var(--ring-width, 14px) var(--ring);
+  background: var(--ring-wash);
+}
+
+.clock-ringing--flash .clock-ring-flash {
+  animation: clock-ring-pulse var(--flash-period) steps(1, end) infinite;
+}
+
+@keyframes clock-ring-pulse {
+  50% {
+    box-shadow: inset 0 0 0 var(--ring-width, 14px) transparent;
+    background: transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .clock-ringing--flash .clock-ring-flash {
+    animation: none;
+  }
+}
+
+.clock-ring-card {
+  position: fixed;
+  z-index: 41;
+  left: 50%;
+  bottom: calc(var(--edge-y) + var(--s2));
+  transform: translateX(-50%);
+  display: grid;
+  grid-template-columns: auto auto;
+  grid-template-areas: "kind dismiss" "title dismiss" "detail dismiss";
+  align-items: center;
+  column-gap: var(--s6);
+  max-width: calc(100vw - 32px);
+  padding: var(--s4) var(--s4) var(--s4) var(--s5);
+  border-radius: var(--radius);
+  background: var(--ring);
+  color: var(--on-ring);
+  box-shadow: var(--shadow);
+}
+
+.clock-ring-card__kind {
+  grid-area: kind;
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  font-size: var(--type-ui-xs);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.clock-ring-card__title {
+  grid-area: title;
+  font-family: var(--font-display);
+  font-size: calc(30px * var(--display-scale));
+  line-height: 1.15;
+}
+
+.clock-ring-card__detail {
+  grid-area: detail;
+}
+
+.clock-ring-card__detail:empty {
+  display: none;
+}
+
+.clock-ring-card__dismiss,
+.clock-ring-card__dismiss:hover {
+  grid-area: dismiss;
+  justify-self: end;
+  border-color: var(--on-ring);
+  background: var(--on-ring);
+  color: var(--ring);
+}
+
+.clock-ring-card :focus-visible {
+  outline-color: var(--on-ring);
+}
+
+/* compact: the frame thins and the card drops its detail line. */
+@media (max-width: 760px), (max-height: 520px) {
+  .clock-ring-flash {
+    --ring-width: 6px;
+  }
+
+  .clock-ring-card {
+    column-gap: var(--s4);
+    padding: var(--s3) var(--s3) var(--s3) var(--s4);
+  }
+
+  .clock-ring-card__detail {
+    display: none;
+  }
+
+  .clock-ring-card__title {
+    font-size: calc(22px * var(--display-scale));
+  }
+
+  .clock-ring-card__dismiss {
+    min-height: var(--tap);
+    padding: 0 var(--s4);
+    font-size: var(--type-ui);
+  }
+}
+
+/* short: one line ("Ringing · Wrap-up time [Dismiss]"); the sound note goes. */
+@media (max-height: 520px) {
+  .clock-ring-card,
   .clock-sound-prompt,
-  .clock-ringing-card {
+  .clock-toast {
+    bottom: 8px;
+  }
+
+  .clock-sound-prompt {
+    padding: 4px 4px 4px 12px;
+  }
+
+  .clock-sound-prompt__note {
+    display: none;
+  }
+
+  .clock-overlay-btn {
+    min-height: 36px;
+  }
+
+  .clock-overlay-btn--icon {
+    width: 36px;
+  }
+
+  .clock-ring-card {
+    left: 8px;
+    right: 8px;
+    transform: none;
+    grid-template-columns: 1fr auto;
+    grid-template-areas: "title dismiss";
+  }
+
+  .clock-ring-card__kind {
+    display: none;
+  }
+
+  .clock-ring-card__title::before {
+    content: "Ringing · ";
+    font-weight: 500;
+  }
+
+  .clock-first {
+    padding: var(--s4);
+  }
+
+  .clock-first h2 {
+    font-size: var(--type-ui-xl);
+  }
+
+  .clock-first__desc {
+    margin: var(--s2) 0 var(--s3);
+  }
+
+  .clock-choice {
+    padding: var(--s2);
+  }
+
+  .clock-choice::before {
+    font-size: 28px;
+  }
+
+  .clock-feedback {
+    margin-top: var(--s2);
+  }
+}
+
+/* narrow: phone, portrait. Overlays sit across the bottom. */
+@media (max-width: 520px) and (min-height: 521px) {
+  .clock-ring-card,
+  .clock-sound-prompt,
+  .clock-toast {
     left: 16px;
     right: 16px;
     bottom: 16px;
     transform: none;
+  }
+
+  .clock-ring-card {
+    grid-template-columns: 1fr auto;
+  }
+
+  .clock-sound-prompt__text {
+    flex: 1;
+    min-width: 0;
+    white-space: normal;
   }
 }

@@ -1,6 +1,7 @@
 /* The Settings drawer's Alarms section (alarm-editor.js): the Alarm list,
    the editor form and the Undo toast. Builds on settings-drawer.css's
-   controls; colours, sizes and spacing are the design tokens. */
+   controls and clock.css's toast; colours, sizes and spacing are the design
+   tokens. */
 
 .clock-btn--accent {
   border-color: var(--accent);
@@ -99,11 +100,6 @@
   display: flex;
   flex-direction: column;
   gap: var(--s2);
-}
-
-.clock-schedule-checks[hidden],
-.clock-field[hidden] {
-  display: none;
 }
 
 .clock-field--inline {
@@ -212,34 +208,8 @@
   justify-content: space-between;
 }
 
-/* "Alarm deleted · Undo": bottom centre of the drawer, about 6 s. */
-.clock-alarm-toast {
-  position: absolute;
-  z-index: 1;
-  left: 50%;
-  bottom: var(--s4);
-  display: flex;
-  align-items: center;
-  gap: var(--s3);
-  max-width: calc(100% - 2 * var(--s4));
-  padding: var(--s2) var(--s2) var(--s2) var(--s4);
-  border: 1.5px solid var(--line);
-  border-radius: var(--radius);
-  background: var(--surface);
-  box-shadow: var(--shadow);
-  font-weight: 600;
-  transform: translateX(-50%);
-}
-
-.clock-alarm-toast[hidden] {
-  display: none;
-}
-
-.clock-alarm-toast > .clock-icon {
-  flex: none;
-  color: var(--accent-text);
-}
-
+/* "Alarm deleted · Undo": ticket 18's toast (bottom centre), inside the
+   drawer so it can be reached while the rest of the page is inert. */
 .clock-alarm-toast .clock-btn--small {
   align-self: center;
 }
