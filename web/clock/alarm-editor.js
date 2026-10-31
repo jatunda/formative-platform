@@ -11,7 +11,7 @@ import { formatSegmentName } from './format.js';
 import { icon } from './icons.js';
 import { drawerSection, soundChoice, switchControl } from './settings-drawer.js';
 import {
-  alarmHint, alarmName, isBlockDays, nextAlarmId, onceDate, parseMinutes, parseTime, scheduleChoices, timeFields,
+  alarmHint, alarmName, isBlockDays, nextAlarmId, onceDate, parseMinutes, parseTime, bellScheduleChoices, timeFields,
 } from './alarm-text.js';
 
 /** @typedef {import('./clock-settings.js').Alarm} Alarm */
@@ -59,16 +59,16 @@ const fieldset = (legend, children) => el('fieldset', { className: 'clock-fields
 ]);
 
 /**
- * The Bell Schedules checklist with its Block Days / Every schedule
+ * The Bell Schedules checklist with its Block Days / Every Bell Schedule
  * shortcuts. `keys` null ticks every one.
- * @param {import('./alarm-text.js').ScheduleChoice[]} choices @param {string[] | null} keys
+ * @param {import('./alarm-text.js').BellScheduleChoice[]} choices @param {string[] | null} keys
  */
-function scheduleChecks(choices, keys) {
+function bellScheduleChecks(choices, keys) {
   const checks = choices.map((choice) => ({
     choice, ...check(choice.name, keys === null || choice.keys.some((k) => keys.includes(k))),
   }));
   const ticked = () => checks.filter(({ input }) => input.checked).flatMap(({ choice }) => choice.keys);
-  /** @param {(choice: import('./alarm-text.js').ScheduleChoice) => boolean} pick */
+  /** @param {(choice: import('./alarm-text.js').BellScheduleChoice) => boolean} pick */
   const tick = (pick) => {
     for (const { choice, input } of checks) input.checked = pick(choice);
     pressed();
@@ -78,7 +78,7 @@ function scheduleChecks(choices, keys) {
     onclick: () => tick((choice) => choice.keys.some((k) => BLOCK_DAYS.includes(k))),
   });
   const every = el('button', {
-    type: 'button', className: 'clock-btn clock-btn--small', textContent: 'Every schedule', onclick: () => tick(() => true),
+    type: 'button', className: 'clock-btn clock-btn--small', textContent: 'Every Bell Schedule', onclick: () => tick(() => true),
   });
   function pressed() {
     blockDays.setAttribute('aria-pressed', String(isBlockDays(ticked())));
@@ -86,7 +86,7 @@ function scheduleChecks(choices, keys) {
   }
   for (const { input } of checks) input.addEventListener('change', pressed);
   pressed();
-  const element = el('div', { className: 'clock-schedule-checks' }, [
+  const element = el('div', { className: 'clock-bell-schedule-checks' }, [
     el('div', { className: 'clock-fieldset__actions' }, [blockDays, every]),
     el('div', { className: 'clock-checks' }, checks.map(({ label }) => label)),
   ]);
@@ -103,7 +103,7 @@ function scheduleChecks(choices, keys) {
  *   `update` saves a change and redraws the page; `play` previews a voice; `now` is the clock's time.
  */
 export function createAlarmEditor({ settings, update, play, now, schoolYears }) {
-  const choices = scheduleChoices(schoolYears);
+  const choices = bellScheduleChoices(schoolYears);
   const list = el('ul', { className: 'clock-alarm-list' });
   const newSlot = el('div');
   const addClock = el('button', {
@@ -232,11 +232,11 @@ export function createAlarmEditor({ settings, update, play, now, schoolYears }) 
     ampm.group.classList.add('clock-segmented--ampm');
     const repeat = segmented(`${ID}-repeat`, 'Repeats', [['once', 'Once'], ['everySchoolDay', 'Every School Day']],
       alarm?.repeat ?? 'everySchoolDay');
-    const schedules = scheduleChecks(choices, alarm?.bellSchedules ?? null);
+    const bellScheduleList = bellScheduleChecks(choices, alarm?.bellSchedules ?? null);
     const some = switchControl(`${ID}-some`, 'Only on some Bell Schedules', 'Otherwise it rings on any day.',
-      (on) => { schedules.element.hidden = !on; });
+      (on) => { bellScheduleList.element.hidden = !on; });
     some.input.checked = (alarm?.bellSchedules ?? null) !== null;
-    schedules.element.hidden = !some.input.checked;
+    bellScheduleList.element.hidden = !some.input.checked;
 
     const timeRow = el('div', { className: 'clock-time-row' }, [
       hour.label, el('span', { className: 'clock-time-row__colon', 'aria-hidden': 'true', textContent: ':' }), minute.label,
@@ -260,11 +260,11 @@ export function createAlarmEditor({ settings, update, play, now, schoolYears }) 
     const form = formFrame(alarm, 'clock', [
       fieldset('Time', [timeRow]),
       fieldset('Repeats', [repeat.group]),
-      fieldset('Bell Schedules', [some.label, schedules.element]),
+      fieldset('Bell Schedules', [some.label, bellScheduleList.element]),
     ], (base) => {
       const time = readTime();
       if (time === null) return use24Hour ? 'Enter a time from 00:00 to 23:59.' : 'Enter a time from 1:00 to 12:59.';
-      const bellSchedules = some.input.checked ? schedules.value() : null;
+      const bellSchedules = some.input.checked ? bellScheduleList.value() : null;
       if (bellSchedules?.length === 0) return 'Tick at least one Bell Schedule.';
       const kind = /** @type {const} */ ('clock');
       return repeat.value() === 'once'
@@ -300,19 +300,19 @@ export function createAlarmEditor({ settings, update, play, now, schoolYears }) 
       }
     };
     relabel();
-    const schedules = scheduleChecks(choices, alarm?.bellSchedules ?? null);
+    const bellScheduleList = bellScheduleChecks(choices, alarm?.bellSchedules ?? null);
 
     const form = formFrame(alarm, 'period', [
       fieldset('When it rings', [when.group, minutesRow]),
       fieldset('Periods', [el('div', { className: 'clock-checks' }, periodChecks.map(({ label }) => label))]),
-      fieldset('Bell Schedules', [schedules.element]),
+      fieldset('Bell Schedules', [bellScheduleList.element]),
     ], (base) => {
       const from = /** @type {'start' | 'end' | 'halfway'} */ (when.value());
       const count = parseMinutes(minutes.value);
       if (from !== 'halfway' && count === null) return 'Enter a number of minutes from 1 to 240.';
       const chosen = periodChecks.filter(({ input }) => input.checked).map(({ period }) => period);
       if (chosen.length === 0) return 'Tick at least one Period.';
-      const bellSchedules = schedules.value();
+      const bellSchedules = bellScheduleList.value();
       if (bellSchedules?.length === 0) return 'Tick at least one Bell Schedule.';
       return {
         ...base, kind: 'period', bellSchedules, periods: chosen,

@@ -13,16 +13,16 @@ import { SOUND_NAMES } from './sound.js';
 /**
  * One Bell Schedule a teacher can tick: its name and every Bell Schedule key
  * with that name (the three Finals days are one choice).
- * @typedef {{ name: string, keys: string[] }} ScheduleChoice
+ * @typedef {{ name: string, keys: string[] }} BellScheduleChoice
  */
 
 /**
  * Every Bell Schedule in `schoolYears`, one choice per name, in the order
  * they're first listed.
  * @param {{ bellSchedules: Record<string, { name: string }> }[]} schoolYears
- * @returns {ScheduleChoice[]}
+ * @returns {BellScheduleChoice[]}
  */
-export function scheduleChoices(schoolYears) {
+export function bellScheduleChoices(schoolYears) {
   /** @type {Map<string, string[]>} */
   const byName = new Map();
   for (const year of schoolYears) {
@@ -41,9 +41,9 @@ export const isBlockDays = (keys) => keys.length === BLOCK_DAYS.length && BLOCK_
 /**
  * The Bell Schedules an Alarm is limited to, in words: "Block Days", or the
  * names ("All Day, Finals"); '' for every Bell Schedule.
- * @param {string[] | null} keys @param {ScheduleChoice[]} choices
+ * @param {string[] | null} keys @param {BellScheduleChoice[]} choices
  */
-function schedulesText(keys, choices) {
+function bellSchedulesText(keys, choices) {
   if (keys === null) return '';
   if (isBlockDays(keys)) return 'Block Days';
   return choices.filter((c) => c.keys.some((k) => keys.includes(k))).map((c) => c.name).join(', ');
@@ -93,14 +93,14 @@ const localDate = (date) => {
  * The Alarm's line under its name in the Settings list:
  * "7:55 AM · every School Day · School bell", "Halfway · Period 3, Period 6 · Beep".
  * @param {Alarm} alarm
- * @param {{ use24Hour: boolean, choices: ScheduleChoice[] }} options
+ * @param {{ use24Hour: boolean, choices: BellScheduleChoice[] }} options
  */
 export function alarmHint(alarm, { use24Hour, choices }) {
   const when = alarm.kind === 'clock'
     ? [timeText(alarm.time, use24Hour),
       alarm.repeat === 'once' ? `once, ${formatShortDate(localDate(/** @type {string} */ (alarm.date)))}` : 'every School Day']
     : [anchorText(alarm.anchor), periodsText(alarm.periods)];
-  return [...when, schedulesText(alarm.bellSchedules, choices), SOUND_NAMES[alarm.sound]].filter(Boolean).join(' · ');
+  return [...when, bellSchedulesText(alarm.bellSchedules, choices), SOUND_NAMES[alarm.sound]].filter(Boolean).join(' · ');
 }
 
 /** An Alarm's name in the list: its label, else its kind. @param {Alarm} alarm */

@@ -96,7 +96,7 @@
   background: var(--accent-soft);
 }
 
-.clock-schedule-checks {
+.clock-bell-schedule-checks {
   display: flex;
   flex-direction: column;
   gap: var(--s2);

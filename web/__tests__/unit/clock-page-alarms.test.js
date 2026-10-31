@@ -185,7 +185,7 @@ describe('School Clock Alarm editor', () => {
       expect(inForm('All Day').checked).toBe(true);
       button('Block Days', form()).click();
       expect(button('Block Days', form()).getAttribute('aria-pressed')).toBe('true');
-      expect(button('Every schedule', form()).getAttribute('aria-pressed')).toBe('false');
+      expect(button('Every Bell Schedule', form()).getAttribute('aria-pressed')).toBe('false');
       expect(inForm('All Day').checked).toBe(false);
       expect(inForm('HS Super Seminar Even').checked).toBe(true);
       setValue('Hour', '10', form());
@@ -305,7 +305,7 @@ describe('School Clock Alarm editor', () => {
       expect(inForm('Period 4 · AP CSA').checked).toBe(true);
       expect(inForm('Seminar').checked).toBe(false);
       expect(inForm('Super Seminar').checked).toBe(false);
-      expect(button('Every schedule', form()).getAttribute('aria-pressed')).toBe('true');
+      expect(button('Every Bell Schedule', form()).getAttribute('aria-pressed')).toBe('true');
 
       setValue('Name', 'Exit ticket', form());
       setValue('minutes before the end', '10', form());
@@ -336,7 +336,7 @@ describe('School Clock Alarm editor', () => {
       inForm('From the start').click();
       expect(inForm('minutes from the start').value).toBe('5');
       setValue('minutes from the start', '40', form());
-      button('Every schedule', form()).click();
+      button('Every Bell Schedule', form()).click();
       toggle('Finals', form());
       button('Save Alarm', form()).click();
       expect(savedAlarms(storage)[0].anchor).toEqual({ from: 'start', minutes: 40 });
@@ -349,7 +349,7 @@ describe('School Clock Alarm editor', () => {
       expect(inForm('Finals').checked).toBe(false);
       inForm('Halfway').click();
       expect(form().querySelector('.clock-field--inline').hidden).toBe(true);
-      button('Every schedule', form()).click();
+      button('Every Bell Schedule', form()).click();
       for (const p of ['Period 1', 'Period 2', 'Period 4', 'Period 5', 'Period 7']) toggle(p, form());
       button('Save Alarm', form()).click();
       expect(savedAlarms(storage)[0]).toMatchObject({
