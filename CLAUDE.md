@@ -4,7 +4,7 @@ Single-teacher tool for planning/delivering class content. See `CONTEXT.md` for 
 
 ## Before considering any `web/` change complete
 
-Run lint, the type checker, and coverage (not just the test suite):
+Run lint, the type checker, and coverage (not just the test suite; run `npm ci` first in a fresh checkout or worktree):
 
 ```
 cd web
@@ -24,6 +24,8 @@ If coverage fails:
 - **Truly unreachable defensive code** (a guard whose caller already prevents the condition) is the one legitimate exception — don't contort a test around it. Leave it uncovered and say so, rather than lowering the threshold to paper over it.
 
 Lowering `coverage.thresholds` to make a failing run pass is not an acceptable fix on its own — raising it is reserved for when coverage has genuinely improved.
+
+To see the School Clock (`/clock`) in a real browser, screenshot it across states and sizes, or check accessibility, run `npm run check:clock` in `web/` (options in `web/scripts/clock-check.mjs`'s header) rather than writing a new harness.
 
 ## Before considering any `functions/` change complete
 

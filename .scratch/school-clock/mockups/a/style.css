@@ -1,0 +1,544 @@
+/* Direction A, "Monument". One typeface (the system UI face), very light
+   digits, generous empty space, one warm amber accent for "now". */
+
+:root {
+  --font: "SF Pro Display", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --radius: 6px;
+  --radius-sm: 4px;
+}
+
+[data-theme="dark"] {
+  --bg: #0b0c0e;
+  --surface: #17191d;
+  --surface-2: #202328;
+  --input-bg: #0f1013;
+  --fg: #f3f2ee;
+  --muted: #a2a5ad;
+  --line: #74777f;
+  --line-soft: #2c2f35;
+  --accent: #f2b84b;
+  --accent-text: #f2b84b;
+  --accent-soft: rgb(242 184 75 / 0.16);
+  --on-accent: #1b1405;
+  --focus: #8fc2ff;
+  --ring: #f2b84b;
+  --on-ring: #1b1405;
+  --ring-wash: rgb(242 184 75 / 0.14);
+  --scrim: rgb(0 0 0 / 0.6);
+  --shadow: 0 12px 48px rgb(0 0 0 / 0.6);
+  --track: #2a2d33;
+}
+
+[data-theme="light"] {
+  --bg: #f4f2ee;
+  --surface: #ffffff;
+  --surface-2: #f4f2ee;
+  --input-bg: #ffffff;
+  --fg: #141414;
+  --muted: #595c63;
+  --line: #7b7e85;
+  --line-soft: #dddad3;
+  --accent: #8f5a00;
+  --accent-text: #8f5a00;
+  --accent-soft: rgb(143 90 0 / 0.12);
+  --on-accent: #ffffff;
+  --focus: #1a5fd0;
+  --ring: #8f5a00;
+  --on-ring: #ffffff;
+  --ring-wash: rgb(143 90 0 / 0.1);
+  --scrim: rgb(20 20 20 / 0.35);
+  --shadow: 0 12px 40px rgb(0 0 0 / 0.18);
+  --track: #d9d5cc;
+}
+
+.a-screen {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  height: 100vh;
+  padding: 3vh 3vw 2vh;
+}
+
+.a-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  min-height: 44px;
+}
+
+.a-day {
+  display: flex;
+  align-items: center;
+  gap: 0.6em;
+  font-size: clamp(14px, 2.2vh, 26px);
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.a-dot {
+  opacity: 0.7;
+}
+
+.a-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  text-align: center;
+}
+
+.a-seg {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  font-size: clamp(18px, 5.2vh, 64px);
+  font-weight: 400;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+}
+
+.a-seg__tag {
+  color: var(--muted);
+}
+
+.a-seg__tag::before {
+  content: "·";
+  margin-right: 0.5em;
+}
+
+.a-chip {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0 0.5em;
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  font-size: clamp(13px, 2vh, 22px);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+}
+
+.a-big {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 0;
+  padding: 0 0.15em;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  border-radius: var(--radius);
+}
+
+.a-big__value {
+  font-size: min(38vh, 25vw);
+  font-weight: 200;
+  line-height: 0.92;
+  letter-spacing: -0.03em;
+  white-space: nowrap;
+}
+
+.a-big__value .unit {
+  font-size: 0.42em;
+  font-weight: 300;
+  letter-spacing: 0;
+  margin: 0 0.12em 0 0.04em;
+  color: var(--muted);
+}
+
+.a-big__caption {
+  margin-top: 0.2em;
+  font-size: clamp(14px, 2.6vh, 30px);
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.a-big--timer .a-big__value {
+  color: var(--accent-text);
+}
+
+.a-progress {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 1.2em;
+  width: min(62vw, 1100px);
+  margin-top: 3.5vh;
+  font-size: clamp(13px, 2vh, 24px);
+  color: var(--muted);
+}
+
+.a-progress__bar {
+  display: block;
+  height: max(4px, 0.6vh);
+  border-radius: 99px;
+  background: var(--track);
+  overflow: hidden;
+}
+
+.a-progress__bar span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+.a-next,
+.a-line {
+  margin-top: 3vh;
+  font-size: clamp(16px, 4.2vh, 50px);
+  font-weight: 400;
+}
+
+.a-next__label {
+  font-size: 0.6em;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent-text);
+  margin-right: 0.5em;
+  vertical-align: 0.15em;
+}
+
+.a-next__at {
+  color: var(--muted);
+  margin-left: 0.4em;
+}
+
+.a-line {
+  color: var(--muted);
+  font-size: clamp(15px, 3.4vh, 40px);
+}
+
+.a-smalls {
+  display: flex;
+  gap: 4vw;
+  margin-top: 3.5vh;
+}
+
+.a-small {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 0.6em;
+  border: 0;
+  border-left: 1px solid var(--line-soft);
+  background: none;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+
+.a-small:first-child {
+  border-left: 0;
+}
+
+.a-small__value {
+  font-size: clamp(22px, 8vh, 96px);
+  font-weight: 300;
+  line-height: 1;
+}
+
+.a-small__value .unit {
+  font-size: 0.4em;
+  margin-left: 0.15em;
+  color: var(--muted);
+}
+
+.a-small__caption {
+  font-size: clamp(12px, 1.9vh, 22px);
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.a-timer-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 2vh;
+}
+
+/* Quiet control row: muted text buttons that only light up on hover/focus. */
+.a-controls {
+  display: flex;
+  justify-content: center;
+  gap: 0.5vw;
+  flex-wrap: wrap;
+}
+
+.ctl {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.ctl:hover {
+  color: var(--fg);
+  background: var(--surface);
+}
+
+.ctl[aria-pressed="true"] {
+  color: var(--accent-text);
+}
+
+/* Overlays, Monument flavour */
+.sound-prompt {
+  top: 3vh;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.ring-card {
+  left: 50%;
+  bottom: 3vh;
+  transform: translateX(-50%);
+  flex-direction: row;
+  align-items: center;
+  gap: 24px;
+  padding: 16px 16px 16px 28px;
+  max-width: calc(100vw - 32px);
+}
+
+.ring-card__title {
+  font-size: 30px;
+}
+
+.ring-card__dismiss {
+  margin: 0 0 0 auto;
+}
+
+.ring-card__kind {
+  font-size: 13px;
+}
+
+/* ---------- small windows ---------- */
+
+@media (max-width: 760px), (max-height: 520px) {
+  .a-day--right {
+    display: none;
+  }
+
+  .a-day {
+    white-space: nowrap;
+  }
+
+  .sound-prompt {
+    top: auto;
+    bottom: 6px;
+  }
+
+  .ring-card__detail {
+    display: none;
+  }
+
+  .ctl__label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .ctl {
+    padding: 0;
+    justify-content: center;
+  }
+
+  .a-controls {
+    gap: 4px;
+  }
+
+  .ring-card {
+    flex-wrap: wrap;
+    gap: 8px 16px;
+    padding: 12px 16px;
+  }
+
+  .ring-card__title {
+    font-size: 22px;
+  }
+}
+
+/* Laptop corner, short landscape window */
+@media (max-height: 520px) {
+  .a-screen {
+    padding: 8px 12px 4px;
+  }
+
+  .a-top {
+    min-height: 0;
+  }
+
+  .a-seg {
+    font-size: clamp(16px, 6vh, 40px);
+  }
+
+  .a-chip {
+    min-height: 32px;
+    min-width: 40px;
+  }
+
+  .a-big__value {
+    font-size: min(40vh, 24vw);
+  }
+
+  .a-big__caption {
+    font-size: 12px;
+  }
+
+  .a-progress {
+    margin-top: 2vh;
+  }
+
+  .a-next,
+  .a-line {
+    margin-top: 1.5vh;
+    font-size: clamp(14px, 5vh, 32px);
+  }
+
+  .ring-card__kind {
+    display: none;
+  }
+
+  .ring-card {
+    left: 8px;
+    right: 8px;
+    bottom: 6px;
+    transform: none;
+    flex-wrap: nowrap;
+    padding: 6px 6px 6px 16px;
+  }
+
+  .ring-card__title::before {
+    content: "Ringing · ";
+    font-weight: 500;
+  }
+}
+
+/* Phone, portrait */
+@media (max-width: 520px) and (min-height: 521px) {
+  .a-screen {
+    padding: 16px 16px 12px;
+  }
+
+  .a-seg {
+    flex-wrap: wrap;
+    justify-content: center;
+    font-size: 26px;
+  }
+
+  .a-big__value {
+    font-size: 27vw;
+  }
+
+  .a-progress {
+    width: 100%;
+  }
+
+  .a-next {
+    font-size: 22px;
+  }
+
+  .a-next__label {
+    display: block;
+    margin: 0 0 4px;
+  }
+
+  .a-smalls {
+    gap: 16px;
+  }
+
+  .a-small__value {
+    font-size: 36px;
+  }
+
+  .a-controls {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+  }
+
+  .ring-card {
+    left: 16px;
+    right: 16px;
+    transform: none;
+    bottom: 76px;
+  }
+
+  .sound-prompt {
+    bottom: 76px;
+  }
+}
+
+/* ---------- mini player (Document Picture-in-Picture, ~320x180) ---------- */
+
+.a-mini {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  height: 100vh;
+  padding: 8px 12px;
+  text-align: center;
+}
+
+.a-mini .ring-flash {
+  --ring-width: 6px;
+}
+
+.m-seg {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.a-mini.is-ringing .m-seg {
+  color: var(--accent-text);
+  font-weight: 700;
+}
+
+.m-big {
+  align-self: center;
+  font-size: min(48vh, 28vw);
+  font-weight: 200;
+  line-height: 1;
+  letter-spacing: -0.03em;
+}
+
+.m-big .unit {
+  font-size: 0.42em;
+  color: var(--muted);
+}
+
+.m-foot {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 44px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.m-dismiss {
+  width: 100%;
+  position: relative;
+  z-index: 9;
+}

@@ -1,0 +1,611 @@
+// School Clock page controller: a thin DOM layer over the clock model.
+// Everything it depends on is passed in (the real clock, the query string and
+// the device's storage), so tests drive it with a fake clock and fake storage.
+// Each tick recomputes the whole display from the current time; nothing is
+// counted up or down by ticks, so a throttled or sleeping tab is right the
+// moment it ticks again. Settings are read once at start and saved on every
+// change; the page never listens for other tabs' storage events.
+// Sound: the coming rings are handed to the sound player ahead of time, mapped
+// onto its audio clock, so they play on time even when this tab's timers are
+// throttled behind other windows. The window is redone when settings change,
+// when the tab is shown again, when sound turns on, and as it rolls forward.
+import { alarmsAfterRinging, describeMoment, ringsInWindow } from './clock-model.js';
+import { createSettingsStore } from './clock-storage.js';
+import { createClockSource } from './clock-source.js';
+import { createDayBarView } from './day-bar-view.js';
+import { describeBar } from './day-bar.js';
+import { el } from './dom.js';
+import { formatClockTime, formatSegmentName, formatShortDate } from './format.js';
+import { icon } from './icons.js';
+import { miniContent } from './mini-content.js';
+import { createMiniPlayer } from './mini-player.js';
+import { createDivisionPrompt, createErrorToast, createRingCard, createSoundPrompt } from './overlays.js';
+import { addReadout, canAddReadout, createLayoutStore, cycleReadout, newLayout, removeReadout } from './readout-layout.js';
+import { readoutParts, readoutValue } from './readouts.js';
+import { TEST_RING_WORDS, nextRingLines, ringWords } from './ring-words.js';
+import { createReadoutsView } from './readouts-view.js';
+import { createStageTextView } from './stage-text-view.js';
+import { SCHOOL_YEARS } from './school-years.js';
+import { createWakeLockKeeper, detectCapabilities } from './screen.js';
+import { createAlarmEditor } from './alarm-editor.js';
+import { createSettingsDrawer } from './settings-drawer.js';
+import { applyLook, createLookSheet, decorations } from './look-sheet.js';
+import { ALARM_MAX_SECONDS, createSoundPlayer } from './sound.js';
+import { cancelTimer, pauseTimer, resumeTimer, settleTimer, timerProgress, timerRingView, timerStatus, timerText } from './timer.js';
+import { createTimerPicker } from './timer-picker.js';
+import { createTimerRing } from './timer-ring.js';
+
+const TICK_MS = 1000;
+/** How far ahead (real time) rings are handed to the sound player: past the
+ * minute-long timer throttling of a background tab. */
+const LOOKAHEAD_MS = 5 * 60 * 1000;
+/** Rings this recent (real time) stay in the window, so one already playing is
+ * kept rather than cancelled when the window is redone. */
+const GRACE_MS = 1000;
+/** Rings older than this (real time) when a tick finally reaches them were
+ * missed while the tab slept or was throttled: they don't ring late. */
+const STALE_MS = 5 * 1000;
+
+let destroyActiveApp = null;
+
+/**
+ * How the page writes clock times, Segment names and the Division under the current settings.
+ * @param {import('./clock-settings.js').ClockSettings} settings
+ */
+function textFor(settings) {
+  return {
+    time: (date, { seconds = false } = {}) => formatClockTime(date, { seconds, use24Hour: settings.use24Hour }),
+    /** The current time, with seconds when they're on. @param {Date} date */
+    now: (date) => formatClockTime(date, { seconds: settings.showSeconds, use24Hour: settings.use24Hour }),
+    readout: { use24Hour: settings.use24Hour, seconds: settings.showSeconds },
+    name: (segment) => formatSegmentName(segment, settings.periodLabels),
+    division: settings.division,
+  };
+}
+
+/**
+ * A name for one ring that stays the same each time the window is redone, so
+ * the sound player can tell a ring it already has from a new one.
+ * @param {import('./clock-model.js').Ring} ring
+ */
+function ringKey(ring) {
+  return `${ring.at.getTime()}|${ring.source}|${'alarm' in ring ? ring.alarm.id : ''}`;
+}
+
+/** Whether the browser asks for less motion (no flashing). */
+function browserPrefersReducedMotion() {
+  try {
+    return Boolean(globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
+  } catch {
+    return false;
+  }
+}
+
+/** The browser's sound player (silent where there's no Web Audio). */
+function browserSoundPlayer() {
+  return createSoundPlayer({ AudioContextClass: globalThis.AudioContext ?? globalThis.webkitAudioContext });
+}
+
+/**
+ * Mount the School Clock.
+ * @param {{ mountId?: string, search?: string, realNow?: () => number, schoolYears?: object[],
+ *   storage?: Pick<Storage, 'getItem' | 'setItem'>, tabStorage?: Pick<Storage, 'getItem' | 'setItem'>,
+ *   soundPlayer?: import('./sound.js').SoundPlayer, prefersReducedMotion?: () => boolean,
+ *   capabilities?: import('./screen.js').Capabilities }} [options]
+ *   `search` is `location.search` (for `?at=` / `&speed=`); `realNow` is the real clock;
+ *   `storage` holds the device's settings and last used Readout layout (localStorage on
+ *   the real page); `tabStorage` holds this tab's Readout layout (sessionStorage);
+ *   `soundPlayer` plays the rings (the browser's by default; the page closes it when destroyed);
+ *   `prefersReducedMotion` swaps the ringing flash for a steady highlight;
+ *   `capabilities` are the browser's Fullscreen, Wake Lock and Document PiP (each null
+ *   when missing, and its control left out).
+ * @returns {{ destroy: () => void } | null} null if the mount element is missing
+ */
+export function initClockApp({
+  mountId = 'clockApp',
+  search = '',
+  realNow = Date.now,
+  schoolYears = SCHOOL_YEARS,
+  storage = globalThis.localStorage,
+  tabStorage = globalThis.sessionStorage,
+  soundPlayer: givenSoundPlayer,
+  prefersReducedMotion = browserPrefersReducedMotion,
+  capabilities = detectCapabilities(globalThis),
+} = {}) {
+  const mount = document.getElementById(mountId);
+  if (!mount) return null;
+  destroyActiveApp?.();
+  const soundPlayer = givenSoundPlayer ?? browserSoundPlayer();
+
+  const clock = createClockSource({ search, realNow });
+  const store = createSettingsStore(storage);
+  let settings = store.load();
+  let lastTick = new Date(clock.now());
+  // Simulated time affects only this tab: its timer lives in memory, and the
+  // real timer saved by other tabs is neither loaded, cleared nor overwritten.
+  const savedTimer = {
+    timerEndsAt: settings.timerEndsAt, timerPausedMs: settings.timerPausedMs, timerTotalMs: settings.timerTotalMs,
+  };
+  if (clock.simulated) settings = { ...settings, ...cancelTimer() };
+  // Saving can fail (storage full or blocked): the page says so once, and
+  // carries on with the change in memory.
+  const saveError = createErrorToast("Couldn't save on this device. Changes last until this tab closes.");
+  let saveErrorShown = false;
+  /** Save the settings (in simulated time, with the real timer as it was saved). */
+  function saveSettings() {
+    if (store.save(clock.simulated ? { ...settings, ...savedTimer } : settings) || saveErrorShown) return;
+    saveErrorShown = true;
+    saveError.show();
+  }
+  // A timer that ended while the page was closed is simply gone: it doesn't ring late.
+  settleSavedTimer(lastTick);
+
+  /** Clear the timer once its end has passed (it has rung by then). @param {Date} now */
+  function settleSavedTimer(now) {
+    if (settleTimer(settings, now.getTime()) === settings) return;
+    settings = { ...settings, ...cancelTimer() };
+    saveSettings();
+  }
+
+  // This tab's Readouts: its own saved layout, else the last used one; with
+  // neither, a default one is made from the first moment the clock describes.
+  const layoutStore = createLayoutStore({ session: tabStorage, local: storage });
+  let layout = layoutStore.load();
+  if (layout) layoutStore.keepInTab(layout);
+  /** @param {import('./readout-layout.js').Layout} next */
+  function changeLayout(next) {
+    layout = next;
+    layoutStore.save(layout);
+    render(new Date(clock.now()));
+  }
+
+  /** @param {Partial<import('./clock-settings.js').ClockSettings>} change */
+  function updateSettings(change) {
+    settings = { ...settings, ...change };
+    saveSettings();
+    soundPlayer.setVolume(settings.volume);
+    const now = new Date(clock.now());
+    scheduleSounds(now);
+    render(now);
+  }
+
+  // Sound. The coming rings, [now - grace, now + lookahead) in clock time,
+  // mapped onto the audio clock: at &speed=60 a clock minute is a real second.
+  let windowEnd = -Infinity;
+  /** @param {Date} now */
+  function scheduleSounds(now) {
+    const t = now.getTime();
+    windowEnd = t + LOOKAHEAD_MS * clock.speed;
+    if (soundPlayer.state() !== 'running') return;
+    const rings = settings.division
+      ? ringsInWindow(new Date(t - GRACE_MS * clock.speed), new Date(windowEnd), schoolYears, settings)
+      : [];
+    const audioNow = soundPlayer.currentTime();
+    soundPlayer.schedule(rings.map((ring) => ({
+      key: ringKey(ring),
+      at: audioNow + (ring.at.getTime() - t) / 1000 / clock.speed,
+      sound: ring.sound,
+      repeat: true,
+    })));
+  }
+
+  // What's ringing on screen: a flash (or a steady highlight) and the ring
+  // card naming it, until dismissed (60 s at most), for Bells, Alarms and the
+  // timer alike. The card takes focus and hands it back when it goes.
+  let ringingUntil = null;
+  /** What the mini player says is ringing, or null. */
+  let ringingWhat = null;
+  /** The timer has rung and is still ringing: it keeps the big Readout until then. */
+  let timerRinging = false;
+  /** The length of the timer that rang (its ring shows 0:00 of it until then). */
+  let rangTotalMs = null;
+  const ringCard = createRingCard({ onDismiss: () => dismiss() });
+  /** @param {import('./ring-words.js').RingWords} words */
+  function startRinging(words) {
+    ringingUntil = Math.max(ringingUntil ?? 0, realNow() + ALARM_MAX_SECONDS * 1000);
+    ringingWhat = words.title;
+    ringCard.show(words);
+    mount.classList.remove('clock-ringing--flash', 'clock-ringing--steady');
+    mount.classList.add('clock-ringing', prefersReducedMotion() ? 'clock-ringing--steady' : 'clock-ringing--flash');
+    showSoundState();
+    renderMiniRinging();
+  }
+  function stopRinging() {
+    ringingUntil = null;
+    ringingWhat = null;
+    timerRinging = false;
+    ringCard.hide();
+    mount.classList.remove('clock-ringing', 'clock-ringing--flash', 'clock-ringing--steady');
+    showSoundState();
+    renderMiniRinging();
+  }
+  /** Stop the current ring, sound and all. */
+  function dismiss() {
+    soundPlayer.dismiss();
+    stopRinging();
+    render(new Date(clock.now()));
+  }
+
+  // First visit: ask the Division once, in a dialog that takes focus.
+  const divisionPrompt = createDivisionPrompt({ onChoose: (division) => updateSettings({ division }) });
+
+  // The Readouts, redrawn only when their arrangement changes. The big one
+  // is the layout's first, or the timer while it's running, paused or
+  // ringing. The timer's spot is never part of the saved layout, so when it
+  // goes the layout is back exactly as it was. Edit mode (adding and
+  // removing) belongs to this tab's page only and is never saved.
+  let lastMoment = null;
+  let editing = false;
+  const timerRing = createTimerRing({
+    onPause: () => {
+      updateSettings(pauseTimer(settings, clock.now()));
+      timerRing.focus('resume');
+    },
+    onResume: () => {
+      updateSettings(resumeTimer(settings, clock.now()));
+      timerRing.focus('pause');
+    },
+    onCancel: () => {
+      updateSettings(cancelTimer());
+      timerControl.focus();
+    },
+  });
+  const readoutsView = createReadoutsView({
+    timerFace: timerRing.element,
+    onCycle: (i) => changeLayout(cycleReadout(layout, i)),
+    onRemove: (i) => {
+      changeLayout(removeReadout(layout, i));
+      // Focus moves on to the next Remove button, or to Done once none is left.
+      if (!readoutsView.focusRemove(i)) readoutsControl.focus();
+    },
+    onAdd: () => {
+      changeLayout(addReadout(layout, lastMoment));
+      readoutsView.focusReadout(layout.readouts.length - 1);
+    },
+  });
+  const editNote = el('p', { className: 'clock-edit-note', textContent: 'Tap a Readout to change what it shows' });
+  /** @param {boolean} on */
+  function setEditing(on) {
+    editing = on;
+    render(new Date(clock.now()));
+  }
+  const onKeyDown = (event) => {
+    if (event.key !== 'Escape') return;
+    // Escape dismisses a ring first.
+    if (ringingUntil !== null) {
+      dismiss();
+      return;
+    }
+    if (!editing) return;
+    setEditing(false);
+    readoutsControl.focus();
+  };
+  document.addEventListener('keydown', onKeyDown);
+
+  // The top bar's controls: quiet text buttons with icons. Timer opens the
+  // picker (timer-picker.js), Look the sheet (look-sheet.js) and Settings the
+  // drawer (settings-drawer.js).
+  /** @param {string} label @param {Parameters<typeof icon>[0]} iconName @param {object} props */
+  const topControl = (label, iconName, props) => {
+    const text = el('span', { className: 'clock-control__label', textContent: label });
+    const button = el('button', { type: 'button', className: 'clock-control', ...props }, [icon(iconName), text]);
+    return Object.assign(button, { setLabel: (to) => { text.textContent = to; } });
+  };
+  /**
+   * A top-bar control that opens a dialog, handing it the control to return focus to.
+   * @param {string} label @param {Parameters<typeof icon>[0]} iconName
+   * @param {{ dialog: HTMLElement, open: (from: HTMLElement) => void }} panel
+   */
+  const dialogControl = (label, iconName, panel) => {
+    const control = topControl(label, iconName, {
+      'aria-controls': panel.dialog.id, 'aria-expanded': 'false', 'aria-haspopup': 'dialog',
+      onclick: () => panel.open(control),
+    });
+    return control;
+  };
+  /** The page's top-level nodes outside the given panels' (what a panel makes inert). @param {Node[][]} panels */
+  const behindAll = (...panels) => [...mount.children].filter((node) => !panels.some((elements) => elements.includes(node)));
+  const bellsControl = topControl('Bells', 'bell', {
+    onclick: () => updateSettings({ bells: { ...settings.bells, on: !settings.bells.on } }),
+  });
+  const readoutsControl = topControl('Readouts', 'readouts', { onclick: () => setEditing(!editing) });
+  readoutsControl.classList.add('clock-control--fills');
+  const divisionChip = el('button', {
+    type: 'button', className: 'clock-chip', onclick: () => drawer.open(divisionChip, { atDivision: true }),
+  });
+
+  // Turning sound on (browsers need one click after every load): in the
+  // bottom row, which makes room for it, so it covers nothing.
+  const soundPrompt = createSoundPrompt({ onTurnOn: () => soundPlayer.resume() });
+  function showSoundState() {
+    // It waits for the first-visit question, and steps aside for a ring.
+    soundPrompt.show(soundPlayer.state(), ringingUntil !== null || settings.division === null);
+  }
+  soundPlayer.onStateChange(() => {
+    showSoundState();
+    scheduleSounds(new Date(clock.now()));
+  });
+  showSoundState();
+  soundPlayer.setVolume(settings.volume);
+
+  // The classroom timer's picker (its ring is in the big spot).
+  const timerPicker = createTimerPicker({
+    settings: () => settings,
+    now: () => clock.now(),
+    update: updateSettings,
+    behind: () => behindAll(timerPicker.elements, ringCard.elements),
+    onChange: (open) => timerControl.setAttribute('aria-expanded', String(open)),
+    onStarted: () => timerRing.focus('pause'),
+  });
+  const timerControl = dialogControl('Timer', 'timer', timerPicker);
+
+  // The Settings drawer (what the clock does), over the rest of the page.
+  const drawer = createSettingsDrawer({
+    settings: () => settings,
+    update: updateSettings,
+    play: (sound) => soundPlayer.play(sound),
+    testRing: () => {
+      soundPlayer.play(settings.bells.sound, { repeat: true });
+      startRinging(TEST_RING_WORDS);
+    },
+    // A ring shows over the drawer too, so it can be seen, heard and dismissed.
+    behind: () => behindAll(drawer.elements, ringCard.elements),
+    onChange: (open) => settingsControl.setAttribute('aria-expanded', String(open)),
+    alarms: createAlarmEditor({
+      settings: () => settings, update: updateSettings, play: (sound) => soundPlayer.play(sound),
+      now: () => new Date(clock.now()), schoolYears,
+    }),
+  });
+  // The Look sheet (how it looks), beside the clock so it previews live.
+  const lookSheet = createLookSheet({
+    settings: () => settings,
+    update: updateSettings,
+    behind: () => behindAll(lookSheet.elements, ringCard.elements),
+    onChange: (open) => {
+      lookControl.setAttribute('aria-expanded', String(open));
+      mainScreen.classList.toggle('has-sheet', open);
+      render(new Date(clock.now()));
+    },
+  });
+  const lookControl = dialogControl('Look', 'look', lookSheet);
+  lookControl.classList.add('clock-control--fills');
+  const settingsControl = dialogControl('Settings', 'gear', drawer);
+
+  // Fullscreen for projecting: the screen is kept awake for as long as it
+  // lasts (however it ends), where the browser allows a wake lock.
+  const { fullscreen, pictureInPicture } = capabilities;
+  const wakeLock = createWakeLockKeeper(capabilities.wakeLock);
+  const fullscreenButton = el('button', {
+    type: 'button', className: 'clock-control clock-control--icon', hidden: !fullscreen,
+    onclick: () => (fullscreen.isActive() ? fullscreen.exit() : fullscreen.request(mount)).catch(() => {}),
+  });
+  function showFullscreen() {
+    const on = Boolean(fullscreen?.isActive());
+    const name = on ? 'Exit fullscreen' : 'Fullscreen';
+    fullscreenButton.setAttribute('aria-label', name);
+    fullscreenButton.title = name;
+    fullscreenButton.replaceChildren(icon(on ? 'collapse' : 'expand'));
+    if (on) wakeLock.hold();
+    else wakeLock.release();
+  }
+  const stopWatchingFullscreen = fullscreen?.onChange(showFullscreen);
+  showFullscreen();
+
+  // The mini player, redrawn with every render of the main page.
+  const mini = createMiniPlayer({
+    pictureInPicture,
+    onOpen: () => {
+      render(new Date(clock.now()));
+      renderMiniRinging();
+    },
+    onDismiss: () => dismiss(),
+  });
+  mini.button.classList.add('clock-control', 'clock-control--icon', 'clock-control--mini');
+  globalThis.addEventListener('pagehide', mini.close);
+
+  /**
+   * @param {Date} now @param {import('./clock-model.js').Moment | null} moment
+   * @param {import('./mini-content.js').Parts} big the big Readout (the layout's first)
+   */
+  function renderMini(now, moment, big) {
+    const { status, remainingMs } = timerStatus(settings, now.getTime());
+    let timer = remainingMs === null ? null : {
+      remainingMs, paused: status === 'paused', totalMs: settings.timerTotalMs ?? null, progress: timerProgress(settings, now.getTime()),
+    };
+    if (!timer && timerRinging) timer = { remainingMs: 0, paused: false, totalMs: rangTotalMs, progress: 0 };
+    mini.show(miniContent({ now, moment, settings, big, timer }));
+  }
+  function renderMiniRinging() {
+    mini.showRinging(ringingWhat);
+  }
+
+  // The main screen: the "Simulated time" banner (with ?at=), the top bar,
+  // the stage (heading, Readouts, the line under them) and the bottom row
+  // (the bar, then the window buttons).
+  const dayBar = createDayBarView();
+  const banner = el('p', { className: 'clock-banner' });
+  const stageText = createStageTextView();
+  const stage = el('section', { className: 'clock-stage', 'aria-label': 'Clock' }, [
+    stageText.heading, readoutsView.element, stageText.underLine, editNote,
+  ]);
+  const top = el('header', { className: 'clock-top' }, [
+    stageText.day,
+    el('div', { className: 'clock-top__end' }, [
+      el('nav', { className: 'clock-controls', 'aria-label': 'Clock controls' },
+        [timerControl, bellsControl, readoutsControl,
+          el('span', { className: 'clock-look-wrap' }, [lookControl, lookSheet.hint]), settingsControl]),
+      divisionChip,
+    ]),
+  ]);
+  const bottom = el('footer', { className: 'clock-bottom' }, [
+    el('div', { className: 'clock-bar-slot' }, [dayBar.element]),
+    el('div', { className: 'clock-corner', role: 'group', 'aria-label': 'Window' }, [mini.button, fullscreenButton]),
+    soundPrompt.element,
+  ]);
+  const mainScreen = el('main', { className: clock.simulated ? 'clock-screen is-simulated' : 'clock-screen' }, [
+    ...(clock.simulated ? [banner] : []), ...decorations(), top, stage, bottom,
+  ]);
+  mount.replaceChildren(
+    mainScreen, ...ringCard.elements, saveError.element,
+    ...timerPicker.elements, ...drawer.elements, ...lookSheet.elements, divisionPrompt.element,
+  );
+
+  /**
+   * Settle whatever rang since the last tick, then redraw. After a sleep or a
+   * long stall, what came due meanwhile is settled (a one-time Clock Alarm is
+   * turned off) but doesn't ring late, and the sound schedule is redone so the
+   * player drops it too.
+   */
+  function tick() {
+    const now = new Date(clock.now());
+    const staleBefore = now.getTime() - STALE_MS * clock.speed;
+    if (ringingUntil !== null && realNow() >= ringingUntil) stopRinging();
+    if (lastTick.getTime() < staleBefore || now.getTime() >= windowEnd - (LOOKAHEAD_MS * clock.speed) / 2) {
+      scheduleSounds(now);
+    }
+    if (settings.division) {
+      const rang = ringsInWindow(lastTick, now, schoolYears, settings);
+      const text = textFor(settings);
+      for (const ring of rang) {
+        if (ring.at.getTime() < staleBefore) continue;
+        startRinging(ringWords(ring, text));
+        if (ring.source === 'timer') {
+          timerRinging = true;
+          rangTotalMs = ring.totalMs;
+        }
+      }
+      const alarms = alarmsAfterRinging(settings.alarms, rang, { simulated: clock.simulated });
+      if (alarms !== settings.alarms) {
+        settings = { ...settings, alarms };
+        saveSettings();
+      }
+      settleSavedTimer(now);
+    }
+    lastTick = now;
+    render(now);
+  }
+
+  function render(now) {
+    const chosen = settings.division !== null;
+    const text = textFor(settings);
+    const moment = chosen ? describeMoment(now, schoolYears, { division: settings.division }) : null;
+    // Until a Division is chosen, the prompt is the only thing in reach.
+    mainScreen.toggleAttribute('inert', !chosen);
+    divisionPrompt.show(!chosen);
+    showSoundState();
+    drawer.render();
+    applyLook(document.documentElement, settings);
+    lookSheet.render();
+    lookControl.classList.toggle('is-hinted', !lookSheet.hint.hidden);
+    bellsControl.setAttribute('aria-pressed', String(settings.bells.on));
+    for (const control of [timerControl, bellsControl, lookControl, settingsControl, divisionChip]) control.hidden = !chosen;
+    divisionChip.replaceChildren(
+      el('span', { className: 'visually-hidden', textContent: 'Division: ' }),
+      String(settings.division),
+      el('span', { className: 'visually-hidden', textContent: ', switch Division' }),
+    );
+    banner.replaceChildren(icon('clock'), el('span', {
+      textContent: `Simulated time · ${formatShortDate(now)}, ${text.now(now)} · this tab only`,
+    }));
+    stageText.show(now, moment, settings);
+    renderMini(now, moment, renderReadouts(now, moment, text));
+    renderBar(now, moment, text);
+    drawer.showRings(chosen ? nextRingLines(now, schoolYears, settings, text) : []);
+  }
+
+  /**
+   * The bar: hidden before a Division, while the timer has the big spot (the
+   * ring needs the height), and wherever describeBar has none.
+   * @param {Date} now @param {import('./clock-model.js').Moment | null} moment @param {ReturnType<typeof textFor>} text
+   */
+  function renderBar(now, moment, text) {
+    const timerShows = timerText(settings, now.getTime()) !== '' || timerRinging;
+    const bar = moment && !timerShows
+      ? describeBar(now, moment, schoolYears, { division: settings.division, dayStrip: settings.dayStrip, periodLabels: settings.periodLabels })
+      : null;
+    dayBar.show(bar, (date) => text.time(date));
+  }
+
+  /**
+   * Show the Readouts for `moment`: the tab's layout (with the timer in the
+   * big spot while it shows), or just the time before a Division is chosen
+   * or on a date the clock knows nothing about.
+   * @param {Date} now @param {import('./clock-model.js').Moment | null} moment @param {ReturnType<typeof textFor>} text
+   * @returns {import('./mini-content.js').Parts} the big Readout (the layout's first, under a timer too)
+   */
+  function renderReadouts(now, moment, text) {
+    const options = text.readout;
+    const timeOnly = !moment || moment.state === 'unknown';
+    readoutsControl.hidden = timeOnly;
+    if (timeOnly) {
+      editing = false;
+      mainScreen.classList.remove('has-timer');
+      const parts = readoutParts({ kind: 'time', at: now }, options);
+      readoutsView.show({ count: 1, cyclable: false, timer: false, editing: false, canAdd: false }, [parts]);
+      showEditing();
+      return parts;
+    }
+    lastMoment = moment;
+    if (!layout) {
+      layout = newLayout(moment);
+      layoutStore.keepInTab(layout);
+    }
+    const timer = timerText(settings, now.getTime());
+    const withTimer = timer !== '' || timerRinging;
+    mainScreen.classList.toggle('has-timer', withTimer);
+    if (withTimer) timerRing.show(timerRingView(settings, now.getTime(), { rangTotalMs }));
+    const values = layout.readouts.map(({ mode }) => readoutValue(mode, moment, now, settings.periodLabels));
+    const parts = values.map((value) => readoutParts(value, options));
+    // Beside the ring, the old main Readout's time left names its Segment
+    // (the heading steps aside for the ring).
+    if (withTimer && moment.state === 'segment' && parts[0].caption === 'left') {
+      parts[0] = { ...parts[0], caption: `left in ${text.name(moment.current)}` };
+    }
+    readoutsView.show(
+      { count: values.length, cyclable: true, timer: withTimer, editing, canAdd: canAddReadout(layout) },
+      parts,
+    );
+    showEditing();
+    return parts[0];
+  }
+
+  /** The Readouts control's pressed state, and the screen's edit-mode look. */
+  function showEditing() {
+    readoutsControl.setAttribute('aria-pressed', String(editing));
+    readoutsControl.setLabel(editing ? 'Done' : 'Readouts');
+    editNote.hidden = !editing;
+    mainScreen.classList.toggle('is-editing', editing);
+  }
+
+  render(lastTick);
+  scheduleSounds(lastTick);
+  const interval = setInterval(tick, TICK_MS);
+  const onVisibility = () => {
+    if (document.visibilityState !== 'visible') return;
+    scheduleSounds(new Date(clock.now()));
+    // The browser let go of the wake lock while the tab was hidden.
+    wakeLock.refresh();
+  };
+  document.addEventListener('visibilitychange', onVisibility);
+
+  function destroy() {
+    clearInterval(interval);
+    document.removeEventListener('keydown', onKeyDown);
+    document.removeEventListener('visibilitychange', onVisibility);
+    globalThis.removeEventListener('pagehide', mini.close);
+    stopWatchingFullscreen?.();
+    wakeLock.release();
+    mini.close();
+    drawer.destroy();
+    timerPicker.destroy();
+    lookSheet.destroy();
+    soundPlayer.close();
+    if (destroyActiveApp === destroy) destroyActiveApp = null;
+  }
+  destroyActiveApp = destroy;
+  return { destroy };
+}
+
+if (typeof document !== 'undefined' && document.getElementById('clockApp')) {
+  initClockApp({ search: window.location.search });
+}

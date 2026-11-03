@@ -8,11 +8,12 @@ Issues and specs for this repo live as markdown files in `.scratch/`.
 - The spec is `.scratch/<feature-slug>/spec.md`
 - Implementation issues are one file per ticket at `.scratch/<feature-slug>/issues/<NN>-<slug>.md`, numbered from `01`, never a single combined tickets file
 - Status is recorded as a `Status:` line near the top of each issue file
-- Comments and conversation history append to the bottom of the file under a `## Comments` heading
+- Comments and conversation history append to the bottom of the file under a single `## Comments` heading (append under the existing one)
+- A ticket that defers work names the ticket that owns it; write that ticket if none exists
 
 ## Closing an issue
 
-- Set `Status: closed` and move the file into `.scratch/<feature-slug>/issues/closed/<file>`.
+- Set `Status: closed`, then `git mv` the file into `.scratch/<feature-slug>/issues/closed/<file>`, with the edit and the move in the same commit.
 - `ls .scratch/<feature-slug>/issues/` then shows only open issues at a glance — no need to open files to check status.
 - Re-opening is the reverse: move the file back out of `closed/` and flip `Status:` back to whatever state applies.
 

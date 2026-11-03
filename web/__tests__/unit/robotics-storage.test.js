@@ -1,9 +1,23 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { createLocalStorageAdapter } from '../../robotics/storage.js';
 
 describe('createLocalStorageAdapter', () => {
   beforeEach(() => {
     localStorage.clear();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('lets storage errors propagate, rather than passing an unreadable storage off as nothing saved', () => {
+    vi.stubGlobal('localStorage', {
+      getItem() { throw new Error('SecurityError'); },
+      setItem() { throw new Error('QuotaExceededError'); },
+    });
+    const adapter = createLocalStorageAdapter('robotics-tournament');
+    expect(() => adapter.load()).toThrow('SecurityError');
+    expect(() => adapter.save({})).toThrow('QuotaExceededError');
   });
 
   it('load returns null when nothing has been saved yet', () => {

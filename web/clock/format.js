@@ -1,0 +1,100 @@
+// @ts-check
+// Text formatting for the School Clock. Every clock time on the page goes
+// through formatClockTime, so the 24-hour setting has one place to live. Durations ("42:17 left") are separate and never affected by it.
+
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** @param {number} n */
+const pad2 = (n) => String(n).padStart(2, '0');
+
+/**
+ * A time of day: "8:05 AM" (with seconds "1:04:09 PM"), or with `use24Hour`
+ * "08:05" / "13:04:09". The one clock-time formatter on the page.
+ * @param {Date} date
+ * @param {{ seconds?: boolean, use24Hour?: boolean }} [options]
+ * @returns {string}
+ */
+export function formatClockTime(date, { seconds = false, use24Hour = false } = {}) {
+  const h = date.getHours();
+  const secs = seconds ? `:${pad2(date.getSeconds())}` : '';
+  if (use24Hour) return `${pad2(h)}:${pad2(date.getMinutes())}${secs}`;
+  const hour12 = h % 12 === 0 ? 12 : h % 12;
+  return `${hour12}:${pad2(date.getMinutes())}${secs} ${h < 12 ? 'AM' : 'PM'}`;
+}
+
+/** Periods that use another's Period Label: Super Seminar shares Seminar's. */
+const SHARED_LABELS = /** @type {Readonly<Record<string, string>>} */ (Object.freeze({ 'Super Seminar': 'Seminar' }));
+
+/**
+ * A Segment's Period Label ('' for none). Breaks and Assemblies are never
+ * labelled, and Super Seminar shows Seminar's label.
+ * @param {{ name: string, kind: string }} segment
+ * @param {Record<string, string>} periodLabels Period name -> label
+ * @returns {string}
+ */
+export function periodLabel(segment, periodLabels) {
+  if (segment.kind !== 'period') return '';
+  return periodLabels[SHARED_LABELS[segment.name] ?? segment.name]?.trim() ?? '';
+}
+
+/**
+ * A Segment's name as the page shows it: a Period with a Period Label reads
+ * "Period 3 · AP CSA"; Breaks and Assemblies are never labelled.
+ * @param {{ name: string, kind: string }} segment
+ * @param {Record<string, string>} periodLabels Period name -> label
+ * @returns {string}
+ */
+export function formatSegmentName(segment, periodLabels) {
+  const label = periodLabel(segment, periodLabels);
+  return label ? `${segment.name} · ${label}` : segment.name;
+}
+
+/**
+ * A length of time as "M:SS", or "H:MM:SS" from an hour up. Whole seconds,
+ * rounded down. With `seconds: false` it's whole minutes ("42 min", "1h 05m"),
+ * except under a minute, which always shows its seconds ("0:59") so the end
+ * of a countdown stays exact.
+ * @param {number} ms
+ * @param {{ seconds?: boolean }} [options]
+ * @returns {string}
+ */
+export function formatDuration(ms, { seconds = true } = {}) {
+  const total = Math.floor(ms / 1000);
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  if (!seconds && total >= 60) return h > 0 ? `${h}h ${pad2(m)}m` : `${m} min`;
+  return h > 0 ? `${h}:${pad2(m)}:${pad2(s)}` : `${m}:${pad2(s)}`;
+}
+
+/**
+ * A countdown that may run for days: like formatDuration under a day, then
+ * whole days and hours, e.g. "2d 14h" (rounded down, whatever `seconds` says).
+ * @param {number} ms
+ * @param {{ seconds?: boolean }} [options]
+ * @returns {string}
+ */
+export function formatLongDuration(ms, options = {}) {
+  const totalHours = Math.floor(ms / 3600000);
+  if (totalHours < 24) return formatDuration(ms, options);
+  return `${Math.floor(totalHours / 24)}d ${totalHours % 24}h`;
+}
+
+/**
+ * A date without the year, e.g. "Mon, Nov 30".
+ * @param {Date} date
+ * @returns {string}
+ */
+export function formatShortDate(date) {
+  return `${WEEKDAYS[date.getDay()]}, ${MONTHS[date.getMonth()]} ${date.getDate()}`;
+}
+
+/**
+ * A date, e.g. "Wed, Jan 20, 2027".
+ * @param {Date} date
+ * @returns {string}
+ */
+export function formatDate(date) {
+  return `${WEEKDAYS[date.getDay()]}, ${MONTHS[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`;
+}

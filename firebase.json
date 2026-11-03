@@ -63,6 +63,14 @@
         "destination": "/robotics/robotics.html"
       },
       {
+        "source": "/clock",
+        "destination": "/clock/index.html"
+      },
+      {
+        "source": "/clock/",
+        "destination": "/clock/index.html"
+      },
+      {
         "source": "**",
         "destination": "/index.html"
       }
