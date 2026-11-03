@@ -119,6 +119,11 @@ describe('School Clock bar', () => {
       advance(10 * MIN);
       expect([...bar().querySelectorAll('.clock-agenda li')].map(words)[1]).toBe('9:25 AM Period 2 Now');
     });
+
+    it('lets the keyboard reach the agenda, since it scrolls on its own', () => {
+      open({ when: at(9, 22) });
+      expect(bar().querySelector('.clock-agenda').tabIndex).toBe(0);
+    });
   });
 
   it("scrolls the agenda's current row into view", async () => {

@@ -109,7 +109,7 @@ export function createDayBarView() {
       return row;
     });
     const shown = rows.find((row) => row.dataset.state === 'now' || row.dataset.state === 'next');
-    const list = el('ol', { className: 'clock-agenda', tabindex: '0', 'aria-label': name }, rows);
+    const list = el('ol', { className: 'clock-agenda', tabIndex: 0, 'aria-label': name }, rows);
     // The page scrolls the current row into view (where the list shows).
     if (shown) queueMicrotask(() => shown.scrollIntoView?.({ block: 'nearest' }));
     return list;
