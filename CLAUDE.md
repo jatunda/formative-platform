@@ -4,7 +4,7 @@ Single-teacher tool for planning/delivering class content. See `CONTEXT.md` for 
 
 ## Before considering any `web/` change complete
 
-Run lint, the type checker, and coverage (not just the test suite):
+Run lint, the type checker, and coverage (not just the test suite; run `npm ci` first in a fresh checkout or worktree):
 
 ```
 cd web
