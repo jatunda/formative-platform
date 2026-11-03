@@ -29,6 +29,8 @@ Each direction shows every one of these screens/states, as separate frames or a 
 
 ## Self-review checklist
 
+On the real `/clock` page, `npm run check:clock` in `web/` runs the screenshot, axe, scroll and page-error parts of this checklist across every state and size.
+
 Used by this ticket, 03 and 04. Take screenshots with Playwright (pre-installed Chromium) at 1920×1080, 1440×900, 480×320, 390×844 and 320×180, look at every one, and fix problems before calling anything done.
 
 - **Projected readability:** the main Readout's digits are at least ~25% of viewport height at 1920×1080 and readable at 1280×720 shrunk to a quarter. Use tabular (fixed-width) digits so numbers don't jiggle as they tick. Hierarchy is obvious in under a second: number first, Segment second, everything else quiet.

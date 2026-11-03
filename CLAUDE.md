@@ -25,6 +25,8 @@ If coverage fails:
 
 Lowering `coverage.thresholds` to make a failing run pass is not an acceptable fix on its own — raising it is reserved for when coverage has genuinely improved.
 
+To see the School Clock (`/clock`) in a real browser, screenshot it across states and sizes, or check accessibility, run `npm run check:clock` in `web/` (options in `web/scripts/clock-check.mjs`'s header) rather than writing a new harness.
+
 ## Before considering any `functions/` change complete
 
 Run the link-preview function's tests (Node's built-in test runner, no emulator or network; run `npm ci` first in a fresh checkout):
