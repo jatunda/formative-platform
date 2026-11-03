@@ -5,6 +5,12 @@ import { existsSync } from 'fs';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 
+// Tests build dates in local time, and the School Clock's dates cross the
+// school's daylight-saving changes. Run every test in the school's time zone so
+// results match on any machine (CI runs in UTC). Set before the workers start,
+// so they inherit it.
+process.env.TZ = 'America/Los_Angeles';
+
 // ai-config.js holds a real API key, so it's gitignored and absent from CI
 // and fresh worktrees. Tests only need its shape: fall back to the template.
 const aiConfigFallback = existsSync(resolve(__dirname, 'ai-config.js'))

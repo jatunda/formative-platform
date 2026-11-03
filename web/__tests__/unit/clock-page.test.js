@@ -273,8 +273,14 @@ describe('School Clock page', () => {
       // It reads the device's real localStorage.
       expect(pageText()).toContain('43:00 left');
       // The self-started clock is the active one; a new init replaces it.
+      // Count relative to now: loading the module can leave the test runner's
+      // own timers pending, depending on the Node version.
+      const withSelfStarted = vi.getTimerCount();
       app = fresh.initClockApp();
-      expect(vi.getTimerCount()).toBe(1);
+      expect(vi.getTimerCount()).toBe(withSelfStarted);
+      app.destroy();
+      app = null;
+      expect(vi.getTimerCount()).toBe(withSelfStarted - 1);
     } finally {
       localStorage.clear();
       sessionStorage.clear();
