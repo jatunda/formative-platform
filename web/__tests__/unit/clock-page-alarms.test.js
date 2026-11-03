@@ -187,7 +187,8 @@ describe('School Clock Alarm editor', () => {
       expect(button('Block Days', form()).getAttribute('aria-pressed')).toBe('true');
       expect(button('Every Bell Schedule', form()).getAttribute('aria-pressed')).toBe('false');
       expect(inForm('All Day').checked).toBe(false);
-      expect(inForm('HS Super Seminar Even').checked).toBe(true);
+      // Super Seminar is a Block Day; the other special Bell Schedules aren't.
+      expect(inForm('Special Bell Schedules').indeterminate).toBe(true);
       setValue('Hour', '10', form());
       setValue('Minute', '45', form());
       button('Save Alarm', form()).click();
@@ -249,7 +250,9 @@ describe('School Clock Alarm editor', () => {
 
       toggle('Only on some Bell Schedules', form());
       button('Block Days', form()).click();
-      for (const name of ['Even Day', 'Odd Day', 'Late Start Even', 'HS Super Seminar Even']) toggle(name, form());
+      for (const name of ['Even Day', 'Odd Day', 'Late Start Even']) toggle(name, form());
+      toggle('Special Bell Schedules', form()); // partly ticked -> all of them
+      toggle('Special Bell Schedules', form()); // -> none
       setValue('Hour', '12', form());
       button('Save Alarm', form()).click();
       expect(form().querySelector('[role="alert"]').textContent).toBe('Tick at least one Bell Schedule.');
@@ -343,7 +346,7 @@ describe('School Clock Alarm editor', () => {
       expect(savedAlarms(storage)[0].bellSchedules).toEqual(
         ['all', 'even', 'odd', 'lateStartEven', 'convocation', 'pepRally', 'hsSuperSeminar']);
       expect(listed()[0].hint).toBe('Minute 40 · Periods 1–7 · All Day, Even Day, Odd Day, Late Start Even, '
-        + 'All School Convocation, Pep Rally, HS Super Seminar Even · Chime');
+        + 'Special Bell Schedules · Chime');
 
       button('Edit Wrap-up time').click();
       expect(inForm('Finals').checked).toBe(false);
@@ -357,6 +360,38 @@ describe('School Clock Alarm editor', () => {
       });
       expect(listed()[0].hint).toBe('Halfway · Period 3, Period 6 · Chime');
       expect(nextRings()).toContain('10:52:30 AM · Period Alarm · Wrap-up time · Period 3, halfway · Chime');
+    });
+
+    it('ticks the special Bell Schedules as one, and says which they are', () => {
+      open();
+      button('Period Alarm', section()).click();
+      const info = button('What are special Bell Schedules?', form());
+      const detail = form().querySelector('.clock-check__detail');
+      expect(info.title).toBe('Includes All School Convocation, Pep Rally, HS Super Seminar Even');
+      expect(isShown(detail)).toBe(false);
+      info.click();
+      expect(info.getAttribute('aria-expanded')).toBe('true');
+      expect(detail.textContent).toBe('Includes All School Convocation, Pep Rally, HS Super Seminar Even.');
+      info.click();
+      expect(isShown(detail)).toBe(false);
+
+      button('Every Bell Schedule', form()).click();
+      toggle('Special Bell Schedules', form());
+      button('Save Alarm', form()).click();
+      expect(savedAlarms(storage)[0].bellSchedules).toEqual(['all', 'even', 'odd', 'lateStartEven', 'finals23', 'finals456', 'finals17']);
+
+      // Partly ticked (Block Days, then only Super Seminar left), it names the ones ticked.
+      button('Edit Period Alarm').click();
+      button('Block Days', form()).click();
+      for (const name of ['Even Day', 'Odd Day', 'Late Start Even']) toggle(name, form());
+      button('Save Alarm', form()).click();
+      expect(savedAlarms(storage)[0].bellSchedules).toEqual(['hsSuperSeminar']);
+      expect(listed()[0].hint).toBe('5 min before the end · Periods 1–7 · HS Super Seminar Even · Chime');
+    });
+
+    it('names Finals once, even when it was saved with only some of the Finals days', () => {
+      open({ settings: { alarms: [{ ...PERIOD_ALARM, bellSchedules: ['finals23'] }] } });
+      expect(listed()[0].hint).toBe('5 min before the end · Periods 1–7 · Finals · Chime');
     });
 
     it('says what is missing (minutes, a Period) and saves nothing', () => {
@@ -376,7 +411,9 @@ describe('School Clock Alarm editor', () => {
 
       toggle('Period 3', form());
       button('Block Days', form()).click();
-      for (const name of ['Even Day', 'Odd Day', 'Late Start Even', 'HS Super Seminar Even']) toggle(name, form());
+      for (const name of ['Even Day', 'Odd Day', 'Late Start Even']) toggle(name, form());
+      toggle('Special Bell Schedules', form()); // partly ticked -> all of them
+      toggle('Special Bell Schedules', form()); // -> none
       button('Save Alarm', form()).click();
       expect(form().querySelector('[role="alert"]').textContent).toBe('Tick at least one Bell Schedule.');
       expect(savedAlarms(storage)).toEqual([]);

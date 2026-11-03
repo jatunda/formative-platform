@@ -6,7 +6,7 @@ Spec: `.scratch/school-clock/spec.md`.
 
 **Blocked by:** 04
 
-**Status:** open
+**Status:** closed
 
 ## 0. Get a URL the Mac, phone and projector can all open
 
@@ -87,6 +87,18 @@ Write anything that felt off under `## Comments` below, or tell Claude in chat. 
 - [ ] Mini player checked in Chrome
 - [ ] Projected and readable from the back of the room
 - [ ] Checked on a phone
-- [ ] Findings recorded
+- [x] Findings recorded
 
 ## Comments
+
+**2026-11-02, Eric (in chat):** Generally looks good. Changes asked for, all made in the same pass before deploy:
+
+- More sounds; the school bell was too annoying. Added Clock tower, Marimba, Desk bell and Wood block, and remade the school bell as a gentle "ring-ring" (pure tones, lower pitch, a shallow flutter instead of the 18 Hz rattle, two bursts with a gap). The design principles are in `web/clock/sound.js` and the spec's Sound engine notes.
+- Bells ring like Alarms: repeating until dismissed, for up to 60 s (spec story 62 changed). The Test ring does the same.
+- Alternate themes differ by more than colour and font: backdrops for 12 of the 15 themes (dot grid, graph paper, lined paper, aged edges, sunset horizon, glow from above, scanlines, spotlight, mown stripes, diagonal stripes, a soft wash, chalk dust). Slate, Gallery and High contrast stay plain.
+- "Have a great summer!" gets its exclamation mark; Experience Week's line says "It's Experience Week" instead of "Enjoy the trips".
+- The current-time Readout has no "now" caption.
+- Seminar and Super Seminar share one Period Label field ("Seminar & Super Seminar").
+- Alarms tick All School Convocation (Veterans Day), Pep Rally and HS Super Seminar Even as one "Special Bell Schedules" choice, with an info button (click, or hover for a tooltip) naming them. Block Days ticks it partly, shown as a mixed checkbox.
+
+The preview channel was deleted.

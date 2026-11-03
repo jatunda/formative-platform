@@ -91,7 +91,7 @@ export function readoutText(value, options = {}) {
 /**
  * A Readout as the page draws it: its amount ("42:17", "42 min", "10:12:43 AM")
  * cut into pieces, where letters and the space before them ("min", "h", "AM")
- * are set small and clock seconds are not; its caption ("left", "now"); and
+ * are set small and clock seconds are not; its caption ("left"; none for the current time); and
  * the glyph counts the big Readout's size rule needs.
  * @param {ReadoutValue} value
  * @param {{ use24Hour?: boolean, seconds?: boolean }} [options]
@@ -107,7 +107,7 @@ export function readoutParts(value, { use24Hour = false, seconds = true } = {}) 
   const count = (pattern) => (amount.match(pattern) ?? []).length;
   return {
     amount,
-    caption: value.kind === 'time' ? 'now' : value.caption,
+    caption: value.kind === 'time' ? '' : value.caption,
     pieces,
     glyphs: { digits: count(/\d/g), colons: count(/:/g), letters: count(/[a-z]/gi) },
   };

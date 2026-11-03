@@ -107,8 +107,8 @@ A public page at `mrhsieh.app/clock` that any teacher can bookmark. No login. It
 52. As a teacher, I want to set a Period Alarm at the halfway point of a Period, so that one Alarm works on both 45- and 85-minute Periods.
 53. As a teacher, I want to choose which Periods a Period Alarm applies to (Periods 1–7 by default; Seminar and Super Seminar can be ticked), so that it only rings when I'm teaching.
 54. As a teacher, I want Period Alarms never to apply to Breaks or Assemblies, so that nothing rings during Lunch or Chapel.
-55. As a teacher, I want to limit any Alarm to chosen Bell Schedules, with a Block Days shortcut (Even, Odd, Late Start Even, HS Super Seminar Even), so that my mid-period walk only rings on Block Days.
-56. As a teacher, I want to choose a sound for each Alarm from a few options (e.g. chime, school bell, beep, buzzer), so that different Alarms sound different.
+55. As a teacher, I want to limit any Alarm to chosen Bell Schedules, with a Block Days shortcut (Even, Odd, Late Start Even, HS Super Seminar Even), so that my mid-period walk only rings on Block Days. The one-off Bell Schedules (All School Convocation, Pep Rally, HS Super Seminar Even) are ticked as one "Special Bell Schedules" choice, with an info button naming them; Block Days ticks it partly.
+56. As a teacher, I want to choose a sound for each Alarm from a few options (chime, clock tower, marimba, desk bell, wood block, school bell, beep, buzzer), so that different Alarms sound different.
 57. As a teacher, I want to turn an Alarm off without deleting it, so that I can pause it for a while.
 58. As a teacher, I want my Alarms saved on my device, so that I set them up once.
 
@@ -117,7 +117,7 @@ A public page at `mrhsieh.app/clock` that any teacher can bookmark. No login. It
 59. As a teacher, I want one toggle for Bells, so that my room gets a bell even if the building's is hard to hear.
 60. As a teacher, I want Bells to ring at the start and end of every Period and Break, but not Assemblies, so that every Passing Period starts and ends with a bell.
 61. As a teacher, I want Bells to ring once where one Segment ends exactly as the next begins, so that there's no double ring.
-62. As a teacher, I want Bells to play a short sound (about 3 seconds) that stops on its own, so that I don't have to dismiss them.
+62. As a teacher, I want Bells to ring like Alarms, repeating until dismissed for up to 60 seconds, so that the room hears them. (Changed after the device check in ticket 05; Bells first played about 3 seconds.)
 63. As a teacher, I want the Bells toggle one tap away from the main screen, so that I can turn them on for the day quickly.
 84. As a teacher, I want the option of Bells at the end of each Assembly (never its start), so that my room hears when Chapel, Convocation or a Pep Rally is over. (A follow-up, numbered after the rest so earlier numbers stay put.)
 
@@ -205,10 +205,10 @@ A public page at `mrhsieh.app/clock` that any teacher can bookmark. No login. It
 - **Device storage.** A small storage adapter (Robotics' `createLocalStorageAdapter` is the precedent) with versioned keys, falling back to defaults on missing or corrupt data.
   - **Saved in `localStorage`:** Division, the 24-hour time setting (default off, i.e. 12-hour), the seconds setting (default on), the Day Strip on/off (default on), the theme with any font or palette swap, whether it is flipped to its other version (ticket 21 replaced light/dark/auto), whether the "Pick a theme" hint is done, Period Labels, Alarms, Bells on/off, sound choices, volume, the running timer's end time, the recent custom durations, and the "last used" Readout layout.
   - **Per tab:** the layout lives in `sessionStorage` and is read from `localStorage` only when a tab with no session layout opens. The page never listens for cross-tab storage events, so open tabs never change each other.
-- **Sound engine.** Web Audio synthesis only, with no audio assets: a few named voices (e.g. chime, school bell, beep, buzzer), each a short function of an audio context and a start time.
+- **Sound engine.** Web Audio synthesis only, with no audio assets: eight named voices (chime, clock tower, marimba, desk bell, wood block, school bell, beep, buzzer), each a short function of an audio context and a start time. They sit between about 400 Hz and 3 kHz (loud on laptop and projector speakers, cutting through room chatter), avoid a steady harsh rattle, differ in rhythm and timbre, and leave a gap before repeating. The school bell is a gentle "ring-ring", not a hallway bell.
   - Upcoming rings are scheduled ahead on the audio clock for a lookahead window, so they play on time even when timers in a background tab are throttled. The schedule is recomputed whenever settings change, the tab becomes visible, or the window rolls over.
   - The engine starts suspended. A visible "turn sound on" control resumes it after any user click, and is shown again whenever the audio context is suspended (after every load).
-  - Bells play about 3 s and stop on their own. Alarms and the timer repeat until dismissed, for at most 60 s.
+  - Bells, Alarms and the timer repeat until dismissed, for at most 60 s. A sound preview plays about 3 s.
 - **Time format.** One formatter turns a clock time into text according to the 24-hour setting, and every clock time on the page and in the mini player goes through it. Durations and countdowns ("12:04 left", "2d 14h") are not affected.
 - **Seconds.** The same formatter applies the seconds setting to clock times and countdowns. The last minute of a countdown and the timer always show seconds.
 - **Look (from tickets 02 and 03; Eric's review of the first design reference, in 03's Comments, revises the details: one bar at the bottom with whole day / just this Segment settings instead of a separate Day Strip and hairline; a separate Look menu; themes that own their light or dark mode, with no auto; controls along the top; seconds at equal weight).**

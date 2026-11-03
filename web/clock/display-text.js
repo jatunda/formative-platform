@@ -4,7 +4,7 @@
 // Period Label, or what kind of time it is), and the one line under the
 // Readouts (up next, or when the Next School Day starts). Pure: a moment from
 // the clock model and the time settings give the text.
-import { formatClockTime, formatDate, formatLongDuration, formatSegmentName, formatShortDate } from './format.js';
+import { formatClockTime, formatDate, formatLongDuration, formatSegmentName, formatShortDate, periodLabel } from './format.js';
 
 /** @typedef {import('./clock-model.js').Moment} Moment */
 
@@ -46,8 +46,7 @@ export function displayText(now, moment, { use24Hour, showSeconds, periodLabels 
   switch (moment.state) {
     case 'segment': {
       const current = /** @type {import('./clock-model.js').TimedSegment} */ (moment.current);
-      const label = current.kind === 'period' ? (periodLabels[current.name]?.trim() ?? '') : '';
-      return text({ day: schoolDay, title: current.name, tag: label });
+      return text({ day: schoolDay, title: current.name, tag: periodLabel(current, periodLabels) });
     }
     case 'passing':
       return text({ day: schoolDay, title: 'Passing Period', upNext: next });
@@ -58,9 +57,9 @@ export function displayText(now, moment, { use24Hour, showSeconds, periodLabels 
     case 'dayOff':
       return text({ title: /** @type {string} */ (moment.dayLabel), line: `Back ${back} · ${nextDayLabel()} · ${startsIn()}` });
     case 'experienceWeek':
-      return text({ title: /** @type {string} */ (moment.dayLabel), line: `Enjoy the trips · back ${back} · ${startsIn()}` });
+      return text({ title: /** @type {string} */ (moment.dayLabel), line: `It's Experience Week · back ${back} · ${startsIn()}` });
     case 'summer':
-      return text({ title: `Day ${moment.summerDay} of Summer`, line: back ? `Have a great summer · back ${back}` : 'Have a great summer' });
+      return text({ title: `Day ${moment.summerDay} of Summer`, line: back ? `Have a great summer! · back ${back}` : 'Have a great summer!' });
     default:
       return text({ day: formatDate(now), title: formatDate(now), line: 'No school calendar for this date yet' });
   }

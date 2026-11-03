@@ -164,7 +164,7 @@ describe('School Clock overlays', () => {
       byId('outside').focus();
       advance(2 * SEC);
       expect(ringCard().contains(document.activeElement)).toBe(true);
-      advance(4 * SEC);
+      advance(61 * SEC);
       expect(visible(ringCard())).toBe(false);
       expect(document.activeElement).toBe(byId('outside'));
     });

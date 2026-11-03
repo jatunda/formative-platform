@@ -24,7 +24,7 @@ A Segment with no class: Nutrition and Lunch.
 A Segment where the school gathers outside regular rooms: Chapel, Convocation, Pep Rally.
 
 **Period Label**:
-A teacher's own name for one of their Periods ("AP CSA", "Prep"), shown alongside the Period's name wherever the clock names that Period — including "up next" during a Passing Period.
+A teacher's own name for one of their Periods ("AP CSA", "Prep"), shown alongside the Period's name wherever the clock names that Period — including "up next" during a Passing Period. Seminar and Super Seminar share one Period Label.
 
 **Passing Period**:
 The gap between the end of one Segment and the start of the next. Not named or listed in a Bell Schedule — it exists implicitly wherever two consecutive Segments don't touch (a zero-minute gap is not a Passing Period). Always shows which Segment is up next.

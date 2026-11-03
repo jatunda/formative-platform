@@ -1,5 +1,5 @@
 // @ts-check
-// The School Clock theme set: which palette, font and decoration
+// The School Clock theme set: which palette, font, decoration and backdrop
 // each theme uses, each palette's own mode, and the look descriptions the
 // Look sheet uses as accessible names. Colour and font values live in
 // tokens.css (the default) and themes.css; the page applies a look by setting
@@ -13,11 +13,14 @@
 //   for any entry in PALETTES: every combination is contrast-checked.
 // - Themes own their mode: a theme shows its palette's own version until the
 //   teacher flips it. There is no "auto".
+// - A backdrop (graph paper, a spotlight, ...) belongs to its theme and stays
+//   through swaps, like a decoration. It is drawn faintly in the palette's
+//   own colours, so it works with any palette and in either version.
 
 /** @typedef {'dark' | 'light'} Mode */
 /** @typedef {{ id: string, native: Mode, look: string }} Palette */
 /** @typedef {{ id: string, look: string }} Font */
-/** @typedef {{ id: string, palette: string, font: string, deco?: string }} Theme */
+/** @typedef {{ id: string, palette: string, font: string, deco?: string, backdrop?: string }} Theme */
 /**
  * The look settings (a slice of ClockSettings).
  * @typedef {{ theme: string, fontSwap: string | null, paletteSwap: string | null, flipped: boolean }} LookSettings
@@ -61,22 +64,38 @@ export const FONTS = Object.freeze([
 
 const DECOS = Object.freeze([{ id: 'flowers', look: 'with flowers' }]);
 
+/** The page backgrounds behind everything (drawn in themes.css). */
+const BACKDROPS = Object.freeze([
+  { id: 'dots', look: 'on dot-grid paper' },
+  { id: 'graph', look: 'on graph paper' },
+  { id: 'ruled', look: 'on lined paper' },
+  { id: 'aged', look: 'with aged edges' },
+  { id: 'horizon', look: 'with a sunset horizon' },
+  { id: 'dusk', look: 'with a glow from above' },
+  { id: 'scanlines', look: 'with screen scanlines' },
+  { id: 'spotlight', look: 'under a spotlight' },
+  { id: 'stripes', look: 'with mown stripes' },
+  { id: 'pennant', look: 'with diagonal stripes' },
+  { id: 'wash', look: 'and a soft wash' },
+  { id: 'dust', look: 'with chalk dust' },
+]);
+
 /** @type {readonly Theme[]} The picker's order; the first is the default. */
 export const THEMES = Object.freeze([
   { id: 'slate', palette: 'slate', font: 'system' },
-  { id: 'ink', palette: 'ink', font: 'din' },
-  { id: 'lab', palette: 'lab', font: 'rounded' },
-  { id: 'paper', palette: 'paper', font: 'serif' },
-  { id: 'parchment', palette: 'parchment', font: 'slab' },
-  { id: 'coast', palette: 'coast', font: 'humanist' },
-  { id: 'vesper', palette: 'vesper', font: 'classic' },
-  { id: 'terminal', palette: 'terminal', font: 'mono' },
+  { id: 'ink', palette: 'ink', font: 'din', backdrop: 'dots' },
+  { id: 'lab', palette: 'lab', font: 'rounded', backdrop: 'graph' },
+  { id: 'paper', palette: 'paper', font: 'serif', backdrop: 'ruled' },
+  { id: 'parchment', palette: 'parchment', font: 'slab', backdrop: 'aged' },
+  { id: 'coast', palette: 'coast', font: 'humanist', backdrop: 'horizon' },
+  { id: 'vesper', palette: 'vesper', font: 'classic', backdrop: 'dusk' },
+  { id: 'terminal', palette: 'terminal', font: 'mono', backdrop: 'scanlines' },
   { id: 'gallery', palette: 'gallery', font: 'geometric' },
-  { id: 'stage', palette: 'stage', font: 'serif' },
-  { id: 'court', palette: 'court', font: 'heavy' },
-  { id: 'team', palette: 'team', font: 'condensed' },
-  { id: 'bloom', palette: 'blush', font: 'script', deco: 'flowers' },
-  { id: 'chalk', palette: 'chalk', font: 'hand' },
+  { id: 'stage', palette: 'stage', font: 'serif', backdrop: 'spotlight' },
+  { id: 'court', palette: 'court', font: 'heavy', backdrop: 'stripes' },
+  { id: 'team', palette: 'team', font: 'condensed', backdrop: 'pennant' },
+  { id: 'bloom', palette: 'blush', font: 'script', deco: 'flowers', backdrop: 'wash' },
+  { id: 'chalk', palette: 'chalk', font: 'hand', backdrop: 'dust' },
   { id: 'contrast', palette: 'contrast', font: 'heavy' },
 ]);
 
@@ -110,7 +129,8 @@ export function themeLook(theme) {
   const palette = byId(PALETTES, theme.palette)?.look;
   const font = byId(FONTS, theme.font)?.look;
   const deco = theme.deco ? ` ${byId(DECOS, theme.deco)?.look}` : '';
-  return `${palette}${deco}, ${font}`;
+  const backdrop = theme.backdrop ? ` ${byId(BACKDROPS, theme.backdrop)?.look}` : '';
+  return `${palette}${deco}${backdrop}, ${font}`;
 }
 
 /**
@@ -129,10 +149,10 @@ export function lookParts({ theme, fontSwap, paletteSwap }) {
 
 /**
  * What <html> gets for these look settings: the mode (already resolved: the
- * palette's own, or the other while flipped), palette, font and decoration
- * ('' for none).
+ * palette's own, or the other while flipped), palette, font, decoration and
+ * backdrop ('' for none).
  * @param {LookSettings} settings
- * @returns {Record<'data-mode' | 'data-palette' | 'data-font' | 'data-deco', string>}
+ * @returns {Record<'data-mode' | 'data-palette' | 'data-font' | 'data-deco' | 'data-backdrop', string>}
  */
 export function lookAttributes(settings) {
   const { theme, font, palette } = lookParts(settings);
@@ -142,6 +162,7 @@ export function lookAttributes(settings) {
     'data-palette': palette,
     'data-font': font,
     'data-deco': theme.deco ?? '',
+    'data-backdrop': theme.backdrop ?? '',
   };
 }
 

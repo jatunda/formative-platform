@@ -82,11 +82,11 @@ describe('School Clock display preferences', () => {
       button('Readouts').click();
       button('Add Readout').click();
       mount().querySelectorAll('.clock-readout__face')[1].click();
-      expect(readouts()[1].text).toBe('10:32:30 AM now');
+      expect(readouts()[1].text).toBe('10:32:30 AM');
 
       toggle('Show seconds');
       expect(saved(storage).showSeconds).toBe(false);
-      expect(readouts().map((r) => r.text)).toEqual(['42 min left', '10:32 AM now']);
+      expect(readouts().map((r) => r.text)).toEqual(['42 min left', '10:32 AM']);
       expect(displayText()).not.toContain('10:32:30');
     });
 
@@ -157,15 +157,15 @@ describe('School Clock display preferences', () => {
       button('Add Readout').click();
       button('Done').click();
       tapReadout(1);
-      expect(readouts()).toEqual([big('42:30 left'), small('10:32:30 AM now')]);
+      expect(readouts()).toEqual([big('42:30 left'), small('10:32:30 AM')]);
     }
 
     it('takes the big spot while it runs, and the previous main Readout becomes a smaller one', () => {
       openWithTwoReadouts();
       button('5 min', picker()).click();
-      expect(readouts()).toEqual([big('Timer, 5:00 left of 5:00'), small('42:30 left in Period 3'), small('10:32:30 AM now')]);
+      expect(readouts()).toEqual([big('Timer, 5:00 left of 5:00'), small('42:30 left in Period 3'), small('10:32:30 AM')]);
       advance(SEC);
-      expect(readouts()).toEqual([big('Timer, 4:59 left of 5:00'), small('42:29 left in Period 3'), small('10:32:31 AM now')]);
+      expect(readouts()).toEqual([big('Timer, 4:59 left of 5:00'), small('42:29 left in Period 3'), small('10:32:31 AM')]);
     });
 
     it('always shows seconds, even with seconds off', () => {
@@ -181,7 +181,7 @@ describe('School Clock display preferences', () => {
       button('5 min', picker()).click();
       expect(savedLayouts()).toEqual(before);
       button('Cancel', ring()).click();
-      expect(readouts()).toEqual([big('42:30 left'), small('10:32:30 AM now')]);
+      expect(readouts()).toEqual([big('42:30 left'), small('10:32:30 AM')]);
       expect(savedLayouts()).toEqual(before);
     });
 
@@ -197,9 +197,9 @@ describe('School Clock display preferences', () => {
       openWithTwoReadouts();
       button('5 min', picker()).click();
       tapReadout(0); // the previous main one: time left -> time since start
-      expect(readouts()).toEqual([big('Timer, 5:00 left of 5:00'), small('2:30 since start'), small('10:32:30 AM now')]);
+      expect(readouts()).toEqual([big('Timer, 5:00 left of 5:00'), small('2:30 since start'), small('10:32:30 AM')]);
       button('Readouts').click();
-      button('Remove Readout: now').click();
+      button('Remove Readout: current time').click();
       expect(readouts()).toEqual([big('Timer, 5:00 left of 5:00'), small('2:30 since start')]);
       button('Cancel', ring()).click();
       expect(readouts()).toEqual([big('2:30 since start')]);
@@ -211,9 +211,9 @@ describe('School Clock display preferences', () => {
       button('5 min', picker()).click();
       advance(MIN);
       open();
-      expect(readouts()).toEqual([big('Timer, 4:00 left of 5:00'), small('41:30 left in Period 3'), small('10:33:30 AM now')]);
+      expect(readouts()).toEqual([big('Timer, 4:00 left of 5:00'), small('41:30 left in Period 3'), small('10:33:30 AM')]);
       button('Cancel', ring()).click();
-      expect(readouts()).toEqual([big('41:30 left'), small('10:33:30 AM now')]);
+      expect(readouts()).toEqual([big('41:30 left'), small('10:33:30 AM')]);
     });
 
     it('stays in the main spot while it rings, until dismissed', () => {
@@ -221,9 +221,9 @@ describe('School Clock display preferences', () => {
       button('1 min', picker()).click();
       advance(MIN + SEC);
       expect(ringing().hidden).toBe(false);
-      expect(readouts()).toEqual([big("Timer, time's up, 0:00 left of 1:00"), small('41:29 left in Period 3'), small('10:33:31 AM now')]);
+      expect(readouts()).toEqual([big("Timer, time's up, 0:00 left of 1:00"), small('41:29 left in Period 3'), small('10:33:31 AM')]);
       button('Dismiss', ringing()).click();
-      expect(readouts()).toEqual([big('41:29 left'), small('10:33:31 AM now')]);
+      expect(readouts()).toEqual([big('41:29 left'), small('10:33:31 AM')]);
     });
 
     it('gives the spot back when it stops ringing on its own', () => {
@@ -232,7 +232,7 @@ describe('School Clock display preferences', () => {
       advance(MIN + SEC);
       advance(61 * SEC);
       expect(ringing().hidden).toBe(true);
-      expect(readouts()).toEqual([big('40:28 left'), small('10:34:32 AM now')]);
+      expect(readouts()).toEqual([big('40:28 left'), small('10:34:32 AM')]);
     });
 
     it('is what the mini player shows', async () => {

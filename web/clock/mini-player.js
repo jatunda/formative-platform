@@ -131,8 +131,8 @@ export function createMiniPlayer({ pictureInPicture, onOpen, onDismiss, page = d
     mini.bell.toggleAttribute('hidden', ringing === null);
     mini.headText.textContent = ringing === null ? head : `Ringing · ${ringing}`;
     writeValue(mini.readoutValue, readout);
-    // The time needs no caption; a length of time keeps its own for screen readers.
-    mini.readoutCaption.textContent = readout.caption === 'now' ? '' : ` ${readout.caption}`;
+    // The time has no caption; a length of time keeps its own for screen readers.
+    mini.readoutCaption.textContent = readout.caption && ` ${readout.caption}`;
     const kind = ringing === null ? foot.kind : 'dismiss';
     mini.progress.hidden = kind !== 'progress';
     mini.sub.hidden = kind !== 'progress';

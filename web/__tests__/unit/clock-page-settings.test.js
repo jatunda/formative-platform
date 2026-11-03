@@ -261,18 +261,26 @@ describe('School Clock settings drawer', () => {
 
     it('Period Labels: one field per Period, two to a row, shown at once and saved', () => {
       open();
-      expect(drawer().querySelectorAll('.clock-labels-grid input')).toHaveLength(9);
+      expect(drawer().querySelectorAll('.clock-labels-grid input')).toHaveLength(8);
       expect(field('Period 3').placeholder).toBe('Add a label');
       setValue('Period 3', 'AP CSA');
       expect(mount().querySelector('h1').textContent.replace(/\s+/g, ' ')).toBe('Period 3 · AP CSA');
       expect(saved(storage).periodLabels).toEqual({ 'Period 3': 'AP CSA' });
     });
 
+    it('Period Labels: Seminar and Super Seminar share one field', () => {
+      // Wed 4/28/27 is HS Super Seminar Even: Super Seminar 11:45–13:05.
+      open({ when: new Date(2027, 3, 28, 12, 0) });
+      setValue('Seminar & Super Seminar', 'Advisory');
+      expect(mount().querySelector('h1').textContent.replace(/\s+/g, ' ')).toBe('Super Seminar · Advisory');
+      expect(saved(storage).periodLabels).toEqual({ Seminar: 'Advisory' });
+    });
+
     it('Test ring: plays the Bell sound and shows the ring', () => {
       open();
       button('Settings').click();
       button('Test ring').click();
-      expect(player.played).toEqual([{ sound: 'schoolBell', repeat: false }]);
+      expect(player.played).toEqual([{ sound: 'schoolBell', repeat: true }]);
       expect(mount().querySelector('[role="alertdialog"]').hidden).toBe(false);
       advance(4 * SEC);
     });

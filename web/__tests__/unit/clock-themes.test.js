@@ -12,7 +12,7 @@ describe('the theme set', () => {
     expect(PALETTES).toHaveLength(15);
     expect(FONTS).toHaveLength(13);
     expect(DEFAULT_THEME).toBe('slate');
-    expect(look({})).toEqual({ 'data-mode': 'dark', 'data-palette': 'slate', 'data-font': 'system', 'data-deco': '' });
+    expect(look({})).toEqual({ 'data-mode': 'dark', 'data-palette': 'slate', 'data-font': 'system', 'data-deco': '', 'data-backdrop': '' });
   });
 
   it('mixes light and dark themes: 8 palettes are natively dark and 7 light', () => {
@@ -23,15 +23,17 @@ describe('the theme set', () => {
   });
 
   it('names each theme by its look, never by who it is for', () => {
-    expect(themeLook(THEMES.find((t) => t.id === 'team'))).toBe('Navy and orange, bold condensed');
-    expect(themeLook(THEMES.find((t) => t.id === 'bloom'))).toBe('Blush pink and rose with flowers, calligraphy labels');
+    expect(themeLook(THEMES.find((t) => t.id === 'slate'))).toBe('Slate blue and sky blue, clean sans');
+    expect(themeLook(THEMES.find((t) => t.id === 'team'))).toBe('Navy and orange with diagonal stripes, bold condensed');
+    expect(themeLook(THEMES.find((t) => t.id === 'bloom'))).toBe('Blush pink and rose with flowers and a soft wash, calligraphy labels');
     const names = THEMES.map((t) => `${t.id} ${themeLook(t)}`).join(' ');
     expect(names).not.toMatch(/teacher|student|kid|girl|boy|science|math|english|history|art|music|drama|sport|pe\b|cs\b|for /i);
   });
 
-  it('shows a theme in its own version, with its font and decoration', () => {
-    expect(look({ theme: 'paper' })).toEqual({ 'data-mode': 'light', 'data-palette': 'paper', 'data-font': 'serif', 'data-deco': '' });
+  it('shows a theme in its own version, with its font, decoration and backdrop', () => {
+    expect(look({ theme: 'paper' })).toEqual({ 'data-mode': 'light', 'data-palette': 'paper', 'data-font': 'serif', 'data-deco': '', 'data-backdrop': 'ruled' });
     expect(look({ theme: 'bloom' })['data-deco']).toBe('flowers');
+    expect(look({ theme: 'lab' })['data-backdrop']).toBe('graph');
   });
 
   it('shows the other version while flipped', () => {
@@ -41,7 +43,7 @@ describe('the theme set', () => {
 
   it('swaps the font or palette; a swapped palette shows its own version (or the other one while flipped)', () => {
     expect(look({ theme: 'bloom', fontSwap: 'mono', paletteSwap: 'team' })).toEqual({
-      'data-mode': 'dark', 'data-palette': 'team', 'data-font': 'mono', 'data-deco': 'flowers',
+      'data-mode': 'dark', 'data-palette': 'team', 'data-font': 'mono', 'data-deco': 'flowers', 'data-backdrop': 'wash',
     });
     expect(look({ paletteSwap: 'paper', flipped: true })['data-mode']).toBe('dark');
   });

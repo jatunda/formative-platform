@@ -23,6 +23,21 @@ export function formatClockTime(date, { seconds = false, use24Hour = false } = {
   return `${hour12}:${pad2(date.getMinutes())}${secs} ${h < 12 ? 'AM' : 'PM'}`;
 }
 
+/** Periods that use another's Period Label: Super Seminar shares Seminar's. */
+const SHARED_LABELS = /** @type {Readonly<Record<string, string>>} */ (Object.freeze({ 'Super Seminar': 'Seminar' }));
+
+/**
+ * A Segment's Period Label ('' for none). Breaks and Assemblies are never
+ * labelled, and Super Seminar shows Seminar's label.
+ * @param {{ name: string, kind: string }} segment
+ * @param {Record<string, string>} periodLabels Period name -> label
+ * @returns {string}
+ */
+export function periodLabel(segment, periodLabels) {
+  if (segment.kind !== 'period') return '';
+  return periodLabels[SHARED_LABELS[segment.name] ?? segment.name]?.trim() ?? '';
+}
+
 /**
  * A Segment's name as the page shows it: a Period with a Period Label reads
  * "Period 3 · AP CSA"; Breaks and Assemblies are never labelled.
@@ -31,7 +46,7 @@ export function formatClockTime(date, { seconds = false, use24Hour = false } = {
  * @returns {string}
  */
 export function formatSegmentName(segment, periodLabels) {
-  const label = segment.kind === 'period' ? periodLabels[segment.name]?.trim() : '';
+  const label = periodLabel(segment, periodLabels);
   return label ? `${segment.name} · ${label}` : segment.name;
 }
 

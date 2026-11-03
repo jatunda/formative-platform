@@ -5,13 +5,13 @@
 // (Delete with an Undo toast); the form's changes apply on Save Alarm. When
 // and how Alarms ring is the clock model's (`ringsInWindow`); this only edits
 // the saved list.
-import { BLOCK_DAYS, DEFAULT_ALARM_PERIODS, LABELLED_PERIODS } from './clock-settings.js';
+import { ALARM_PERIODS, BLOCK_DAYS, DEFAULT_ALARM_PERIODS } from './clock-settings.js';
 import { drawerSection, fieldset, soundChoice, switchControl } from './controls.js';
 import { el } from './dom.js';
 import { formatSegmentName } from './format.js';
 import { icon } from './icons.js';
 import {
-  alarmHint, alarmName, isBlockDays, nextAlarmId, onceDate, parseMinutes, parseTime, bellScheduleChoices, timeFields,
+  alarmHint, alarmName, includedNames, isBlockDays, nextAlarmId, onceDate, parseMinutes, parseTime, bellScheduleChoices, timeFields,
 } from './alarm-text.js';
 
 /** @typedef {import('./clock-settings.js').Alarm} Alarm */
@@ -57,35 +57,69 @@ function check(words, checked) {
  * @param {import('./alarm-text.js').BellScheduleChoice[]} choices @param {string[] | null} keys
  */
 function bellScheduleChecks(choices, keys) {
-  const checks = choices.map((choice) => ({
-    choice, ...check(choice.name, keys === null || choice.keys.some((k) => keys.includes(k))),
-  }));
-  const ticked = () => checks.filter(({ input }) => input.checked).flatMap(({ choice }) => choice.keys);
-  /** @param {(choice: import('./alarm-text.js').BellScheduleChoice) => boolean} pick */
+  // Each choice keeps the keys of it that are ticked: all (checked), none, or
+  // some (a choice for several, like Special Bell Schedules, partly ticked by
+  // Block Days, which shows as a mixed checkbox).
+  const checks = choices.map((choice) => {
+    const box = check(choice.name, false);
+    const row = choice.includes ? specialRow(box, includedNames(choice)) : box.label;
+    return { choice, ...box, row, selected: keys === null ? choice.keys : choice.keys.filter((k) => keys.includes(k)) };
+  });
+  const ticked = () => checks.flatMap(({ selected }) => selected);
+  const allTicked = () => checks.every(({ choice, selected }) => selected.length === choice.keys.length);
+  function show() {
+    for (const { choice, input, selected } of checks) {
+      input.checked = selected.length === choice.keys.length;
+      input.indeterminate = selected.length > 0 && !input.checked;
+    }
+    blockDays.setAttribute('aria-pressed', String(isBlockDays(ticked())));
+    every.setAttribute('aria-pressed', String(allTicked()));
+  }
+  /** @param {(key: string) => boolean} pick */
   const tick = (pick) => {
-    for (const { choice, input } of checks) input.checked = pick(choice);
-    pressed();
+    for (const c of checks) c.selected = c.choice.keys.filter(pick);
+    show();
   };
   const blockDays = el('button', {
     type: 'button', className: 'clock-btn clock-btn--small', textContent: 'Block Days',
-    onclick: () => tick((choice) => choice.keys.some((k) => BLOCK_DAYS.includes(k))),
+    onclick: () => tick((k) => BLOCK_DAYS.includes(k)),
   });
   const every = el('button', {
     type: 'button', className: 'clock-btn clock-btn--small', textContent: 'Every Bell Schedule', onclick: () => tick(() => true),
   });
-  function pressed() {
-    blockDays.setAttribute('aria-pressed', String(isBlockDays(ticked())));
-    every.setAttribute('aria-pressed', String(checks.every(({ input }) => input.checked)));
+  for (const c of checks) {
+    c.input.addEventListener('change', () => {
+      c.selected = c.input.checked ? c.choice.keys : [];
+      show();
+    });
   }
-  for (const { input } of checks) input.addEventListener('change', pressed);
-  pressed();
+  show();
   const element = el('div', { className: 'clock-bell-schedule-checks' }, [
     el('div', { className: 'clock-fieldset__actions' }, [blockDays, every]),
-    el('div', { className: 'clock-checks' }, checks.map(({ label }) => label)),
+    el('div', { className: 'clock-checks' }, checks.map(({ row }) => row)),
   ]);
   /** The ticked Bell Schedule keys; null when every one is ticked. */
-  const value = () => (checks.every(({ input }) => input.checked) ? null : ticked());
+  const value = () => (allTicked() ? null : ticked());
   return { element, value };
+}
+
+/**
+ * The Special Bell Schedules checkbox with an info button that shows (on a click,
+ * or as a tooltip on hover) which Bell Schedules it stands for.
+ * @param {ReturnType<typeof check>} box @param {string[]} names
+ */
+function specialRow(box, names) {
+  const list = names.join(', ');
+  const detail = el('p', { className: 'clock-check__detail', hidden: true, textContent: `Includes ${list}.` });
+  const info = el('button', {
+    type: 'button', className: 'clock-btn clock-btn--icon clock-check__info', title: `Includes ${list}`,
+    'aria-label': 'What are special Bell Schedules?', 'aria-expanded': 'false',
+    onclick: () => {
+      detail.hidden = !detail.hidden;
+      info.setAttribute('aria-expanded', String(!detail.hidden));
+    },
+  }, [icon('info')]);
+  return el('div', { className: 'clock-check-row' }, [box.label, info, detail]);
 }
 
 /**
@@ -286,7 +320,7 @@ export function createAlarmEditor({ settings, update, play, now, schoolYears }) 
     }
     showMinutes();
     const periods = alarm?.periods ?? DEFAULT_ALARM_PERIODS;
-    const periodChecks = LABELLED_PERIODS.map((period) => ({ period, ...check(period, periods.includes(period)) }));
+    const periodChecks = ALARM_PERIODS.map((period) => ({ period, ...check(period, periods.includes(period)) }));
     const relabel = () => {
       for (const { period, text } of periodChecks) {
         text.textContent = formatSegmentName({ name: period, kind: 'period' }, settings().periodLabels);

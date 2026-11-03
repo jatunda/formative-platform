@@ -165,10 +165,10 @@ describe('readoutParts (what the page draws)', () => {
       .toBe('4d 17h');
   });
 
-  it('gives the current time the caption "now", with full-size seconds and a small AM/PM', () => {
+  it('gives the current time no caption, with full-size seconds and a small AM/PM', () => {
     const parts = readoutParts({ kind: 'time', at: tue(10, 12, 43) });
     expect(parts).toEqual({
-      amount: '10:12:43 AM', caption: 'now',
+      amount: '10:12:43 AM', caption: '',
       pieces: [{ text: '10:12:43', small: false }, { text: ' AM', small: true }],
       glyphs: { digits: 6, colons: 2, letters: 2 },
     });

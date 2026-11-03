@@ -4,6 +4,7 @@ import { SETTINGS_KEY } from '../../clock/clock-storage.js';
 import { createFakeStorage } from '../helpers/fake-storage.js';
 import { createFakeSoundPlayer } from '../helpers/fake-sound-player.js';
 import { field, setValue } from '../helpers/clock-dom.js';
+import { SOUNDS } from '../../clock/sound.js';
 
 /** A real clock the test moves by hand; the page's ticks come from fake timers. */
 function fakeRealClock(date) {
@@ -99,7 +100,7 @@ describe('School Clock sound', () => {
 
       // 11:15 is 3 minutes away: 180 s after the audio clock's 100.
       expect(player.scheduled).toEqual([
-        expect.objectContaining({ at: 280, sound: 'schoolBell', repeat: false }),
+        expect.objectContaining({ at: 280, sound: 'schoolBell', repeat: true }),
       ]);
     });
 
@@ -189,7 +190,7 @@ describe('School Clock sound', () => {
   });
 
   describe('ringing', () => {
-    it('flashes the screen and says what rang when a Bell comes due, and stops after about 3 s', () => {
+    it('flashes the screen and says what rang when a Bell comes due, and keeps ringing like an Alarm, up to 60 s', () => {
       open({ when: at(11, 14, 59) });
       expect(mount().classList.contains('clock-ringing')).toBe(false);
       expect(ringing().hidden).toBe(true);
@@ -200,7 +201,9 @@ describe('School Clock sound', () => {
       expect(ringing().hidden).toBe(false);
       expect(ringing().textContent).toContain('Period 3 ends');
 
-      real.advance(3 * SEC);
+      real.advance(30 * SEC);
+      expect(mount().classList.contains('clock-ringing')).toBe(true);
+      real.advance(30 * SEC);
       expect(mount().classList.contains('clock-ringing')).toBe(false);
       expect(ringing().hidden).toBe(true);
     });
@@ -312,16 +315,18 @@ describe('School Clock sound', () => {
       });
     });
 
-    it('a test ring plays the Bells sound now and flashes like a Bell', () => {
+    it('a test ring plays the Bells sound now and rings like a Bell, until dismissed', () => {
       open({ settings: { bells: { on: true, sound: 'buzzer' } } });
       openSettings();
 
       button('Test ring').click();
 
-      expect(player.played).toEqual([{ sound: 'buzzer', repeat: false }]);
+      expect(player.played).toEqual([{ sound: 'buzzer', repeat: true }]);
       expect(mount().classList.contains('clock-ringing--flash')).toBe(true);
       expect(ringing().textContent).toContain('Test ring');
       real.advance(4 * SEC);
+      expect(mount().classList.contains('clock-ringing')).toBe(true);
+      button('Dismiss').click();
       expect(mount().classList.contains('clock-ringing')).toBe(false);
     });
   });
@@ -343,11 +348,11 @@ describe('School Clock sound', () => {
     it('previews each voice', () => {
       open();
       openSettings();
-      for (const sound of ['chime', 'schoolBell', 'beep', 'buzzer']) {
+      for (const sound of SOUNDS) {
         setValue('Bell sound', sound);
         button('Preview Bell sound').click();
       }
-      expect(player.played.map((p) => p.sound)).toEqual(['chime', 'schoolBell', 'beep', 'buzzer']);
+      expect(player.played.map((p) => p.sound)).toEqual(SOUNDS);
     });
 
     it('chooses the Bells sound, which is saved and used for the coming Bells', () => {

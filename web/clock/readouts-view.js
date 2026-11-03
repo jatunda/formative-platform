@@ -93,7 +93,7 @@ export function createReadoutsView({ onCycle, onRemove, onAdd, timerFace }) {
         const readout = shown[i];
         writeValue(readout.value, parts);
         readout.caption.textContent = parts.caption;
-        if (readout.removeName) readout.removeName.textContent = ` Readout: ${parts.caption}`;
+        if (readout.removeName) readout.removeName.textContent = ` Readout: ${parts.caption || 'current time'}`;
       });
     },
     focusReadout(index) {

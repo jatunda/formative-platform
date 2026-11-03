@@ -9,7 +9,7 @@
 // onto its audio clock, so they play on time even when this tab's timers are
 // throttled behind other windows. The window is redone when settings change,
 // when the tab is shown again, when sound turns on, and as it rolls forward.
-import { alarmsAfterRinging, describeMoment, ringsInWindow, ringsUntilDismissed } from './clock-model.js';
+import { alarmsAfterRinging, describeMoment, ringsInWindow } from './clock-model.js';
 import { createSettingsStore } from './clock-storage.js';
 import { createClockSource } from './clock-source.js';
 import { createDayBarView } from './day-bar-view.js';
@@ -30,7 +30,7 @@ import { createWakeLockKeeper, detectCapabilities } from './screen.js';
 import { createAlarmEditor } from './alarm-editor.js';
 import { createSettingsDrawer } from './settings-drawer.js';
 import { applyLook, createLookSheet, decorations } from './look-sheet.js';
-import { BELL_SECONDS, ALARM_MAX_SECONDS, createSoundPlayer } from './sound.js';
+import { ALARM_MAX_SECONDS, createSoundPlayer } from './sound.js';
 import { cancelTimer, pauseTimer, resumeTimer, settleTimer, timerProgress, timerRingView, timerStatus, timerText } from './timer.js';
 import { createTimerPicker } from './timer-picker.js';
 import { createTimerRing } from './timer-ring.js';
@@ -185,13 +185,13 @@ export function initClockApp({
       key: ringKey(ring),
       at: audioNow + (ring.at.getTime() - t) / 1000 / clock.speed,
       sound: ring.sound,
-      repeat: ringsUntilDismissed(ring),
+      repeat: true,
     })));
   }
 
   // What's ringing on screen: a flash (or a steady highlight) and the ring
-  // card naming it, about 3 s for a Bell and until dismissed (60 s at most)
-  // otherwise. The card takes focus and hands it back when it goes.
+  // card naming it, until dismissed (60 s at most), for Bells, Alarms and the
+  // timer alike. The card takes focus and hands it back when it goes.
   let ringingUntil = null;
   /** What the mini player says is ringing, or null. */
   let ringingWhat = null;
@@ -200,10 +200,9 @@ export function initClockApp({
   /** The length of the timer that rang (its ring shows 0:00 of it until then). */
   let rangTotalMs = null;
   const ringCard = createRingCard({ onDismiss: () => dismiss() });
-  /** @param {import('./ring-words.js').RingWords} words @param {boolean} untilDismissed */
-  function startRinging(words, untilDismissed) {
-    const seconds = untilDismissed ? ALARM_MAX_SECONDS : BELL_SECONDS;
-    ringingUntil = Math.max(ringingUntil ?? 0, realNow() + seconds * 1000);
+  /** @param {import('./ring-words.js').RingWords} words */
+  function startRinging(words) {
+    ringingUntil = Math.max(ringingUntil ?? 0, realNow() + ALARM_MAX_SECONDS * 1000);
     ringingWhat = words.title;
     ringCard.show(words);
     mount.classList.remove('clock-ringing--flash', 'clock-ringing--steady');
@@ -346,8 +345,8 @@ export function initClockApp({
     update: updateSettings,
     play: (sound) => soundPlayer.play(sound),
     testRing: () => {
-      soundPlayer.play(settings.bells.sound);
-      startRinging(TEST_RING_WORDS, false);
+      soundPlayer.play(settings.bells.sound, { repeat: true });
+      startRinging(TEST_RING_WORDS);
     },
     // A ring shows over the drawer too, so it can be seen, heard and dismissed.
     behind: () => behindAll(drawer.elements, ringCard.elements),
@@ -469,7 +468,7 @@ export function initClockApp({
       const text = textFor(settings);
       for (const ring of rang) {
         if (ring.at.getTime() < staleBefore) continue;
-        startRinging(ringWords(ring, text), ringsUntilDismissed(ring));
+        startRinging(ringWords(ring, text));
         if (ring.source === 'timer') {
           timerRinging = true;
           rangTotalMs = ring.totalMs;

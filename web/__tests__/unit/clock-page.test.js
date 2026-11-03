@@ -76,7 +76,7 @@ describe('School Clock page', () => {
     expect(pageText()).not.toContain('10:32');
     document.querySelector('#clockApp .clock-readout__face').click();
     document.querySelector('#clockApp .clock-readout__face').click();
-    expect(readoutTexts()).toEqual(['10:32:00 AM now']);
+    expect(readoutTexts()).toEqual(['10:32:00 AM']);
     expect(pageText().match(/10:32:00/g)).toHaveLength(1);
   });
 
@@ -165,7 +165,7 @@ describe('School Clock page', () => {
     app = start({ realNow: real.now });
     expect(headingText()).toBe('HS Experience Week');
     expect(dayText()).toBe('Wed, Jan 20');
-    expect(displayText()).toContain('Enjoy the trips · back Mon, Jan 25 · starts in 4d 22h');
+    expect(displayText()).toContain("It's Experience Week · back Mon, Jan 25 · starts in 4d 22h");
   });
 
   describe('Summer', () => {
@@ -176,14 +176,14 @@ describe('School Clock page', () => {
 
       expect(headingText()).toBe('Day 2 of Summer');
       expect(dayText()).toBe('Fri, May 28');
-      expect(displayText()).toContain('Have a great summer');
+      expect(displayText()).toContain('Have a great summer!');
       expect(displayText()).not.toContain('back');
     });
 
     it('is a plain clock with no next year: the Readout shows the time, never a dash', () => {
       const real = fakeRealClock(new Date(2027, 4, 28, 10, 0, 0));
       app = start({ realNow: real.now });
-      expect(readoutTexts()).toEqual(['10:00:00 AM now']);
+      expect(readoutTexts()).toEqual(['10:00:00 AM']);
       expect(pageText()).not.toContain('—');
     });
 
@@ -203,7 +203,7 @@ describe('School Clock page', () => {
 
       expect(headingText()).toBe('Day 2 of Summer');
       expect(readoutTexts()).toEqual(['79d 22h until Mon, Aug 16']);
-      expect(displayText()).toContain('Have a great summer · back Mon, Aug 16');
+      expect(displayText()).toContain('Have a great summer! · back Mon, Aug 16');
     });
   });
 
@@ -211,7 +211,7 @@ describe('School Clock page', () => {
     const real = fakeRealClock(new Date(2030, 0, 1, 9, 0, 0));
     app = start({ realNow: real.now });
     expect(headingText()).toBe('Tue, Jan 1, 2030');
-    expect(readoutTexts()).toEqual(['9:00:00 AM now']);
+    expect(readoutTexts()).toEqual(['9:00:00 AM']);
     expect(displayText()).toContain('No school calendar for this date yet');
     // Nothing to cycle or arrange: the time is all there is.
     expect(control('Readouts')).toBeUndefined();
@@ -418,9 +418,9 @@ describe('School Clock page', () => {
 
         expect(isShown(button('Middle School'))).toBe(true);
         expect(control('Settings')).toBeUndefined();
-        expect(readoutTexts()).toEqual(['10:30:00 AM now']);
+        expect(readoutTexts()).toEqual(['10:30:00 AM']);
         real.advance(1000);
-        expect(readoutTexts()).toEqual(['10:30:01 AM now']);
+        expect(readoutTexts()).toEqual(['10:30:01 AM']);
       });
 
       it('saves the chosen Division and follows its Bell Schedules', () => {
@@ -538,11 +538,11 @@ describe('School Clock page', () => {
         const face = document.querySelector('#clockApp .clock-readout__face');
         face.click();
         face.click();
-        expect(readoutTexts()).toEqual(['1:45:00 PM now']);
+        expect(readoutTexts()).toEqual(['1:45:00 PM']);
 
         toggle('24-hour time');
 
-        expect(readoutTexts()).toEqual(['13:45:00 now']);
+        expect(readoutTexts()).toEqual(['13:45:00']);
         expect(displayText()).not.toMatch(/AM|PM/);
         expect(saved(storage).use24Hour).toBe(true);
       });
@@ -609,7 +609,7 @@ describe('School Clock page', () => {
       tapReadout(0);
       expect(readouts()).toEqual(['2:00 since start']);
       tapReadout(0);
-      expect(readouts()).toEqual(['10:32:00 AM now']);
+      expect(readouts()).toEqual(['10:32:00 AM']);
       tapReadout(0);
       expect(readouts()).toEqual(['43:00 left']);
     });
@@ -639,7 +639,7 @@ describe('School Clock page', () => {
       expect(value.style.getPropertyValue('--d')).toBe('6');
       expect(value.style.getPropertyValue('--c')).toBe('2');
       expect(value.style.getPropertyValue('--u')).toBe('2');
-      expect(document.querySelector('#clockApp .clock-readout--big .clock-readout__caption').textContent).toBe('now');
+      expect(document.querySelector('#clockApp .clock-readout--big .clock-readout__caption').textContent).toBe('');
     });
 
     describe('edit mode (adding and removing)', () => {
@@ -670,7 +670,7 @@ describe('School Clock page', () => {
         addButton().click();
         expect(readouts()).toEqual(['43:00 left', '2:00 since start']);
         addButton().click();
-        expect(readouts()).toEqual(['43:00 left', '2:00 since start', '10:32:00 AM now']);
+        expect(readouts()).toEqual(['43:00 left', '2:00 since start', '10:32:00 AM']);
         expect(addButton()).toBeUndefined();
       });
 
@@ -708,7 +708,7 @@ describe('School Clock page', () => {
         expect(removeButtons()).toHaveLength(3);
 
         removeButtons()[0].click();
-        expect(readouts()).toEqual(['2:00 since start', '10:32:00 AM now']);
+        expect(readouts()).toEqual(['2:00 since start', '10:32:00 AM']);
         expect(document.activeElement).toBe(removeButtons()[0]);
         expect(document.querySelector('#clockApp .clock-readout--big').textContent).toContain('since start');
 
@@ -800,11 +800,11 @@ describe('School Clock page', () => {
 
     it('shows just the time, with nothing to arrange, before a Division is chosen or on a date outside every School Year', () => {
       app = initClockApp({ realNow: inPeriod3().now, storage: createFakeStorage(), tabStorage: createFakeStorage() });
-      expect(readouts()).toEqual(['10:32:00 AM now']);
+      expect(readouts()).toEqual(['10:32:00 AM']);
       expect(control('Readouts')).toBeUndefined();
       app.destroy();
       app = start({ realNow: fakeRealClock(new Date(2030, 0, 1, 9, 0, 0)).now });
-      expect(readouts()).toEqual(['9:00:00 AM now']);
+      expect(readouts()).toEqual(['9:00:00 AM']);
       expect(control('Readouts')).toBeUndefined();
     });
 
@@ -829,11 +829,11 @@ describe('School Clock page', () => {
       app.destroy();
 
       tabB.open(now);
-      expect(readouts()).toEqual(['2:00 since start', '10:32:00 AM now']);
+      expect(readouts()).toEqual(['2:00 since start', '10:32:00 AM']);
       app.destroy();
 
       newTab().open(now); // a third tab: B changed last
-      expect(readouts()).toEqual(['2:00 since start', '10:32:00 AM now']);
+      expect(readouts()).toEqual(['2:00 since start', '10:32:00 AM']);
     });
 
     it('a tab keeps the layout it opened with through a reload, even after another tab changes', () => {

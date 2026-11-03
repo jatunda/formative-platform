@@ -186,7 +186,7 @@ describe('School Clock look', () => {
       openLook();
       const themes = radios('Theme');
       expect(themes).toHaveLength(15);
-      expect(themes.map((t) => t.name)).toContain('Navy and orange, bold condensed');
+      expect(themes.map((t) => t.name)).toContain('Navy and orange with diagonal stripes, bold condensed');
       expect(themes.filter((t) => t.input.checked).map((t) => t.name)).toEqual(['Slate blue and sky blue, clean sans']);
       // Each preview draws itself in its theme's own version.
       const preview = themes.find((t) => t.name.startsWith('Cream paper')).input.closest('label');
@@ -199,7 +199,7 @@ describe('School Clock look', () => {
       withSettings({ fontSwap: 'mono', flipped: true });
       open();
       openLook();
-      choose('Theme', 'Cream paper and ink blue, book serif');
+      choose('Theme', 'Cream paper and ink blue on lined paper, book serif');
       expect(look()).toEqual({ mode: 'light', palette: 'paper', font: 'serif', deco: null });
       expect(saved(storage)).toMatchObject({ theme: 'paper', fontSwap: null, paletteSwap: null, flipped: false });
       open();
@@ -209,7 +209,7 @@ describe('School Clock look', () => {
     it('a theme with a decoration draws it in the corners', () => {
       open();
       openLook();
-      choose('Theme', 'Blush pink and rose with flowers, calligraphy labels');
+      choose('Theme', 'Blush pink and rose with flowers and a soft wash, calligraphy labels');
       expect(look().deco).toBe('flowers');
       expect(mount().querySelectorAll('.clock-screen > .clock-deco')).toHaveLength(2);
     });
@@ -225,7 +225,7 @@ describe('School Clock look', () => {
       expect(look().mode).toBe('light');
       expect(saved(storage).flipped).toBe(true);
       expect(flipLabel()).toContain('Light version');
-      choose('Theme', 'Pale sage and leaf green, rounded sans');
+      choose('Theme', 'Pale sage and leaf green on graph paper, rounded sans');
       expect(look().mode).toBe('light');
       expect(flipSwitch().checked).toBe(false);
       expect(flipLabel()).toContain('Dark version');
@@ -274,7 +274,7 @@ describe('School Clock look', () => {
       expect(isShown(hint())).toBe(true);
       expect(button('Look').classList.contains('is-hinted')).toBe(true);
       openLook();
-      choose('Theme', 'Deep ink and teal, engineered sans');
+      choose('Theme', 'Deep ink and teal on dot-grid paper, engineered sans');
       expect(hint() && isShown(hint())).toBeFalsy();
       open();
       expect(hint() && isShown(hint())).toBeFalsy();
@@ -311,7 +311,7 @@ describe('School Clock look', () => {
     expect([...doc.head.querySelectorAll('link')].map((l) => l.getAttribute('href'))).toContain('/clock/themes.css');
     expect(doc.documentElement.dataset).toMatchObject({ mode: 'light', palette: 'paper', font: 'serif' });
     openLook();
-    choose('Theme', 'Navy and orange, bold condensed');
+    choose('Theme', 'Navy and orange with diagonal stripes, bold condensed');
     expect(doc.documentElement.dataset).toMatchObject({ mode: 'dark', palette: 'team', font: 'condensed' });
   });
 });

@@ -8,7 +8,7 @@
 
 /**
  * A named generated voice (the sound engine synthesises each one).
- * @typedef {'chime' | 'schoolBell' | 'beep' | 'buzzer'} SoundName
+ * @typedef {'chime' | 'clockTower' | 'marimba' | 'deskBell' | 'woodBlock' | 'schoolBell' | 'beep' | 'buzzer'} SoundName
  */
 
 /**
@@ -134,10 +134,22 @@ export const DIVISIONS = Object.freeze([['MS', 'Middle School'], ['HS', 'High Sc
 /** The Block Days shortcut: Bell Schedules with long (~85-minute) Periods. */
 export const BLOCK_DAYS = Object.freeze(['even', 'odd', 'lateStartEven', 'hsSuperSeminar']);
 
+/**
+ * The one-off Bell Schedules an Alarm ticks as one "Special Bell Schedules" choice
+ * (the Veterans Day convocation, the Pep Rallies, Super Seminar).
+ */
+export const SPECIAL_BELL_SCHEDULES = Object.freeze(['convocation', 'pepRally', 'hsSuperSeminar']);
+
 /** Periods a new Period Alarm applies to; Seminar and Super Seminar are opt-in. */
 export const DEFAULT_ALARM_PERIODS = Object.freeze(
   ['Period 1', 'Period 2', 'Period 3', 'Period 4', 'Period 5', 'Period 6', 'Period 7'],
 );
 
-/** Every Period a teacher can give a Period Label, in the order the page lists them. */
-export const LABELLED_PERIODS = Object.freeze([...DEFAULT_ALARM_PERIODS, 'Seminar', 'Super Seminar']);
+/** Every Period a Period Alarm can ring in, in the order the page lists them. */
+export const ALARM_PERIODS = Object.freeze([...DEFAULT_ALARM_PERIODS, 'Seminar', 'Super Seminar']);
+
+/**
+ * Every Period a teacher can give a Period Label, in the order the page lists
+ * them. Super Seminar has none of its own: it shows Seminar's (format.js).
+ */
+export const LABELLED_PERIODS = Object.freeze([...DEFAULT_ALARM_PERIODS, 'Seminar']);

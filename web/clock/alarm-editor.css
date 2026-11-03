@@ -192,6 +192,35 @@
   opacity: 1;
 }
 
+.clock-check input:indeterminate {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+/* A partly ticked choice (some of Special Bell Schedules): a bar, not a tick. */
+.clock-check input:indeterminate::after {
+  height: 0;
+  border-left: 0;
+  opacity: 1;
+  transform: none;
+}
+
+/* Special Bell Schedules: its checkbox, an info button, and what it includes. */
+.clock-check-row {
+  display: grid;
+  grid-template-columns: auto auto;
+  justify-content: start;
+  align-items: center;
+  column-gap: var(--s1);
+}
+
+.clock-check__detail {
+  grid-column: 1 / -1;
+  margin: 0 0 var(--s2);
+  font-size: 0.9em;
+  color: var(--muted);
+}
+
 .clock-check input:focus-visible {
   outline: var(--focus-width) solid var(--focus);
   outline-offset: 2px;

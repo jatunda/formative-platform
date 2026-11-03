@@ -3,7 +3,7 @@
 // one-line summary of an Alarm in the Settings list ("5 min before the end ·
 // Periods 1–7 · Block Days · Chime"), the Bell Schedules a teacher can tick,
 // and turning what was typed (hour, minute, minutes) into an Alarm's fields.
-import { BLOCK_DAYS } from './clock-settings.js';
+import { BLOCK_DAYS, SPECIAL_BELL_SCHEDULES } from './clock-settings.js';
 import { formatClockTime, formatShortDate } from './format.js';
 import { anchorText, repeatText } from './ring-words.js';
 import { SOUND_NAMES } from './sound.js';
@@ -13,27 +13,50 @@ import { SOUND_NAMES } from './sound.js';
 
 /**
  * One Bell Schedule a teacher can tick: its name and every Bell Schedule key
- * with that name (the three Finals days are one choice).
- * @typedef {{ name: string, keys: string[] }} BellScheduleChoice
+ * with that name (the three Finals days are one choice). "Special Bell Schedules"
+ * is one choice for several; `includes` gives each one's key and name.
+ * @typedef {{ name: string, keys: string[], includes?: { key: string, name: string }[] }} BellScheduleChoice
  */
+
+/** The name of the choice that ticks every one of SPECIAL_BELL_SCHEDULES. */
+export const SPECIAL_BELL_SCHEDULES_NAME = 'Special Bell Schedules';
+
+/** Names, once each, in order. @param {string[]} names */
+const unique = (names) => [...new Set(names)];
+
+/**
+ * The names a choice stands for: its own, or those of the special ones.
+ * `keys` limits them to the ones ticked.
+ * @param {BellScheduleChoice} choice @param {string[]} [keys]
+ */
+export function includedNames(choice, keys = choice.keys) {
+  if (!choice.includes) return [choice.name];
+  return unique(choice.includes.filter((s) => keys.includes(s.key)).map((s) => s.name));
+}
 
 /**
  * Every Bell Schedule in `schoolYears`, one choice per name, in the order
- * they're first listed.
+ * they're first listed; the special ones are one choice, where the first of
+ * them would be.
  * @param {{ bellSchedules: Record<string, { name: string }> }[]} schoolYears
  * @returns {BellScheduleChoice[]}
  */
 export function bellScheduleChoices(schoolYears) {
   /** @type {Map<string, string[]>} */
   const byName = new Map();
+  /** @type {{ key: string, name: string }[]} */
+  const includes = [];
   for (const year of schoolYears) {
     for (const [key, { name }] of Object.entries(year.bellSchedules)) {
-      const keys = byName.get(name) ?? [];
+      const special = SPECIAL_BELL_SCHEDULES.includes(key);
+      if (special) includes.push({ key, name });
+      const choiceName = special ? SPECIAL_BELL_SCHEDULES_NAME : name;
+      const keys = byName.get(choiceName) ?? [];
       if (!keys.includes(key)) keys.push(key);
-      byName.set(name, keys);
+      byName.set(choiceName, keys);
     }
   }
-  return [...byName].map(([name, keys]) => ({ name, keys }));
+  return [...byName].map(([name, keys]) => (name === SPECIAL_BELL_SCHEDULES_NAME ? { name, keys, includes } : { name, keys }));
 }
 
 /** Whether `keys` is exactly the Block Days. @param {string[]} keys */
@@ -41,13 +64,16 @@ export const isBlockDays = (keys) => keys.length === BLOCK_DAYS.length && BLOCK_
 
 /**
  * The Bell Schedules an Alarm is limited to, in words: "Block Days", or the
- * names ("All Day, Finals"); '' for every Bell Schedule.
+ * names ("All Day, Finals", "Special Bell Schedules" when all of those are
+ * ticked, else the ticked ones by name); '' for every Bell Schedule.
  * @param {string[] | null} keys @param {BellScheduleChoice[]} choices
  */
 function bellSchedulesText(keys, choices) {
   if (keys === null) return '';
   if (isBlockDays(keys)) return 'Block Days';
-  return choices.filter((c) => c.keys.some((k) => keys.includes(k))).map((c) => c.name).join(', ');
+  return choices.filter((c) => c.keys.some((k) => keys.includes(k)))
+    .flatMap((c) => (c.keys.every((k) => keys.includes(k)) ? [c.name] : includedNames(c, keys)))
+    .join(', ');
 }
 
 /**

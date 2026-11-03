@@ -317,6 +317,9 @@ button.clock-readout__face {
 
 .clock-readout__caption {
   margin-top: 0.25em;
+  /* Keeps its line when empty (the current time has no caption), so the
+     big number doesn't jump as it cycles. */
+  min-height: 1.2em;
   font-size: var(--type-caption);
   font-weight: 600;
   letter-spacing: 0.12em;

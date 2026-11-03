@@ -8,6 +8,7 @@
 // there is no bar. Pure: a moment from the clock model and the settings give
 // what to draw (positions in percent of the bar's width).
 import { segmentsOn } from './clock-model.js';
+import { periodLabel } from './format.js';
 
 /** @typedef {import('./clock-model.js').Moment} Moment */
 /** @typedef {import('./clock-model.js').TimedSegment} TimedSegment */
@@ -79,7 +80,7 @@ export function describeBar(now, moment, schoolYears, { division, dayStrip, peri
   const block = (s, state, left = 0, width = 100) => ({
     name: s.name,
     short: shortName(s.name),
-    label: s.kind === 'period' ? (periodLabels[s.name]?.trim() ?? '') : '',
+    label: periodLabel(s, periodLabels),
     kind: s.kind,
     start: s.start,
     end: s.end,

@@ -10,24 +10,33 @@
 
 /** @typedef {import('./clock-settings.js').SoundName} SoundName */
 
-/** Every voice's name for people, in the order the page lists them. */
+/** Every voice's name for people, in the order the page lists them (gentlest first). */
 /** @type {Readonly<Record<SoundName, string>>} */
-export const SOUND_NAMES = Object.freeze({ chime: 'Chime', schoolBell: 'School bell', beep: 'Beep', buzzer: 'Buzzer' });
+export const SOUND_NAMES = Object.freeze({
+  chime: 'Chime',
+  clockTower: 'Clock tower',
+  marimba: 'Marimba',
+  deskBell: 'Desk bell',
+  woodBlock: 'Wood block',
+  schoolBell: 'School bell',
+  beep: 'Beep',
+  buzzer: 'Buzzer',
+});
 
 /** Every voice, in the order the page lists them. */
 /** @type {readonly SoundName[]} */
 export const SOUNDS = Object.freeze(/** @type {SoundName[]} */ (Object.keys(SOUND_NAMES)));
 
-/** How long a Bell (or a preview) plays, in seconds. */
+/** How long a preview (or any ring not set to repeat) plays, in seconds. */
 export const BELL_SECONDS = 3;
-/** The longest an Alarm or the timer repeats before stopping on its own. */
+/** The longest a ring (Bell, Alarm or the timer) repeats before stopping on its own. */
 export const ALARM_MAX_SECONDS = 60;
 
 /**
  * One ring for the audio clock.
  * @typedef {{ key: string, at: number, sound: SoundName, repeat: boolean }} ScheduledRing
  *   `key` names the ring across reschedules; `at` is audio-clock seconds;
- *   `repeat` rings until dismissed (Alarms, the timer) rather than about 3 s (Bells).
+ *   `repeat` rings until dismissed (every Bell, Alarm and the timer) rather than about 3 s (a preview).
  */
 
 /** @typedef {'suspended' | 'running' | 'closed' | 'unavailable'} SoundState */
@@ -54,16 +63,18 @@ export const ALARM_MAX_SECONDS = 60;
 /**
  * One tone with a quick attack and a decay to silence.
  * @param {BaseAudioContext} ctx @param {AudioNode} out @param {AudioScheduledSourceNode[]} sources
- * @param {{ type: OscillatorType, freq: number, t: number, length: number, peak?: number }} tone
+ * @param {{ type: OscillatorType, freq: number, t: number, length: number, peak?: number, attack?: number, bendTo?: number }} tone
+ *   `attack` is the rise time (s); `bendTo` glides the pitch there over the first 50 ms.
  * @returns {GainNode} the tone's envelope, for voices that modulate it
  */
-function tone(ctx, out, sources, { type, freq, t, length, peak = 0.5 }) {
+function tone(ctx, out, sources, { type, freq, t, length, peak = 0.5, attack = 0.01, bendTo }) {
   const osc = ctx.createOscillator();
   const env = ctx.createGain();
   osc.type = type;
   osc.frequency.setValueAtTime(freq, t);
+  if (bendTo) osc.frequency.exponentialRampToValueAtTime(bendTo, t + 0.05);
   env.gain.setValueAtTime(0.0001, t);
-  env.gain.exponentialRampToValueAtTime(peak, t + 0.01);
+  env.gain.exponentialRampToValueAtTime(peak, t + attack);
   env.gain.exponentialRampToValueAtTime(0.0001, t + length);
   osc.connect(env);
   env.connect(out);
@@ -73,6 +84,28 @@ function tone(ctx, out, sources, { type, freq, t, length, peak = 0.5 }) {
   return env;
 }
 
+/**
+ * A struck note: a few sine partials (multiples of `freq`, as `[ratio, peak,
+ * length]`), the higher ones dying away sooner, as on a real bell or bar.
+ * @param {BaseAudioContext} ctx @param {AudioNode} out @param {AudioScheduledSourceNode[]} sources
+ * @param {number} freq @param {number} t @param {[number, number, number][]} partials
+ */
+function strike(ctx, out, sources, freq, t, partials) {
+  for (const [ratio, peak, length] of partials) tone(ctx, out, sources, { type: 'sine', freq: freq * ratio, t, length, peak });
+}
+
+// Partials of a tubular bell, a small hand bell and a marimba bar. Bells have
+// slightly "out of tune" upper partials, which is what makes them sound like
+// bells; a marimba bar is tuned so its second partial is two octaves up.
+const TUBULAR = /** @type {[number, number, number][]} */ ([[1, 0.3, 1.8], [2, 0.12, 1.2], [3.01, 0.06, 0.7], [4.17, 0.03, 0.4]]);
+const HAND_BELL = /** @type {[number, number, number][]} */ ([[1, 0.3, 1.4], [2.76, 0.1, 0.6], [5.4, 0.04, 0.25]]);
+const MARIMBA_BAR = /** @type {[number, number, number][]} */ ([[1, 0.38, 0.5], [4, 0.07, 0.12]]);
+
+// The sound design: every voice sits between about 400 Hz and 3 kHz, where
+// laptop and projector speakers are loud and the ear cuts through room chatter
+// best; none lingers on a steady harsh tone; each has its own rhythm and
+// timbre so different Alarms are told apart; and each leaves a gap before it
+// repeats, so an Alarm ringing for a minute keeps breathing.
 /** @type {Record<SoundName, Voice>} */
 const VOICES = {
   // Two soft notes, high then low.
@@ -81,20 +114,57 @@ const VOICES = {
     tone(ctx, out, sources, { type: 'sine', freq: 523.25, t: t + 0.75, length: 0.75 });
     return 1.5;
   },
-  // An electric bell: a bright tone rattled by a fast tremolo.
-  schoolBell(ctx, out, t, sources) {
-    const env = tone(ctx, out, sources, { type: 'triangle', freq: 1250, t, length: 1, peak: 0.4 });
-    const lfo = ctx.createOscillator();
-    const depth = ctx.createGain();
-    lfo.type = 'square';
-    lfo.frequency.setValueAtTime(18, t);
-    depth.gain.setValueAtTime(0.3, t);
-    lfo.connect(depth);
-    depth.connect(env.gain);
-    lfo.start(t);
-    lfo.stop(t + 1);
-    sources.push(lfo);
+  // The Westminster phrase (G#, F#, E, B) on tubular bells, once per Bell.
+  clockTower(ctx, out, t, sources) {
+    [830.61, 739.99, 659.25, 493.88].forEach((freq, i) => strike(ctx, out, sources, freq, t + i * 0.55, TUBULAR));
+    return 3.2;
+  },
+  // A quick rising arpeggio (C, E, G, C) on a wooden bar, twice per Bell.
+  marimba(ctx, out, t, sources) {
+    [523.25, 659.25, 783.99, 1046.5].forEach((freq, i) => strike(ctx, out, sources, freq, t + i * 0.12, MARIMBA_BAR));
+    return 1.5;
+  },
+  // One bright ding, like a hotel desk bell or a kitchen timer.
+  deskBell(ctx, out, t, sources) {
+    strike(ctx, out, sources, 1046.5, t, HAND_BELL);
+    return 1.5;
+  },
+  // Tok-tok: two hollow knocks, three times per Bell.
+  woodBlock(ctx, out, t, sources) {
+    for (const at of [t, t + 0.16]) {
+      tone(ctx, out, sources, { type: 'sine', freq: 1100, bendTo: 850, t: at, length: 0.12, peak: 0.6, attack: 0.003 });
+      tone(ctx, out, sources, { type: 'sine', freq: 2420, t: at, length: 0.05, peak: 0.12, attack: 0.003 });
+    }
     return 1;
+  },
+  // Ring-ring: a bell struck about ten times a second, in two short bursts.
+  // Gentler than a hallway bell: pure tones, a lower pitch, a shallow
+  // flutter rather than a hard rattle, and a gap to breathe.
+  schoolBell(ctx, out, t, sources) {
+    const RATE = 10;
+    for (const [from, to] of [[t, t + 0.8], [t + 1.2, t + 2.0]]) {
+      const env = ctx.createGain();
+      env.connect(out);
+      env.gain.setValueAtTime(0.0001, from);
+      for (let at = from; at < to; at += 1 / RATE) {
+        env.gain.linearRampToValueAtTime(0.32, at + 0.005);
+        env.gain.exponentialRampToValueAtTime(0.2, at + 1 / RATE);
+      }
+      env.gain.exponentialRampToValueAtTime(0.0001, to + 0.6);
+      for (const [ratio, mix] of [[1, 1], [2.76, 0.3], [5.4, 0.1]]) {
+        const osc = ctx.createOscillator();
+        const level = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880 * ratio, from);
+        level.gain.setValueAtTime(mix * 0.85, from);
+        osc.connect(level);
+        level.connect(env);
+        osc.start(from);
+        osc.stop(to + 0.6);
+        sources.push(osc);
+      }
+    }
+    return 3;
   },
   // Beep-beep.
   beep(ctx, out, t, sources) {

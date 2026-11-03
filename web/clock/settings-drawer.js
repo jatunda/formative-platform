@@ -79,7 +79,9 @@ export function createSettingsDrawer({ settings, update, play, testRing, behind,
       oninput: () => update({ periodLabels: { ...settings().periodLabels, [period]: input.value } }),
     });
     input.value = settings().periodLabels[period] ?? '';
-    return el('label', { className: 'clock-field' }, [el('span', { className: 'clock-field__label', textContent: period }), input]);
+    // One box for both Seminars: Super Seminar shows Seminar's label.
+    const name = period === 'Seminar' ? 'Seminar & Super Seminar' : period;
+    return el('label', { className: 'clock-field' }, [el('span', { className: 'clock-field__label', textContent: name }), input]);
   });
   const labels = drawerSection('labels', 'Period Labels', [el('div', { className: 'clock-labels-grid' }, labelInputs)]);
 

@@ -387,3 +387,133 @@
 @media (max-width: 520px), (max-height: 520px) {
   [data-deco] .clock-deco { display: none; }
 }
+
+/* ======================= backdrops ======================= */
+/* A theme's page background (themes.js says which theme has which). Drawn
+   faintly from the palette's own tokens, so a swapped palette or the flipped
+   version still works, and kept off-centre or fine enough never to fight the
+   big Readout. Each one is set on the page body, the clock while fullscreen,
+   and that theme's tile in the Look sheet, where --bd (one backdrop unit)
+   shrinks the pattern to the tile. Forced-colours mode drops them. */
+
+[data-backdrop] > body,
+[data-backdrop] #clockApp:fullscreen,
+[data-backdrop] > .clock-theme-tile__preview {
+  --bd: 1vmin;
+  background-image: var(--backdrop);
+  background-size: var(--backdrop-size, auto);
+}
+
+[data-backdrop] > .clock-theme-tile__preview { --bd: 1.3px; }
+
+/* Ink: engineering dot-grid paper. */
+[data-backdrop="dots"] > body,
+[data-backdrop="dots"] #clockApp:fullscreen,
+[data-backdrop="dots"] > .clock-theme-tile__preview {
+  --backdrop: radial-gradient(circle, color-mix(in srgb, var(--accent) 45%, transparent) 0 max(1px, calc(var(--bd) * 0.18)), transparent max(1.5px, calc(var(--bd) * 0.18 + 0.5px)));
+  --backdrop-size: calc(var(--bd) * 4) calc(var(--bd) * 4);
+}
+
+/* Lab: graph paper, a fine grid with a bolder line every fifth square. */
+[data-backdrop="graph"] > body,
+[data-backdrop="graph"] #clockApp:fullscreen,
+[data-backdrop="graph"] > .clock-theme-tile__preview {
+  --bd-minor: color-mix(in srgb, var(--accent) 20%, transparent);
+  --bd-major: color-mix(in srgb, var(--accent) 38%, transparent);
+  --backdrop:
+    linear-gradient(var(--bd-major) 1px, transparent 1px),
+    linear-gradient(90deg, var(--bd-major) 1px, transparent 1px),
+    linear-gradient(var(--bd-minor) 1px, transparent 1px),
+    linear-gradient(90deg, var(--bd-minor) 1px, transparent 1px);
+  --backdrop-size:
+    calc(var(--bd) * 20) calc(var(--bd) * 20), calc(var(--bd) * 20) calc(var(--bd) * 20),
+    calc(var(--bd) * 4) calc(var(--bd) * 4), calc(var(--bd) * 4) calc(var(--bd) * 4);
+}
+
+/* Paper: a lined notebook page with a red margin. */
+[data-backdrop="ruled"] > body,
+[data-backdrop="ruled"] #clockApp:fullscreen,
+[data-backdrop="ruled"] > .clock-theme-tile__preview {
+  --backdrop:
+    linear-gradient(90deg, transparent calc(var(--bd) * 12), rgb(217 72 95 / 0.4) calc(var(--bd) * 12) calc(var(--bd) * 12 + 2px), transparent 0),
+    linear-gradient(transparent calc(var(--bd) * 6 - 1px), color-mix(in srgb, var(--accent) 26%, transparent) 0);
+  --backdrop-size: auto, 100% calc(var(--bd) * 6);
+}
+
+/* Parchment: edges darkened with age. */
+[data-backdrop="aged"] > body,
+[data-backdrop="aged"] #clockApp:fullscreen,
+[data-backdrop="aged"] > .clock-theme-tile__preview {
+  --backdrop: radial-gradient(ellipse at center, transparent 45%, color-mix(in srgb, var(--accent) 14%, transparent) 100%);
+}
+
+/* Coast: the sea deepening towards the bottom, a coral sunset on the horizon. */
+[data-backdrop="horizon"] > body,
+[data-backdrop="horizon"] #clockApp:fullscreen,
+[data-backdrop="horizon"] > .clock-theme-tile__preview {
+  --backdrop:
+    radial-gradient(ellipse 90% 40% at 50% 100%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 70%),
+    linear-gradient(to bottom, transparent 35%, color-mix(in srgb, var(--surface-2) 80%, transparent));
+}
+
+/* Vesper: a gold glow from above. */
+[data-backdrop="dusk"] > body,
+[data-backdrop="dusk"] #clockApp:fullscreen,
+[data-backdrop="dusk"] > .clock-theme-tile__preview {
+  --backdrop: radial-gradient(ellipse 80% 60% at 50% 0%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 70%);
+}
+
+/* Terminal: CRT scanlines with a faint phosphor glow and darker corners. */
+[data-backdrop="scanlines"] > body,
+[data-backdrop="scanlines"] #clockApp:fullscreen,
+[data-backdrop="scanlines"] > .clock-theme-tile__preview {
+  --backdrop:
+    repeating-linear-gradient(to bottom, transparent 0 2px, color-mix(in srgb, var(--accent) 7%, transparent) 2px 3px),
+    radial-gradient(ellipse at center, color-mix(in srgb, var(--accent) 9%, transparent), transparent 65%),
+    radial-gradient(ellipse at center, transparent 60%, color-mix(in srgb, var(--fg) 10%, transparent));
+}
+
+/* Stage: a brass spotlight from above, the corners in shadow. */
+[data-backdrop="spotlight"] > body,
+[data-backdrop="spotlight"] #clockApp:fullscreen,
+[data-backdrop="spotlight"] > .clock-theme-tile__preview {
+  --backdrop:
+    radial-gradient(ellipse 50% 90% at 50% -15%, color-mix(in srgb, var(--accent) 20%, transparent), transparent 75%),
+    radial-gradient(ellipse at center, transparent 55%, rgb(0 0 0 / 0.22));
+}
+
+/* Court: wide mown stripes, like a playing field. */
+[data-backdrop="stripes"] > body,
+[data-backdrop="stripes"] #clockApp:fullscreen,
+[data-backdrop="stripes"] > .clock-theme-tile__preview {
+  --backdrop: repeating-linear-gradient(90deg, transparent 0 calc(var(--bd) * 12), color-mix(in srgb, var(--accent) 7%, transparent) calc(var(--bd) * 12) calc(var(--bd) * 24));
+}
+
+/* Team: a pair of bold diagonal stripes, off to the lower right. */
+[data-backdrop="pennant"] > body,
+[data-backdrop="pennant"] #clockApp:fullscreen,
+[data-backdrop="pennant"] > .clock-theme-tile__preview {
+  --backdrop: linear-gradient(115deg,
+    transparent 66%, color-mix(in srgb, var(--accent) 13%, transparent) 66% 73%,
+    transparent 73% 76%, color-mix(in srgb, var(--accent) 8%, transparent) 76% 80%, transparent 80%);
+}
+
+/* Bloom: a soft rose wash from corner to corner. */
+[data-backdrop="wash"] > body,
+[data-backdrop="wash"] #clockApp:fullscreen,
+[data-backdrop="wash"] > .clock-theme-tile__preview {
+  --backdrop:
+    radial-gradient(ellipse 60% 50% at 0% 0%, color-mix(in srgb, var(--deco) 12%, transparent), transparent),
+    linear-gradient(160deg, transparent 35%, color-mix(in srgb, var(--accent) 14%, transparent));
+}
+
+/* Chalk: smudges of half-erased chalk, the board darker at its edges. */
+[data-backdrop="dust"] > body,
+[data-backdrop="dust"] #clockApp:fullscreen,
+[data-backdrop="dust"] > .clock-theme-tile__preview {
+  --backdrop:
+    radial-gradient(ellipse 30% 16% at 20% 28%, color-mix(in srgb, var(--fg) 7%, transparent), transparent 70%),
+    radial-gradient(ellipse 26% 14% at 80% 70%, color-mix(in srgb, var(--fg) 6%, transparent), transparent 70%),
+    radial-gradient(ellipse 40% 9% at 62% 14%, color-mix(in srgb, var(--fg) 5%, transparent), transparent 70%),
+    radial-gradient(ellipse at center, transparent 60%, rgb(0 0 0 / 0.22));
+}
