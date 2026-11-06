@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { describeMoment, segmentsOn } from '../../clock/clock-model.js';
 import { SCHOOL_YEARS } from '../../clock/school-years.js';
 
@@ -435,17 +435,9 @@ describe('describeMoment in Off-Hours, days off and Summer', () => {
   });
 });
 
+// Tests run in Los Angeles time (vitest.config.js), where 11/1 changes the clocks.
 describe('describeMoment across the 2026-11-01 daylight-saving change (Los Angeles)', () => {
   const HOUR = 60 * MIN;
-  let savedTz;
-  beforeAll(() => {
-    savedTz = process.env.TZ;
-    process.env.TZ = 'America/Los_Angeles';
-  });
-  afterAll(() => {
-    if (savedTz === undefined) delete process.env.TZ;
-    else process.env.TZ = savedTz;
-  });
 
   it('counts down to 8:30 AM Monday on the wall clock, an hour longer in real time', () => {
     // Sat 10/31 noon (PDT) → Mon 11/2 8:30 (PST): 44.5 wall-clock hours, 45.5 real.
