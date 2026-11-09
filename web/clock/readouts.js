@@ -59,12 +59,12 @@ export function readoutValue(mode, moment, now, periodLabels = {}) {
   /** @type {(ms: number | null, caption: string, long?: boolean) => ReadoutValue} */
   const duration = (ms, caption, long = false) => (ms === null ? time : { kind: 'duration', ms, caption, long });
   if (mode === 'clock' || moment.state === 'unknown') return time;
-  if (moment.state === 'segment') {
-    return mode === 'countdown'
-      ? duration(moment.timeLeftMs, 'left')
-      : duration(moment.timeElapsedMs, 'since start');
+  // A Segment or a Passing Period counts up from its own start.
+  if (mode === 'countup' && (moment.state === 'segment' || moment.state === 'passing')) {
+    return duration(moment.timeElapsedMs, 'since start');
   }
-  // With no Segment to count up from, a Passing Period shows what's left of it either way.
+  if (moment.state === 'segment') return duration(moment.timeLeftMs, 'left');
+  // A Passing Period counts down to the Segment up next.
   if (moment.state === 'passing') {
     const next = /** @type {import('./clock-model.js').TimedSegment} */ (moment.upNext);
     return duration(moment.timeLeftMs, `until ${formatSegmentName(next, periodLabels)}`);

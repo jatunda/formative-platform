@@ -96,11 +96,14 @@ describe('readoutValue', () => {
     });
   });
 
-  it("in a Passing Period: both counting modes show the Passing Period's remaining time, until the next Segment", () => {
+  it("in a Passing Period: counts down to the next Segment, or up from the Passing Period's start", () => {
     // Nutrition ends 10:25; Period 3 starts 10:30.
     const now = tue(10, 27, 20);
-    const remaining = { kind: 'duration', ms: 2 * MIN + 40 * 1000, caption: 'until Period 3', long: false };
-    expect(valuesAt(now)).toEqual({ countdown: remaining, countup: remaining, clock: { kind: 'time', at: now } });
+    expect(valuesAt(now)).toEqual({
+      countdown: { kind: 'duration', ms: 2 * MIN + 40 * 1000, caption: 'until Period 3', long: false },
+      countup: { kind: 'duration', ms: 2 * MIN + 20 * 1000, caption: 'since start', long: false },
+      clock: { kind: 'time', at: now },
+    });
   });
 
   it('before school: until school starts, since the last School Day ended', () => {

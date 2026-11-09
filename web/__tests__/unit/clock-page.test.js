@@ -102,6 +102,14 @@ describe('School Clock page', () => {
     expect(displayText()).toContain('Up next Period 3 10:30 AM');
   });
 
+  it('counts up from the start of a Passing Period when the Readout is tapped', () => {
+    const real = fakeRealClock(new Date(2026, 9, 27, 10, 27, 20));
+    app = start({ realNow: real.now });
+
+    document.querySelector('#clockApp .clock-readout__face').click();
+    expect(readoutTexts()).toEqual(['2:20 since start']);
+  });
+
   it('names the Period coming up in a Passing Period by its Period Label', () => {
     const real = fakeRealClock(new Date(2026, 9, 27, 10, 27, 20));
     app = start({ realNow: real.now, settings: { periodLabels: { 'Period 3': 'AP CSA' } } });

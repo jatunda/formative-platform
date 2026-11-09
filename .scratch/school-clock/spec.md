@@ -199,7 +199,7 @@ A public page at `mrhsieh.app/clock` that any teacher can bookmark. No login. It
 - **Readout modes:**
   - In-school modes: time left, time elapsed, current time.
   - Off-Hours modes: until Next School Day, since school ended, current time.
-  - During a Passing Period, both countdown modes show the Passing Period's remaining time.
+  - During a Passing Period, time left counts down to the next Segment and time elapsed counts up from the Passing Period's start ("since start"), so each click changes what shows.
   - Defaults: "until school starts" before school on a School Day; "since school ended" after school; "until Next School Day" on days off.
   - A Readout keeps its position in the mode cycle as the day moves between in-school and Off-Hours.
 - **Device storage.** A small storage adapter (Robotics' `createLocalStorageAdapter` is the precedent) with versioned keys, falling back to defaults on missing or corrupt data.
