@@ -210,6 +210,69 @@ describe('School Clock fullscreen, mini player and feedback', () => {
       expect(progress()).toBeUndefined();
     });
 
+    it('cycles the big Readout when clicked, on the main page too', async () => {
+      open();
+      await openMini();
+      // A button named by what it shows, like the main page's Readouts.
+      const face = () => button(readout().trim(), mini());
+      expect(face()).toBeDefined();
+
+      face().click();
+      expect(readout()).toBe('42:00 since start');
+      expect(bigReadout()).toBe('42:00 since start');
+      face().click();
+      expect(readout()).toBe('11:12:00 AM');
+      face().click();
+      expect(readout()).toBe('3:00 left');
+    });
+
+    it('marks which mode of the three the big Readout is in', async () => {
+      const dots = () => mini().querySelector('.clock-mini__modes');
+      const current = () => [...dots().children].findIndex((dot) => dot.classList.contains('is-current'));
+      open();
+      await openMini();
+      expect(dots().children).toHaveLength(3);
+      expect(dots().getAttribute('aria-hidden')).toBe('true'); // the Readout's own words say it
+      expect(current()).toBe(0);
+      mini().querySelector('.clock-mini__readout').click();
+      expect(current()).toBe(1);
+      mini().querySelector('.clock-mini__readout').click();
+      expect(current()).toBe(2);
+
+      button('Timer').click();
+      button('5 min', picker()).click();
+      expect(dots().hidden).toBe(true);
+    });
+
+    it("can't be cycled while the timer has the big spot, while ringing, or with just the time", async () => {
+      const face = () => mini().querySelector('.clock-mini__readout');
+      const smallReadout = () => mount().querySelector('.clock-readout--small .clock-readout__face').textContent.replace(/\s+/g, ' ').trim();
+      open();
+      button('Timer').click();
+      button('5 min', picker()).click();
+      await openMini();
+      expect(face().disabled).toBe(true);
+      face().click();
+      expect(smallReadout()).toBe('3:00 left in Period 3');
+      button('Cancel', timerRing()).click();
+      expect(face().disabled).toBe(false);
+
+      face().focus();
+      advance(3 * 60 * SEC + SEC); // the Bell at the end of Period 3
+      expect(face().disabled).toBe(true);
+      // Focus on the Readout moves on to Dismiss rather than being lost.
+      expect(pip.window.document.activeElement).toBe(button('Dismiss', mini()));
+      button('Dismiss', mini()).click();
+      expect(face().disabled).toBe(false);
+      app.destroy();
+
+      open({ settings: {} });
+      await openMini();
+      expect(face().disabled).toBe(true);
+      expect(() => face().click()).not.toThrow();
+      expect(readout()).toBe('11:12:00 AM');
+    });
+
     it('uses the same Period Labels, time format and seconds setting as the main page', async () => {
       open({ settings: { division: 'HS', use24Hour: true, showSeconds: false, periodLabels: { 'Period 4': 'AP CSA' } } });
       await openMini();

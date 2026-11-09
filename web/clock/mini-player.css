@@ -62,22 +62,75 @@
   font-weight: 700;
 }
 
-/* The big Readout: about half the window's height, capped so it fits the
-   width by the same unit rule as the main page (--d, --c, --u). */
+/* The big Readout: a button that cycles its mode, pressed anywhere in the
+   window (its ::after covers it, under Dismiss and the ringing frame). */
 .clock-mini__readout {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   align-self: center;
+  gap: 2px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
   line-height: 1;
+  cursor: pointer;
 }
 
+.clock-mini__readout::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+}
+
+.clock-mini__readout:disabled {
+  cursor: default;
+}
+
+/* About 40% of the window's height, capped so it fits the width by the same
+   unit rule as the main page (--d, --c, --u). */
 .clock-mini__value {
   --units: calc(var(--d, 4) + var(--c, 1) * var(--colon-units) + var(--u, 0) * 0.42);
   font-family: var(--font-digits);
-  font-size: min(50vh, calc((100vw - 24px) * 0.94 * var(--digits-fit) / (var(--units) * var(--glyph-em))));
+  font-size: min(40vh, calc((100vw - 24px) * 0.94 * var(--digits-fit) / (var(--units) * var(--glyph-em))));
   font-weight: var(--digits-weight);
   font-variant-numeric: tabular-nums lining-nums;
   letter-spacing: var(--digits-tracking);
   color: var(--digits);
   white-space: nowrap;
+}
+
+/* Under the digits: which mode of three it's in (a dot each, the current one
+   filled) and its caption ("left", "since start"; none for the time). */
+.clock-mini__mode {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.5em;
+  min-height: 1.2em;
+  font-size: clamp(11px, 6.5vh, 20px);
+  color: var(--muted);
+}
+
+.clock-mini__caption:empty {
+  display: none;
+}
+
+.clock-mini__modes {
+  display: flex;
+  gap: 0.3em;
+}
+
+.clock-mini__dot {
+  width: 0.45em;
+  height: 0.45em;
+  border-radius: 50%;
+  background: var(--track);
+}
+
+.clock-mini__dot.is-current {
+  background: var(--accent);
 }
 
 /* Foot, 44px at least: the Segment's bar and end, up next, the time left in

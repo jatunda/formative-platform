@@ -332,7 +332,9 @@ The Document Picture-in-Picture window, about 320×180. It's one column of three
 1. **Head:** "Period 3 · AP CSA" (display face, muted, 14–28px).
    - While ringing: a bell icon and "Ringing · Wrap-up time" in `--accent-text`, bold.
    - While a timer runs: "Timer of 5:00" in `--accent-text`.
-2. **Big Readout:** `min(50vh, width-capped)` with the same unit rule, so "42:17" fills about half the height. Clock seconds are full size here too.
+2. **Big Readout:** `min(40vh, width-capped)` with the same unit rule. Clock seconds are full size here too.
+   - Under the digits, in muted text: three dots (one per mode, the current one in `--accent`) and the caption ("left", "since start"; none for the time).
+   - A click anywhere in the window cycles the page's big Readout to its next mode, like tapping it on the page. There's no cycling (and no dots) while the timer has the big spot or with just the time, and no cycling while something rings.
 3. **Foot**, 44px minimum. One of these:
    - a just-this-Segment bar (4px) plus "ends 10:55" (in a Segment);
    - "UP NEXT Period 4 · Prep" (Passing Period);

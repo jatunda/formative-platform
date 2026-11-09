@@ -47,7 +47,10 @@ export function createFakeFullscreen() {
   return fullscreen;
 }
 
-/** Document Picture-in-Picture: each window opened has its own document. */
+/**
+ * Document Picture-in-Picture: each window opened has its own document, an
+ * iframe's, since jsdom only moves focus in a document with a window.
+ */
 export function createFakePictureInPicture() {
   const pip = {
     /** Every window opened, oldest first, with the size asked for. */
@@ -55,10 +58,12 @@ export function createFakePictureInPicture() {
     get window() { return pip.windows.at(-1) ?? null; },
     async open(size) {
       const win = new EventTarget();
+      const frame = document.createElement('iframe');
+      document.body.append(frame);
       Object.assign(win, {
         size,
         closed: false,
-        document: document.implementation.createHTMLDocument(''),
+        document: frame.contentDocument,
         /** Closed by the page, or by the user (its own close button). Like a
          * browser, it says so (pagehide) a moment later, not straight away. */
         close() {

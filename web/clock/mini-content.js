@@ -11,6 +11,10 @@ import { readoutParts, readoutText } from './readouts.js';
 const SECOND = 1000;
 
 /** @typedef {ReturnType<typeof readoutParts>} Parts */
+/**
+ * @typedef {{ big: Parts, mode: import('./readouts.js').ReadoutMode | null }} BigReadout
+ * The page's big Readout and its mode (null when it's just the time).
+ */
 
 /**
  * @typedef {{ kind: 'progress', label: string, percent: number, text: string }
@@ -22,8 +26,11 @@ const SECOND = 1000;
  */
 
 /**
- * @typedef {{ timer: boolean, head: string, readout: Parts, foot: MiniFoot }} MiniContent
+ * @typedef {{ timer: boolean, head: string, readout: Parts, mode: import('./readouts.js').ReadoutMode | null,
+ *   foot: MiniFoot }} MiniContent
  * `timer`: the timer has the big Readout (the head is "Timer").
+ * `mode`: the big Readout's mode, which a click cycles; null when there's none
+ * to cycle (just the time, or the timer in the big spot).
  */
 
 /**
@@ -32,14 +39,16 @@ const SECOND = 1000;
  *   moment: import('./clock-model.js').Moment | null,
  *   settings: { use24Hour: boolean, showSeconds: boolean, periodLabels: Record<string, string> },
  *   big: Parts,
+ *   mode: BigReadout['mode'],
  *   timer: { remainingMs: number, paused: boolean, totalMs: number | null, progress: number } | null,
  * }} state `moment` is null before a Division is chosen; `big` is the page's
- *   big Readout (ignored while `timer` shows); `timer` while one runs, is
+ *   big Readout (ignored while `timer` shows) and `mode` its mode (null when
+ *   it's just the time); `timer` while one runs, is
  *   paused or has just rung, with the length it was started with (null if
  *   unknown) and the share of it left, 0–1.
  * @returns {MiniContent}
  */
-export function miniContent({ now, moment, settings, big, timer }) {
+export function miniContent({ now, moment, settings, big, mode, timer }) {
   const options = { use24Hour: settings.use24Hour, seconds: settings.showSeconds };
   const words = moment ? displayText(now, moment, settings) : null;
   const segmentHead = words ? [words.title, words.tag].filter(Boolean).join(' · ') : '';
@@ -51,6 +60,7 @@ export function miniContent({ now, moment, settings, big, timer }) {
     timer: Boolean(timer),
     head: timer ? timerHead(timer) : segmentHead,
     readout,
+    mode: timer ? null : mode,
     foot: footFor(moment, settings, options, timer),
   };
 }

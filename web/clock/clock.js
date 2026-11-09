@@ -398,6 +398,7 @@ export function initClockApp({
       render(new Date(clock.now()));
       renderMiniRinging();
     },
+    onCycle: () => changeLayout(cycleReadout(layout, 0)),
     onDismiss: () => dismiss(),
   });
   mini.button.classList.add('clock-control', 'clock-control--icon', 'clock-control--mini');
@@ -405,15 +406,15 @@ export function initClockApp({
 
   /**
    * @param {Date} now @param {import('./clock-model.js').Moment | null} moment
-   * @param {import('./mini-content.js').Parts} big the big Readout (the layout's first)
+   * @param {import('./mini-content.js').BigReadout} bigReadout the big Readout (the layout's first) and its mode
    */
-  function renderMini(now, moment, big) {
+  function renderMini(now, moment, { big, mode }) {
     const { status, remainingMs } = timerStatus(settings, now.getTime());
     let timer = remainingMs === null ? null : {
       remainingMs, paused: status === 'paused', totalMs: settings.timerTotalMs ?? null, progress: timerProgress(settings, now.getTime()),
     };
     if (!timer && timerRinging) timer = { remainingMs: 0, paused: false, totalMs: rangTotalMs, progress: 0 };
-    mini.show(miniContent({ now, moment, settings, big, timer }));
+    mini.show(miniContent({ now, moment, settings, big, mode, timer }));
   }
   function renderMiniRinging() {
     mini.showRinging(ringingWhat);
@@ -531,7 +532,7 @@ export function initClockApp({
    * big spot while it shows), or just the time before a Division is chosen
    * or on a date the clock knows nothing about.
    * @param {Date} now @param {import('./clock-model.js').Moment | null} moment @param {ReturnType<typeof textFor>} text
-   * @returns {import('./mini-content.js').Parts} the big Readout (the layout's first, under a timer too)
+   * @returns {import('./mini-content.js').BigReadout} the big Readout (the layout's first, under a timer too)
    */
   function renderReadouts(now, moment, text) {
     const options = text.readout;
@@ -543,7 +544,7 @@ export function initClockApp({
       const parts = readoutParts({ kind: 'time', at: now }, options);
       readoutsView.show({ count: 1, cyclable: false, timer: false, editing: false, canAdd: false }, [parts]);
       showEditing();
-      return parts;
+      return { big: parts, mode: null };
     }
     lastMoment = moment;
     if (!layout) {
@@ -566,7 +567,7 @@ export function initClockApp({
       parts,
     );
     showEditing();
-    return parts[0];
+    return { big: parts[0], mode: layout.readouts[0].mode };
   }
 
   /** The Readouts control's pressed state, and the screen's edit-mode look. */
