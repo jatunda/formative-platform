@@ -34,6 +34,7 @@ import { ALARM_MAX_SECONDS, BELL_AUTO_DISMISS_SECONDS, createSoundPlayer } from 
 import { cancelTimer, pauseTimer, resumeTimer, settleTimer, timerProgress, timerRingView, timerStatus, timerText } from './timer.js';
 import { createTimerPicker } from './timer-picker.js';
 import { createTimerRing } from './timer-ring.js';
+import { keepRingClear } from './ring-fit.js';
 
 const TICK_MS = 1000;
 /** How far ahead (real time) rings are handed to the sound player: past the
@@ -488,6 +489,7 @@ export function initClockApp({
   const mainScreen = el('main', { className: clock.simulated ? 'clock-screen is-simulated' : 'clock-screen' }, [
     ...(clock.simulated ? [banner] : []), ...decorations(), top, stage, bottom,
   ]);
+  keepRingClear(readoutsView.element, timerRing.element, top);
   mount.replaceChildren(
     mainScreen, ...ringCard.elements, saveError.element,
     ...timerPicker.elements, ...drawer.elements, ...lookSheet.elements, divisionPrompt.element,

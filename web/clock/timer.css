@@ -43,8 +43,10 @@
   align-self: stretch;
   min-height: 0;
   container-type: size;
-  /* No wider than the stage allows (the Look sheet narrows it), leaving room for the side column. */
-  --ring-d: min(100cqh, 56vw, 60cqw);
+  /* No wider than the stage allows (the Look sheet narrows it), leaving room
+     for the side column, and clear of the top bar's text and buttons
+     (ring-fit.js measures --ring-room while the ring shares their row). */
+  --ring-d: min(100cqh, 56vw, 60cqw, var(--ring-room, 100cqh));
 }
 
 .clock-readouts.has-timer .clock-smalls {
@@ -74,6 +76,8 @@
   width: var(--ring-d);
   height: var(--ring-d);
   container-type: size;
+  /* Lower than the middle when that's what clears the top bar (ring-fit.js). */
+  translate: 0 var(--ring-shift, 0px);
 }
 
 .clock-ring__svg {
@@ -345,6 +349,43 @@
   .clock-picker__custom {
     margin-top: var(--s3);
     padding-top: var(--s3);
+  }
+}
+
+/* squarish to portrait (a portrait tablet, a 4:3-or-narrower window): as
+   the Readouts do there, the others sit in a row under the ring, so the ring
+   is centred and each caption keeps to one line. The ring keeps to the
+   stage, as large as the row above the small Readouts and the width allow. */
+@media (min-width: 521px) and (min-height: 521px) and (aspect-ratio < 4/3) {
+  .clock-screen.has-timer .clock-stage {
+    grid-row: stage;
+  }
+
+  .clock-readouts.has-timer {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+    justify-items: center;
+    row-gap: var(--gap-lg);
+  }
+
+  .clock-readouts.has-timer .clock-ring {
+    grid-column: 1;
+    width: auto;
+    height: min(100%, 84cqw);
+    aspect-ratio: 1;
+    align-self: center;
+  }
+
+  .clock-readouts.has-timer .clock-smalls {
+    grid-column: 1;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--gap-md) clamp(24px, 6vw, 80px);
+  }
+
+  .clock-readouts.has-timer .clock-readout--small .clock-readout__value {
+    font-size: clamp(24px, min(6vh, 6vw), 72px);
   }
 }
 

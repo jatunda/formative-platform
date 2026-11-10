@@ -552,6 +552,15 @@ button.clock-readout__face {
   flex: none;
 }
 
+/* Too narrow to centre the prompt between the window buttons (a portrait
+   tablet zoomed in): it takes the free width left of them instead. */
+@media (min-width: 521px) and (max-width: 760px) {
+  .clock-bottom:not(:has(.clock-bar:not([hidden]))) {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "prompt corner";
+  }
+}
+
 /* ---------- the bar: whole day or just this Segment ---------- */
 
 .clock-bar {
