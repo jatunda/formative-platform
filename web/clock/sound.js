@@ -10,8 +10,10 @@
 
 /** @typedef {import('./clock-settings.js').SoundName} SoundName */
 
-/** Every voice's name for people, in the order the page lists them (gentlest first). */
-/** @type {Readonly<Record<SoundName, string>>} */
+/**
+ * Every voice's name for people, in the order the page lists them (gentlest
+ * first). Its keys are the `SoundName`s.
+ */
 export const SOUND_NAMES = Object.freeze({
   swell: 'Swell',
   chime: 'Chime',
@@ -74,25 +76,60 @@ export const BELL_AUTO_DISMISS_SECONDS = 5;
  */
 
 /**
- * One tone with a quick attack and a decay to silence.
- * @param {BaseAudioContext} ctx @param {AudioNode} out @param {Track} track
- * @param {{ type: OscillatorType, freq: number, t: number, length: number, peak?: number, attack?: number, bendTo?: number }} tone
- *   `attack` is the rise time (s); `bendTo` glides the pitch there over the first 50 ms.
- * @returns {GainNode} the tone's envelope, for voices that modulate it
+ * How a tone's level moves: `decay` rises over its attack and dies away to
+ * silence by its end; `gate` starts at its peak, holds, and cuts off over the
+ * last 12 ms; `steady` stays at its peak (for a voice that shapes it after).
+ * @typedef {'decay' | 'gate' | 'steady'} Envelope
  */
-function tone(ctx, out, track, { type, freq, t, length, peak = 0.5, attack = 0.01, bendTo }) {
+
+/**
+ * One tone: an oscillator through a low-pass filter (if given) and its own
+ * level into `out`.
+ * @param {BaseAudioContext} ctx @param {AudioNode} out @param {Track} track
+ * @param {{ type?: OscillatorType, wave?: PeriodicWave, freq: number, t: number, length: number, peak?: number,
+ *   attack?: number, bendTo?: number, bendLength?: number, envelope?: Envelope,
+ *   filter?: { from: number, to: number, over: number, q: number } }} tone
+ *   `wave` takes the place of `type` (a sine when neither); `attack` is the
+ *   rise time (s); `bendTo` glides the pitch there over `bendLength` (50 ms
+ *   unless given); `filter` closes from `from` Hz to `to` Hz over `over` s.
+ * @returns {{ osc: OscillatorNode, env: GainNode }} for voices that modulate them
+ */
+function tone(ctx, out, track, {
+  type = 'sine', wave, freq, t, length, peak = 0.5, attack = 0.01, bendTo, bendLength = 0.05, envelope = 'decay', filter,
+}) {
   const osc = ctx.createOscillator();
+  const lowpass = filter ? ctx.createBiquadFilter() : null;
   const env = ctx.createGain();
-  osc.type = type;
+  if (wave) osc.setPeriodicWave(wave);
+  else osc.type = type;
   osc.frequency.setValueAtTime(freq, t);
-  if (bendTo) osc.frequency.exponentialRampToValueAtTime(bendTo, t + 0.05);
-  env.gain.setValueAtTime(0.0001, t);
-  env.gain.exponentialRampToValueAtTime(peak, t + attack);
-  env.gain.exponentialRampToValueAtTime(0.0001, t + length);
-  osc.connect(env);
+  if (bendTo) osc.frequency.exponentialRampToValueAtTime(bendTo, t + bendLength);
+  if (lowpass && filter) {
+    lowpass.type = 'lowpass';
+    lowpass.Q.value = filter.q;
+    lowpass.frequency.setValueAtTime(filter.from, t);
+    lowpass.frequency.exponentialRampToValueAtTime(filter.to, t + filter.over);
+  }
+  if (envelope === 'decay') {
+    env.gain.setValueAtTime(0.0001, t);
+    env.gain.exponentialRampToValueAtTime(peak, t + attack);
+    env.gain.exponentialRampToValueAtTime(0.0001, t + length);
+  } else {
+    env.gain.setValueAtTime(peak, t);
+    if (envelope === 'gate') {
+      env.gain.setValueAtTime(peak, t + length - 0.012);
+      env.gain.linearRampToValueAtTime(0.0001, t + length);
+    }
+  }
+  if (lowpass) {
+    osc.connect(lowpass);
+    lowpass.connect(env);
+  } else {
+    osc.connect(env);
+  }
   env.connect(out);
   track(osc, t, t + length);
-  return env;
+  return { osc, env };
 }
 
 /**
@@ -102,7 +139,7 @@ function tone(ctx, out, track, { type, freq, t, length, peak = 0.5, attack = 0.0
  * @param {number} freq @param {number} t @param {[number, number, number][]} partials
  */
 function strike(ctx, out, track, freq, t, partials) {
-  for (const [ratio, peak, length] of partials) tone(ctx, out, track, { type: 'sine', freq: freq * ratio, t, length, peak });
+  for (const [ratio, peak, length] of partials) tone(ctx, out, track, { freq: freq * ratio, t, length, peak });
 }
 
 /**
@@ -171,14 +208,7 @@ const VOICES = {
     env.gain.exponentialRampToValueAtTime(0.0001, t + 3.6);
     for (const [freq, peak] of NOTES) {
       for (const detune of [-1.2, 1.2]) {
-        const osc = ctx.createOscillator();
-        const level = ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(freq + detune, t);
-        level.gain.setValueAtTime(peak * 1.6, t);
-        osc.connect(level);
-        level.connect(env);
-        track(osc, t, t + 3.6);
+        tone(ctx, env, track, { freq: freq + detune, t, length: 3.6, peak: peak * 1.6, envelope: 'steady' });
       }
     }
     return 5;
@@ -198,23 +228,10 @@ const VOICES = {
     SCALE.forEach((freq, i) => {
       const at = t + i * 0.075;
       const last = i === SCALE.length - 1;
-      const length = last ? 1.6 : 1.1;
-      const osc = ctx.createOscillator();
-      const filter = ctx.createBiquadFilter();
-      const env = ctx.createGain();
-      osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(freq, at);
-      filter.type = 'lowpass';
-      filter.Q.value = 0.7;
-      filter.frequency.setValueAtTime(Math.min(freq * 4, 3000), at);
-      filter.frequency.exponentialRampToValueAtTime(freq * 1.2, at + 0.35);
-      env.gain.setValueAtTime(0.0001, at);
-      env.gain.exponentialRampToValueAtTime(last ? 0.22 : 0.16, at + 0.004);
-      env.gain.exponentialRampToValueAtTime(0.0001, at + length);
-      osc.connect(filter);
-      filter.connect(env);
-      env.connect(out);
-      track(osc, at, at + length);
+      tone(ctx, out, track, {
+        type: 'sawtooth', freq, t: at, length: last ? 1.6 : 1.1, peak: last ? 0.22 : 0.16, attack: 0.004,
+        filter: { from: Math.min(freq * 4, 3000), to: freq * 1.2, over: 0.35, q: 0.7 },
+      });
     });
     return 2.5;
   },
@@ -238,19 +255,9 @@ const VOICES = {
   // sensitive: it cuts through chatter without being loud. Twice per Bell.
   songbird(ctx, out, t, track) {
     /** @param {number} at @param {number} from @param {number} to @param {number} length @param {number} peak */
-    const chirp = (at, from, to, length, peak) => {
-      const osc = ctx.createOscillator();
-      const env = ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(from, at);
-      osc.frequency.exponentialRampToValueAtTime(to, at + length);
-      env.gain.setValueAtTime(0.0001, at);
-      env.gain.exponentialRampToValueAtTime(peak, at + length * 0.3);
-      env.gain.exponentialRampToValueAtTime(0.0001, at + length);
-      osc.connect(env);
-      env.connect(out);
-      track(osc, at, at + length);
-    };
+    const chirp = (at, from, to, length, peak) => tone(ctx, out, track, {
+      freq: from, bendTo: to, bendLength: length, t: at, length, peak, attack: length * 0.3,
+    });
     for (let i = 0; i < 3; i += 1) chirp(t + i * 0.17, 1800, 2700, 0.09, 0.4);
     for (let i = 0; i < 7; i += 1) chirp(t + 0.62 + i * 0.05, 2900 - i * 120, 2500 - i * 110, 0.04, 0.32);
     return 2.5;
@@ -275,19 +282,7 @@ const VOICES = {
     const wave = pulseWave(ctx, 0.25, 4);
     const RUN = [523.25, 659.25, 783.99, 587.33, 739.99, 880, 659.25, 830.61, 987.77];
     /** @param {number} freq @param {number} at @param {number} length @param {number} peak */
-    const note = (freq, at, length, peak) => {
-      const osc = ctx.createOscillator();
-      const env = ctx.createGain();
-      osc.setPeriodicWave(wave);
-      osc.frequency.setValueAtTime(freq, at);
-      env.gain.setValueAtTime(peak, at);
-      env.gain.setValueAtTime(peak, at + length - 0.012);
-      env.gain.linearRampToValueAtTime(0.0001, at + length);
-      osc.connect(env);
-      env.connect(out);
-      track(osc, at, at + length);
-      return osc;
-    };
+    const note = (freq, at, length, peak) => tone(ctx, out, track, { wave, freq, t: at, length, peak, envelope: 'gate' }).osc;
     RUN.forEach((freq, i) => note(freq, t + i * 0.055, 0.05, 0.17));
     const holdAt = t + RUN.length * 0.055;
     const hold = note(1046.5, holdAt, 0.42, 0.2);

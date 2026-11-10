@@ -7,8 +7,9 @@
 /** @typedef {import('./school-years.js').Division} Division */
 
 /**
- * A named generated voice (the sound engine synthesises each one).
- * @typedef {'swell' | 'chime' | 'harp' | 'clockTower' | 'marimba' | 'songbird' | 'deskBell' | 'woodBlock' | 'levelUp' | 'clapPattern' | 'schoolBell' | 'beep' | 'buzzer'} SoundName
+ * A named generated voice (the sound engine synthesises each one): one of
+ * `SOUND_NAMES`' keys.
+ * @typedef {keyof typeof import('./sound.js').SOUND_NAMES} SoundName
  */
 
 /**
