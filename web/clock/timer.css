@@ -147,13 +147,6 @@
   height: 0.8em;
 }
 
-.clock-ring__of {
-  color: var(--muted);
-  font-family: var(--font-ui);
-  font-weight: 500;
-  font-variant-numeric: tabular-nums;
-}
-
 /* Fills about 80-90% of the ring's width across the middle, but no taller
    than the ring's chord allows (narrow faces would otherwise poke out). */
 .clock-ring__digits {

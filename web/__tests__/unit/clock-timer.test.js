@@ -133,21 +133,22 @@ describe('the classroom timer', () => {
     it('says what the ring shows: running, paused, and rung', () => {
       const timer = startTimer(5 * MIN, t0);
       expect(timerRingView(timer, t0 + 48 * SEC)).toEqual({
-        status: 'running', left: '4:12', total: '5:00', progress: 252 / 300,
-        label: 'Timer, 4:12 left of 5:00',
+        status: 'running', left: '4:12', name: '5:00 timer', progress: 252 / 300,
+        label: '5:00 timer, running, 4:12 to go',
       });
       const paused = pauseTimer(timer, t0 + 175 * SEC);
       expect(timerRingView(paused, t0 + 10 * MIN)).toMatchObject({
-        status: 'paused', left: '2:05', label: 'Timer, paused, 2:05 left of 5:00',
+        status: 'paused', left: '2:05', label: '5:00 timer, paused, 2:05 to go',
       });
       expect(timerRingView(cancelTimer(), t0, { rangTotalMs: 5 * MIN })).toEqual({
-        status: 'done', left: '0:00', total: '5:00', progress: 0, label: "Timer, time's up, 0:00 left of 5:00",
+        status: 'done', left: '0:00', name: '5:00 timer', progress: 0, label: "5:00 timer, time's up",
       });
     });
 
-    it('rounds the time left up, and leaves out the length when unknown', () => {
+    it('rounds the time left up, and is just "Timer" when the length is unknown', () => {
       const view = timerRingView({ timerEndsAt: t0 + MIN, timerPausedMs: null }, t0 + 100);
-      expect(view).toMatchObject({ left: '1:00', total: null, label: 'Timer, 1:00 left' });
+      expect(view).toMatchObject({ left: '1:00', name: 'Timer', label: 'Timer, running, 1:00 to go' });
+      expect(timerRingView(cancelTimer(), t0)).toMatchObject({ name: 'Timer', label: "Timer, time's up" });
     });
   });
 

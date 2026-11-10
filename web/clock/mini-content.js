@@ -1,12 +1,13 @@
 // @ts-check
 // What the School Clock's mini player shows, in words: a head line (the
-// current Segment with its Period Label, or "Timer of 5:00"), the big Readout,
+// current Segment with its Period Label, or "5:00 timer"), the big Readout,
 // and a foot (how far through the Segment, up next, or the timer's bar and the
 // time left in the Segment under a timer). Pure: the page's moment, settings and big Readout give it.
 // What's ringing is the mini player's own overlay on top of this.
 import { displayText } from './display-text.js';
-import { formatClockTime, formatDuration, formatSegmentName } from './format.js';
+import { formatClockTime, formatSegmentName } from './format.js';
 import { readoutParts, readoutText } from './readouts.js';
+import { timerName } from './timer.js';
 
 const SECOND = 1000;
 
@@ -21,7 +22,7 @@ const SECOND = 1000;
  *   | { kind: 'next', name: string }
  *   | { kind: 'none' }} MiniFoot
  * - `progress`: the just-this-Segment bar ("Period 3 progress", 93) and "ends 11:15 AM",
- *   or under a timer its own bar ("Timer progress", the share left) and "42:17 left in Period 3";
+ *   or under a timer its own bar ("Timer progress", the share left) and "42:17 until end of Period 3";
  * - `next`: "Up next" and the next Segment's name, with its Period Label.
  */
 
@@ -65,9 +66,9 @@ export function miniContent({ now, moment, settings, big, mode, timer }) {
   };
 }
 
-/** "Timer of 5:00", or "Timer of 5:00 · paused". @param {{ paused: boolean, totalMs: number | null }} timer */
+/** "5:00 timer", or "5:00 timer · paused". @param {{ paused: boolean, totalMs: number | null }} timer */
 function timerHead({ paused, totalMs }) {
-  return `Timer${totalMs ? ` of ${formatDuration(totalMs)}` : ''}${paused ? ' · paused' : ''}`;
+  return `${timerName(totalMs)}${paused ? ' · paused' : ''}`;
 }
 
 /**
@@ -86,7 +87,7 @@ function footFor(moment, settings, options, timer) {
         kind: 'progress',
         label: 'Timer progress',
         percent: Math.round(timer.progress * 100),
-        text: `${readoutText({ kind: 'duration', ms: left, caption: 'left', long: false }, options)} in ${current.name}`,
+        text: `${readoutText({ kind: 'duration', ms: left, caption: 'until end of', long: false }, options)} ${current.name}`,
       };
     }
     const elapsed = /** @type {number} */ (moment.timeElapsedMs);

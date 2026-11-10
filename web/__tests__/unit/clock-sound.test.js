@@ -29,6 +29,21 @@ describe('School Clock sound player', () => {
     expect(ctx.sources.every((s) => s.startAt >= 5 && s.stopAt > s.startAt)).toBe(true);
   });
 
+  it('plays the second half of the Westminster chime on the Clock tower voice, inside 5 seconds', () => {
+    const [gSharp, fSharp, e, b] = [830.61, 739.99, 659.25, 493.88];
+    const ctx = createFakeAudioContext({ state: 'running' });
+    createSoundPlayer({ context: ctx }).play('clockTower');
+
+    const notes = ctx.sources
+      .filter((s) => [gSharp, fSharp, e, b].includes(s.frequency.value))
+      .sort((x, y) => x.startAt - y.startAt);
+    expect(notes.map((s) => s.frequency.value)).toEqual([gSharp, e, fSharp, b, b, fSharp, gSharp, e]);
+    // Each phrase's last note is held before the next phrase starts.
+    const gap = (i) => notes[i + 1].startAt - notes[i].startAt;
+    expect(gap(3)).toBeGreaterThan(gap(0));
+    expect(notes[7].startAt).toBeLessThan(5);
+  });
+
   it('repeats an Alarm for at most 60 seconds', () => {
     const ctx = createFakeAudioContext({ state: 'running' });
     createSoundPlayer({ context: ctx }).schedule([alarm('a1', 20)]);

@@ -1,5 +1,5 @@
 // The running timer in the big spot: C's progress ring around its digits,
-// with the title ("Timer of 5:00", or "Paused") and Pause / Resume / Cancel
+// with the title ("5:00 timer", or "5:00 timer · paused") and Pause / Resume / Cancel
 // inside. The arc's length is the share of time left (timerRingView), so it
 // drains back toward 12 o'clock; CSS eases it between ticks, except under
 // reduced motion, where it steps. The digits are a timer (never live) whose
@@ -34,7 +34,6 @@ export function createTimerRing({ onPause, onResume, onCancel }) {
 
   const pausedIcon = icon('pause');
   const titleText = el('span');
-  const of = el('span', { className: 'clock-ring__of' });
   const digits = el('p', { className: 'clock-ring__digits', role: 'timer', 'aria-live': 'off' });
   const button = (label, iconName, onclick, extra = '') =>
     el('button', { type: 'button', className: `clock-btn${extra}`, onclick }, [icon(iconName), label]);
@@ -46,7 +45,7 @@ export function createTimerRing({ onPause, onResume, onCancel }) {
   const element = el('div', { className: 'clock-ring', role: 'group', 'aria-label': 'Timer' }, [
     svg,
     el('div', { className: 'clock-ring__inner' }, [
-      el('p', { className: 'clock-ring__title' }, [pausedIcon, titleText, ' ', of]),
+      el('p', { className: 'clock-ring__title' }, [pausedIcon, titleText]),
       digits,
       actions,
     ]),
@@ -54,11 +53,10 @@ export function createTimerRing({ onPause, onResume, onCancel }) {
 
   return {
     element,
-    show({ status, left, total, progress, label }) {
+    show({ status, left, name, progress, label }) {
       element.classList.toggle('is-paused', status === 'paused');
       pausedIcon.style.display = status === 'paused' ? '' : 'none';
-      titleText.textContent = status === 'paused' ? 'Paused' : 'Timer';
-      of.textContent = total ? `of ${total}` : '';
+      titleText.textContent = status === 'paused' ? `${name} · paused` : name;
       digits.textContent = left;
       digits.setAttribute('aria-label', label);
       // The size rule's glyph counts (as for a Readout's value).

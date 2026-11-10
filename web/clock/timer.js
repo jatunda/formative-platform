@@ -180,26 +180,31 @@ export function timerProgress(timer, now) {
 }
 
 /**
+ * A timer's name, said the way people say it: "5:00 timer", or just "Timer"
+ * when its length is unknown.
+ * @param {number | null | undefined} totalMs
+ */
+export const timerName = (totalMs) => (totalMs ? `${formatDuration(totalMs)} timer` : 'Timer');
+
+/**
  * What the timer's ring shows: the time left (always with seconds, rounded
- * up), the length it was started with, the share left, and the digits'
- * accessible name. `rangTotalMs` is the length of a timer that has rung and
- * is gone (it shows 0:00 until dismissed).
+ * up), its name ("5:00 timer"), the share left, and the digits' accessible
+ * name ("5:00 timer, running, 4:12 to go"). `rangTotalMs` is the length of a
+ * timer that has rung and is gone (it shows 0:00 until dismissed).
  * @param {TimerState} timer @param {number} now epoch ms
  * @param {{ rangTotalMs?: number | null }} [rung]
- * @returns {{ status: 'running' | 'paused' | 'done', left: string, total: string | null, progress: number, label: string }}
+ * @returns {{ status: 'running' | 'paused' | 'done', left: string, name: string, progress: number, label: string }}
  */
 export function timerRingView(timer, now, { rangTotalMs = null } = {}) {
   const { status, remainingMs } = timerStatus(timer, now);
   const done = status === 'idle';
-  const totalMs = done ? rangTotalMs : timer.timerTotalMs;
+  const name = timerName(done ? rangTotalMs : timer.timerTotalMs);
   const left = formatDuration(done ? 0 : Math.ceil(/** @type {number} */ (remainingMs) / SECOND) * SECOND);
-  const total = totalMs ? formatDuration(totalMs) : null;
-  const state = { running: '', paused: 'paused, ', idle: "time's up, " }[status];
   return {
     status: done ? 'done' : status,
     left,
-    total,
+    name,
     progress: done ? 0 : timerProgress(timer, now),
-    label: `Timer, ${state}${left} left${total ? ` of ${total}` : ''}`,
+    label: done ? `${name}, time's up` : `${name}, ${status}, ${left} to go`,
   };
 }

@@ -186,7 +186,7 @@ describe('School Clock fullscreen, mini player and feedback', () => {
       expect(pip.windows).toHaveLength(1);
       expect(pip.window.size).toEqual({ width: 320, height: 180 });
       expect(head()).toBe('Period 3 · AP CSA');
-      expect(readout()).toBe('3:00 left');
+      expect(readout()).toBe('3:00 until end');
       // 42 of Period 3's 45 minutes have gone.
       expect(progress().getAttribute('aria-label')).toBe('Period 3 progress');
       expect(progress().getAttribute('aria-valuenow')).toBe('93');
@@ -197,12 +197,12 @@ describe('School Clock fullscreen, mini player and feedback', () => {
       open();
       await openMini();
       advance(SEC);
-      expect(bigReadout()).toBe('2:59 left');
-      expect(readout()).toBe('2:59 left');
+      expect(bigReadout()).toBe('2:59 until end');
+      expect(readout()).toBe('2:59 until end');
 
       mount().querySelector('.clock-readout--big .clock-readout__face').click();
       expect(readout()).toBe(bigReadout());
-      expect(readout()).not.toBe('2:59 left');
+      expect(readout()).not.toBe('2:59 until end');
 
       advance(3 * 60 * SEC + 5 * SEC); // into the Passing Period, after its Bell
       expect(head()).toBe('Passing Period');
@@ -223,7 +223,7 @@ describe('School Clock fullscreen, mini player and feedback', () => {
       face().click();
       expect(readout()).toBe('11:12:00 AM');
       face().click();
-      expect(readout()).toBe('3:00 left');
+      expect(readout()).toBe('3:00 until end');
     });
 
     it('marks which mode of the three the big Readout is in', async () => {
@@ -253,7 +253,7 @@ describe('School Clock fullscreen, mini player and feedback', () => {
       await openMini();
       expect(face().disabled).toBe(true);
       face().click();
-      expect(smallReadout()).toBe('3:00 left in Period 3');
+      expect(smallReadout()).toBe('3:00 until end of Period 3');
       button('Cancel', timerRing()).click();
       expect(face().disabled).toBe(false);
 
@@ -277,7 +277,7 @@ describe('School Clock fullscreen, mini player and feedback', () => {
       open({ settings: { division: 'HS', use24Hour: true, showSeconds: false, periodLabels: { 'Period 4': 'AP CSA' } } });
       await openMini();
       expect(footText()).toBe('ends 11:15');
-      expect(readout()).toBe('3 min left');
+      expect(readout()).toBe('3 min until end');
       advance(4 * 60 * SEC); // 11:16, in the Passing Period
       expect(footText()).toBe('Up next Period 4 · AP CSA');
     });
@@ -294,9 +294,9 @@ describe('School Clock fullscreen, mini player and feedback', () => {
       button('Timer').click();
       button('5 min', picker()).click();
       await openMini();
-      expect(head()).toBe('Timer of 5:00');
+      expect(head()).toBe('5:00 timer');
       expect(readout()).toBe('5:00 left');
-      expect(footText()).toBe('3:00 left in Period 3');
+      expect(footText()).toBe('3:00 until end of Period 3');
       expect(progress().getAttribute('aria-label')).toBe('Timer progress');
       expect(progress().getAttribute('aria-valuenow')).toBe('100');
       expect(miniMain().classList.contains('has-timer')).toBe(true);
@@ -305,7 +305,7 @@ describe('School Clock fullscreen, mini player and feedback', () => {
       expect(readout()).toBe('4:00 left');
       expect(progress().getAttribute('aria-valuenow')).toBe('80');
       button('Pause', timerRing()).click();
-      expect(head()).toBe('Timer of 5:00 · paused');
+      expect(head()).toBe('5:00 timer · paused');
 
       button('Cancel', timerRing()).click();
       expect(head()).toBe('Period 3');
@@ -319,6 +319,13 @@ describe('School Clock fullscreen, mini player and feedback', () => {
       await openMini();
       expect(readout()).toBe('1:00 left');
       expect(footText()).toBe('Up next Period 4');
+    });
+
+    it('just says "Timer" for a saved timer whose length is not known', async () => {
+      open({ settings: { division: 'HS', timerEndsAt: at(11, 12).getTime() + 2 * 60 * SEC, timerPausedMs: null } });
+      await openMini();
+      expect(head()).toBe('Timer');
+      expect(readout()).toBe('2:00 left');
     });
 
     it('shows just the time before a Division is chosen', async () => {
@@ -444,7 +451,7 @@ describe('School Clock fullscreen, mini player and feedback', () => {
       expect(pip.windows).toHaveLength(2);
       expect(button('Close mini player')).toBeDefined();
       advance(SEC);
-      expect(readout()).toBe('2:59 left');
+      expect(readout()).toBe('2:59 until end');
     });
 
     it('stops updating once the user closes it', async () => {

@@ -604,8 +604,8 @@ export function initClockApp({
     const parts = values.map((value) => readoutParts(value, options));
     // Beside the ring, the old main Readout's time left names its Segment
     // (the heading steps aside for the ring).
-    if (withTimer && moment.state === 'segment' && parts[0].caption === 'left') {
-      parts[0] = { ...parts[0], caption: `left in ${text.name(moment.current)}` };
+    if (withTimer && moment.state === 'segment' && parts[0].caption === 'until end') {
+      parts[0] = { ...parts[0], caption: `until end of ${text.name(moment.current)}` };
     }
     readoutsView.show(
       { count: values.length, cyclable: true, timer: withTimer, editing, canAdd: canAddReadout(layout) },
