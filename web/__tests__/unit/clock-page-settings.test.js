@@ -212,6 +212,26 @@ describe('School Clock settings drawer', () => {
       expect(field('Bells').checked).toBe(true);
     });
 
+    it('Ring Bells until you dismiss them: an off-by-default switch right under Bells, saved, and out of reach while Bells are off', () => {
+      open();
+      const untilDismissed = () => field('Ring Bells until you dismiss them');
+      expect(untilDismissed().getAttribute('role')).toBe('switch');
+      expect(untilDismissed().checked).toBe(false);
+      expect(untilDismissed().disabled).toBe(false);
+      const switches = [...drawer().querySelectorAll('[role="switch"]')].map(accessibleName);
+      expect(switches.indexOf('Ring Bells until you dismiss them')).toBe(switches.indexOf('Bells') + 1);
+
+      toggle('Ring Bells until you dismiss them');
+      expect(saved(storage).bells).toEqual({ on: true, sound: 'schoolBell', assemblyEnds: false, untilDismissed: true });
+      expect(untilDismissed().checked).toBe(true);
+
+      toggle('Bells');
+      expect(untilDismissed().disabled).toBe(true);
+      expect(saved(storage).bells.untilDismissed).toBe(true);
+      button('Bells').click();
+      expect(untilDismissed().disabled).toBe(false);
+    });
+
     it('Bell when an Assembly ends: an off-by-default switch, saved, and followed by Next rings today', () => {
       // Wed 10/28/26, HS Even Day: Chapel 10:15–10:55, then Period 4 at 11:00.
       open({ when: new Date(2026, 9, 28, 10, 30) });
@@ -223,7 +243,7 @@ describe('School Clock settings drawer', () => {
 
       toggle('Bell when an Assembly ends');
 
-      expect(saved(storage).bells).toEqual({ on: true, sound: 'schoolBell', assemblyEnds: true });
+      expect(saved(storage).bells).toEqual({ on: true, sound: 'schoolBell', assemblyEnds: true, untilDismissed: false });
       expect(assemblyEnds().checked).toBe(true);
       expect(ringLines().slice(0, 2)).toEqual([
         '10:55 AM · Bell · Chapel ends · School bell',
@@ -253,7 +273,7 @@ describe('School Clock settings drawer', () => {
       button('Preview Bell sound').click();
       button('Preview Timer sound').click();
 
-      expect(saved(storage).bells).toEqual({ on: true, sound: 'chime', assemblyEnds: false });
+      expect(saved(storage).bells).toEqual({ on: true, sound: 'chime', assemblyEnds: false, untilDismissed: false });
       expect(saved(storage).timerSound).toBe('buzzer');
       expect(player.played.map((p) => p.sound)).toEqual(['chime', 'buzzer']);
       expect(drawer().textContent).toContain('3:10 PM · Bell · Period 7 ends · Chime');
@@ -280,7 +300,7 @@ describe('School Clock settings drawer', () => {
       open();
       button('Settings').click();
       button('Test ring').click();
-      expect(player.played).toEqual([{ sound: 'schoolBell', repeat: true }]);
+      expect(player.played).toEqual([{ sound: 'schoolBell', repeat: true, seconds: 5 }]);
       expect(mount().querySelector('[role="alertdialog"]').hidden).toBe(false);
       advance(4 * SEC);
     });

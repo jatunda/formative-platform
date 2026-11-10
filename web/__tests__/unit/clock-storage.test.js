@@ -40,7 +40,7 @@ describe('clock settings store', () => {
     const storage = createFakeStorage();
     const settings = {
       division: 'MS', use24Hour: true, periodLabels: { 'Period 3': 'AP CSA', Seminar: 'Advisory' },
-      bells: { on: false, sound: 'chime', assemblyEnds: true }, alarms: [clockAlarm, onceAlarm, periodAlarm],
+      bells: { on: false, sound: 'chime', assemblyEnds: true, untilDismissed: true }, alarms: [clockAlarm, onceAlarm, periodAlarm],
       volume: 0.25, timerEndsAt: 1793000000000, timerPausedMs: null, timerTotalMs: 300000, timerSound: 'buzzer',
       recentDurations: [450000, 900000],
       showSeconds: false, dayStrip: false, theme: 'bloom', fontSwap: 'mono', paletteSwap: 'team',
@@ -155,7 +155,18 @@ describe('clock settings store', () => {
     ['missing (an earlier save)', { on: false, sound: 'chime' }],
     ['not a boolean', { on: false, sound: 'chime', assemblyEnds: 'yes' }],
   ])('keeps the Bells but turns Assembly-end Bells off when that field is %s', (_, bells) => {
-    expect(storeHolding({ bells }).load().bells).toEqual({ on: false, sound: 'chime', assemblyEnds: false });
+    expect(storeHolding({ bells }).load().bells).toEqual({ on: false, sound: 'chime', assemblyEnds: false, untilDismissed: false });
+  });
+
+  it('starts with Bells that stop on their own (not ringing until dismissed)', () => {
+    expect(DEFAULT_SETTINGS.bells.untilDismissed).toBe(false);
+  });
+
+  it.each([
+    ['missing (an earlier save)', { on: true, sound: 'chime', assemblyEnds: true }],
+    ['not a boolean', { on: true, sound: 'chime', assemblyEnds: true, untilDismissed: 'yes' }],
+  ])('keeps the Bells but has them stop on their own when the until-dismissed field is %s', (_, bells) => {
+    expect(storeHolding({ bells }).load().bells).toEqual({ on: true, sound: 'chime', assemblyEnds: true, untilDismissed: false });
   });
 
   it('defaults Bells that are missing a field', () => {

@@ -373,6 +373,18 @@ describe('School Clock fullscreen, mini player and feedback', () => {
       expect(miniMain().classList.contains('is-ringing')).toBe(false);
     });
 
+    it('stops showing a Bell 5 s after it rang, as the main page does', async () => {
+      open();
+      await openMini();
+      advance(3 * 60 * SEC + SEC); // 11:15:01
+      expect(head()).toBe('Ringing · Period 3 ends');
+      advance(4 * SEC); // 11:15:05
+      expect(button('Dismiss', mini())).toBeUndefined();
+      expect(head()).toBe('Passing Period');
+      expect(miniMain().classList.contains('is-ringing')).toBe(false);
+      expect(player.dismissals).toBe(0);
+    });
+
     it("loads the page's tokens, themes and components, then its own layout", async () => {
       open();
       await openMini();
