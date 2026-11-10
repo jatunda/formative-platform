@@ -4,6 +4,8 @@ import { createFakeAudioContext, audibleStarts } from '../helpers/fake-audio.js'
 
 const bell = (key, at, sound = 'schoolBell') => ({ key, at, sound, repeat: false });
 const alarm = (key, at, sound = 'beep') => ({ key, at, sound, repeat: true });
+/** Sources that make any sound at all (one cut off before it starts never does). */
+const sounding = (ctx) => ctx.sources.filter((s) => s.stopAt > s.startAt);
 
 describe('School Clock sound player', () => {
   it('plays a scheduled Bell at its audio time for about 3 seconds, then stops on its own', () => {
@@ -50,6 +52,24 @@ describe('School Clock sound player', () => {
     expect(Math.min(...starts)).toBe(20);
     expect(Math.max(...starts)).toBeGreaterThan(20 + ALARM_MAX_SECONDS - 5);
     expect(Math.max(...ctx.sources.map((s) => s.stopAt))).toBeLessThanOrEqual(20 + ALARM_MAX_SECONDS + 0.5);
+  });
+
+  it.each(SOUNDS)('stops a %s ring given its own length right on time, voice and all', (sound) => {
+    const ctx = createFakeAudioContext({ state: 'running' });
+    createSoundPlayer({ context: ctx }).schedule([{ key: 'b', at: 20, sound, repeat: true, seconds: 5 }]);
+
+    expect(Math.min(...ctx.sources.map((s) => s.startAt))).toBe(20);
+    // Nothing sounds past 25 s, even a voice that started just before.
+    expect(sounding(ctx).every((s) => s.stopAt <= 25)).toBe(true);
+    expect(sounding(ctx).some((s) => s.stopAt > 24)).toBe(true);
+  });
+
+  it('plays a sound now for a given length', () => {
+    const ctx = createFakeAudioContext({ state: 'running' });
+    ctx.currentTime = 3;
+    createSoundPlayer({ context: ctx }).play('beep', { repeat: true, seconds: 5 });
+    expect(sounding(ctx).every((s) => s.stopAt <= 8)).toBe(true);
+    expect(sounding(ctx).some((s) => s.stopAt > 7.5)).toBe(true);
   });
 
   it('dismiss stops whatever is sounding, but not rings still to come', () => {

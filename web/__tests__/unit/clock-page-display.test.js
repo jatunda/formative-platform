@@ -173,16 +173,16 @@ describe('School Clock display preferences', () => {
     it('takes the big spot while it runs, and the previous main Readout becomes a smaller one', () => {
       openWithTwoReadouts();
       button('5 min', picker()).click();
-      expect(readouts()).toEqual([big('Timer, 5:00 left of 5:00'), small('42:30 until end of Period 3'), small('10:32:30 AM')]);
+      expect(readouts()).toEqual([big('5:00 timer, running, 5:00 to go'), small('42:30 until end of Period 3'), small('10:32:30 AM')]);
       advance(SEC);
-      expect(readouts()).toEqual([big('Timer, 4:59 left of 5:00'), small('42:29 until end of Period 3'), small('10:32:31 AM')]);
+      expect(readouts()).toEqual([big('5:00 timer, running, 4:59 to go'), small('42:29 until end of Period 3'), small('10:32:31 AM')]);
     });
 
     it('always shows seconds, even with seconds off', () => {
       withSettings({ showSeconds: false });
       open({ when: at(10, 32, 30) });
       button('5 min', picker()).click();
-      expect(readouts()).toEqual([big('Timer, 5:00 left of 5:00'), small('42 min until end of Period 3')]);
+      expect(readouts()).toEqual([big('5:00 timer, running, 5:00 to go'), small('42 min until end of Period 3')]);
     });
 
     it('cancelling puts the layout back exactly, and the saved layout is never touched', () => {
@@ -200,17 +200,17 @@ describe('School Clock display preferences', () => {
       button('5 min', picker()).click();
       advance(MIN);
       button('Pause', ring()).click();
-      expect(readouts()[0]).toEqual(big('Timer, paused, 4:00 left of 5:00'));
+      expect(readouts()[0]).toEqual(big('5:00 timer, paused, 4:00 to go'));
     });
 
     it('the smaller Readouts still switch and go on their own, into the saved layout', () => {
       openWithTwoReadouts();
       button('5 min', picker()).click();
       tapReadout(0); // the previous main one: time left -> time since start
-      expect(readouts()).toEqual([big('Timer, 5:00 left of 5:00'), small('2:30 since start'), small('10:32:30 AM')]);
+      expect(readouts()).toEqual([big('5:00 timer, running, 5:00 to go'), small('2:30 since start'), small('10:32:30 AM')]);
       button('Readouts').click();
       button('Remove Readout: current time').click();
-      expect(readouts()).toEqual([big('Timer, 5:00 left of 5:00'), small('2:30 since start')]);
+      expect(readouts()).toEqual([big('5:00 timer, running, 5:00 to go'), small('2:30 since start')]);
       button('Cancel', ring()).click();
       expect(readouts()).toEqual([big('2:30 since start')]);
       expect(JSON.parse(tabStorage.getItem(LAYOUT_KEY))).toEqual({ readouts: [{ mode: 'countup' }] });
@@ -221,7 +221,7 @@ describe('School Clock display preferences', () => {
       button('5 min', picker()).click();
       advance(MIN);
       open();
-      expect(readouts()).toEqual([big('Timer, 4:00 left of 5:00'), small('41:30 until end of Period 3'), small('10:33:30 AM')]);
+      expect(readouts()).toEqual([big('5:00 timer, running, 4:00 to go'), small('41:30 until end of Period 3'), small('10:33:30 AM')]);
       button('Cancel', ring()).click();
       expect(readouts()).toEqual([big('41:30 until end'), small('10:33:30 AM')]);
     });
@@ -231,7 +231,7 @@ describe('School Clock display preferences', () => {
       button('1 min', picker()).click();
       advance(MIN + SEC);
       expect(ringing().hidden).toBe(false);
-      expect(readouts()).toEqual([big("Timer, time's up, 0:00 left of 1:00"), small('41:29 until end of Period 3'), small('10:33:31 AM')]);
+      expect(readouts()).toEqual([big("1:00 timer, time's up"), small('41:29 until end of Period 3'), small('10:33:31 AM')]);
       button('Dismiss', ringing()).click();
       expect(readouts()).toEqual([big('41:29 until end'), small('10:33:31 AM')]);
     });

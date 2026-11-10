@@ -294,7 +294,7 @@ describe('School Clock fullscreen, mini player and feedback', () => {
       button('Timer').click();
       button('5 min', picker()).click();
       await openMini();
-      expect(head()).toBe('Timer of 5:00');
+      expect(head()).toBe('5:00 timer');
       expect(readout()).toBe('5:00 left');
       expect(footText()).toBe('3:00 until end of Period 3');
       expect(progress().getAttribute('aria-label')).toBe('Timer progress');
@@ -305,7 +305,7 @@ describe('School Clock fullscreen, mini player and feedback', () => {
       expect(readout()).toBe('4:00 left');
       expect(progress().getAttribute('aria-valuenow')).toBe('80');
       button('Pause', timerRing()).click();
-      expect(head()).toBe('Timer of 5:00 · paused');
+      expect(head()).toBe('5:00 timer · paused');
 
       button('Cancel', timerRing()).click();
       expect(head()).toBe('Period 3');
@@ -319,6 +319,13 @@ describe('School Clock fullscreen, mini player and feedback', () => {
       await openMini();
       expect(readout()).toBe('1:00 left');
       expect(footText()).toBe('Up next Period 4');
+    });
+
+    it('just says "Timer" for a saved timer whose length is not known', async () => {
+      open({ settings: { division: 'HS', timerEndsAt: at(11, 12).getTime() + 2 * 60 * SEC, timerPausedMs: null } });
+      await openMini();
+      expect(head()).toBe('Timer');
+      expect(readout()).toBe('2:00 left');
     });
 
     it('shows just the time before a Division is chosen', async () => {
@@ -371,6 +378,18 @@ describe('School Clock fullscreen, mini player and feedback', () => {
       expect(head()).toBe('Passing Period');
       expect(bell().hasAttribute('hidden')).toBe(true);
       expect(miniMain().classList.contains('is-ringing')).toBe(false);
+    });
+
+    it('stops showing a Bell 5 s after it rang, as the main page does', async () => {
+      open();
+      await openMini();
+      advance(3 * 60 * SEC + SEC); // 11:15:01
+      expect(head()).toBe('Ringing · Period 3 ends');
+      advance(4 * SEC); // 11:15:05
+      expect(button('Dismiss', mini())).toBeUndefined();
+      expect(head()).toBe('Passing Period');
+      expect(miniMain().classList.contains('is-ringing')).toBe(false);
+      expect(player.dismissals).toBe(0);
     });
 
     it("loads the page's tokens, themes and components, then its own layout", async () => {

@@ -190,8 +190,75 @@ describe('School Clock sound', () => {
   });
 
   describe('ringing', () => {
-    it('flashes the screen and says what rang when a Bell comes due, and keeps ringing like an Alarm, up to 60 s', () => {
+    it('flashes the screen and says what rang when a Bell comes due, then stops on its own 5 s after it started', () => {
       open({ when: at(11, 14, 59) });
+      expect(ringing().hidden).toBe(true);
+
+      real.advance(2 * SEC); // 11:15:01
+      expect(mount().classList.contains('clock-ringing--flash')).toBe(true);
+      expect(ringing().textContent).toContain('Period 3 ends');
+
+      real.advance(3 * SEC); // 11:15:04
+      expect(ringing().hidden).toBe(false);
+      real.advance(SEC); // 11:15:05
+      expect(mount().classList.contains('clock-ringing')).toBe(false);
+      expect(ringing().hidden).toBe(true);
+    });
+
+    it("schedules a Bell's sound to stop on its own after 5 s, but an Alarm's to ring until dismissed", () => {
+      open({
+        when: at(11, 13), sound: { state: 'running', time: 0 },
+        settings: { alarms: [{ id: 'a', kind: 'clock', time: '11:14', repeat: 'everySchoolDay', enabled: true, sound: 'chime', bellSchedules: null }] },
+      });
+      const [alarm, bell] = player.scheduled;
+      expect(alarm).toEqual({ key: expect.any(String), at: 60, sound: 'chime', repeat: true });
+      expect(bell).toEqual({ key: expect.any(String), at: 120, sound: 'schoolBell', repeat: true, seconds: 5 });
+    });
+
+    it('can still be dismissed early while it would stop on its own', () => {
+      open({ when: at(11, 14, 59) });
+      real.advance(2 * SEC);
+      button('Dismiss').click();
+      expect(player.dismissals).toBe(1);
+      expect(ringing().hidden).toBe(true);
+    });
+
+    it('does not cut short an Alarm ringing alongside a Bell', () => {
+      open({
+        when: at(11, 14, 59),
+        settings: { alarms: [{ id: 'a', label: 'Wrap up', kind: 'clock', time: '11:15', repeat: 'everySchoolDay', enabled: true, sound: 'chime', bellSchedules: null }] },
+      });
+      real.advance(2 * SEC);
+      real.advance(10 * SEC);
+      expect(mount().classList.contains('clock-ringing')).toBe(true);
+      expect(ringing().textContent).toContain('Wrap up');
+      expect(ringing().textContent).not.toContain('Period 3 ends');
+    });
+
+    it('goes back to a timer still ringing when a Bell rang over it stops on its own', () => {
+      // The timer ends at 11:14:40; the Bell rings over it at 11:15.
+      open({ when: at(11, 14, 30), settings: { timerEndsAt: at(11, 14, 40).getTime(), timerTotalMs: 5 * 60 * SEC } });
+      real.advance(11 * SEC);
+      expect(ringing().textContent).toContain('Timer');
+      for (let i = 0; i < 20; i += 1) real.advance(SEC); // 11:15:01
+      expect(ringing().textContent).toContain('Period 3 ends');
+
+      for (let i = 0; i < 5; i += 1) real.advance(SEC); // 11:15:06
+      expect(mount().classList.contains('clock-ringing')).toBe(true);
+      expect(ringing().textContent).toContain('Timer');
+      expect(ringing().textContent).not.toContain('Period 3 ends');
+      // The timer keeps the big spot, at 0:00, while it rings.
+      const timerFace = () => mount().querySelector('.clock-stage [role="group"][aria-label="Timer"]');
+      expect(timerFace().closest('[hidden]')).toBeNull();
+      expect(timerFace().querySelector('[role="timer"]').textContent).toBe('0:00');
+
+      for (let i = 0; i < 40; i += 1) real.advance(SEC); // past 11:15:40, the timer's minute
+      expect(mount().classList.contains('clock-ringing')).toBe(false);
+    });
+
+    it('with "Ring Bells until you dismiss them" on, a Bell keeps ringing like an Alarm, up to 60 s', () => {
+      open({ when: at(11, 14, 59), sound: { state: 'running', time: 0 }, settings: { bells: { on: true, sound: 'schoolBell', untilDismissed: true } } });
+      expect(player.scheduled[0]).not.toHaveProperty('seconds');
       expect(mount().classList.contains('clock-ringing')).toBe(false);
       expect(ringing().hidden).toBe(true);
 
@@ -315,8 +382,22 @@ describe('School Clock sound', () => {
       });
     });
 
-    it('a test ring plays the Bells sound now and rings like a Bell, until dismissed', () => {
+    it('a test ring plays the Bells sound now and rings like a Bell, stopping on its own after 5 s', () => {
       open({ settings: { bells: { on: true, sound: 'buzzer' } } });
+      openSettings();
+
+      button('Test ring').click();
+
+      expect(player.played).toEqual([{ sound: 'buzzer', repeat: true, seconds: 5 }]);
+      expect(ringing().textContent).toContain('Test ring');
+      real.advance(4 * SEC);
+      expect(mount().classList.contains('clock-ringing')).toBe(true);
+      real.advance(SEC);
+      expect(mount().classList.contains('clock-ringing')).toBe(false);
+    });
+
+    it('a test ring rings until dismissed when Bells are set to', () => {
+      open({ settings: { bells: { on: true, sound: 'buzzer', untilDismissed: true } } });
       openSettings();
 
       button('Test ring').click();
@@ -363,7 +444,7 @@ describe('School Clock sound', () => {
       select.value = 'chime';
       select.dispatchEvent(new Event('change'));
 
-      expect(saved(storage).bells).toEqual({ on: true, sound: 'chime', assemblyEnds: false });
+      expect(saved(storage).bells).toEqual({ on: true, sound: 'chime', assemblyEnds: false, untilDismissed: false });
       expect(player.scheduled[0].sound).toBe('chime');
     });
   });

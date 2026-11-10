@@ -1,6 +1,6 @@
 // The School Clock's mini player: an always-on-top window (Document
 // Picture-in-Picture, where it exists) laid out to the design reference: a
-// head line (the Segment, "Timer of 5:00", or what's ringing), the big Readout
+// head line (the Segment, "5:00 timer", or what's ringing), the big Readout
 // (with dots for its mode, which a click anywhere cycles), and a
 // foot (the Segment's or timer's bar and words, up next, or Dismiss while something
 // rings). The page works out what to show (mini-content.js); this draws it

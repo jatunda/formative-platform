@@ -318,6 +318,16 @@
   outline-offset: 2px;
 }
 
+/* A switch that doesn't apply right now (one that depends on Bells being on). */
+.clock-switch:has(input:disabled),
+.clock-switch input:disabled {
+  cursor: not-allowed;
+}
+
+.clock-switch:has(input:disabled) {
+  opacity: 0.5;
+}
+
 /* Volume. --val is the filled share, set by the page. */
 .clock-range {
   appearance: none;

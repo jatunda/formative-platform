@@ -12,6 +12,7 @@ import { DIVISIONS, LABELLED_PERIODS } from './clock-settings.js';
 import { closeButton, drawerSection, feedbackLink, soundChoice, switchControl } from './controls.js';
 import { el } from './dom.js';
 import { createModal } from './modal.js';
+import { BELL_AUTO_DISMISS_SECONDS } from './sound.js';
 
 const ID = 'clock-settings';
 
@@ -46,6 +47,9 @@ export function createSettingsDrawer({ settings, update, play, testRing, behind,
 
   const bells = switchControl(`${ID}-bells`, 'Bells', 'Start and end of every Period and Break',
     (on) => update({ bells: { ...settings().bells, on } }));
+  const untilDismissed = switchControl(`${ID}-until-dismissed`, 'Ring Bells until you dismiss them',
+    `Otherwise each Bell stops on its own after ${BELL_AUTO_DISMISS_SECONDS} seconds. Alarms and the timer always ring until dismissed.`,
+    (on) => update({ bells: { ...settings().bells, untilDismissed: on } }));
   const assemblyEnds = switchControl(`${ID}-assembly-ends`, 'Bell when an Assembly ends',
     'Chapel, Convocation and Pep Rally. Never when one starts.',
     (on) => update({ bells: { ...settings().bells, assemblyEnds: on } }));
@@ -58,6 +62,7 @@ export function createSettingsDrawer({ settings, update, play, testRing, behind,
   const timerSound = soundChoice('Timer sound', (sound) => update({ timerSound: sound }), play);
   const sound = drawerSection('sound', 'Sound', [
     bells.label,
+    untilDismissed.label,
     assemblyEnds.label,
     el('label', { className: 'clock-field' }, [
       el('span', { className: 'clock-field__label' }, [el('span', { id: `${ID}-volume-name`, textContent: 'Volume' }), ' ', volumeValue]),
@@ -116,6 +121,8 @@ export function createSettingsDrawer({ settings, update, play, testRing, behind,
     use24Hour.input.checked = s.use24Hour;
     use24Hour.hint.textContent = s.use24Hour ? 'Clock times show as 13:05.' : 'Clock times show as 1:05.';
     bells.input.checked = s.bells.on;
+    untilDismissed.input.checked = s.bells.untilDismissed === true;
+    untilDismissed.input.disabled = !s.bells.on;
     assemblyEnds.input.checked = s.bells.assemblyEnds === true;
     const percent = Math.round(s.volume * 100);
     volume.value = String(percent);
