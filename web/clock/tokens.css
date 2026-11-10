@@ -109,7 +109,7 @@
      or colon is 1 unit and a small unit or seconds glyph 0.42. */
   --type-digits: 36vh;  /* about 26% digit height on screens 16:10 and wider */
   --glyph-em: 0.56;     /* average digit advance (em) of the default face */
-  --type-small: clamp(26px, 8.5vh, 100px);   /* small Readouts */
+  --type-small: clamp(26px, min(8.5vh, 9vw), 100px);   /* small Readouts; a row of two fits a portrait screen */
   --type-segment: clamp(20px, 5.4vh, 64px);  /* Segment name with Period Label */
   --type-line: clamp(16px, 3.8vh, 46px);     /* Up next, Off-Hours lines */
   --type-meta: clamp(14px, 2.3vh, 28px);     /* Day Label · date (uppercase) */
@@ -135,6 +135,7 @@
   --gap-xs: clamp(4px, 1vh, 12px);
   --gap-sm: clamp(6px, 2vh, 24px);
   --gap-md: clamp(8px, 3vh, 36px);
+  --gap-lg: clamp(16px, 6vh, 72px);
   --edge-y: clamp(8px, 3vh, 36px);   /* screen padding, top and bottom */
   --edge-x: clamp(12px, 3vw, 64px);  /* screen padding, left and right */
 

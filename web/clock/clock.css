@@ -342,7 +342,8 @@ button.clock-readout__face {
 }
 
 /* Below (the default): small Readouts in one centred row under the big one,
-   with hairline dividers. */
+   with hairline dividers. The row keeps a wide gap above it, so the big
+   Readout's caption reads as its own and not as a label for the row. */
 .clock-readouts {
   display: flex;
   flex-direction: column;
@@ -353,7 +354,7 @@ button.clock-readout__face {
   display: flex;
   justify-content: center;
   gap: 0 clamp(16px, 4vw, 80px);
-  margin-top: var(--gap-md);
+  margin-top: var(--gap-lg);
 }
 
 .clock-smalls > * + * {
@@ -397,7 +398,7 @@ button.clock-readout__face {
 
   .has-sheet .clock-readouts.has-smalls .clock-smalls {
     flex-direction: row;
-    margin-top: var(--gap-md);
+    margin-top: var(--gap-lg);
     padding-left: 0;
     border-left: 0;
   }
@@ -880,7 +881,7 @@ button.clock-readout__face {
   }
 
   .clock-smalls {
-    margin-top: 4px;
+    margin-top: 12px;
   }
 
   .clock-readout--small .clock-readout__value {
