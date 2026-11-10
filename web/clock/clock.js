@@ -10,8 +10,9 @@
 // throttled behind other windows. The window is redone when settings change,
 // when the tab is shown again, when sound turns on, and as it rolls forward.
 import { alarmsAfterRinging, describeMoment, ringsInWindow } from './clock-model.js';
-import { createSettingsStore } from './clock-storage.js';
+import { createHintStore, createSettingsStore } from './clock-storage.js';
 import { createClockSource } from './clock-source.js';
+import { createCycleHint } from './cycle-hint.js';
 import { createDayBarView } from './day-bar-view.js';
 import { describeBar } from './day-bar.js';
 import { el } from './dom.js';
@@ -291,8 +292,13 @@ export function initClockApp({
       timerControl.focus();
     },
   });
+  // The first-time "Click to change what this shows" tooltips, on the page
+  // and in the mini player, each remembered on its own.
+  const hints = createHintStore(storage);
+  const pageHint = createCycleHint({ name: 'page', hints, now: realNow });
   const readoutsView = createReadoutsView({
     timerFace: timerRing.element,
+    hint: pageHint.element,
     onCycle: (i) => changeLayout(cycleReadout(layout, i)),
     onRemove: (i) => {
       changeLayout(removeReadout(layout, i));
@@ -312,6 +318,7 @@ export function initClockApp({
   }
   const onKeyDown = (event) => {
     if (event.key !== 'Escape') return;
+    pageHint.dismiss();
     // Escape dismisses a ring first.
     if (ringing.length > 0) {
       dismiss();
@@ -322,6 +329,10 @@ export function initClockApp({
     readoutsControl.focus();
   };
   document.addEventListener('keydown', onKeyDown);
+  // Any click puts the tooltip away: caught on the way down, so the click
+  // that first shows it (choosing a Division) doesn't also put it away.
+  const onClick = () => pageHint.dismiss();
+  document.addEventListener('click', onClick, true);
 
   // The top bar's controls: quiet text buttons with icons. Timer opens the
   // picker (timer-picker.js), Look the sheet (look-sheet.js) and Settings the
@@ -442,6 +453,7 @@ export function initClockApp({
     },
     onCycle: () => changeLayout(cycleReadout(layout, 0)),
     onDismiss: () => dismiss(),
+    hint: createCycleHint({ name: 'mini', hints, now: realNow }),
   });
   mini.button.classList.add('clock-control', 'clock-control--icon', 'clock-control--mini');
   globalThis.addEventListener('pagehide', mini.close);
@@ -588,6 +600,7 @@ export function initClockApp({
       mainScreen.classList.remove('has-timer');
       const parts = readoutParts({ kind: 'time', at: now }, options);
       readoutsView.show({ count: 1, cyclable: false, timer: false, editing: false, canAdd: false }, [parts]);
+      pageHint.update(false);
       showEditing();
       return { big: parts, mode: null };
     }
@@ -611,6 +624,8 @@ export function initClockApp({
       { count: values.length, cyclable: true, timer: withTimer, editing, canAdd: canAddReadout(layout) },
       parts,
     );
+    // Not in edit mode, which has its own note.
+    pageHint.update(!editing);
     showEditing();
     return { big: parts[0], mode: layout.readouts[0].mode };
   }
@@ -637,6 +652,7 @@ export function initClockApp({
   function destroy() {
     clearInterval(interval);
     document.removeEventListener('keydown', onKeyDown);
+    document.removeEventListener('click', onClick, true);
     document.removeEventListener('visibilitychange', onVisibility);
     globalThis.removeEventListener('pagehide', mini.close);
     stopWatchingFullscreen?.();

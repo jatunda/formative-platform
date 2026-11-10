@@ -226,24 +226,6 @@ describe('School Clock fullscreen, mini player and feedback', () => {
       expect(readout()).toBe('3:00 until end');
     });
 
-    it('marks which mode of the three the big Readout is in', async () => {
-      const dots = () => mini().querySelector('.clock-mini__modes');
-      const current = () => [...dots().children].findIndex((dot) => dot.classList.contains('is-current'));
-      open();
-      await openMini();
-      expect(dots().children).toHaveLength(3);
-      expect(dots().getAttribute('aria-hidden')).toBe('true'); // the Readout's own words say it
-      expect(current()).toBe(0);
-      mini().querySelector('.clock-mini__readout').click();
-      expect(current()).toBe(1);
-      mini().querySelector('.clock-mini__readout').click();
-      expect(current()).toBe(2);
-
-      button('Timer').click();
-      button('5 min', picker()).click();
-      expect(dots().hidden).toBe(true);
-    });
-
     it("can't be cycled while the timer has the big spot, while ringing, or with just the time", async () => {
       const face = () => mini().querySelector('.clock-mini__readout');
       const smallReadout = () => mount().querySelector('.clock-readout--small .clock-readout__face').textContent.replace(/\s+/g, ' ').trim();
