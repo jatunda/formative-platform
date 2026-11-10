@@ -185,7 +185,7 @@ describe('School Clock settings drawer', () => {
       expect(field('Show seconds').checked).toBe(true);
       toggle('Show seconds');
       expect(saved(storage).showSeconds).toBe(false);
-      expect(readoutTexts()).toEqual(['42 min left']);
+      expect(readoutTexts()).toEqual(['42 min until end']);
     });
 
     it('24-hour time: a switch with a hint that follows it, saved, shown at once', () => {

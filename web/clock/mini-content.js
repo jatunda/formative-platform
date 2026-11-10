@@ -21,7 +21,7 @@ const SECOND = 1000;
  *   | { kind: 'next', name: string }
  *   | { kind: 'none' }} MiniFoot
  * - `progress`: the just-this-Segment bar ("Period 3 progress", 93) and "ends 11:15 AM",
- *   or under a timer its own bar ("Timer progress", the share left) and "42:17 left in Period 3";
+ *   or under a timer its own bar ("Timer progress", the share left) and "42:17 until end of Period 3";
  * - `next`: "Up next" and the next Segment's name, with its Period Label.
  */
 
@@ -86,7 +86,7 @@ function footFor(moment, settings, options, timer) {
         kind: 'progress',
         label: 'Timer progress',
         percent: Math.round(timer.progress * 100),
-        text: `${readoutText({ kind: 'duration', ms: left, caption: 'left', long: false }, options)} in ${current.name}`,
+        text: `${readoutText({ kind: 'duration', ms: left, caption: 'until end of', long: false }, options)} ${current.name}`,
       };
     }
     const elapsed = /** @type {number} */ (moment.timeElapsedMs);
