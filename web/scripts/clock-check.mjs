@@ -6,10 +6,13 @@
 //   npm run check:clock -- --size 390x844 --division MS --settings '{"showSeconds":false}'
 //   npm run check:clock -- --layout countdown,clock,countup   Readouts to show, big one first
 //   npm run check:clock -- --timer            with the first preset timer running
+//   npm run check:clock -- --zoom 1366x768    that screen at every browser zoom, 67% to 200%
+//                                             (the viewport it leaves: 2039x1146 … 683x384; repeatable)
 //   npm run check:clock -- --no-shots         checks only, no PNGs
 //
 // For each state × size it saves a screenshot, runs axe, checks the page doesn't
-// scroll, and records page errors. Results go to .clock-check/ (gitignored):
+// scroll, checks the timer's ring (when one shows) runs into nothing in the top
+// bar or the side Readouts, and records page errors. Results go to .clock-check/ (gitignored):
 // one PNG per render plus report.json. Exits 1 if anything failed.
 //
 // It starts its own Vite server on 127.0.0.1 (a free port) and always stops it
@@ -41,6 +44,8 @@ const DEFAULT_STATES = {
   unknown: '?at=2030-01-15T12:00',     // outside every School Year
 };
 const DEFAULT_SIZES = ['1920x1080', '1440x900', '1280x720', '480x320', '390x844'];
+// Chrome's zoom steps from 67% to 200%: zooming to z leaves a viewport of size / z CSS pixels.
+const ZOOMS = [0.67, 0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2];
 
 function parseArgs(argv) {
   const opts = { states: [], sizes: [], division: 'HS', settings: {}, layout: null, timer: false, shots: true, axe: true };
@@ -49,6 +54,10 @@ function parseArgs(argv) {
     const next = () => argv[++i];
     if (arg === '--state') opts.states.push(next());
     else if (arg === '--size') opts.sizes.push(next());
+    else if (arg === '--zoom') {
+      const [width, height] = next().split('x').map(Number);
+      opts.sizes.push(...ZOOMS.map((z) => `${Math.round(width / z)}x${Math.round(height / z)}`));
+    }
     else if (arg === '--division') opts.division = next();
     else if (arg === '--settings') opts.settings = JSON.parse(next());
     else if (arg === '--layout') opts.layout = { readouts: next().split(',').map((mode) => ({ mode })) };
@@ -118,6 +127,36 @@ try {
         x: document.documentElement.scrollWidth > innerWidth,
         y: document.documentElement.scrollHeight > innerHeight,
       }));
+      // The ring's circle (its stroke's outer edge) against every box it must
+      // stay clear of: the Day Label's text, the top bar's buttons, the side Readouts.
+      const overlaps = await page.evaluate(() => {
+        const ring = document.querySelector('.clock-ring');
+        if (!ring || !ring.getClientRects().length) return [];
+        const box = ring.getBoundingClientRect();
+        const cx = box.left + box.width / 2;
+        const cy = box.top + box.height / 2;
+        // The circle fits the box's shorter side (a squeezed box stays round):
+        // r=48 plus half the 2.4 stroke, on a 100 box.
+        const r = (Math.min(box.width, box.height) / 2) * (49.2 / 50);
+        const textBox = (node) => {
+          const range = document.createRange();
+          range.selectNodeContents(node);
+          return range.getBoundingClientRect();
+        };
+        const targets = [
+          ...[...document.querySelectorAll('.clock-top .clock-day')].map((n) => ['Day Label', textBox(n)]),
+          ...[...document.querySelectorAll('.clock-top button')].map((n) => [`"${n.textContent.trim() || n.getAttribute('aria-label')}"`, n.getBoundingClientRect()]),
+          ...[...document.querySelectorAll('.clock-readouts .clock-smalls .clock-readout')].map((n, i) => [`small Readout ${i + 1}`, n.getBoundingClientRect()]),
+        ];
+        return targets
+          .filter(([, b]) => b.width && b.height)
+          .filter(([, b]) => {
+            const dx = cx - Math.max(b.left, Math.min(cx, b.right));
+            const dy = cy - Math.max(b.top, Math.min(cy, b.bottom));
+            return dx * dx + dy * dy < r * r;
+          })
+          .map(([name]) => name);
+      });
       let violations = [];
       if (opts.axe) {
         await page.addScriptTag({ path: axeSource });
@@ -129,8 +168,8 @@ try {
       }
       const file = `${state.name}-${size.label}.png`;
       if (opts.shots) await page.screenshot({ path: resolve(outDir, file) });
-      const ok = !scroll.x && !scroll.y && !errors.length && !violations.length;
-      results.push({ state: state.name, size: size.label, url: base + state.query, ok, scroll, errors, violations, shot: opts.shots ? file : null });
+      const ok = !scroll.x && !scroll.y && !overlaps.length && !errors.length && !violations.length;
+      results.push({ state: state.name, size: size.label, url: base + state.query, ok, scroll, overlaps, errors, violations, shot: opts.shots ? file : null });
       await page.close();
     }
     await context.close();
@@ -142,7 +181,8 @@ try {
 writeFileSync(resolve(outDir, 'report.json'), JSON.stringify(results, null, 2));
 const failed = results.filter((r) => !r.ok);
 for (const r of failed) {
-  const why = [r.scroll.x && 'scrolls sideways', r.scroll.y && 'scrolls down', ...r.errors, ...r.violations].filter(Boolean);
+  const why = [r.scroll.x && 'scrolls sideways', r.scroll.y && 'scrolls down',
+    r.overlaps.length && `ring overlaps ${r.overlaps.join(', ')}`, ...r.errors, ...r.violations].filter(Boolean);
   console.log(`✗ ${r.state} @ ${r.size}: ${why.join('; ')}`);
 }
 console.log(`${results.length - failed.length}/${results.length} renders passed. Screenshots and report.json in ${outDir}`);
