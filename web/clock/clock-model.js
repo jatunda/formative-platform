@@ -341,8 +341,9 @@ export function describeMoment(now, schoolYears, { division = 'HS' } = {}) {
 /** @typedef {{ at: Date, source: 'periodAlarm', sound: SoundName, alarm: PeriodAlarm, period: TimedSegment }} PeriodAlarmRing */
 
 /**
- * @typedef {{ at: Date, source: 'timer', sound: SoundName, totalMs: number | null }} TimerRing
- *   `totalMs`: the length the timer was started with (null when unknown).
+ * @typedef {{ at: Date, source: 'timer', sound: SoundName, totalMs: number | null, label?: string | null }} TimerRing
+ *   `totalMs`: the length the timer was started with (null when unknown);
+ *   `label`: the teacher's name for it (null for none).
  */
 
 /**
@@ -467,7 +468,7 @@ export function ringsInWindow(start, end, schoolYears, settings) {
   if (settings.timerEndsAt != null) {
     rings.push({
       at: new Date(settings.timerEndsAt), source: 'timer', sound: settings.timerSound ?? 'beep',
-      totalMs: settings.timerTotalMs ?? null,
+      totalMs: settings.timerTotalMs ?? null, label: settings.timerLabel ?? null,
     });
   }
   return rings

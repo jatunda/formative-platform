@@ -1,0 +1,650 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clock Sound Candidates</title>
+<!--
+  Throwaway listening page for ticket 31 (new ring sounds). Not part of the
+  shipped clock; ticket 32 deletes it once the five picks are in sound.js.
+
+  Every voice here has sound.js's shape, `(ctx, out, t, track) => seconds`,
+  and uses only `tone`, `strike` and the partial tables copied from sound.js
+  plus the two small helpers below (`pulseWave`, `noiseBuffer`), so a pick
+  lifts into sound.js's VOICES with little change. `ring()` mirrors the
+  player's `add()`: play once (a 3 s preview), as a Bell (cut at 5 s with a
+  50 ms fade) or on repeat (up to 60 s).
+
+  `window.renderVoice(id, mode)` renders a voice offline and reports its
+  peak, loudness and where its energy sits, for headless checks.
+-->
+<style>
+  :root {
+    --bg: #f6f5f2; --card: #ffffff; --ink: #1d1d1f; --muted: #5d5d66;
+    --line: #dddad3; --accent: #1f5fbf; --accent-ink: #ffffff; --pick: #2e7d4f;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #17181b; --card: #222328; --ink: #ececf0; --muted: #a3a3ad;
+      --line: #34353b; --accent: #7aa7ff; --accent-ink: #0d1424; --pick: #6fd39a;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.45 system-ui, sans-serif; }
+  main { max-width: 860px; margin: 0 auto; padding: 24px 16px 64px; }
+  h1 { font-size: 1.5rem; margin: 0 0 4px; }
+  h2 { font-size: 1.1rem; margin: 32px 0 8px; }
+  p.lede { color: var(--muted); margin: 0 0 16px; }
+  .bar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 8px; }
+  .row { display: grid; grid-template-columns: 1fr auto; gap: 8px 16px; align-items: center;
+         background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin: 8px 0; }
+  .row.pick { border-left: 5px solid var(--pick); }
+  .name { font-weight: 600; }
+  .tag { font-size: 0.75rem; font-weight: 600; color: var(--pick); margin-left: 6px; }
+  .desc { color: var(--muted); font-size: 0.9rem; }
+  .buttons { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+  button { font: inherit; font-size: 0.9rem; border: 1px solid var(--accent); background: transparent; color: var(--accent);
+           border-radius: 6px; padding: 5px 10px; cursor: pointer; }
+  button.primary { background: var(--accent); color: var(--accent-ink); }
+  button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  @media (max-width: 560px) { .row { grid-template-columns: 1fr; } .buttons { justify-content: flex-start; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>Clock sound candidates</h1>
+  <p class="lede">Ticket 31. The eight voices the clock has now, then twelve candidates. Picks for ticket 32 are marked. "Once" is a 3 s preview, "Bell" stops at 5 s like a Bell, "Repeat" rings like an Alarm until Stop.</p>
+  <div class="bar">
+    <label>Volume <input id="volume" type="range" min="0" max="1" step="0.05" value="0.8"></label>
+    <button id="stop" class="primary">Stop</button>
+  </div>
+  <h2>The existing eight</h2>
+  <div id="existing"></div>
+  <h2>Candidates</h2>
+  <div id="candidates"></div>
+</main>
+<script>
+'use strict';
+
+// ---- Copied from web/clock/sound.js (keep in step if that changes) ----
+
+const BELL_SECONDS = 3;
+const ALARM_MAX_SECONDS = 60;
+const BELL_AUTO_DISMISS_SECONDS = 5;
+
+function tone(ctx, out, track, { type, freq, t, length, peak = 0.5, attack = 0.01, bendTo }) {
+  const osc = ctx.createOscillator();
+  const env = ctx.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, t);
+  if (bendTo) osc.frequency.exponentialRampToValueAtTime(bendTo, t + 0.05);
+  env.gain.setValueAtTime(0.0001, t);
+  env.gain.exponentialRampToValueAtTime(peak, t + attack);
+  env.gain.exponentialRampToValueAtTime(0.0001, t + length);
+  osc.connect(env);
+  env.connect(out);
+  track(osc, t, t + length);
+  return env;
+}
+
+function strike(ctx, out, track, freq, t, partials) {
+  for (const [ratio, peak, length] of partials) tone(ctx, out, track, { type: 'sine', freq: freq * ratio, t, length, peak });
+}
+
+const TUBULAR = [[1, 0.3, 1.8], [2, 0.12, 1.2], [3.01, 0.06, 0.7], [4.17, 0.03, 0.4]];
+const HAND_BELL = [[1, 0.3, 1.4], [2.76, 0.1, 0.6], [5.4, 0.04, 0.25]];
+const MARIMBA_BAR = [[1, 0.38, 0.5], [4, 0.07, 0.12]];
+
+const EXISTING = {
+  chime(ctx, out, t, track) {
+    tone(ctx, out, track, { type: 'sine', freq: 659.25, t, length: 0.75 });
+    tone(ctx, out, track, { type: 'sine', freq: 523.25, t: t + 0.75, length: 0.75 });
+    return 1.5;
+  },
+  clockTower(ctx, out, t, track) {
+    const [gSharp, fSharp, e, b] = [830.61, 739.99, 659.25, 493.88];
+    [[gSharp, e, fSharp, b], [b, fSharp, gSharp, e]].forEach((phrase, p) => {
+      phrase.forEach((freq, i) => strike(ctx, out, track, freq, t + p * 2.2 + i * 0.45, TUBULAR));
+    });
+    return 6;
+  },
+  marimba(ctx, out, t, track) {
+    [523.25, 659.25, 783.99, 1046.5].forEach((freq, i) => strike(ctx, out, track, freq, t + i * 0.12, MARIMBA_BAR));
+    return 1.5;
+  },
+  deskBell(ctx, out, t, track) {
+    strike(ctx, out, track, 1046.5, t, HAND_BELL);
+    return 1.5;
+  },
+  woodBlock(ctx, out, t, track) {
+    for (const at of [t, t + 0.16]) {
+      tone(ctx, out, track, { type: 'sine', freq: 1100, bendTo: 850, t: at, length: 0.12, peak: 0.6, attack: 0.003 });
+      tone(ctx, out, track, { type: 'sine', freq: 2420, t: at, length: 0.05, peak: 0.12, attack: 0.003 });
+    }
+    return 1;
+  },
+  schoolBell(ctx, out, t, track) {
+    const RATE = 10;
+    for (const [from, to] of [[t, t + 0.8], [t + 1.2, t + 2.0]]) {
+      const env = ctx.createGain();
+      env.connect(out);
+      env.gain.setValueAtTime(0.0001, from);
+      for (let at = from; at < to; at += 1 / RATE) {
+        env.gain.linearRampToValueAtTime(0.32, at + 0.005);
+        env.gain.exponentialRampToValueAtTime(0.2, at + 1 / RATE);
+      }
+      env.gain.exponentialRampToValueAtTime(0.0001, to + 0.6);
+      for (const [ratio, mix] of [[1, 1], [2.76, 0.3], [5.4, 0.1]]) {
+        const osc = ctx.createOscillator();
+        const level = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880 * ratio, from);
+        level.gain.setValueAtTime(mix * 0.85, from);
+        osc.connect(level);
+        level.connect(env);
+        track(osc, from, to + 0.6);
+      }
+    }
+    return 3;
+  },
+  beep(ctx, out, t, track) {
+    tone(ctx, out, track, { type: 'square', freq: 880, t, length: 0.15, peak: 0.3 });
+    tone(ctx, out, track, { type: 'square', freq: 880, t: t + 0.25, length: 0.15, peak: 0.3 });
+    return 0.5;
+  },
+  buzzer(ctx, out, t, track) {
+    tone(ctx, out, track, { type: 'sawtooth', freq: 140, t, length: 0.6, peak: 0.4 });
+    return 0.75;
+  },
+};
+
+const EXISTING_INFO = {
+  chime: ['Chime', 'Two soft sine notes, E5 then C5 (660, 520 Hz). Gentle falling third, 1.5 s loop.'],
+  clockTower: ['Clock tower', 'Westminster half-phrase on tubular bells, 490-830 Hz. Slow, stately, once per Bell (6 s).'],
+  marimba: ['Marimba', 'Quick rising C-E-G-C on wooden bars, 520-1050 Hz. Short and bouncy, 1.5 s loop.'],
+  deskBell: ['Desk bell', 'One bright metal ding on C6 (1050 Hz). 1.5 s loop.'],
+  woodBlock: ['Wood block', 'Tok-tok: two hollow pitched knocks around 1 kHz. 1 s loop.'],
+  schoolBell: ['School bell', 'A pure-tone bell struck 10 times a second, two bursts at 880 Hz. 3 s loop.'],
+  beep: ['Beep', 'Two square-wave beeps at 880 Hz. 0.5 s loop, insistent.'],
+  buzzer: ['Buzzer', 'Low sawtooth buzz at 140 Hz. Harsh on purpose.'],
+};
+
+// ---- Helpers for the candidates (would move into sound.js with a pick) ----
+
+/**
+ * A pulse wave (narrow square, like an old game console) with only its first
+ * few harmonics, so even a high note keeps its energy under about 3 kHz.
+ * @param {BaseAudioContext} ctx @param {number} duty 0-1 @param {number} harmonics
+ */
+function pulseWave(ctx, duty, harmonics) {
+  const real = new Float32Array(harmonics + 1);
+  const imag = new Float32Array(harmonics + 1);
+  for (let n = 1; n <= harmonics; n += 1) imag[n] = (2 / (n * Math.PI)) * Math.sin(n * Math.PI * duty);
+  return ctx.createPeriodicWave(real, imag);
+}
+
+/**
+ * A buffer of white noise. Seeded, so every ring (and every test) gets the same noise.
+ * @param {BaseAudioContext} ctx @param {number} seconds
+ */
+function noiseBuffer(ctx, seconds) {
+  const buffer = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * seconds), ctx.sampleRate);
+  const data = buffer.getChannelData(0);
+  let seed = 12345;
+  for (let i = 0; i < data.length; i += 1) {
+    seed = (seed * 1103515245 + 12345) % 2147483648;
+    data[i] = (seed / 1073741824) - 1;
+  }
+  return buffer;
+}
+
+// ---- Candidates ----
+
+const CANDIDATES = {
+  // PICK. A soft pad: an open A-major chord that fades in over a second and
+  // out over two, each note two sines a hair apart so it shimmers. No attack
+  // at all, unlike every existing voice. Once per Bell.
+  swell(ctx, out, t, track) {
+    const NOTES = [[440, 0.07], [659.25, 0.06], [880, 0.04], [1108.73, 0.035]];
+    const env = ctx.createGain();
+    env.connect(out);
+    env.gain.setValueAtTime(0.0001, t);
+    env.gain.linearRampToValueAtTime(1, t + 1.1);
+    env.gain.setValueAtTime(1, t + 1.5);
+    env.gain.exponentialRampToValueAtTime(0.0001, t + 3.6);
+    for (const [freq, peak] of NOTES) {
+      for (const detune of [-1.2, 1.2]) {
+        const osc = ctx.createOscillator();
+        const level = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq + detune, t);
+        level.gain.setValueAtTime(peak * 1.6, t);
+        osc.connect(level);
+        level.connect(env);
+        track(osc, t, t + 3.6);
+      }
+    }
+    return 5;
+  },
+
+  // PICK. A harp glissando: eight plucked strings up a C pentatonic scale
+  // (C5 to E6), each a sawtooth through a low-pass filter that closes quickly,
+  // which is what a plucked string does. Twice per Bell.
+  harp(ctx, out, t, track) {
+    const SCALE = [523.25, 587.33, 659.25, 783.99, 880, 1046.5, 1174.66, 1318.51];
+    SCALE.forEach((freq, i) => {
+      const at = t + i * 0.075;
+      const last = i === SCALE.length - 1;
+      const length = last ? 1.6 : 1.1;
+      const osc = ctx.createOscillator();
+      const filter = ctx.createBiquadFilter();
+      const env = ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(freq, at);
+      filter.type = 'lowpass';
+      filter.Q.value = 0.7;
+      filter.frequency.setValueAtTime(Math.min(freq * 4, 3000), at);
+      filter.frequency.exponentialRampToValueAtTime(freq * 1.2, at + 0.35);
+      env.gain.setValueAtTime(0.0001, at);
+      env.gain.exponentialRampToValueAtTime(last ? 0.22 : 0.16, at + 0.004);
+      env.gain.exponentialRampToValueAtTime(0.0001, at + length);
+      osc.connect(filter);
+      filter.connect(env);
+      env.connect(out);
+      track(osc, at, at + length);
+    });
+    return 2.5;
+  },
+
+  // PICK. A songbird: three rising "tsee" chirps, then a quick falling trill,
+  // then quiet. Pure sines gliding between 1.7 and 2.9 kHz: high enough to
+  // cut through chatter, soft enough not to startle.
+  songbird(ctx, out, t, track) {
+    const chirp = (at, from, to, length, peak) => {
+      const osc = ctx.createOscillator();
+      const env = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(from, at);
+      osc.frequency.exponentialRampToValueAtTime(to, at + length);
+      env.gain.setValueAtTime(0.0001, at);
+      env.gain.exponentialRampToValueAtTime(peak, at + length * 0.3);
+      env.gain.exponentialRampToValueAtTime(0.0001, at + length);
+      osc.connect(env);
+      env.connect(out);
+      track(osc, at, at + length);
+    };
+    for (let i = 0; i < 3; i += 1) chirp(t + i * 0.17, 1800, 2700, 0.09, 0.4);
+    for (let i = 0; i < 7; i += 1) chirp(t + 0.62 + i * 0.05, 2900 - i * 120, 2500 - i * 110, 0.04, 0.32);
+    return 2.5;
+  },
+
+  // PICK. The clap pattern teachers use to get a room's attention:
+  // clap, clap, clap-clap-clap. Band-passed noise with no pitch, each clap
+  // three tiny bursts and a short tail, like real hands.
+  clapPattern(ctx, out, t, track) {
+    const noise = noiseBuffer(ctx, 0.2);
+    for (const offset of [0, 0.36, 0.72, 0.9, 1.08]) {
+      const at = t + offset;
+      const source = ctx.createBufferSource();
+      const filter = ctx.createBiquadFilter();
+      const tame = ctx.createBiquadFilter();
+      const env = ctx.createGain();
+      source.buffer = noise;
+      filter.type = 'bandpass';
+      filter.frequency.value = 1300;
+      filter.Q.value = 1.1;
+      // Noise has as much energy up high as anywhere: cap it near 3 kHz.
+      tame.type = 'lowpass';
+      tame.frequency.value = 2600;
+      env.gain.setValueAtTime(0.0001, at);
+      for (const burst of [0, 0.011, 0.022]) {
+        env.gain.setValueAtTime(1.6, at + burst);
+        env.gain.exponentialRampToValueAtTime(0.3, at + burst + 0.009);
+      }
+      env.gain.setValueAtTime(1.3, at + 0.031);
+      env.gain.exponentialRampToValueAtTime(0.0001, at + 0.16);
+      source.connect(filter);
+      filter.connect(tame);
+      tame.connect(env);
+      env.connect(out);
+      track(source, at, at + 0.17);
+    }
+    return 2.5;
+  },
+
+  // PICK. Level up: a fast rising run of three little arpeggios, each a step
+  // higher, then a held note with a wobble, on a narrow pulse wave like an old
+  // game console. Three times per Bell.
+  levelUp(ctx, out, t, track) {
+    const wave = pulseWave(ctx, 0.25, 4);
+    const RUN = [523.25, 659.25, 783.99, 587.33, 739.99, 880, 659.25, 830.61, 987.77];
+    const note = (freq, at, length, peak) => {
+      const osc = ctx.createOscillator();
+      const env = ctx.createGain();
+      osc.setPeriodicWave(wave);
+      osc.frequency.setValueAtTime(freq, at);
+      env.gain.setValueAtTime(peak, at);
+      env.gain.setValueAtTime(peak, at + length - 0.012);
+      env.gain.linearRampToValueAtTime(0.0001, at + length);
+      osc.connect(env);
+      env.connect(out);
+      track(osc, at, at + length);
+      return osc;
+    };
+    RUN.forEach((freq, i) => note(freq, t + i * 0.055, 0.05, 0.17));
+    const hold = note(1046.5, t + RUN.length * 0.055, 0.42, 0.2);
+    const lfo = ctx.createOscillator();
+    const depth = ctx.createGain();
+    const holdAt = t + RUN.length * 0.055;
+    lfo.frequency.setValueAtTime(9, holdAt);
+    depth.gain.setValueAtTime(14, holdAt);
+    lfo.connect(depth);
+    depth.connect(hold.frequency);
+    track(lfo, holdAt, holdAt + 0.42);
+    return 2;
+  },
+
+  // A singing bowl: one soft strike that rings long with a slow beat between
+  // two close partials. Calm, but a struck metal tone like Clock tower and Desk bell.
+  singingBowl(ctx, out, t, track) {
+    for (const [freq, peak, length] of [[528, 0.22, 3.5], [530.8, 0.18, 3.5], [1428, 0.06, 2.2], [2640, 0.02, 1.0]]) {
+      tone(ctx, out, track, { type: 'sine', freq, t, length, peak, attack: 0.04 });
+    }
+    return 5;
+  },
+
+  // An ocarina: a breathy sine with vibrato playing sol-mi-la-sol, each note
+  // eased in. Sustained and vocal, but a melody of soft sines like Chime.
+  ocarina(ctx, out, t, track) {
+    const breathNoise = noiseBuffer(ctx, 0.15);
+    [[783.99, 0, 0.36], [659.25, 0.38, 0.36], [880, 0.76, 0.36], [783.99, 1.14, 0.8]].forEach(([freq, offset, length]) => {
+      const at = t + offset;
+      const osc = ctx.createOscillator();
+      const env = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, at);
+      env.gain.setValueAtTime(0.0001, at);
+      env.gain.exponentialRampToValueAtTime(0.32, at + 0.06);
+      env.gain.setValueAtTime(0.32, at + length - 0.08);
+      env.gain.exponentialRampToValueAtTime(0.0001, at + length);
+      osc.connect(env);
+      env.connect(out);
+      track(osc, at, at + length);
+      // Vibrato that grows in, as a player's would.
+      const lfo = ctx.createOscillator();
+      const depth = ctx.createGain();
+      lfo.frequency.setValueAtTime(5.5, at);
+      depth.gain.setValueAtTime(0, at);
+      depth.gain.linearRampToValueAtTime(freq * 0.012, at + 0.25);
+      lfo.connect(depth);
+      depth.connect(osc.frequency);
+      track(lfo, at, at + length);
+      // Breath: a puff of band-passed noise at the start of each note.
+      const source = ctx.createBufferSource();
+      const filter = ctx.createBiquadFilter();
+      const breath = ctx.createGain();
+      source.buffer = breathNoise;
+      filter.type = 'bandpass';
+      filter.frequency.value = freq * 2;
+      filter.Q.value = 3;
+      breath.gain.setValueAtTime(0.0001, at);
+      breath.gain.exponentialRampToValueAtTime(0.12, at + 0.03);
+      breath.gain.exponentialRampToValueAtTime(0.0001, at + 0.14);
+      source.connect(filter);
+      filter.connect(breath);
+      breath.connect(out);
+      track(source, at, at + 0.15);
+    });
+    return 2.6;
+  },
+
+  // A music box: a high, tinkling six-note tune on a metal comb.
+  // Pretty, but its partials sit up past 3 kHz and it overlaps Desk bell.
+  musicBox(ctx, out, t, track) {
+    const COMB = [[1, 0.22, 1.2], [3, 0.05, 0.3], [5.2, 0.02, 0.12]];
+    [1318.51, 1046.5, 1174.66, 1567.98, 1318.51, 1046.5].forEach((freq, i) => strike(ctx, out, track, freq, t + i * 0.24, COMB));
+    return 2.8;
+  },
+
+  // Water drops: little "bloop" blips that bend up fast, in an uneven drip.
+  // Charming, but tiny and short, so it's lost under room noise.
+  waterDrop(ctx, out, t, track) {
+    for (const [offset, freq] of [[0, 600], [0.32, 760], [0.5, 540], [0.95, 700]]) {
+      const osc = ctx.createOscillator();
+      const env = ctx.createGain();
+      const at = t + offset;
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, at);
+      osc.frequency.exponentialRampToValueAtTime(freq * 2.4, at + 0.06);
+      env.gain.setValueAtTime(0.0001, at);
+      env.gain.exponentialRampToValueAtTime(0.4, at + 0.008);
+      env.gain.exponentialRampToValueAtTime(0.0001, at + 0.09);
+      osc.connect(env);
+      env.connect(out);
+      track(osc, at, at + 0.1);
+    }
+    return 2;
+  },
+
+  // A slide whistle: a triangle wave gliding up, then down. Playful, but its
+  // glides overlap Songbird and it can read as a joke at a student's expense.
+  slideWhistle(ctx, out, t, track) {
+    const osc = ctx.createOscillator();
+    const env = ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(600, t);
+    osc.frequency.exponentialRampToValueAtTime(1800, t + 0.45);
+    osc.frequency.exponentialRampToValueAtTime(700, t + 0.9);
+    env.gain.setValueAtTime(0.0001, t);
+    env.gain.exponentialRampToValueAtTime(0.3, t + 0.05);
+    env.gain.setValueAtTime(0.3, t + 0.8);
+    env.gain.exponentialRampToValueAtTime(0.0001, t + 0.95);
+    osc.connect(env);
+    env.connect(out);
+    track(osc, t, t + 0.95);
+    return 2;
+  },
+
+  // A steel drum: a short calypso figure on a pan, partials at 1, 2 and 3
+  // times the note with a slight pitch drop. Bright and happy, but another
+  // struck, tuned bar, close to Marimba.
+  steelDrum(ctx, out, t, track) {
+    [[783.99, 0], [880, 0.16], [783.99, 0.32], [659.25, 0.56], [523.25, 0.8]].forEach(([freq, offset]) => {
+      const at = t + offset;
+      tone(ctx, out, track, { type: 'sine', freq, bendTo: freq * 0.985, t: at, length: 0.5, peak: 0.3, attack: 0.004 });
+      tone(ctx, out, track, { type: 'sine', freq: freq * 2, t: at, length: 0.3, peak: 0.12, attack: 0.004 });
+      tone(ctx, out, track, { type: 'sine', freq: freq * 3, t: at, length: 0.15, peak: 0.05, attack: 0.004 });
+    });
+    return 2;
+  },
+
+  // A cuckoo clock: two hollow notes falling a major third. Familiar, but the
+  // same shape as Chime.
+  cuckoo(ctx, out, t, track) {
+    tone(ctx, out, track, { type: 'triangle', freq: 739.99, t, length: 0.3, peak: 0.35, attack: 0.02 });
+    tone(ctx, out, track, { type: 'triangle', freq: 587.33, t: t + 0.35, length: 0.45, peak: 0.35, attack: 0.02 });
+    return 1.5;
+  },
+};
+
+const CANDIDATE_INFO = {
+  swell: ['Swell', 'Soft pad: an A-major chord fades in and out (440-1110 Hz). For quiet work time.', true],
+  harp: ['Harp', 'Plucked strings sweep up a scale, C5 to E6. Start or end of class.', true],
+  songbird: ['Songbird', 'Three rising chirps and a falling trill, 1.7-2.9 kHz. Morning, outdoors, brain breaks.', true],
+  clapPattern: ['Clap pattern', 'Clap, clap, clap-clap-clap with no pitch. "Eyes up here."', true],
+  levelUp: ['Level up', 'A game-style rising run and a wobbly held note. End of a task, a win.', true],
+  singingBowl: ['Singing bowl', 'One soft strike that rings and beats slowly at 528 Hz. Calm, but another struck metal tone.'],
+  ocarina: ['Ocarina', 'A breathy, wobbly sol-mi-la-sol. Sustained, but a soft-sine melody like Chime.'],
+  musicBox: ['Music box', 'A tinkling high tune. Lovely, but much of it is above 3 kHz and it overlaps Desk bell.'],
+  waterDrop: ['Water drop', 'Bloops that bend up, in an uneven drip. Too small to hear over a room.'],
+  slideWhistle: ['Slide whistle', 'Up-and-down glide. Playful, but it can sound like teasing.'],
+  steelDrum: ['Steel drum', 'A calypso figure on a pan. Happy, but close to Marimba.'],
+  cuckoo: ['Cuckoo', 'Two hollow notes falling a major third. Same shape as Chime.'],
+};
+
+const ALL = { ...EXISTING, ...CANDIDATES };
+
+// ---- A small player that rings voices the way sound.js's add() does ----
+
+/**
+ * Schedules `voice` from `at`, like sound.js's add(): `mode` is 'once' (3 s
+ * preview), 'bell' (cut at exactly 5 s with a 50 ms fade) or 'repeat' (60 s).
+ * @returns {AudioScheduledSourceNode[]}
+ */
+function ring(ctx, master, voice, at, mode) {
+  const seconds = mode === 'bell' ? BELL_AUTO_DISMISS_SECONDS : undefined;
+  const limit = seconds ?? (mode === 'repeat' ? ALARM_MAX_SECONDS : BELL_SECONDS);
+  const cut = seconds === undefined ? Infinity : at + seconds;
+  const sources = [];
+  const track = (source, start, stop) => {
+    source.start(start);
+    source.stop(Math.max(start, Math.min(stop, cut)));
+    sources.push(source);
+  };
+  let out = master;
+  if (seconds !== undefined) {
+    const fade = ctx.createGain();
+    fade.gain.setValueAtTime(1, Math.max(at, cut - 0.05));
+    fade.gain.linearRampToValueAtTime(0, cut);
+    fade.connect(master);
+    out = fade;
+  }
+  let offset = 0;
+  while (offset < limit) offset += voice(ctx, out, at + offset, track);
+  return sources;
+}
+
+let live = null;
+let playing = [];
+
+function player() {
+  if (!live) {
+    const ctx = new AudioContext();
+    const master = ctx.createGain();
+    master.gain.value = Number(document.getElementById('volume').value);
+    master.connect(ctx.destination);
+    live = { ctx, master };
+  }
+  return live;
+}
+
+function stop() {
+  if (!live) return;
+  const now = live.ctx.currentTime;
+  playing.forEach((source) => { try { source.stop(now); } catch { /* already stopped */ } });
+  playing = [];
+}
+
+async function play(id, mode) {
+  const { ctx, master } = player();
+  await ctx.resume();
+  stop();
+  playing = ring(ctx, master, ALL[id], ctx.currentTime + 0.05, mode);
+}
+
+function rowFor(id, [name, desc, pick]) {
+  const row = document.createElement('div');
+  row.className = pick ? 'row pick' : 'row';
+  row.innerHTML = `<div><div class="name"></div><div class="desc"></div></div><div class="buttons"></div>`;
+  row.querySelector('.name').textContent = name;
+  if (pick) row.querySelector('.name').insertAdjacentHTML('beforeend', '<span class="tag">PICK</span>');
+  row.querySelector('.desc').textContent = desc;
+  for (const [mode, label] of [['once', 'Once'], ['bell', 'Bell'], ['repeat', 'Repeat']]) {
+    const button = document.createElement('button');
+    button.textContent = label;
+    button.dataset.voice = id;
+    button.dataset.mode = mode;
+    button.addEventListener('click', () => play(id, mode));
+    row.querySelector('.buttons').append(button);
+  }
+  return row;
+}
+
+for (const [id, info] of Object.entries(EXISTING_INFO)) document.getElementById('existing').append(rowFor(id, info));
+for (const [id, info] of Object.entries(CANDIDATE_INFO)) document.getElementById('candidates').append(rowFor(id, info));
+document.getElementById('stop').addEventListener('click', stop);
+document.getElementById('volume').addEventListener('input', (event) => {
+  if (live) live.master.gain.value = Number(event.target.value);
+});
+
+// ---- Headless check: render offline and describe the result ----
+
+/**
+ * Renders one voice offline at volume 1 and returns its peak, RMS, length of
+ * sound, and the share of its energy below 400 Hz, 400 Hz-3 kHz and above 3 kHz.
+ */
+window.renderVoice = async function renderVoice(id, mode = 'bell') {
+  const rate = 44100;
+  const seconds = mode === 'repeat' ? 12 : 6;
+  const ctx = new OfflineAudioContext(1, rate * seconds, rate);
+  const master = ctx.createGain();
+  master.connect(ctx.destination);
+  ring(ctx, master, ALL[id], 0, mode);
+  const data = (await ctx.startRendering()).getChannelData(0);
+  let peak = 0;
+  let sum = 0;
+  let last = 0;
+  for (let i = 0; i < data.length; i += 1) {
+    const v = Math.abs(data[i]);
+    if (!Number.isFinite(v)) return { id, error: 'non-finite sample' };
+    if (v > peak) peak = v;
+    sum += v * v;
+    if (v > 0.001) last = i;
+  }
+  // Band energy from 4096-point DFT frames (Hann window) across the sound.
+  const N = 4096;
+  const bands = [0, 0, 0];
+  const win = Float64Array.from({ length: N }, (_, i) => 0.5 - 0.5 * Math.cos((2 * Math.PI * i) / N));
+  for (let start = 0; start + N <= last + N && start + N <= data.length; start += N) {
+    const re = new Float64Array(N);
+    const im = new Float64Array(N);
+    for (let i = 0; i < N; i += 1) re[i] = data[start + i] * win[i];
+    fft(re, im);
+    for (let k = 1; k < N / 2; k += 1) {
+      const f = (k * rate) / N;
+      const e = re[k] * re[k] + im[k] * im[k];
+      bands[f < 400 ? 0 : f <= 3000 ? 1 : 2] += e;
+    }
+  }
+  const total = bands[0] + bands[1] + bands[2] || 1;
+  return {
+    id, mode,
+    peak: +peak.toFixed(3),
+    rms: +Math.sqrt(sum / (last + 1)).toFixed(3),
+    soundsFor: +(last / rate).toFixed(2),
+    below400: +(bands[0] / total).toFixed(3),
+    inRange: +(bands[1] / total).toFixed(3),
+    above3k: +(bands[2] / total).toFixed(3),
+  };
+};
+
+/** In-place radix-2 FFT. */
+function fft(re, im) {
+  const n = re.length;
+  for (let i = 1, j = 0; i < n; i += 1) {
+    let bit = n >> 1;
+    for (; j & bit; bit >>= 1) j ^= bit;
+    j ^= bit;
+    if (i < j) { [re[i], re[j]] = [re[j], re[i]]; [im[i], im[j]] = [im[j], im[i]]; }
+  }
+  for (let len = 2; len <= n; len <<= 1) {
+    const angle = (-2 * Math.PI) / len;
+    for (let i = 0; i < n; i += len) {
+      for (let j = 0; j < len / 2; j += 1) {
+        const cr = Math.cos(angle * j);
+        const ci = Math.sin(angle * j);
+        const ar = re[i + j + len / 2] * cr - im[i + j + len / 2] * ci;
+        const ai = re[i + j + len / 2] * ci + im[i + j + len / 2] * cr;
+        re[i + j + len / 2] = re[i + j] - ar;
+        im[i + j + len / 2] = im[i + j] - ai;
+        re[i + j] += ar;
+        im[i + j] += ai;
+      }
+    }
+  }
+}
+
+window.VOICE_IDS = Object.keys(ALL);
+</script>
+</body>
+</html>

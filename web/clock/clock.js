@@ -10,8 +10,9 @@
 // throttled behind other windows. The window is redone when settings change,
 // when the tab is shown again, when sound turns on, and as it rolls forward.
 import { alarmsAfterRinging, describeMoment, ringsInWindow } from './clock-model.js';
-import { createSettingsStore } from './clock-storage.js';
+import { createHintStore, createSettingsStore } from './clock-storage.js';
 import { createClockSource } from './clock-source.js';
+import { createCycleHint } from './cycle-hint.js';
 import { createDayBarView } from './day-bar-view.js';
 import { describeBar } from './day-bar.js';
 import { el } from './dom.js';
@@ -31,7 +32,7 @@ import { createAlarmEditor } from './alarm-editor.js';
 import { createSettingsDrawer } from './settings-drawer.js';
 import { applyLook, createLookSheet, decorations } from './look-sheet.js';
 import { ALARM_MAX_SECONDS, BELL_AUTO_DISMISS_SECONDS, createSoundPlayer } from './sound.js';
-import { cancelTimer, pauseTimer, resumeTimer, settleTimer, timerProgress, timerRingView, timerStatus, timerText } from './timer.js';
+import { cancelTimer, nameTimer, pauseTimer, resumeTimer, settleTimer, timerProgress, timerRingView, timerStatus, timerText } from './timer.js';
 import { createTimerPicker } from './timer-picker.js';
 import { createTimerRing } from './timer-ring.js';
 import { keepRingClear } from './ring-fit.js';
@@ -126,6 +127,7 @@ export function initClockApp({
   // real timer saved by other tabs is neither loaded, cleared nor overwritten.
   const savedTimer = {
     timerEndsAt: settings.timerEndsAt, timerPausedMs: settings.timerPausedMs, timerTotalMs: settings.timerTotalMs,
+    timerLabel: settings.timerLabel,
   };
   if (clock.simulated) settings = { ...settings, ...cancelTimer() };
   // Saving can fail (storage full or blocked): the page says so once, and
@@ -217,8 +219,9 @@ export function initClockApp({
   let ringingWhat = null;
   /** The timer has rung and is still ringing: it keeps the big Readout until then. */
   let timerRinging = false;
-  /** The length of the timer that rang (its ring shows 0:00 of it until then). */
+  /** The length and name of the timer that rang (its ring shows 0:00 of it until then). */
   let rangTotalMs = null;
+  let rangLabel = null;
   const ringCard = createRingCard({ onDismiss: () => dismiss() });
   /**
    * @param {import('./ring-words.js').RingWords} words
@@ -291,9 +294,15 @@ export function initClockApp({
       updateSettings(cancelTimer());
       timerControl.focus();
     },
+    onRename: (text) => updateSettings(nameTimer(settings, text)),
   });
+  // The first-time "Click to change what this shows" tooltips, on the page
+  // and in the mini player, each remembered on its own.
+  const hints = createHintStore(storage);
+  const pageHint = createCycleHint({ name: 'page', hints, now: realNow });
   const readoutsView = createReadoutsView({
     timerFace: timerRing.element,
+    hint: pageHint.element,
     onCycle: (i) => changeLayout(cycleReadout(layout, i)),
     onRemove: (i) => {
       changeLayout(removeReadout(layout, i));
@@ -313,6 +322,7 @@ export function initClockApp({
   }
   const onKeyDown = (event) => {
     if (event.key !== 'Escape') return;
+    pageHint.dismiss();
     // Escape dismisses a ring first.
     if (ringing.length > 0) {
       dismiss();
@@ -323,6 +333,10 @@ export function initClockApp({
     readoutsControl.focus();
   };
   document.addEventListener('keydown', onKeyDown);
+  // Any click puts the tooltip away: caught on the way down, so the click
+  // that first shows it (choosing a Division) doesn't also put it away.
+  const onClick = () => pageHint.dismiss();
+  document.addEventListener('click', onClick, true);
 
   // The top bar's controls: quiet text buttons with icons. Timer opens the
   // picker (timer-picker.js), Look the sheet (look-sheet.js) and Settings the
@@ -443,6 +457,7 @@ export function initClockApp({
     },
     onCycle: () => changeLayout(cycleReadout(layout, 0)),
     onDismiss: () => dismiss(),
+    hint: createCycleHint({ name: 'mini', hints, now: realNow }),
   });
   mini.button.classList.add('clock-control', 'clock-control--icon', 'clock-control--mini');
   globalThis.addEventListener('pagehide', mini.close);
@@ -454,9 +469,10 @@ export function initClockApp({
   function renderMini(now, moment, { big, mode }) {
     const { status, remainingMs } = timerStatus(settings, now.getTime());
     let timer = remainingMs === null ? null : {
-      remainingMs, paused: status === 'paused', totalMs: settings.timerTotalMs ?? null, progress: timerProgress(settings, now.getTime()),
+      remainingMs, paused: status === 'paused', totalMs: settings.timerTotalMs ?? null, label: settings.timerLabel,
+      progress: timerProgress(settings, now.getTime()),
     };
-    if (!timer && timerRinging) timer = { remainingMs: 0, paused: false, totalMs: rangTotalMs, progress: 0 };
+    if (!timer && timerRinging) timer = { remainingMs: 0, paused: false, totalMs: rangTotalMs, label: rangLabel, progress: 0 };
     mini.show(miniContent({ now, moment, settings, big, mode, timer }));
   }
   function renderMiniRinging() {
@@ -513,7 +529,10 @@ export function initClockApp({
       const text = textFor(settings);
       for (const ring of rang) {
         if (ring.at.getTime() < staleBefore) continue;
-        if (ring.source === 'timer') rangTotalMs = ring.totalMs;
+        if (ring.source === 'timer') {
+          rangTotalMs = ring.totalMs;
+          rangLabel = ring.label ?? null;
+        }
         const seconds = ringSeconds(ring.source);
         startRinging(ringWords(ring, text), {
           seconds,
@@ -590,6 +609,7 @@ export function initClockApp({
       mainScreen.classList.remove('has-timer');
       const parts = readoutParts({ kind: 'time', at: now }, options);
       readoutsView.show({ count: 1, cyclable: false, timer: false, editing: false, canAdd: false }, [parts]);
+      pageHint.update(false);
       showEditing();
       return { big: parts, mode: null };
     }
@@ -601,7 +621,7 @@ export function initClockApp({
     const timer = timerText(settings, now.getTime());
     const withTimer = timer !== '' || timerRinging;
     mainScreen.classList.toggle('has-timer', withTimer);
-    if (withTimer) timerRing.show(timerRingView(settings, now.getTime(), { rangTotalMs }));
+    if (withTimer) timerRing.show(timerRingView(settings, now.getTime(), { rangTotalMs, rangLabel }));
     const values = layout.readouts.map(({ mode }) => readoutValue(mode, moment, now, settings.periodLabels));
     const parts = values.map((value) => readoutParts(value, options));
     // Beside the ring, the old main Readout's time left names its Segment
@@ -613,6 +633,8 @@ export function initClockApp({
       { count: values.length, cyclable: true, timer: withTimer, editing, canAdd: canAddReadout(layout) },
       parts,
     );
+    // Not in edit mode, which has its own note.
+    pageHint.update(!editing);
     showEditing();
     return { big: parts[0], mode: layout.readouts[0].mode };
   }
@@ -639,6 +661,7 @@ export function initClockApp({
   function destroy() {
     clearInterval(interval);
     document.removeEventListener('keydown', onKeyDown);
+    document.removeEventListener('click', onClick, true);
     document.removeEventListener('visibilitychange', onVisibility);
     globalThis.removeEventListener('pagehide', mini.close);
     stopWatchingFullscreen?.();

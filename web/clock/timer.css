@@ -149,8 +149,51 @@
 }
 
 .clock-ring__title .clock-icon {
+  flex: none;
   width: 0.8em;
   height: 0.8em;
+}
+
+/* The title is a button that names the timer: it looks like the title, and
+   a long name ("Read chapter 4 and answer the questions") is set smaller and
+   wraps inside the ring's chord rather than running past it. */
+.clock-ring__name {
+  /* Above the digits' glyphs, which reach up past their short line box and
+     would otherwise take the click. */
+  position: relative;
+  z-index: 1;
+  max-width: 62cqw;
+  padding: 0 0.15em;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: center;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.clock-ring__name:hover:not(:disabled) {
+  text-decoration: underline dotted;
+  text-underline-offset: 0.15em;
+}
+
+.clock-ring__name:disabled {
+  cursor: default;
+}
+
+.clock-ring__name.is-long {
+  max-width: 56cqw;
+  font-size: 0.72em;
+}
+
+.clock-ring__name-field {
+  width: 56cqw;
+  min-height: 0;
+  padding: 0.1em 0.3em;
+  font-size: 0.72em;
+  text-align: center;
 }
 
 /* Fills about 80-90% of the ring's width across the middle, but no taller
@@ -246,7 +289,8 @@
 .clock-pill {
   min-height: var(--tap);
   min-width: 72px;
-  padding: 0 var(--s4);
+  max-width: 100%;
+  padding: var(--s1) var(--s4);
   border: 1.5px solid var(--line);
   border-radius: 999px;
   background: transparent;
@@ -254,6 +298,11 @@
   font-weight: 600;
   font-variant-numeric: tabular-nums lining-nums;
   cursor: pointer;
+}
+
+/* A quick pick with a long name wraps inside the picker. */
+.clock-picker__recent .clock-pill {
+  overflow-wrap: anywhere;
 }
 
 .clock-pill:hover {

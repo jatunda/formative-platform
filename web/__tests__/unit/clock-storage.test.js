@@ -41,8 +41,8 @@ describe('clock settings store', () => {
     const settings = {
       division: 'MS', use24Hour: true, periodLabels: { 'Period 3': 'AP CSA', Seminar: 'Advisory' },
       bells: { on: false, sound: 'chime', assemblyEnds: true, untilDismissed: true }, alarms: [clockAlarm, onceAlarm, periodAlarm],
-      volume: 0.25, timerEndsAt: 1793000000000, timerPausedMs: null, timerTotalMs: 300000, timerSound: 'buzzer',
-      recentDurations: [450000, 900000],
+      volume: 0.25, timerEndsAt: 1793000000000, timerPausedMs: null, timerTotalMs: 300000, timerLabel: 'Quiz',
+      timerSound: 'buzzer', quickPicks: [{ ms: 450000, label: 'Quiz' }, { ms: 900000 }],
       showSeconds: false, dayStrip: false, theme: 'bloom', fontSwap: 'mono', paletteSwap: 'team',
       flipped: true, themeHint: false,
     };
@@ -90,7 +90,7 @@ describe('clock settings store', () => {
   });
 
   it('round-trips a paused timer, and has no timer or quick picks on a first visit', () => {
-    expect(DEFAULT_SETTINGS).toMatchObject({ timerPausedMs: null, recentDurations: [] });
+    expect(DEFAULT_SETTINGS).toMatchObject({ timerPausedMs: null, timerLabel: null, quickPicks: [] });
     expect(storeHolding({ timerPausedMs: 180000 }).load().timerPausedMs).toBe(180000);
   });
 
@@ -101,10 +101,33 @@ describe('clock settings store', () => {
 
   it.each([
     ['not a list', 'soon', []],
-    ['with bad entries dropped', [450000, -5, 'x', 0, 900000], [450000, 900000]],
-    ['to the 3 most recent', [1000, 2000, 3000, 4000], [1000, 2000, 3000]],
+    ['with bad entries dropped', [{ ms: 450000 }, { ms: -5 }, 'x', { ms: 0 }, null, { ms: 900000, label: 5 }],
+      [{ ms: 450000 }, { ms: 900000 }]],
+    ['to the 3 most recent', [{ ms: 1000 }, { ms: 2000 }, { ms: 3000 }, { ms: 4000 }],
+      [{ ms: 1000 }, { ms: 2000 }, { ms: 3000 }]],
+    ['with their names, capped, and empty names dropped', [{ ms: 1000, label: 'x'.repeat(50) }, { ms: 2000, label: ' ' }],
+      [{ ms: 1000, label: 'x'.repeat(40) }, { ms: 2000 }]],
   ])('keeps the quick picks %s', (_, saved, kept) => {
-    expect(storeHolding({ recentDurations: saved }).load().recentDurations).toEqual(kept);
+    expect(storeHolding({ quickPicks: saved }).load().quickPicks).toEqual(kept);
+  });
+
+  it.each([
+    ['as unnamed quick picks', [450000, 900000], [{ ms: 450000 }, { ms: 900000 }]],
+    ['with bad entries dropped', [450000, -5, 'x', 0, 900000], [{ ms: 450000 }, { ms: 900000 }]],
+    ['to the 3 most recent', [1000, 2000, 3000, 4000], [{ ms: 1000 }, { ms: 2000 }, { ms: 3000 }]],
+  ])('loads quick picks saved before timers had names %s', (_, saved, kept) => {
+    const settings = storeHolding({ recentDurations: saved }).load();
+    expect(settings.quickPicks).toEqual(kept);
+    expect(settings).not.toHaveProperty('recentDurations');
+  });
+
+  it("keeps a timer's name only while there is a timer, and only when it is a name", () => {
+    expect(storeHolding({ timerPausedMs: 180000, timerLabel: 'Quiz' }).load().timerLabel).toBe('Quiz');
+    expect(storeHolding({ timerLabel: 'Quiz' }).load().timerLabel).toBeNull();
+    expect(storeHolding({ timerEndsAt: 1793000000000, timerLabel: 7 }).load().timerLabel).toBeNull();
+    expect(storeHolding({ timerEndsAt: 1793000000000, timerLabel: '  ' }).load().timerLabel).toBeNull();
+    expect(storeHolding({ timerEndsAt: 1793000000000, timerLabel: 'y'.repeat(41) }).load().timerLabel)
+      .toBe('y'.repeat(40));
   });
 
   it("keeps a timer's length only while there is a timer, and only when it is a length", () => {
