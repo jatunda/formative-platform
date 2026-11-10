@@ -7,7 +7,7 @@
 import { createStorageAdapter } from '../storage.js';
 import { SOUNDS } from './sound.js';
 import { DEFAULT_THEME, isFont, isPalette, isTheme, migrateFlipped } from './themes.js';
-import { QUICK_PICKS } from './timer.js';
+import { QUICK_PICKS, cleanTimerLabel } from './timer.js';
 
 /** @typedef {import('./clock-settings.js').ClockSettings} ClockSettings */
 /** @typedef {import('./clock-settings.js').Alarm} Alarm */
@@ -26,8 +26,9 @@ export const DEFAULT_SETTINGS = Object.freeze(/** @type {ClockSettings} */ ({
   timerEndsAt: null,
   timerPausedMs: null,
   timerTotalMs: null,
+  timerLabel: null,
   timerSound: 'beep',
-  recentDurations: [],
+  quickPicks: [],
   showSeconds: true,
   dayStrip: true,
   // The dark muted blue theme, in its own version.
@@ -46,6 +47,24 @@ const isSound = (v) => SOUNDS.includes(/** @type {import('./clock-settings.js').
 const isStringList = (v) => Array.isArray(v) && v.every((s) => typeof s === 'string');
 /** @param {unknown} v @returns {v is number} */
 const isFiniteNumber = (v) => typeof v === 'number' && Number.isFinite(v);
+
+/**
+ * The saved quick picks: each `{ ms, label? }`, or a bare length in ms as
+ * saved (as `recentDurations`) before timers had names.
+ * @param {Record<string, any>} s the saved settings
+ * @returns {import('./timer.js').QuickPick[]}
+ */
+function parseQuickPicks(s) {
+  const saved = Array.isArray(s.quickPicks) ? s.quickPicks : s.recentDurations;
+  if (!Array.isArray(saved)) return [];
+  return saved.map((p) => (isObject(p) ? p : { ms: p }))
+    .filter((p) => isFiniteNumber(p.ms) && p.ms > 0)
+    .slice(0, QUICK_PICKS)
+    .map((p) => {
+      const label = typeof p.label === 'string' ? cleanTimerLabel(p.label) : null;
+      return label ? { ms: p.ms, label } : { ms: p.ms };
+    });
+}
 
 /** @param {unknown} anchor */
 function isAnchor(anchor) {
@@ -89,6 +108,7 @@ function parseSettings(saved) {
   const isPositive = (v) => isFiniteNumber(v) && v > 0;
   // One timer at a time: a running one wins over a paused one.
   const timerPausedMs = timerEndsAt === null && isPositive(s.timerPausedMs) ? s.timerPausedMs : d.timerPausedMs;
+  const hasTimer = timerEndsAt !== null || timerPausedMs !== null;
   return {
     division: s.division === 'MS' || s.division === 'HS' ? s.division : d.division,
     use24Hour: typeof s.use24Hour === 'boolean' ? s.use24Hour : d.use24Hour,
@@ -99,11 +119,10 @@ function parseSettings(saved) {
     volume: isFiniteNumber(s.volume) && s.volume >= 0 && s.volume <= 1 ? s.volume : d.volume,
     timerEndsAt,
     timerPausedMs,
-    timerTotalMs: (timerEndsAt !== null || timerPausedMs !== null) && isPositive(s.timerTotalMs)
-      ? s.timerTotalMs : d.timerTotalMs,
+    timerTotalMs: hasTimer && isPositive(s.timerTotalMs) ? s.timerTotalMs : d.timerTotalMs,
+    timerLabel: hasTimer && typeof s.timerLabel === 'string' ? cleanTimerLabel(s.timerLabel) : d.timerLabel,
     timerSound: isSound(s.timerSound) ? s.timerSound : d.timerSound,
-    recentDurations: Array.isArray(s.recentDurations)
-      ? s.recentDurations.filter(isPositive).slice(0, QUICK_PICKS) : [],
+    quickPicks: parseQuickPicks(s),
     showSeconds: typeof s.showSeconds === 'boolean' ? s.showSeconds : d.showSeconds,
     dayStrip: typeof s.dayStrip === 'boolean' ? s.dayStrip : d.dayStrip,
     // The earlier 'default' theme (and any id the set doesn't have) is the default.

@@ -31,7 +31,7 @@ import { createAlarmEditor } from './alarm-editor.js';
 import { createSettingsDrawer } from './settings-drawer.js';
 import { applyLook, createLookSheet, decorations } from './look-sheet.js';
 import { ALARM_MAX_SECONDS, createSoundPlayer } from './sound.js';
-import { cancelTimer, pauseTimer, resumeTimer, settleTimer, timerProgress, timerRingView, timerStatus, timerText } from './timer.js';
+import { cancelTimer, nameTimer, pauseTimer, resumeTimer, settleTimer, timerProgress, timerRingView, timerStatus, timerText } from './timer.js';
 import { createTimerPicker } from './timer-picker.js';
 import { createTimerRing } from './timer-ring.js';
 
@@ -125,6 +125,7 @@ export function initClockApp({
   // real timer saved by other tabs is neither loaded, cleared nor overwritten.
   const savedTimer = {
     timerEndsAt: settings.timerEndsAt, timerPausedMs: settings.timerPausedMs, timerTotalMs: settings.timerTotalMs,
+    timerLabel: settings.timerLabel,
   };
   if (clock.simulated) settings = { ...settings, ...cancelTimer() };
   // Saving can fail (storage full or blocked): the page says so once, and
@@ -197,8 +198,9 @@ export function initClockApp({
   let ringingWhat = null;
   /** The timer has rung and is still ringing: it keeps the big Readout until then. */
   let timerRinging = false;
-  /** The length of the timer that rang (its ring shows 0:00 of it until then). */
+  /** The length and name of the timer that rang (its ring shows 0:00 of it until then). */
   let rangTotalMs = null;
+  let rangLabel = null;
   const ringCard = createRingCard({ onDismiss: () => dismiss() });
   /** @param {import('./ring-words.js').RingWords} words */
   function startRinging(words) {
@@ -249,6 +251,7 @@ export function initClockApp({
       updateSettings(cancelTimer());
       timerControl.focus();
     },
+    onRename: (text) => updateSettings(nameTimer(settings, text)),
   });
   const readoutsView = createReadoutsView({
     timerFace: timerRing.element,
@@ -411,9 +414,10 @@ export function initClockApp({
   function renderMini(now, moment, { big, mode }) {
     const { status, remainingMs } = timerStatus(settings, now.getTime());
     let timer = remainingMs === null ? null : {
-      remainingMs, paused: status === 'paused', totalMs: settings.timerTotalMs ?? null, progress: timerProgress(settings, now.getTime()),
+      remainingMs, paused: status === 'paused', totalMs: settings.timerTotalMs ?? null, label: settings.timerLabel,
+      progress: timerProgress(settings, now.getTime()),
     };
-    if (!timer && timerRinging) timer = { remainingMs: 0, paused: false, totalMs: rangTotalMs, progress: 0 };
+    if (!timer && timerRinging) timer = { remainingMs: 0, paused: false, totalMs: rangTotalMs, label: rangLabel, progress: 0 };
     mini.show(miniContent({ now, moment, settings, big, mode, timer }));
   }
   function renderMiniRinging() {
@@ -473,6 +477,7 @@ export function initClockApp({
         if (ring.source === 'timer') {
           timerRinging = true;
           rangTotalMs = ring.totalMs;
+          rangLabel = ring.label ?? null;
         }
       }
       const alarms = alarmsAfterRinging(settings.alarms, rang, { simulated: clock.simulated });
@@ -554,7 +559,7 @@ export function initClockApp({
     const timer = timerText(settings, now.getTime());
     const withTimer = timer !== '' || timerRinging;
     mainScreen.classList.toggle('has-timer', withTimer);
-    if (withTimer) timerRing.show(timerRingView(settings, now.getTime(), { rangTotalMs }));
+    if (withTimer) timerRing.show(timerRingView(settings, now.getTime(), { rangTotalMs, rangLabel }));
     const values = layout.readouts.map(({ mode }) => readoutValue(mode, moment, now, settings.periodLabels));
     const parts = values.map((value) => readoutParts(value, options));
     // Beside the ring, the old main Readout's time left names its Segment

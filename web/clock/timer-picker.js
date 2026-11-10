@@ -1,6 +1,7 @@
 // The timer picker: "Start a timer", a modal dialog the top bar's Timer
 // control opens. Four presets start at once; "Recent" holds the last three
-// custom times (most recent first); the custom row takes minutes and seconds.
+// custom times (most recent first), each with the name it was last given
+// ("20:00 · Quiz"), which starts it named; the custom row takes minutes and seconds.
 // Built once (so typing survives the ticks). Pause, resume and cancel are on
 // the ring (timer-ring.js), not here. The timer itself is plain data in the
 // settings (timer.js).
@@ -9,7 +10,7 @@ import { el } from './dom.js';
 import { formatDuration } from './format.js';
 import { icon } from './icons.js';
 import { createModal } from './modal.js';
-import { PRESET_MINUTES, parseMinutesSeconds, rememberDuration, startTimer } from './timer.js';
+import { PRESET_MINUTES, parseMinutesSeconds, quickPickLabel, rememberQuickPick, startTimer } from './timer.js';
 
 const ID = 'clock-picker';
 const MINUTE = 60 * 1000;
@@ -23,10 +24,15 @@ const MINUTE = 60 * 1000;
  *   open, `onChange` hears it open and close, and `onStarted` hears a timer start (after it closes).
  */
 export function createTimerPicker({ settings, now, update, behind, onChange, onStarted }) {
-  /** Start a timer of `ms`, remembering it as a quick pick when `custom`. @param {number} ms @param {boolean} custom */
+  /**
+   * Start a timer of `ms`, remembering it as a quick pick (and with its quick
+   * pick's name) when `custom`. @param {number} ms @param {boolean} custom
+   */
   function start(ms, custom) {
-    const recent = custom ? { recentDurations: rememberDuration(settings().recentDurations, ms) } : {};
-    update({ ...startTimer(ms, now()), ...recent });
+    const { quickPicks } = settings();
+    const label = custom ? quickPickLabel(quickPicks, ms) : null;
+    const recent = custom ? { quickPicks: rememberQuickPick(quickPicks, ms) } : {};
+    update({ ...startTimer(ms, now(), label), ...recent });
     modal.close();
     onStarted();
   }
@@ -42,11 +48,12 @@ export function createTimerPicker({ settings, now, update, behind, onChange, onS
   const recentLabel = el('p', { className: 'clock-picker__sub', id: `${ID}-recent`, textContent: 'Recent' });
   const recent = el('div', { className: 'clock-picker__recent', role: 'group', 'aria-labelledby': recentLabel.id });
   function buildRecent() {
-    const durations = settings().recentDurations;
-    recentLabel.hidden = durations.length === 0;
-    recent.hidden = durations.length === 0;
-    recent.replaceChildren(...durations.map((ms) => el('button', {
-      type: 'button', className: 'clock-pill', textContent: formatDuration(ms), onclick: () => start(ms, true),
+    const picks = settings().quickPicks;
+    recentLabel.hidden = picks.length === 0;
+    recent.hidden = picks.length === 0;
+    recent.replaceChildren(...picks.map(({ ms, label }) => el('button', {
+      type: 'button', className: 'clock-pill',
+      textContent: label ? `${formatDuration(ms)} · ${label}` : formatDuration(ms), onclick: () => start(ms, true),
     })));
   }
 

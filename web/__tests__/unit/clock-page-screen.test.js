@@ -321,6 +321,12 @@ describe('School Clock fullscreen, mini player and feedback', () => {
       expect(footText()).toBe('Up next Period 4');
     });
 
+    it("puts a named timer's name first", async () => {
+      open({ settings: { division: 'HS', timerPausedMs: 4 * 60 * SEC, timerTotalMs: 20 * 60 * SEC, timerLabel: 'Quiz' } });
+      await openMini();
+      expect(head()).toBe('Quiz · 20:00 timer · paused');
+    });
+
     it('just says "Timer" for a saved timer whose length is not known', async () => {
       open({ settings: { division: 'HS', timerEndsAt: at(11, 12).getTime() + 2 * 60 * SEC, timerPausedMs: null } });
       await openMini();

@@ -294,7 +294,7 @@ describe('School Clock classroom timer', () => {
       open({ search: SIMULATED });
       typeDuration('3');
       expect(digits().textContent).toBe('3:00');
-      expect(saved(storage)).toMatchObject({ timerEndsAt: null, timerPausedMs: null, recentDurations: [3 * MIN] });
+      expect(saved(storage)).toMatchObject({ timerEndsAt: null, timerPausedMs: null, quickPicks: [{ ms: 3 * MIN }] });
 
       advance(MIN);
       ringButton('Pause').click();
@@ -386,6 +386,145 @@ describe('School Clock classroom timer', () => {
       pick('5 min');
       typeDuration('5');
       expect(quickPicks()).toEqual([]);
+    });
+
+    it('quick picks saved before timers had names still load', () => {
+      storage = createFakeStorage({ [SETTINGS_KEY]: JSON.stringify({ division: 'HS', recentDurations: [20 * MIN, 7.5 * MIN] }) });
+      open();
+      expect(quickPicks()).toEqual(['20:00', '7:30']);
+      pick('20:00');
+      expect(title()).toBe('20:00 timer');
+    });
+  });
+
+  describe('a name', () => {
+    /** The ring's title, a button that turns into a text field to name the timer. */
+    const titleButton = () => ring().querySelector('.clock-ring__title button');
+    const nameField = () => ring().querySelector('.clock-ring__title input');
+    const editing = () => isShown(nameField());
+    /** Click the title, type `text` and finish with `key` (Enter or Escape), or by leaving the field. */
+    function rename(text, key = 'Enter') {
+      titleButton().click();
+      nameField().value = text;
+      if (key === 'blur') nameField().blur();
+      else press(key);
+    }
+
+    it('clicking the title opens a field with the name in it; Enter saves it and goes back to the title', () => {
+      open();
+      typeDuration('20');
+      expect(titleButton().textContent).toBe('20:00 timer');
+      expect(editing()).toBe(false);
+      titleButton().click();
+      expect(editing()).toBe(true);
+      expect(document.activeElement).toBe(nameField());
+      expect(nameField().getAttribute('aria-label')).toBe('Timer name');
+      expect(nameField().value).toBe('');
+      nameField().value = 'Quiz';
+      // The key's default action is stopped: it would click the title (focused by then) open again.
+      expect(press('Enter', { cancelable: true })).toBe(false);
+
+      expect(editing()).toBe(false);
+      expect(document.activeElement).toBe(titleButton());
+      expect(title()).toBe('Quiz');
+      expect(digits().getAttribute('aria-label')).toBe('Quiz · 20:00 timer, running, 20:00 to go');
+      expect(saved(storage).timerLabel).toBe('Quiz');
+
+      titleButton().click();
+      expect(nameField().value).toBe('Quiz');
+    });
+
+    it('leaving the field saves the name too; Escape keeps the old one', () => {
+      open();
+      typeDuration('20');
+      rename('Quiz', 'blur');
+      expect(title()).toBe('Quiz');
+      rename('Test', 'Escape');
+      expect(editing()).toBe(false);
+      expect(title()).toBe('Quiz');
+      expect(document.activeElement).toBe(titleButton());
+      expect(saved(storage).timerLabel).toBe('Quiz');
+      // Escape in the field closes nothing else: the timer keeps the big spot.
+      expect(ringShown()).toBe(true);
+    });
+
+    it('keeps the name, not a bare "paused", while paused, and through a reload', () => {
+      open();
+      typeDuration('20');
+      rename('Quiz');
+      ringButton('Pause').click();
+      expect(title()).toBe('Quiz · paused');
+      open();
+      expect(title()).toBe('Quiz · paused');
+      expect(digits().getAttribute('aria-label')).toBe('Quiz · 20:00 timer, paused, 20:00 to go');
+    });
+
+    it('is saved with that length\'s quick pick, so choosing it again starts it named', () => {
+      open();
+      typeDuration('3');
+      typeDuration('20');
+      rename('Quiz');
+      ringButton('Cancel').click();
+      expect(quickPicks()).toEqual(['20:00 · Quiz', '3:00']);
+      pick('20:00 · Quiz');
+      expect(title()).toBe('Quiz');
+      // Typing the same length starts it named, too.
+      typeDuration('20');
+      expect(title()).toBe('Quiz');
+      // Another quick pick starts without it.
+      pick('3:00');
+      expect(title()).toBe('3:00 timer');
+    });
+
+    it('a named preset becomes a quick pick, and a preset tapped again starts unnamed', () => {
+      open();
+      pick('5 min');
+      rename('Warm-up');
+      expect(quickPicks()).toEqual(['5:00 · Warm-up']);
+      pick('5 min');
+      expect(title()).toBe('5:00 timer');
+      pick('5:00 · Warm-up');
+      expect(title()).toBe('Warm-up');
+    });
+
+    it('leaving it empty clears the name, on the timer and its quick pick', () => {
+      open();
+      typeDuration('20');
+      rename('Quiz');
+      rename('   ');
+      expect(title()).toBe('20:00 timer');
+      expect(saved(storage).timerLabel).toBeNull();
+      expect(quickPicks()).toEqual(['20:00']);
+    });
+
+    it('is 40 characters at most', () => {
+      open();
+      typeDuration('20');
+      titleButton().click();
+      expect(nameField().maxLength).toBe(40);
+      rename('Read chapter 4 and answer the questions at the end');
+      expect(title()).toBe('Read chapter 4 and answer the questions');
+      expect(title().length).toBeLessThanOrEqual(40);
+    });
+
+    it('is on the ring card when time is up, and the title is not editable then', () => {
+      open();
+      pick('1 min');
+      rename('Clean up');
+      advance(MIN + SEC);
+      expect(ringing().textContent).toContain('Clean up · 1:00 timer');
+      expect(title()).toBe('Clean up');
+      expect(titleButton().disabled).toBe(true);
+    });
+
+    it('goes when the timer is cancelled', () => {
+      open();
+      pick('1 min');
+      rename('Clean up');
+      ringButton('Cancel').click();
+      expect(saved(storage).timerLabel).toBeNull();
+      pick('1 min');
+      expect(title()).toBe('1:00 timer');
     });
   });
 });

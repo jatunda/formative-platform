@@ -65,6 +65,9 @@ Middle School (MS) or High School (HS). The two Divisions share most Bell Schedu
 **Readout**:
 One displayed number on the clock screen, with its own mode (e.g. time left in the Period, time since it started, current time). A screen shows one big Readout and up to two small ones (three in all), each switched independently. During Off-Hours a Readout's modes become their Off-Hours counterparts (until the Next School Day, since school ended, current time). While the classroom timer runs, is paused or rings, it takes the big Readout's place and the others become smaller; the saved layout itself never changes.
 
+**Timer**:
+The one classroom countdown a teacher starts from a preset or a typed length; it can be paused, and it rings when it reaches zero. Called by its length ("20:00 timer"). A teacher can give it a name ("Quiz"), shown first wherever the timer is named ("Quiz · 20:00 timer"). The last few typed lengths are kept as quick picks, and a name is saved with its length's quick pick, so picking it again starts the timer already named.
+
 **Alarm**:
 Any sound a teacher sets up to ring. Always one of two kinds: a Clock Alarm or a Period Alarm.
 _Avoid_: Bell, for anything a teacher creates — Bells (below) are the one built-in set.

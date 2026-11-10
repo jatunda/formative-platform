@@ -41,12 +41,13 @@ const SECOND = 1000;
  *   settings: { use24Hour: boolean, showSeconds: boolean, periodLabels: Record<string, string> },
  *   big: Parts,
  *   mode: BigReadout['mode'],
- *   timer: { remainingMs: number, paused: boolean, totalMs: number | null, progress: number } | null,
+ *   timer: { remainingMs: number, paused: boolean, totalMs: number | null, label?: string | null,
+ *     progress: number } | null,
  * }} state `moment` is null before a Division is chosen; `big` is the page's
  *   big Readout (ignored while `timer` shows) and `mode` its mode (null when
  *   it's just the time); `timer` while one runs, is
  *   paused or has just rung, with the length it was started with (null if
- *   unknown) and the share of it left, 0–1.
+ *   unknown), its name (null for none) and the share of it left, 0–1.
  * @returns {MiniContent}
  */
 export function miniContent({ now, moment, settings, big, mode, timer }) {
@@ -66,9 +67,12 @@ export function miniContent({ now, moment, settings, big, mode, timer }) {
   };
 }
 
-/** "5:00 timer", or "5:00 timer · paused". @param {{ paused: boolean, totalMs: number | null }} timer */
-function timerHead({ paused, totalMs }) {
-  return `${timerName(totalMs)}${paused ? ' · paused' : ''}`;
+/**
+ * "5:00 timer", "Quiz · 5:00 timer", or either "· paused".
+ * @param {{ paused: boolean, totalMs: number | null, label?: string | null }} timer
+ */
+function timerHead({ paused, totalMs, label }) {
+  return `${timerName(totalMs, label)}${paused ? ' · paused' : ''}`;
 }
 
 /**
