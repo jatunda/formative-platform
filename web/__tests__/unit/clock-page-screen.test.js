@@ -294,7 +294,7 @@ describe('School Clock fullscreen, mini player and feedback', () => {
       button('Timer').click();
       button('5 min', picker()).click();
       await openMini();
-      expect(head()).toBe('Timer of 5:00');
+      expect(head()).toBe('5:00 timer');
       expect(readout()).toBe('5:00 left');
       expect(footText()).toBe('3:00 left in Period 3');
       expect(progress().getAttribute('aria-label')).toBe('Timer progress');
@@ -305,7 +305,7 @@ describe('School Clock fullscreen, mini player and feedback', () => {
       expect(readout()).toBe('4:00 left');
       expect(progress().getAttribute('aria-valuenow')).toBe('80');
       button('Pause', timerRing()).click();
-      expect(head()).toBe('Timer of 5:00 · paused');
+      expect(head()).toBe('5:00 timer · paused');
 
       button('Cancel', timerRing()).click();
       expect(head()).toBe('Period 3');
@@ -319,6 +319,13 @@ describe('School Clock fullscreen, mini player and feedback', () => {
       await openMini();
       expect(readout()).toBe('1:00 left');
       expect(footText()).toBe('Up next Period 4');
+    });
+
+    it('just says "Timer" for a saved timer whose length is not known', async () => {
+      open({ settings: { division: 'HS', timerEndsAt: at(11, 12).getTime() + 2 * 60 * SEC, timerPausedMs: null } });
+      await openMini();
+      expect(head()).toBe('Timer');
+      expect(readout()).toBe('2:00 left');
     });
 
     it('shows just the time before a Division is chosen', async () => {

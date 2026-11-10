@@ -6,7 +6,7 @@
 // and the Settings drawer's "Next rings today" lines.
 
 import { ringsInWindow } from './clock-model.js';
-import { formatDuration } from './format.js';
+import { timerName } from './timer.js';
 import { SOUND_NAMES } from './sound.js';
 
 /** @typedef {{ kind: string, title: string, detail: string }} RingWords */
@@ -62,7 +62,7 @@ export function ringWords(ring, text) {
       return { kind: 'Period Alarm', title: ring.alarm.label || period, detail: anchorText(ring.alarm.anchor, period) };
     }
     default:
-      return { kind: 'Timer', title: 'Time is up', detail: ring.totalMs ? `${formatDuration(ring.totalMs)} timer` : '' };
+      return { kind: 'Timer', title: 'Time is up', detail: ring.totalMs ? timerName(ring.totalMs) : '' };
   }
 }
 

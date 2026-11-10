@@ -44,6 +44,8 @@ const ring = () => mount().querySelector('.clock-stage [role="group"][aria-label
 const ringShown = () => Boolean(ring()) && isShown(ring());
 const digits = () => ring().querySelector('[role="timer"]');
 const ringButton = (name) => buttonIn(ring(), name);
+/** The line above the digits: "5:00 timer". */
+const title = () => ring().querySelector('.clock-ring__title').textContent.trim();
 /** The arc's length: the share of time left, out of 100. */
 const arc = () => Number.parseFloat(ring().querySelector('.clock-ring__arc').getAttribute('stroke-dasharray'));
 const ringing = () => mount().querySelector('[role="alertdialog"]');
@@ -149,10 +151,10 @@ describe('School Clock classroom timer', () => {
       open();
       pick('5 min');
       advance(48 * SEC);
-      expect(digits().getAttribute('aria-label')).toBe('Timer, 4:12 left of 5:00');
+      expect(digits().getAttribute('aria-label')).toBe('5:00 timer, running, 4:12 to go');
       expect(digits().getAttribute('aria-live')).toBe('off');
-      expect(ring().textContent).toContain('Timer');
-      expect(ring().textContent).toContain('of 5:00');
+      expect(title()).toBe('5:00 timer');
+      expect(ring().textContent).not.toContain('of 5:00');
     });
 
     it('shows the share of time left, a little less every tick', () => {
@@ -197,8 +199,8 @@ describe('School Clock classroom timer', () => {
     advance(10 * MIN);
     open();
     expect(digits().textContent).toBe('4:00');
-    expect(digits().getAttribute('aria-label')).toBe('Timer, paused, 4:00 left of 5:00');
-    expect(ring().textContent).toContain('Paused');
+    expect(digits().getAttribute('aria-label')).toBe('5:00 timer, paused, 4:00 to go');
+    expect(title()).toBe('5:00 timer · paused');
     expect(arc()).toBeCloseTo(80, 1);
     expect(ringButton('Pause')).toBeUndefined();
 
@@ -238,7 +240,7 @@ describe('School Clock classroom timer', () => {
       expect(ringing().textContent).toContain('1:00 timer');
       expect(saved(storage)).toMatchObject({ timerEndsAt: null });
       expect(digits().textContent).toBe('0:00');
-      expect(digits().getAttribute('aria-label')).toBe("Timer, time's up, 0:00 left of 1:00");
+      expect(digits().getAttribute('aria-label')).toBe("1:00 timer, time's up");
       expect(arc()).toBe(0);
       expect(ringButton('Pause')).toBeUndefined();
       expect(ringButton('Cancel')).toBeUndefined();
@@ -296,7 +298,7 @@ describe('School Clock classroom timer', () => {
 
       advance(MIN);
       ringButton('Pause').click();
-      expect(digits().getAttribute('aria-label')).toBe('Timer, paused, 2:00 left of 3:00');
+      expect(digits().getAttribute('aria-label')).toBe('3:00 timer, paused, 2:00 to go');
       expect(saved(storage)).toMatchObject({ timerEndsAt: null, timerPausedMs: null });
 
       ringButton('Resume').click();
@@ -324,7 +326,7 @@ describe('School Clock classroom timer', () => {
 
       t = START;
       open();
-      expect(digits().getAttribute('aria-label')).toBe('Timer, 5:00 left of 10:00');
+      expect(digits().getAttribute('aria-label')).toBe('10:00 timer, running, 5:00 to go');
     });
   });
 
@@ -333,7 +335,7 @@ describe('School Clock classroom timer', () => {
       open();
       typeDuration('7', '30');
       expect(pickerOpen()).toBe(false);
-      expect(digits().getAttribute('aria-label')).toBe('Timer, 7:30 left of 7:30');
+      expect(digits().getAttribute('aria-label')).toBe('7:30 timer, running, 7:30 to go');
       expect(saved(storage).timerEndsAt).toBe(START + 7.5 * MIN);
     });
 
