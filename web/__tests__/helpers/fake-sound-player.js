@@ -15,7 +15,7 @@ export function createFakeSoundPlayer({ state = 'suspended', time = 0 } = {}) {
     schedules: [],
     /** The rings the page wants right now (the last schedule() call). */
     get scheduled() { return player.schedules.at(-1) ?? []; },
-    /** Sounds played straight away: { sound, repeat } */
+    /** Sounds played straight away: { sound, repeat } (and `seconds` when given) */
     played: [],
     dismissals: 0,
     volume: null,
@@ -31,7 +31,9 @@ export function createFakeSoundPlayer({ state = 'suspended', time = 0 } = {}) {
     currentTime: () => player.time,
     setVolume: (v) => { player.volume = v; },
     schedule: (rings) => { player.schedules.push(rings); },
-    play: (sound, { repeat = false } = {}) => { player.played.push({ sound, repeat }); },
+    play: (sound, { repeat = false, seconds } = {}) => {
+      player.played.push(seconds === undefined ? { sound, repeat } : { sound, repeat, seconds });
+    },
     dismiss: () => { player.dismissals += 1; },
     close: () => { player.closed = true; },
   };

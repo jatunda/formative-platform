@@ -30,7 +30,7 @@ import { createWakeLockKeeper, detectCapabilities } from './screen.js';
 import { createAlarmEditor } from './alarm-editor.js';
 import { createSettingsDrawer } from './settings-drawer.js';
 import { applyLook, createLookSheet, decorations } from './look-sheet.js';
-import { ALARM_MAX_SECONDS, createSoundPlayer } from './sound.js';
+import { ALARM_MAX_SECONDS, BELL_AUTO_DISMISS_SECONDS, createSoundPlayer } from './sound.js';
 import { cancelTimer, nameTimer, pauseTimer, resumeTimer, settleTimer, timerProgress, timerRingView, timerStatus, timerText } from './timer.js';
 import { createTimerPicker } from './timer-picker.js';
 import { createTimerRing } from './timer-ring.js';
@@ -182,18 +182,37 @@ export function initClockApp({
       ? ringsInWindow(new Date(t - GRACE_MS * clock.speed), new Date(windowEnd), schoolYears, settings)
       : [];
     const audioNow = soundPlayer.currentTime();
-    soundPlayer.schedule(rings.map((ring) => ({
-      key: ringKey(ring),
-      at: audioNow + (ring.at.getTime() - t) / 1000 / clock.speed,
-      sound: ring.sound,
-      repeat: true,
-    })));
+    soundPlayer.schedule(rings.map((ring) => {
+      const seconds = ringSeconds(ring.source);
+      return {
+        key: ringKey(ring),
+        at: audioNow + (ring.at.getTime() - t) / 1000 / clock.speed,
+        sound: ring.sound,
+        repeat: true,
+        ...(seconds === undefined ? {} : { seconds }),
+      };
+    }));
+  }
+
+  /**
+   * How long a ring of this kind rings before stopping on its own, when that's
+   * shorter than an Alarm's minute: a Bell's few seconds, unless the teacher
+   * keeps Bells ringing until dismissed.
+   * @param {import('./clock-model.js').Ring['source']} source
+   * @returns {number | undefined}
+   */
+  function ringSeconds(source) {
+    return source === 'bell' && !settings.bells.untilDismissed ? BELL_AUTO_DISMISS_SECONDS : undefined;
   }
 
   // What's ringing on screen: a flash (or a steady highlight) and the ring
-  // card naming it, until dismissed (60 s at most), for Bells, Alarms and the
-  // timer alike. The card takes focus and hands it back when it goes.
-  let ringingUntil = null;
+  // card naming the newest ring, until dismissed (60 s at most), for Bells,
+  // Alarms and the timer alike; a Bell stops on its own sooner unless the
+  // teacher keeps Bells ringing. When the newest stops on its own, the card
+  // goes back to one still ringing. The card takes focus and hands it back
+  // when it goes.
+  /** @type {{ words: import('./ring-words.js').RingWords, until: number, timer: boolean }[]} Oldest first; `until` is real time. */
+  let ringing = [];
   /** What the mini player says is ringing, or null. */
   let ringingWhat = null;
   /** The timer has rung and is still ringing: it keeps the big Readout until then. */
@@ -202,9 +221,18 @@ export function initClockApp({
   let rangTotalMs = null;
   let rangLabel = null;
   const ringCard = createRingCard({ onDismiss: () => dismiss() });
-  /** @param {import('./ring-words.js').RingWords} words */
-  function startRinging(words) {
-    ringingUntil = Math.max(ringingUntil ?? 0, realNow() + ALARM_MAX_SECONDS * 1000);
+  /**
+   * @param {import('./ring-words.js').RingWords} words
+   * @param {{ seconds?: number, lateMs?: number, timer?: boolean }} [options] it rings
+   *   `seconds` (an Alarm's minute when missing) from `lateMs` (real time) ago.
+   */
+  function startRinging(words, { seconds = ALARM_MAX_SECONDS, lateMs = 0, timer = false } = {}) {
+    ringing.push({ words, until: realNow() - lateMs + seconds * 1000, timer });
+    if (timer) timerRinging = true;
+    showNewestRing();
+  }
+  function showNewestRing() {
+    const { words } = ringing[ringing.length - 1];
     ringingWhat = words.title;
     ringCard.show(words);
     mount.classList.remove('clock-ringing--flash', 'clock-ringing--steady');
@@ -212,8 +240,21 @@ export function initClockApp({
     showSoundState();
     renderMiniRinging();
   }
+  /** Let go of the rings whose time is up; the card goes back to one still ringing, if any. */
+  function settleRinging() {
+    const t = realNow();
+    if (!ringing.some((ring) => t >= ring.until)) return;
+    const shown = ringing[ringing.length - 1];
+    ringing = ringing.filter((ring) => t < ring.until);
+    if (ringing.length === 0) {
+      stopRinging();
+      return;
+    }
+    timerRinging = ringing.some((ring) => ring.timer);
+    if (ringing[ringing.length - 1] !== shown) showNewestRing();
+  }
   function stopRinging() {
-    ringingUntil = null;
+    ringing = [];
     ringingWhat = null;
     timerRinging = false;
     ringCard.hide();
@@ -275,7 +316,7 @@ export function initClockApp({
   const onKeyDown = (event) => {
     if (event.key !== 'Escape') return;
     // Escape dismisses a ring first.
-    if (ringingUntil !== null) {
+    if (ringing.length > 0) {
       dismiss();
       return;
     }
@@ -322,7 +363,7 @@ export function initClockApp({
   const soundPrompt = createSoundPrompt({ onTurnOn: () => soundPlayer.resume() });
   function showSoundState() {
     // It waits for the first-visit question, and steps aside for a ring.
-    soundPrompt.show(soundPlayer.state(), ringingUntil !== null || settings.division === null);
+    soundPrompt.show(soundPlayer.state(), ringing.length > 0 || settings.division === null);
   }
   soundPlayer.onStateChange(() => {
     showSoundState();
@@ -348,8 +389,9 @@ export function initClockApp({
     update: updateSettings,
     play: (sound) => soundPlayer.play(sound),
     testRing: () => {
-      soundPlayer.play(settings.bells.sound, { repeat: true });
-      startRinging(TEST_RING_WORDS);
+      const seconds = ringSeconds('bell');
+      soundPlayer.play(settings.bells.sound, { repeat: true, ...(seconds === undefined ? {} : { seconds }) });
+      startRinging(TEST_RING_WORDS, { seconds });
     },
     // A ring shows over the drawer too, so it can be seen, heard and dismissed.
     behind: () => behindAll(drawer.elements, ringCard.elements),
@@ -464,7 +506,7 @@ export function initClockApp({
   function tick() {
     const now = new Date(clock.now());
     const staleBefore = now.getTime() - STALE_MS * clock.speed;
-    if (ringingUntil !== null && realNow() >= ringingUntil) stopRinging();
+    settleRinging();
     if (lastTick.getTime() < staleBefore || now.getTime() >= windowEnd - (LOOKAHEAD_MS * clock.speed) / 2) {
       scheduleSounds(now);
     }
@@ -473,12 +515,17 @@ export function initClockApp({
       const text = textFor(settings);
       for (const ring of rang) {
         if (ring.at.getTime() < staleBefore) continue;
-        startRinging(ringWords(ring, text));
         if (ring.source === 'timer') {
-          timerRinging = true;
           rangTotalMs = ring.totalMs;
           rangLabel = ring.label ?? null;
         }
+        const seconds = ringSeconds(ring.source);
+        startRinging(ringWords(ring, text), {
+          seconds,
+          // A Bell that stops on its own does so on time, as its sound does.
+          lateMs: seconds === undefined ? 0 : (now.getTime() - ring.at.getTime()) / clock.speed,
+          timer: ring.source === 'timer',
+        });
       }
       const alarms = alarmsAfterRinging(settings.alarms, rang, { simulated: clock.simulated });
       if (alarms !== settings.alarms) {

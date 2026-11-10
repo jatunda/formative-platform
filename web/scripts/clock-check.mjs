@@ -4,6 +4,8 @@
 //   npm run check:clock -- --state passing    just one default state (repeatable)
 //   npm run check:clock -- --state "chapel=?at=2026-11-18T10:30"   any ?at= / &speed= URL
 //   npm run check:clock -- --size 390x844 --division MS --settings '{"showSeconds":false}'
+//   npm run check:clock -- --layout countdown,clock,countup   Readouts to show, big one first
+//   npm run check:clock -- --timer            with the first preset timer running
 //   npm run check:clock -- --no-shots         checks only, no PNGs
 //
 // For each state × size it saves a screenshot, runs axe, checks the page doesn't
@@ -22,6 +24,7 @@ import { resolve, dirname } from 'path';
 const webDir = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const axeSource = createRequire(import.meta.url).resolve('axe-core/axe.min.js');
 const SETTINGS_KEY = 'school-clock-settings-v1';
+const LAYOUT_KEY = 'school-clock-layout-v1';
 
 // One moment per kind of state, on real 2026–27 dates (HS unless --division MS).
 const DEFAULT_STATES = {
@@ -40,7 +43,7 @@ const DEFAULT_STATES = {
 const DEFAULT_SIZES = ['1920x1080', '1440x900', '1280x720', '480x320', '390x844'];
 
 function parseArgs(argv) {
-  const opts = { states: [], sizes: [], division: 'HS', settings: {}, shots: true, axe: true };
+  const opts = { states: [], sizes: [], division: 'HS', settings: {}, layout: null, timer: false, shots: true, axe: true };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     const next = () => argv[++i];
@@ -48,6 +51,8 @@ function parseArgs(argv) {
     else if (arg === '--size') opts.sizes.push(next());
     else if (arg === '--division') opts.division = next();
     else if (arg === '--settings') opts.settings = JSON.parse(next());
+    else if (arg === '--layout') opts.layout = { readouts: next().split(',').map((mode) => ({ mode })) };
+    else if (arg === '--timer') opts.timer = true;
     else if (arg === '--no-shots') opts.shots = false;
     else if (arg === '--no-axe') opts.axe = false;
     else throw new Error(`Unknown option ${arg}`);
@@ -96,11 +101,18 @@ try {
   for (const size of opts.sizes) {
     const context = await browser.newContext({ viewport: { width: size.width, height: size.height } });
     await context.addInitScript(([key, value]) => localStorage.setItem(key, value), [SETTINGS_KEY, seeded]);
+    if (opts.layout) {
+      await context.addInitScript(([key, value]) => localStorage.setItem(key, value), [LAYOUT_KEY, JSON.stringify(opts.layout)]);
+    }
     for (const state of opts.states) {
       const page = await context.newPage();
       const errors = [];
       page.on('pageerror', (e) => errors.push(e.message));
       await page.goto(base + state.query);
+      if (opts.timer) {
+        await page.getByRole('button', { name: 'Timer', exact: true }).click();
+        await page.locator('.clock-preset').first().click();
+      }
       await page.waitForTimeout(400);
       const scroll = await page.evaluate(() => ({
         x: document.documentElement.scrollWidth > innerWidth,
