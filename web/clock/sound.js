@@ -114,10 +114,15 @@ const VOICES = {
     tone(ctx, out, sources, { type: 'sine', freq: 523.25, t: t + 0.75, length: 0.75 });
     return 1.5;
   },
-  // The Westminster phrase (G#, F#, E, B) on tubular bells, once per Bell.
+  // The second half of the Westminster chime on tubular bells, once per Bell:
+  // two phrases (G#, E, F#, B, then B, F#, G#, E), each ending on a held note.
+  // It fits inside a Bell's 5 seconds.
   clockTower(ctx, out, t, sources) {
-    [830.61, 739.99, 659.25, 493.88].forEach((freq, i) => strike(ctx, out, sources, freq, t + i * 0.55, TUBULAR));
-    return 3.2;
+    const [gSharp, fSharp, e, b] = [830.61, 739.99, 659.25, 493.88];
+    [[gSharp, e, fSharp, b], [b, fSharp, gSharp, e]].forEach((phrase, p) => {
+      phrase.forEach((freq, i) => strike(ctx, out, sources, freq, t + p * 2.2 + i * 0.45, TUBULAR));
+    });
+    return 6;
   },
   // A quick rising arpeggio (C, E, G, C) on a wooden bar, twice per Bell.
   marimba(ctx, out, t, sources) {
