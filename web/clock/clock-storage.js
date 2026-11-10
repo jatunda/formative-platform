@@ -131,3 +131,27 @@ export function createSettingsStore(storage) {
     save: (settings) => adapter.save(settings),
   };
 }
+
+/** Which one-time tips this device has already seen. */
+export const HINTS_KEY = 'school-clock-hints-v1';
+
+/**
+ * The one-time tips this device has seen (the "Click to change what this
+ * shows" tooltip, once on the page and once in the mini player), in their own
+ * key so seeing one doesn't save the settings (or say a save failed). It never
+ * throws: storage that can't be read means nothing seen yet, and a tip that
+ * can't be remembered just shows again next time.
+ * @param {import('../storage.js').StorageLike} storage
+ * @returns {{ seen: (name: string) => boolean, markSeen: (name: string) => void }}
+ */
+export function createHintStore(storage) {
+  const adapter = createStorageAdapter(HINTS_KEY, storage, { quiet: true });
+  const read = () => {
+    const saved = adapter.load();
+    return isObject(saved) ? saved : {};
+  };
+  return {
+    seen: (name) => read()[name] === true,
+    markSeen: (name) => { adapter.save({ ...read(), [name]: true }); },
+  };
+}

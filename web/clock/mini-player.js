@@ -1,7 +1,7 @@
 // The School Clock's mini player: an always-on-top window (Document
 // Picture-in-Picture, where it exists) laid out to the design reference: a
 // head line (the Segment, "5:00 timer", or what's ringing), the big Readout
-// (with dots for its mode, which a click anywhere cycles), and a
+// (its mode cycles on a click anywhere, as the first-time tooltip says), and a
 // foot (the Segment's or timer's bar and words, up next, or Dismiss while something
 // rings). The page works out what to show (mini-content.js); this draws it
 // while the window is open. The window loads the page's tokens, themes and
@@ -9,7 +9,6 @@
 // follows the teacher's theme as it changes.
 import { el } from './dom.js';
 import { icon } from './icons.js';
-import { READOUT_MODES } from './readouts.js';
 import { writeValue } from './readouts-view.js';
 
 /** The mini player's starting size (the user can resize it; it scales up). */
@@ -21,17 +20,20 @@ const STYLESHEETS = ['/clock/tokens.css', '/clock/themes.css', '/clock/clock.css
 
 /**
  * @param {{ pictureInPicture: import('./screen.js').PictureInPicture | null,
- *   onOpen: () => void, onCycle: () => void, onDismiss: () => void, page?: Document }} options
+ *   onOpen: () => void, onCycle: () => void, onDismiss: () => void,
+ *   hint: ReturnType<typeof import('./cycle-hint.js').createCycleHint>, page?: Document }} options
  *   `onOpen` runs once a window has opened (the page fills it in); `onCycle`
  *   when the window is clicked to change the big Readout's mode; `onDismiss`
- *   when its Dismiss button is pressed. `page` is the document whose
+ *   when its Dismiss button is pressed. `hint` is the first-time "Click to
+ *   change what this shows" tooltip, shown while the Readout can be clicked
+ *   and put away by a click or Escape in the window. `page` is the document whose
  *   look (its <html> data-* attributes) it follows.
  * @returns {{ button: HTMLElement, show: (content: MiniContent) => void,
  *   showRinging: (what: string | null) => void, close: () => void }}
  *   `button` opens and closes it (hidden where the browser has no
  *   Picture-in-Picture); `show` and `showRinging` do nothing while it's closed.
  */
-export function createMiniPlayer({ pictureInPicture, onOpen, onCycle, onDismiss, page = document }) {
+export function createMiniPlayer({ pictureInPicture, onOpen, onCycle, onDismiss, hint, page = document }) {
   let mini = null;
   /** What's ringing ("Bell · Period 3 ends"), kept across windows. */
   let ringing = null;
@@ -76,9 +78,6 @@ export function createMiniPlayer({ pictureInPicture, onOpen, onCycle, onDismiss,
       headText: el('span'),
       readoutValue: el('span', { className: 'clock-mini__value' }),
       readoutCaption: el('span', { className: 'clock-mini__caption' }),
-      // Where the big Readout is in its cycle of modes, one dot each.
-      modeDots: el('span', { className: 'clock-mini__modes', 'aria-hidden': 'true' },
-        READOUT_MODES.map(() => el('span', { className: 'clock-mini__dot' }))),
       progress: el('div', {
         className: 'clock-mini__bar', role: 'progressbar', 'aria-valuemin': '0', 'aria-valuemax': '100',
       }, [fill]),
@@ -93,10 +92,7 @@ export function createMiniPlayer({ pictureInPicture, onOpen, onCycle, onDismiss,
     };
     parts.readout = el('button', {
       type: 'button', className: 'clock-mini__readout', title: 'Click to change what it shows', onclick: () => onCycle(),
-    }, [
-      parts.readoutValue,
-      el('span', { className: 'clock-mini__mode' }, [parts.modeDots, parts.readoutCaption]),
-    ]);
+    }, [parts.readoutValue, parts.readoutCaption]);
     parts.next = el('p', { className: 'clock-mini__next' }, [
       el('span', { className: 'clock-mini__next-label', textContent: 'Up next' }), ' ', parts.nextName,
     ]);
@@ -104,9 +100,15 @@ export function createMiniPlayer({ pictureInPicture, onOpen, onCycle, onDismiss,
       el('div', { className: 'clock-mini__flash', 'aria-hidden': 'true' }),
       el('h1', { className: 'clock-mini__head' }, [parts.bell, parts.headText]),
       parts.readout,
+      hint.element,
       el('div', { className: 'clock-mini__foot' }, [parts.progress, parts.sub, parts.next, parts.dismiss]),
     );
     doc.body.replaceChildren(parts.main);
+    // Caught on the way down, before the click cycles (and redraws) the Readout.
+    doc.addEventListener('click', () => hint.dismiss(), true);
+    doc.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') hint.dismiss();
+    });
     // Closed by the user, by this page, or because this tab went away. A
     // window this page already closed may say so after a new one has opened.
     win.addEventListener('pagehide', () => {
@@ -141,8 +143,7 @@ export function createMiniPlayer({ pictureInPicture, onOpen, onCycle, onDismiss,
     // A click cycles the big Readout, except while something rings (Dismiss is the one to press).
     const readoutHadFocus = mini.win.document.activeElement === mini.readout;
     mini.readout.disabled = mode === null || ringing !== null;
-    mini.modeDots.hidden = mode === null;
-    [...mini.modeDots.children].forEach((dot, i) => dot.classList.toggle('is-current', READOUT_MODES[i] === mode));
+    hint.update(!mini.readout.disabled);
     mini.main.classList.toggle('has-timer', timer);
     mini.main.classList.toggle('is-ringing', ringing !== null);
     // An SVG has no hidden property: set the attribute.

@@ -3,7 +3,8 @@
 // timer's ring (timer-ring.js) in the big spot while it shows, and edit mode's Remove buttons and
 // Add slot. The page says what to show; this draws it. It rebuilds only when
 // the arrangement changes (so focus survives the ticks) and otherwise just
-// rewrites the values.
+// rewrites the values. The first Readout carries the first-time "Click to
+// change what this shows" tooltip (cycle-hint.js) while they cycle.
 import { el } from './dom.js';
 import { icon } from './icons.js';
 
@@ -30,12 +31,13 @@ export function writeValue(node, { pieces, glyphs }) {
 
 /**
  * @param {{ onCycle: (index: number) => void, onRemove: (index: number) => void, onAdd: () => void,
- *   timerFace: HTMLElement }} actions `timerFace` is the timer's ring, which the page keeps up to date
+ *   timerFace: HTMLElement, hint: HTMLElement }} actions `timerFace` is the timer's ring, which the page
+ *   keeps up to date; `hint` is the first-time tooltip, which the page shows and hides
  * @returns {{ element: HTMLElement, show: (arrangement: Arrangement, readouts: Parts[]) => void,
  *   focusReadout: (index: number) => void, focusRemove: (index: number) => boolean }}
  *   `focusRemove` focuses the Remove button at `index` (or the last one), and says whether there was one.
  */
-export function createReadoutsView({ onCycle, onRemove, onAdd, timerFace }) {
+export function createReadoutsView({ onCycle, onRemove, onAdd, timerFace, hint }) {
   const element = el('div', { className: 'clock-readouts' });
   let built = '';
   /** @type {{ face: HTMLElement, value: HTMLElement, caption: HTMLElement, removeName: HTMLElement | null }[]} */
@@ -58,6 +60,7 @@ export function createReadoutsView({ onCycle, onRemove, onAdd, timerFace }) {
     });
     const readoutBlock = ({ face, removeName }, i, big) => {
       const children = [face];
+      if (cyclable && i === 0) children.push(hint);
       if (removeName) {
         const remove = el('button', { type: 'button', className: 'clock-readout__remove', onclick: () => onRemove(i) }, [
           icon('close'), el('span', { textContent: 'Remove' }), removeName,
