@@ -57,7 +57,7 @@ describe('a Readout keeps its place in the cycle across in-school and Off-Hours'
 
 describe('readoutText', () => {
   it('writes short durations as M:SS or H:MM:SS with their caption', () => {
-    expect(readoutText({ kind: 'duration', ms: 43 * MIN, caption: 'left', long: false })).toBe('43:00 left');
+    expect(readoutText({ kind: 'duration', ms: 43 * MIN, caption: 'until end', long: false })).toBe('43:00 until end');
     expect(readoutText({ kind: 'duration', ms: 125 * MIN, caption: 'since start', long: false })).toBe('2:05:00 since start');
   });
 
@@ -77,8 +77,8 @@ describe('readoutText', () => {
     const off = { seconds: false };
     expect(readoutText({ kind: 'time', at: tue(13, 4, 9) }, off)).toBe('1:04 PM');
     expect(readoutText({ kind: 'time', at: tue(13, 4, 9) }, { ...off, use24Hour: true })).toBe('13:04');
-    expect(readoutText({ kind: 'duration', ms: 12 * MIN + 4000, caption: 'left', long: false }, off)).toBe('12 min left');
-    expect(readoutText({ kind: 'duration', ms: 59000, caption: 'left', long: false }, off)).toBe('0:59 left');
+    expect(readoutText({ kind: 'duration', ms: 12 * MIN + 4000, caption: 'until end', long: false }, off)).toBe('12 min until end');
+    expect(readoutText({ kind: 'duration', ms: 59000, caption: 'until end', long: false }, off)).toBe('0:59 until end');
     expect(readoutText({ kind: 'duration', ms: 14 * 60 * MIN + 22 * MIN + 10000, caption: 'until school starts', long: true }, off))
       .toBe('14h 22m until school starts');
     expect(readoutText({ kind: 'duration', ms: 62 * 60 * MIN, caption: 'until Mon, Nov 2', long: true }, off))
@@ -90,7 +90,7 @@ describe('readoutValue', () => {
   it('in a Segment: time left, time since it started, current time', () => {
     const now = tue(10, 32);
     expect(valuesAt(now)).toEqual({
-      countdown: { kind: 'duration', ms: 43 * MIN, caption: 'left', long: false },
+      countdown: { kind: 'duration', ms: 43 * MIN, caption: 'until end', long: false },
       countup: { kind: 'duration', ms: 2 * MIN, caption: 'since start', long: false },
       clock: { kind: 'time', at: now },
     });
@@ -148,8 +148,8 @@ describe('readoutValue', () => {
 
 describe('readoutParts (what the page draws)', () => {
   it('splits a countdown into its amount and caption, and counts its glyphs for the size rule', () => {
-    expect(readoutParts({ kind: 'duration', ms: 42 * MIN + 17000, caption: 'left', long: false })).toEqual({
-      amount: '42:17', caption: 'left',
+    expect(readoutParts({ kind: 'duration', ms: 42 * MIN + 17000, caption: 'until end', long: false })).toEqual({
+      amount: '42:17', caption: 'until end',
       pieces: [{ text: '42:17', small: false }],
       glyphs: { digits: 4, colons: 1, letters: 0 },
     });
@@ -157,7 +157,7 @@ describe('readoutParts (what the page draws)', () => {
 
   it('sets letters (and the space before them) small: "42 min", "1h 05m", "4d 17h"', () => {
     const off = { seconds: false };
-    expect(readoutParts({ kind: 'duration', ms: 42 * MIN, caption: 'left', long: false }, off).pieces)
+    expect(readoutParts({ kind: 'duration', ms: 42 * MIN, caption: 'until end', long: false }, off).pieces)
       .toEqual([{ text: '42', small: false }, { text: ' min', small: true }]);
     const hourly = readoutParts({ kind: 'duration', ms: 65 * MIN, caption: 'since start', long: false }, off);
     expect(hourly.pieces).toEqual([

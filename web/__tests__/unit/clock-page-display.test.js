@@ -78,7 +78,7 @@ describe('School Clock display preferences', () => {
     it('are on by default; turning them off drops them from the time and the countdowns, saved', () => {
       open({ when: at(10, 32, 30) });
       expect(checkbox('Show seconds').checked).toBe(true);
-      expect(readouts()[0].text).toBe('42:30 left');
+      expect(readouts()[0].text).toBe('42:30 until end');
       button('Readouts').click();
       button('Add Readout').click();
       mount().querySelectorAll('.clock-readout__face')[1].click();
@@ -86,7 +86,7 @@ describe('School Clock display preferences', () => {
 
       toggle('Show seconds');
       expect(saved(storage).showSeconds).toBe(false);
-      expect(readouts().map((r) => r.text)).toEqual(['42 min left', '10:32 AM']);
+      expect(readouts().map((r) => r.text)).toEqual(['42 min until end', '10:32 AM']);
       expect(displayText()).not.toContain('10:32:30');
     });
 
@@ -94,27 +94,37 @@ describe('School Clock display preferences', () => {
       withSettings({ showSeconds: false });
       open({ when: at(11, 13, 50) });
       expect(checkbox('Show seconds').checked).toBe(false);
-      expect(readouts()[0].text).toBe('1 min left');
+      expect(readouts()[0].text).toBe('1 min until end');
       advance(15 * SEC);
-      expect(readouts()[0].text).toBe('0:55 left');
+      expect(readouts()[0].text).toBe('0:55 until end');
     });
 
-    it('Off-Hours lines show them like the countdown Readouts; days and hours stay as they are', () => {
+    /** Click the first Readout round to its countdown (after school it starts on since school ended). */
+    const toCountdown = () => {
+      const face = () => mount().querySelectorAll('.clock-readout__face')[0];
+      face().click(); // the current time
+      face().click(); // until the Next School Day
+    };
+
+    it('the Off-Hours countdown is a Readout, which shows them; days and hours stay as they are', () => {
       open({ when: at(16, 0, 0) });
-      expect(displayText()).toContain('starts in 16:30:00');
+      expect(displayText()).not.toContain('starts in'); // the line under the Readouts has no countdown
+      toCountdown();
+      expect(readouts()[0].text).toBe('16:30:00 until Wed, Oct 28');
       advance(5 * SEC);
-      expect(displayText()).toContain('starts in 16:29:55');
-      open({ when: new Date(2026, 9, 23, 16, 0).getTime() }); // Friday: back on Monday
-      expect(displayText()).toContain('starts in 2d 16h');
+      expect(readouts()[0].text).toBe('16:29:55 until Wed, Oct 28');
+      open({ when: new Date(2026, 9, 23, 16, 0).getTime() }); // Friday: back on Monday; the tab keeps its layout
+      expect(readouts()[0].text).toBe('2d 16h until Mon, Oct 26');
     });
 
     it('when off, Off-Hours Readouts drop them too, but days and hours stay as they are', () => {
       withSettings({ showSeconds: false });
       open({ when: at(16, 0, 0) });
-      expect(displayText()).toContain('starts in 16h 30m');
       expect(readouts()[0].text).toBe('50 min since school ended');
-      open({ when: new Date(2026, 9, 23, 16, 0).getTime() }); // Friday: back on Monday
-      expect(displayText()).toContain('starts in 2d 16h');
+      toCountdown();
+      expect(readouts()[0].text).toBe('16h 30m until Wed, Oct 28');
+      open({ when: new Date(2026, 9, 23, 16, 0).getTime() }); // Friday: back on Monday; the tab keeps its layout
+      expect(readouts()[0].text).toBe('2d 16h until Mon, Oct 26');
     });
 
     it('when off, the timer still shows them', () => {
@@ -130,7 +140,7 @@ describe('School Clock display preferences', () => {
       open({ when: at(10, 32, 30) });
       button('Mini player').click();
       await settle();
-      expect(pip.window.document.body.textContent).toContain('42 min left');
+      expect(pip.window.document.body.textContent).toContain('42 min until end');
     });
   });
 
@@ -157,22 +167,22 @@ describe('School Clock display preferences', () => {
       button('Add Readout').click();
       button('Done').click();
       tapReadout(1);
-      expect(readouts()).toEqual([big('42:30 left'), small('10:32:30 AM')]);
+      expect(readouts()).toEqual([big('42:30 until end'), small('10:32:30 AM')]);
     }
 
     it('takes the big spot while it runs, and the previous main Readout becomes a smaller one', () => {
       openWithTwoReadouts();
       button('5 min', picker()).click();
-      expect(readouts()).toEqual([big('Timer, 5:00 left of 5:00'), small('42:30 left in Period 3'), small('10:32:30 AM')]);
+      expect(readouts()).toEqual([big('Timer, 5:00 left of 5:00'), small('42:30 until end of Period 3'), small('10:32:30 AM')]);
       advance(SEC);
-      expect(readouts()).toEqual([big('Timer, 4:59 left of 5:00'), small('42:29 left in Period 3'), small('10:32:31 AM')]);
+      expect(readouts()).toEqual([big('Timer, 4:59 left of 5:00'), small('42:29 until end of Period 3'), small('10:32:31 AM')]);
     });
 
     it('always shows seconds, even with seconds off', () => {
       withSettings({ showSeconds: false });
       open({ when: at(10, 32, 30) });
       button('5 min', picker()).click();
-      expect(readouts()).toEqual([big('Timer, 5:00 left of 5:00'), small('42 min left in Period 3')]);
+      expect(readouts()).toEqual([big('Timer, 5:00 left of 5:00'), small('42 min until end of Period 3')]);
     });
 
     it('cancelling puts the layout back exactly, and the saved layout is never touched', () => {
@@ -181,7 +191,7 @@ describe('School Clock display preferences', () => {
       button('5 min', picker()).click();
       expect(savedLayouts()).toEqual(before);
       button('Cancel', ring()).click();
-      expect(readouts()).toEqual([big('42:30 left'), small('10:32:30 AM')]);
+      expect(readouts()).toEqual([big('42:30 until end'), small('10:32:30 AM')]);
       expect(savedLayouts()).toEqual(before);
     });
 
@@ -211,9 +221,9 @@ describe('School Clock display preferences', () => {
       button('5 min', picker()).click();
       advance(MIN);
       open();
-      expect(readouts()).toEqual([big('Timer, 4:00 left of 5:00'), small('41:30 left in Period 3'), small('10:33:30 AM')]);
+      expect(readouts()).toEqual([big('Timer, 4:00 left of 5:00'), small('41:30 until end of Period 3'), small('10:33:30 AM')]);
       button('Cancel', ring()).click();
-      expect(readouts()).toEqual([big('41:30 left'), small('10:33:30 AM')]);
+      expect(readouts()).toEqual([big('41:30 until end'), small('10:33:30 AM')]);
     });
 
     it('stays in the main spot while it rings, until dismissed', () => {
@@ -221,9 +231,9 @@ describe('School Clock display preferences', () => {
       button('1 min', picker()).click();
       advance(MIN + SEC);
       expect(ringing().hidden).toBe(false);
-      expect(readouts()).toEqual([big("Timer, time's up, 0:00 left of 1:00"), small('41:29 left in Period 3'), small('10:33:31 AM')]);
+      expect(readouts()).toEqual([big("Timer, time's up, 0:00 left of 1:00"), small('41:29 until end of Period 3'), small('10:33:31 AM')]);
       button('Dismiss', ringing()).click();
-      expect(readouts()).toEqual([big('41:29 left'), small('10:33:31 AM')]);
+      expect(readouts()).toEqual([big('41:29 until end'), small('10:33:31 AM')]);
     });
 
     it('gives the spot back when it stops ringing on its own', () => {
@@ -232,7 +242,7 @@ describe('School Clock display preferences', () => {
       advance(MIN + SEC);
       advance(61 * SEC);
       expect(ringing().hidden).toBe(true);
-      expect(readouts()).toEqual([big('40:28 left'), small('10:34:32 AM')]);
+      expect(readouts()).toEqual([big('40:28 until end'), small('10:34:32 AM')]);
     });
 
     it('is what the mini player shows', async () => {

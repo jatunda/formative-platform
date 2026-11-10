@@ -36,7 +36,7 @@ export function defaultMode(moment) {
 }
 
 /**
- * What a Readout shows: a length of time with its caption ("43:00 left",
+ * What a Readout shows: a length of time with its caption ("43:00 until end",
  * "2:00 since start", "2:40 until Period 4", "4d 22h until Mon, Nov 30"), or
  * the current time. `long` durations can run for days.
  * @typedef {{ kind: 'duration', ms: number, caption: string, long: boolean }
@@ -63,7 +63,7 @@ export function readoutValue(mode, moment, now, periodLabels = {}) {
   if (mode === 'countup' && (moment.state === 'segment' || moment.state === 'passing')) {
     return duration(moment.timeElapsedMs, 'since start');
   }
-  if (moment.state === 'segment') return duration(moment.timeLeftMs, 'left');
+  if (moment.state === 'segment') return duration(moment.timeLeftMs, 'until end');
   // A Passing Period counts down to the Segment up next.
   if (moment.state === 'passing') {
     const next = /** @type {import('./clock-model.js').TimedSegment} */ (moment.upNext);
@@ -76,9 +76,9 @@ export function readoutValue(mode, moment, now, periodLabels = {}) {
 }
 
 /**
- * A Readout's value in words: "43:00 left", "4d 22h until next school day",
- * or the time ("1:04:09 PM"). With `seconds` off: "12 min left" (but
- * "0:59 left" in the last minute) and "1:04 PM".
+ * A Readout's value in words: "43:00 until end", "4d 22h until next school day",
+ * or the time ("1:04:09 PM"). With `seconds` off: "12 min until end" (but
+ * "0:59 until end" in the last minute) and "1:04 PM".
  * @param {ReadoutValue} value
  * @param {{ use24Hour?: boolean, seconds?: boolean }} [options]
  * @returns {string}
@@ -91,7 +91,7 @@ export function readoutText(value, options = {}) {
 /**
  * A Readout as the page draws it: its amount ("42:17", "42 min", "10:12:43 AM")
  * cut into pieces, where letters and the space before them ("min", "h", "AM")
- * are set small and clock seconds are not; its caption ("left"; none for the current time); and
+ * are set small and clock seconds are not; its caption ("until end"; none for the current time); and
  * the glyph counts the big Readout's size rule needs.
  * @param {ReadoutValue} value
  * @param {{ use24Hour?: boolean, seconds?: boolean }} [options]
