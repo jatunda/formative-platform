@@ -9,7 +9,14 @@
  * non-null: `timerEndsAt` (epoch ms) while it runs, `timerPausedMs` (time
  * left) while it's paused. `timerTotalMs` is the length it was started with
  * (the ring's whole), kept through pauses; null or missing when unknown.
- * @typedef {{ timerEndsAt: number | null, timerPausedMs: number | null, timerTotalMs?: number | null }} TimerState
+ * `timerLabel` is the teacher's name for it ("Quiz"), null or missing for none.
+ * @typedef {{ timerEndsAt: number | null, timerPausedMs: number | null, timerTotalMs?: number | null,
+ *   timerLabel?: string | null }} TimerState
+ */
+
+/**
+ * A quick pick: a recent timer length (ms), with the name it was last given.
+ * @typedef {{ ms: number, label?: string }} QuickPick
  */
 
 import { formatDuration } from './format.js';
@@ -22,17 +29,69 @@ export const MAX_DURATION_MS = 24 * 60 * MINUTE;
 export const PRESET_MINUTES = Object.freeze([1, 2, 5, 10]);
 /** How many recent custom durations are kept as quick picks. */
 export const QUICK_PICKS = 3;
+/** The longest name a timer can have. */
+export const MAX_NAME_LENGTH = 40;
+
+/** @param {number} ms */
+const isPreset = (ms) => PRESET_MINUTES.some((minutes) => minutes * MINUTE === ms);
 
 /**
- * The quick picks after a custom duration is used: it moves to the front and
- * only the last 3 distinct ones are kept. A preset is already one tap away,
- * so typing one leaves the list as it was (same array back).
- * @param {number[]} recent most recent first @param {number} ms
- * @returns {number[]}
+ * `pick` moved to the front of the quick picks (replacing any of its length),
+ * keeping only the last 3.
+ * @param {QuickPick[]} recent @param {QuickPick} pick
  */
-export function rememberDuration(recent, ms) {
-  if (PRESET_MINUTES.some((minutes) => minutes * MINUTE === ms)) return recent;
-  return [ms, ...recent.filter((d) => d !== ms)].slice(0, QUICK_PICKS);
+const toFront = (recent, pick) => [pick, ...recent.filter((p) => p.ms !== pick.ms)].slice(0, QUICK_PICKS);
+
+/**
+ * The quick picks after a custom duration is used: it moves to the front
+ * (keeping its name) and only the last 3 distinct ones are kept. A preset is
+ * already one tap away, so typing one leaves the list as it was (same array back).
+ * @param {QuickPick[]} recent most recent first @param {number} ms
+ * @returns {QuickPick[]}
+ */
+export function rememberQuickPick(recent, ms) {
+  if (isPreset(ms)) return recent;
+  return toFront(recent, recent.find((p) => p.ms === ms) ?? { ms });
+}
+
+/**
+ * The name saved with a duration's quick pick, or null.
+ * @param {QuickPick[]} recent @param {number} ms
+ */
+export const quickPickLabel = (recent, ms) => recent.find((p) => p.ms === ms)?.label ?? null;
+
+/**
+ * The quick picks after the timer of `ms` is named `label` (null clears it):
+ * its quick pick moves to the front with the name. A named preset gets one
+ * too (the name is what's new); cleared, it goes, as a plain preset has none.
+ * @param {QuickPick[]} recent @param {number} ms @param {string | null} label
+ * @returns {QuickPick[]}
+ */
+export function nameQuickPick(recent, ms, label) {
+  if (label) return toFront(recent, { ms, label });
+  if (isPreset(ms)) return recent.filter((p) => p.ms !== ms);
+  return recent.map((p) => (p.ms === ms ? { ms } : p));
+}
+
+/**
+ * A typed name, trimmed and cut to 40 characters; null when it's empty.
+ * @param {string} text
+ */
+export function cleanTimerLabel(text) {
+  const label = text.trim().slice(0, MAX_NAME_LENGTH).trim();
+  return label || null;
+}
+
+/**
+ * The settings change that names the timer (an empty name clears it): the
+ * timer, and its length's quick pick when its length is known.
+ * @param {TimerState & { quickPicks: QuickPick[] }} settings @param {string} text
+ * @returns {{ timerLabel: string | null, quickPicks?: QuickPick[] }}
+ */
+export function nameTimer(settings, text) {
+  const timerLabel = cleanTimerLabel(text);
+  const total = settings.timerTotalMs;
+  return total ? { timerLabel, quickPicks: nameQuickPick(settings.quickPicks, total, timerLabel) } : { timerLabel };
 }
 
 /**
@@ -94,12 +153,13 @@ export function parseMinutesSeconds(minutes, seconds) {
 }
 
 /**
- * A timer of `durationMs` starting at `now` (replacing any timer already set).
- * @param {number} durationMs @param {number} now epoch ms
+ * A timer of `durationMs` starting at `now` (replacing any timer already set),
+ * named `label` if given.
+ * @param {number} durationMs @param {number} now epoch ms @param {string | null} [label]
  * @returns {TimerState}
  */
-export function startTimer(durationMs, now) {
-  return { timerEndsAt: now + durationMs, timerPausedMs: null, timerTotalMs: durationMs };
+export function startTimer(durationMs, now, label = null) {
+  return { timerEndsAt: now + durationMs, timerPausedMs: null, timerTotalMs: durationMs, timerLabel: label };
 }
 
 /**
@@ -110,7 +170,10 @@ export function startTimer(durationMs, now) {
  */
 export function pauseTimer(timer, now) {
   if (timer.timerEndsAt === null) return timer;
-  return { timerEndsAt: null, timerPausedMs: Math.max(0, timer.timerEndsAt - now), timerTotalMs: timer.timerTotalMs ?? null };
+  return {
+    timerEndsAt: null, timerPausedMs: Math.max(0, timer.timerEndsAt - now),
+    timerTotalMs: timer.timerTotalMs ?? null, timerLabel: timer.timerLabel ?? null,
+  };
 }
 
 /**
@@ -121,12 +184,12 @@ export function pauseTimer(timer, now) {
  */
 export function resumeTimer(timer, now) {
   if (timer.timerPausedMs === null) return timer;
-  return { ...startTimer(timer.timerPausedMs, now), timerTotalMs: timer.timerTotalMs ?? null };
+  return { ...startTimer(timer.timerPausedMs, now, timer.timerLabel ?? null), timerTotalMs: timer.timerTotalMs ?? null };
 }
 
 /** No timer at all. @returns {TimerState} */
 export function cancelTimer() {
-  return { timerEndsAt: null, timerPausedMs: null, timerTotalMs: null };
+  return { timerEndsAt: null, timerPausedMs: null, timerTotalMs: null, timerLabel: null };
 }
 
 /**
@@ -181,28 +244,41 @@ export function timerProgress(timer, now) {
 
 /**
  * A timer's name, said the way people say it: "5:00 timer", or just "Timer"
- * when its length is unknown.
- * @param {number | null | undefined} totalMs
+ * when its length is unknown; with the teacher's name for it first, "Quiz ·
+ * 5:00 timer" (or just "Quiz").
+ * @param {number | null | undefined} totalMs @param {string | null} [label]
  */
-export const timerName = (totalMs) => (totalMs ? `${formatDuration(totalMs)} timer` : 'Timer');
+export function timerName(totalMs, label = null) {
+  if (!totalMs) return label || 'Timer';
+  const name = `${formatDuration(totalMs)} timer`;
+  return label ? `${label} · ${name}` : name;
+}
 
 /**
  * What the timer's ring shows: the time left (always with seconds, rounded
- * up), its name ("5:00 timer"), the share left, and the digits' accessible
- * name ("5:00 timer, running, 4:12 to go"). `rangTotalMs` is the length of a
- * timer that has rung and is gone (it shows 0:00 until dismissed).
+ * up), its title (the teacher's name for it, else "5:00 timer"), that name
+ * itself (null for none), its whole name ("Quiz · 5:00 timer"), the share
+ * left, and the digits' accessible name
+ * ("5:00 timer, running, 4:12 to go"). `rangTotalMs` and `rangLabel` are the
+ * length and name of a timer that has rung and is gone (it shows 0:00 until
+ * dismissed).
  * @param {TimerState} timer @param {number} now epoch ms
- * @param {{ rangTotalMs?: number | null }} [rung]
- * @returns {{ status: 'running' | 'paused' | 'done', left: string, name: string, progress: number, label: string }}
+ * @param {{ rangTotalMs?: number | null, rangLabel?: string | null }} [rung]
+ * @returns {{ status: 'running' | 'paused' | 'done', left: string, title: string, timerLabel: string | null,
+ *   name: string, progress: number, label: string }}
  */
-export function timerRingView(timer, now, { rangTotalMs = null } = {}) {
+export function timerRingView(timer, now, { rangTotalMs = null, rangLabel = null } = {}) {
   const { status, remainingMs } = timerStatus(timer, now);
   const done = status === 'idle';
-  const name = timerName(done ? rangTotalMs : timer.timerTotalMs);
+  const totalMs = done ? rangTotalMs : timer.timerTotalMs;
+  const label = done ? rangLabel : timer.timerLabel ?? null;
+  const name = timerName(totalMs, label);
   const left = formatDuration(done ? 0 : Math.ceil(/** @type {number} */ (remainingMs) / SECOND) * SECOND);
   return {
     status: done ? 'done' : status,
     left,
+    title: label || timerName(totalMs),
+    timerLabel: label,
     name,
     progress: done ? 0 : timerProgress(timer, now),
     label: done ? `${name}, time's up` : `${name}, ${status}, ${left} to go`,

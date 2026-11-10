@@ -62,7 +62,10 @@ export function ringWords(ring, text) {
       return { kind: 'Period Alarm', title: ring.alarm.label || period, detail: anchorText(ring.alarm.anchor, period) };
     }
     default:
-      return { kind: 'Timer', title: 'Time is up', detail: ring.totalMs ? timerName(ring.totalMs) : '' };
+      return {
+        kind: 'Timer', title: 'Time is up',
+        detail: ring.totalMs || ring.label ? timerName(ring.totalMs, ring.label) : '',
+      };
   }
 }
 
