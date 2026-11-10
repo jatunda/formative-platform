@@ -383,6 +383,8 @@ describe('School Clock page', () => {
         alarms: [{ id: 'o', kind: 'clock', enabled: true, sound: 'chime', bellSchedules: null,
           time, repeat: 'once', date: '2026-10-27' }],
       });
+      // How many times the settings were saved (a first-time tip is remembered apart).
+      const settingsSaves = (setItem) => setItem.mock.calls.filter(([k]) => k === SETTINGS_KEY).length;
 
       it('is turned off, and saved that way, once it rings in real time', () => {
         const real = fakeRealClock(new Date(2026, 9, 27, 10, 59, 58));
@@ -391,13 +393,13 @@ describe('School Clock page', () => {
         app = initClockApp({ realNow: real.now, storage });
 
         real.advance(1000);
-        expect(setItem).not.toHaveBeenCalled();
+        expect(settingsSaves(setItem)).toBe(0);
         real.advance(2000);
-        expect(setItem).toHaveBeenCalledTimes(1);
+        expect(settingsSaves(setItem)).toBe(1);
         expect(saved(storage).alarms[0]).toMatchObject({ id: 'o', enabled: false });
         expect(ringLines()).toEqual([]);
         real.advance(5000);
-        expect(setItem).toHaveBeenCalledTimes(1);
+        expect(settingsSaves(setItem)).toBe(1);
       });
 
       it('is not turned off when it rings in simulated time', () => {
@@ -409,7 +411,7 @@ describe('School Clock page', () => {
 
         real.advance(5000);
         expect(ringLines()).toEqual([]);
-        expect(setItem).not.toHaveBeenCalled();
+        expect(settingsSaves(setItem)).toBe(0);
         expect(saved(storage).alarms[0].enabled).toBe(true);
       });
     });

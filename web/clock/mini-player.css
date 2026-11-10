@@ -104,6 +104,27 @@
   cursor: default;
 }
 
+/* It can be clicked: a light outline while the pointer is anywhere in the
+   window (the ::after is part of it), and the same shape for keyboard focus. */
+.clock-mini__readout:not(:disabled):hover,
+.clock-mini__readout:focus-visible {
+  outline: 1.5px solid var(--line);
+  outline-offset: 4px;
+  border-radius: var(--radius);
+}
+
+.clock-mini__readout:focus-visible {
+  outline: var(--focus-width) solid var(--focus);
+}
+
+/* The first-time tooltip, over the head line for its few seconds. */
+.clock-mini .clock-cycle-hint {
+  top: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: clamp(11px, 6.5vh, 18px);
+}
+
 /* About 40% of the window's height, capped so it fits the width by the same
    unit rule as the main page (--d, --c, --u). */
 .clock-mini__value {
@@ -117,36 +138,13 @@
   white-space: nowrap;
 }
 
-/* Under the digits: which mode of three it's in (a dot each, the current one
-   filled) and its caption ("left", "since start"; none for the time). */
-.clock-mini__mode {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 0.5em;
+/* Under the digits: its caption ("until end", "since start"; none for the
+   time), which changes on each click. Its line is kept when empty, so the
+   digits don't jump. */
+.clock-mini__caption {
   min-height: 1.2em;
   font-size: clamp(11px, 6.5vh, 20px);
   color: var(--muted);
-}
-
-.clock-mini__caption:empty {
-  display: none;
-}
-
-.clock-mini__modes {
-  display: flex;
-  gap: 0.3em;
-}
-
-.clock-mini__dot {
-  width: 0.45em;
-  height: 0.45em;
-  border-radius: 50%;
-  background: var(--track);
-}
-
-.clock-mini__dot.is-current {
-  background: var(--accent);
 }
 
 /* Foot, 44px at least: the Segment's bar and end, up next, the time left in
