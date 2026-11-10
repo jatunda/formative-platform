@@ -13,11 +13,16 @@
 /** Every voice's name for people, in the order the page lists them (gentlest first). */
 /** @type {Readonly<Record<SoundName, string>>} */
 export const SOUND_NAMES = Object.freeze({
+  swell: 'Swell',
   chime: 'Chime',
+  harp: 'Harp',
   clockTower: 'Clock tower',
   marimba: 'Marimba',
+  songbird: 'Songbird',
   deskBell: 'Desk bell',
   woodBlock: 'Wood block',
+  levelUp: 'Level up',
+  clapPattern: 'Clap pattern',
   schoolBell: 'School bell',
   beep: 'Beep',
   buzzer: 'Buzzer',
@@ -100,6 +105,45 @@ function strike(ctx, out, track, freq, t, partials) {
   for (const [ratio, peak, length] of partials) tone(ctx, out, track, { type: 'sine', freq: freq * ratio, t, length, peak });
 }
 
+/**
+ * A pulse wave (a narrow square, like an old game console's) with only its
+ * first few harmonics, so even a high note keeps its energy under about 3 kHz.
+ * @param {BaseAudioContext} ctx @param {number} duty 0–1 @param {number} harmonics
+ * @returns {PeriodicWave}
+ */
+function pulseWave(ctx, duty, harmonics) {
+  const real = new Float32Array(harmonics + 1);
+  const imag = new Float32Array(harmonics + 1);
+  for (let n = 1; n <= harmonics; n += 1) imag[n] = (2 / (n * Math.PI)) * Math.sin(n * Math.PI * duty);
+  return ctx.createPeriodicWave(real, imag);
+}
+
+/** Noise buffers already made, by context and length, so every ring reuses one. */
+/** @type {WeakMap<BaseAudioContext, Map<number, AudioBuffer>>} */
+const NOISE = new WeakMap();
+
+/**
+ * A buffer of white noise. Seeded, so every ring (and every test) gets the same
+ * noise; made once per context and length.
+ * @param {BaseAudioContext} ctx @param {number} seconds
+ * @returns {AudioBuffer}
+ */
+function noiseBuffer(ctx, seconds) {
+  const made = NOISE.get(ctx) ?? new Map();
+  NOISE.set(ctx, made);
+  const cached = made.get(seconds);
+  if (cached) return cached;
+  const buffer = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * seconds), ctx.sampleRate);
+  const data = buffer.getChannelData(0);
+  let seed = 12345;
+  for (let i = 0; i < data.length; i += 1) {
+    seed = (seed * 1103515245 + 12345) % 2147483648;
+    data[i] = (seed / 1073741824) - 1;
+  }
+  made.set(seconds, buffer);
+  return buffer;
+}
+
 // Partials of a tubular bell, a small hand bell and a marimba bar. Bells have
 // slightly "out of tune" upper partials, which is what makes them sound like
 // bells; a marimba bar is tuned so its second partial is two octaves up.
@@ -114,11 +158,65 @@ const MARIMBA_BAR = /** @type {[number, number, number][]} */ ([[1, 0.38, 0.5], 
 // repeats, so an Alarm ringing for a minute keeps breathing.
 /** @type {Record<SoundName, Voice>} */
 const VOICES = {
+  // A soft pad: an open A-major chord that fades in over a second and out over
+  // two, each note two sines a hair apart so it shimmers. The only voice with
+  // no attack. Once per Bell, so on repeat it breathes slowly.
+  swell(ctx, out, t, track) {
+    const NOTES = [[440, 0.07], [659.25, 0.06], [880, 0.04], [1108.73, 0.035]];
+    const env = ctx.createGain();
+    env.connect(out);
+    env.gain.setValueAtTime(0.0001, t);
+    env.gain.linearRampToValueAtTime(1, t + 1.1);
+    env.gain.setValueAtTime(1, t + 1.5);
+    env.gain.exponentialRampToValueAtTime(0.0001, t + 3.6);
+    for (const [freq, peak] of NOTES) {
+      for (const detune of [-1.2, 1.2]) {
+        const osc = ctx.createOscillator();
+        const level = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq + detune, t);
+        level.gain.setValueAtTime(peak * 1.6, t);
+        osc.connect(level);
+        level.connect(env);
+        track(osc, t, t + 3.6);
+      }
+    }
+    return 5;
+  },
   // Two soft notes, high then low.
   chime(ctx, out, t, track) {
     tone(ctx, out, track, { type: 'sine', freq: 659.25, t, length: 0.75 });
     tone(ctx, out, track, { type: 'sine', freq: 523.25, t: t + 0.75, length: 0.75 });
     return 1.5;
+  },
+  // A harp glissando: eight plucked strings up a C pentatonic scale (C5 to
+  // E6), each a sawtooth through a low-pass filter that closes quickly, which
+  // is what a plucked string does. The filter keeps the highs under 3 kHz.
+  // Twice per Bell.
+  harp(ctx, out, t, track) {
+    const SCALE = [523.25, 587.33, 659.25, 783.99, 880, 1046.5, 1174.66, 1318.51];
+    SCALE.forEach((freq, i) => {
+      const at = t + i * 0.075;
+      const last = i === SCALE.length - 1;
+      const length = last ? 1.6 : 1.1;
+      const osc = ctx.createOscillator();
+      const filter = ctx.createBiquadFilter();
+      const env = ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(freq, at);
+      filter.type = 'lowpass';
+      filter.Q.value = 0.7;
+      filter.frequency.setValueAtTime(Math.min(freq * 4, 3000), at);
+      filter.frequency.exponentialRampToValueAtTime(freq * 1.2, at + 0.35);
+      env.gain.setValueAtTime(0.0001, at);
+      env.gain.exponentialRampToValueAtTime(last ? 0.22 : 0.16, at + 0.004);
+      env.gain.exponentialRampToValueAtTime(0.0001, at + length);
+      osc.connect(filter);
+      filter.connect(env);
+      env.connect(out);
+      track(osc, at, at + length);
+    });
+    return 2.5;
   },
   // The second half of the Westminster chime on tubular bells, once per Bell:
   // two phrases (G#, E, F#, B, then B, F#, G#, E), each ending on a held note.
@@ -135,6 +233,28 @@ const VOICES = {
     [523.25, 659.25, 783.99, 1046.5].forEach((freq, i) => strike(ctx, out, track, freq, t + i * 0.12, MARIMBA_BAR));
     return 1.5;
   },
+  // A songbird: three rising "tsee" chirps, then a quick falling trill, then
+  // quiet. Pure sines gliding between 1.7 and 2.9 kHz, where the ear is most
+  // sensitive: it cuts through chatter without being loud. Twice per Bell.
+  songbird(ctx, out, t, track) {
+    /** @param {number} at @param {number} from @param {number} to @param {number} length @param {number} peak */
+    const chirp = (at, from, to, length, peak) => {
+      const osc = ctx.createOscillator();
+      const env = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(from, at);
+      osc.frequency.exponentialRampToValueAtTime(to, at + length);
+      env.gain.setValueAtTime(0.0001, at);
+      env.gain.exponentialRampToValueAtTime(peak, at + length * 0.3);
+      env.gain.exponentialRampToValueAtTime(0.0001, at + length);
+      osc.connect(env);
+      env.connect(out);
+      track(osc, at, at + length);
+    };
+    for (let i = 0; i < 3; i += 1) chirp(t + i * 0.17, 1800, 2700, 0.09, 0.4);
+    for (let i = 0; i < 7; i += 1) chirp(t + 0.62 + i * 0.05, 2900 - i * 120, 2500 - i * 110, 0.04, 0.32);
+    return 2.5;
+  },
   // One bright ding, like a hotel desk bell or a kitchen timer.
   deskBell(ctx, out, t, track) {
     strike(ctx, out, track, 1046.5, t, HAND_BELL);
@@ -147,6 +267,71 @@ const VOICES = {
       tone(ctx, out, track, { type: 'sine', freq: 2420, t: at, length: 0.05, peak: 0.12, attack: 0.003 });
     }
     return 1;
+  },
+  // Level up: a fast rising run of three little arpeggios, each a step higher,
+  // then a held C6 with a wobble, on a narrow pulse wave like an old game
+  // console. Three times per Bell; the third run ends before the Bell's cut.
+  levelUp(ctx, out, t, track) {
+    const wave = pulseWave(ctx, 0.25, 4);
+    const RUN = [523.25, 659.25, 783.99, 587.33, 739.99, 880, 659.25, 830.61, 987.77];
+    /** @param {number} freq @param {number} at @param {number} length @param {number} peak */
+    const note = (freq, at, length, peak) => {
+      const osc = ctx.createOscillator();
+      const env = ctx.createGain();
+      osc.setPeriodicWave(wave);
+      osc.frequency.setValueAtTime(freq, at);
+      env.gain.setValueAtTime(peak, at);
+      env.gain.setValueAtTime(peak, at + length - 0.012);
+      env.gain.linearRampToValueAtTime(0.0001, at + length);
+      osc.connect(env);
+      env.connect(out);
+      track(osc, at, at + length);
+      return osc;
+    };
+    RUN.forEach((freq, i) => note(freq, t + i * 0.055, 0.05, 0.17));
+    const holdAt = t + RUN.length * 0.055;
+    const hold = note(1046.5, holdAt, 0.42, 0.2);
+    const wobble = ctx.createOscillator();
+    const depth = ctx.createGain();
+    wobble.frequency.setValueAtTime(9, holdAt);
+    depth.gain.setValueAtTime(14, holdAt);
+    wobble.connect(depth);
+    depth.connect(hold.frequency);
+    track(wobble, holdAt, holdAt + 0.42);
+    return 2;
+  },
+  // The clap pattern teachers use to get a room's attention: clap, clap,
+  // clap-clap-clap. Band-passed noise with no pitch, each clap three tiny
+  // bursts and a short tail, like real hands. Twice per Bell.
+  clapPattern(ctx, out, t, track) {
+    const noise = noiseBuffer(ctx, 0.2);
+    for (const offset of [0, 0.36, 0.72, 0.9, 1.08]) {
+      const at = t + offset;
+      const source = ctx.createBufferSource();
+      const band = ctx.createBiquadFilter();
+      const cap = ctx.createBiquadFilter();
+      const env = ctx.createGain();
+      source.buffer = noise;
+      band.type = 'bandpass';
+      band.frequency.value = 1300;
+      band.Q.value = 1.1;
+      // Noise has as much energy up high as anywhere: cap it near 3 kHz.
+      cap.type = 'lowpass';
+      cap.frequency.value = 2600;
+      env.gain.setValueAtTime(0.0001, at);
+      for (const burst of [0, 0.011, 0.022]) {
+        env.gain.setValueAtTime(1.6, at + burst);
+        env.gain.exponentialRampToValueAtTime(0.3, at + burst + 0.009);
+      }
+      env.gain.setValueAtTime(1.3, at + 0.031);
+      env.gain.exponentialRampToValueAtTime(0.0001, at + 0.16);
+      source.connect(band);
+      band.connect(cap);
+      cap.connect(env);
+      env.connect(out);
+      track(source, at, at + 0.17);
+    }
+    return 2.5;
   },
   // Ring-ring: a bell struck about ten times a second, in two short bursts.
   // Gentler than a hallway bell: pure tones, a lower pitch, a shallow

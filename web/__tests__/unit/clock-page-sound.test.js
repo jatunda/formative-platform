@@ -4,7 +4,7 @@ import { SETTINGS_KEY } from '../../clock/clock-storage.js';
 import { createFakeStorage } from '../helpers/fake-storage.js';
 import { createFakeSoundPlayer } from '../helpers/fake-sound-player.js';
 import { field, setValue } from '../helpers/clock-dom.js';
-import { SOUNDS } from '../../clock/sound.js';
+import { SOUNDS, SOUND_NAMES } from '../../clock/sound.js';
 
 /** A real clock the test moves by hand; the page's ticks come from fake timers. */
 function fakeRealClock(date) {
@@ -424,6 +424,14 @@ describe('School Clock sound', () => {
 
       expect(player.volume).toBe(0.2);
       expect(saved(storage).volume).toBe(0.2);
+    });
+
+    it('lists every voice, gentlest first, for Bells and the timer', () => {
+      open();
+      openSettings();
+      const listed = (name) => [...field(name).options].map((o) => [o.value, o.textContent]);
+      expect(listed('Bell sound')).toEqual(Object.entries(SOUND_NAMES));
+      expect(listed('Timer sound')).toEqual(Object.entries(SOUND_NAMES));
     });
 
     it('previews each voice', () => {

@@ -8,7 +8,7 @@
 
 /**
  * A named generated voice (the sound engine synthesises each one).
- * @typedef {'chime' | 'clockTower' | 'marimba' | 'deskBell' | 'woodBlock' | 'schoolBell' | 'beep' | 'buzzer'} SoundName
+ * @typedef {'swell' | 'chime' | 'harp' | 'clockTower' | 'marimba' | 'songbird' | 'deskBell' | 'woodBlock' | 'levelUp' | 'clapPattern' | 'schoolBell' | 'beep' | 'buzzer'} SoundName
  */
 
 /**

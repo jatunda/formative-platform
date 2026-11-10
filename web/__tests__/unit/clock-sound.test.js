@@ -1,13 +1,34 @@
 import { describe, it, expect } from 'vitest';
-import { createSoundPlayer, SOUNDS, BELL_SECONDS, ALARM_MAX_SECONDS } from '../../clock/sound.js';
+import { createSoundPlayer, SOUNDS, SOUND_NAMES, BELL_SECONDS, ALARM_MAX_SECONDS } from '../../clock/sound.js';
 import { createFakeAudioContext, audibleStarts } from '../helpers/fake-audio.js';
 
 const bell = (key, at, sound = 'schoolBell') => ({ key, at, sound, repeat: false });
 const alarm = (key, at, sound = 'beep') => ({ key, at, sound, repeat: true });
 /** Sources that make any sound at all (one cut off before it starts never does). */
 const sounding = (ctx) => ctx.sources.filter((s) => s.stopAt > s.startAt);
+/** A 5-second Bell of `sound` at 20 s, as the page rings one that stops on its own. */
+const bellOf = (sound) => {
+  const ctx = createFakeAudioContext({ state: 'running' });
+  createSoundPlayer({ context: ctx }).schedule([{ key: 'b', at: 20, sound, repeat: true, seconds: 5 }]);
+  return ctx;
+};
+/** Every node a source's sound passes through on its way out. */
+const pathOf = (node) => (node.connected?.length ? [node, ...pathOf(node.connected[0])] : [node]);
+/** When a source's loudness first ramps (its attack ends), counted from when it starts. */
+const attackOf = (source) => {
+  const ramps = pathOf(source).flatMap((n) => n.gain?.events ?? []).filter((e) => e.kind !== 'set');
+  return Math.min(...ramps.map((e) => e.at)) - source.startAt;
+};
+const distinct = (values) => [...new Set(values)];
 
 describe('School Clock sound player', () => {
+  it('lists thirteen voices, gentlest first', () => {
+    expect(SOUNDS.map((sound) => SOUND_NAMES[sound])).toEqual([
+      'Swell', 'Chime', 'Harp', 'Clock tower', 'Marimba', 'Songbird', 'Desk bell',
+      'Wood block', 'Level up', 'Clap pattern', 'School bell', 'Beep', 'Buzzer',
+    ]);
+  });
+
   it('plays a scheduled Bell at its audio time for about 3 seconds, then stops on its own', () => {
     const ctx = createFakeAudioContext({ state: 'running' });
     const player = createSoundPlayer({ context: ctx });
@@ -22,7 +43,7 @@ describe('School Clock sound player', () => {
     expect(lastStop).toBeLessThanOrEqual(10 + BELL_SECONDS + 0.5);
   });
 
-  it.each(SOUNDS)('generates the %s voice from oscillators, with no audio files', (sound) => {
+  it.each(SOUNDS)('generates the %s voice with Web Audio, with no audio files', (sound) => {
     const ctx = createFakeAudioContext({ state: 'running' });
     createSoundPlayer({ context: ctx }).schedule([bell('b', 5, sound)]);
     expect(ctx.sources.length).toBeGreaterThan(0);
@@ -44,6 +65,111 @@ describe('School Clock sound player', () => {
     expect(notes[7].startAt).toBeLessThan(5);
   });
 
+  it('fades Swell in over about a second, an A-major chord that shimmers, once per Bell', () => {
+    const ctx = createFakeAudioContext({ state: 'running' });
+    createSoundPlayer({ context: ctx }).play('swell');
+    expect(ctx.sources.every((s) => attackOf(s) >= 1)).toBe(true);
+    // Each note of A, E, A, C# is two sines a hair apart.
+    const notes = ctx.sources.map((s) => s.frequency.value).sort((a, b) => a - b);
+    expect(notes.map(Math.round)).toEqual([439, 441, 658, 660, 879, 881, 1108, 1110]);
+
+    expect(distinct(bellOf('swell').sources.map((s) => s.startAt))).toEqual([20]);
+  });
+
+  it('starts every other voice quickly', () => {
+    const ctx = createFakeAudioContext({ state: 'running' });
+    createSoundPlayer({ context: ctx }).play('chime');
+    expect(ctx.sources.every((s) => attackOf(s) < 0.1)).toBe(true);
+  });
+
+  it('plucks Harp strings up a C pentatonic scale, each through a closing filter under 3 kHz, twice per Bell', () => {
+    const ctx = createFakeAudioContext({ state: 'running' });
+    createSoundPlayer({ context: ctx }).play('harp');
+    const sweep = ctx.sources.filter((s) => s.startAt < 1).sort((a, b) => a.startAt - b.startAt);
+    expect(sweep.map((s) => Math.round(s.frequency.value))).toEqual([523, 587, 659, 784, 880, 1047, 1175, 1319]);
+    for (const string of sweep) {
+      expect(string.type).toBe('sawtooth');
+      const filter = pathOf(string).find((n) => n.isFilter);
+      expect(filter.type).toBe('lowpass');
+      const [opens, closes] = filter.frequency.events;
+      expect(opens.value).toBeLessThanOrEqual(3000);
+      expect(closes.value).toBeLessThan(opens.value);
+    }
+
+    const lowC = (ctx) => ctx.sources.filter((s) => s.frequency.value === 523.25).map((s) => s.startAt);
+    expect(lowC(bellOf('harp'))).toEqual([20, 22.5]);
+  });
+
+  it('sings Songbird as three rising chirps then a falling trill, all gliding between 1.7 and 2.9 kHz, twice per Bell', () => {
+    const ctx = createFakeAudioContext({ state: 'running' });
+    createSoundPlayer({ context: ctx }).play('songbird');
+    const call = ctx.sources.filter((s) => s.startAt < 1).sort((a, b) => a.startAt - b.startAt);
+    const glides = call.map((s) => s.frequency.events.map((e) => e.value));
+    expect(glides.flat().every((f) => f >= 1700 && f <= 2900)).toBe(true);
+    const rises = glides.map(([from, to]) => to > from);
+    expect(rises).toEqual([true, true, true, false, false, false, false, false, false, false]);
+    // The trill steps down.
+    const trill = glides.slice(3).map(([from]) => from);
+    expect(trill).toEqual([...trill].sort((a, b) => b - a));
+
+    const callStarts = (c) => c.sources.filter((s) => s.frequency.value === 1800).map((s) => +s.startAt.toFixed(2));
+    expect(callStarts(bellOf('songbird'))).toEqual([20, 20.17, 20.34, 22.5, 22.67, 22.84]);
+  });
+
+  it('plays Level up on a game-console pulse wave: a rising run, then a held C6 that wobbles, three times per Bell', () => {
+    const ctx = createFakeAudioContext({ state: 'running' });
+    createSoundPlayer({ context: ctx }).play('levelUp');
+    const notes = ctx.sources.filter((s) => s.wave).sort((a, b) => a.startAt - b.startAt);
+    // Only four harmonics, so even the high notes stay under about 3 kHz.
+    expect(notes[0].wave.imag.filter((h) => h !== 0)).toHaveLength(4);
+    const held = notes.find((s) => s.frequency.value === 1046.5);
+    const run = notes.filter((s) => s.startAt < held.startAt);
+    expect(run).toHaveLength(9);
+    expect(run[run.length - 1].frequency.value).toBeGreaterThan(run[0].frequency.value);
+    expect(held).toBe(notes[9]);
+    // A slow oscillator nudges the held note's pitch up and down.
+    const wobble = ctx.sources.find((s) => !s.wave && pathOf(s).includes(held.frequency));
+    expect(wobble.frequency.value).toBeLessThan(20);
+    expect(wobble.startAt).toBe(held.startAt);
+
+    const bell = bellOf('levelUp');
+    const helds = bell.sources.filter((s) => s.frequency.value === 1046.5);
+    expect(helds.map((s) => Math.round(s.startAt - 20))).toEqual([0, 2, 4]);
+    // The last run finishes before the Bell is cut at 25 s.
+    expect(Math.max(...bell.sources.map((s) => s.stopAt))).toBeLessThan(25 - 0.05);
+  });
+
+  it('claps Clap pattern (clap, clap, clap-clap-clap) from filtered noise with no pitch, twice per Bell', () => {
+    const ctx = createFakeAudioContext({ state: 'running' });
+    createSoundPlayer({ context: ctx }).play('clapPattern');
+    expect(ctx.sources.every((s) => s.kind === 'buffer')).toBe(true);
+    const claps = ctx.sources.filter((s) => s.startAt < 2).map((s) => +s.startAt.toFixed(2));
+    expect(claps).toEqual([0, 0.36, 0.72, 0.9, 1.08]);
+    for (const clap of ctx.sources) {
+      const [band, cap] = pathOf(clap).filter((n) => n.isFilter);
+      expect(band.type).toBe('bandpass');
+      expect(cap.type).toBe('lowpass');
+      expect(cap.frequency.value).toBeLessThanOrEqual(3000);
+    }
+
+    const bell = bellOf('clapPattern');
+    expect(bell.sources.map((s) => +(s.startAt - 20).toFixed(2))).toEqual([0, 0.36, 0.72, 0.9, 1.08, 2.5, 2.86, 3.22, 3.4, 3.58]);
+  });
+
+  it('claps the same noise on every ring, made once per audio context', () => {
+    const ctx = createFakeAudioContext({ state: 'running' });
+    const player = createSoundPlayer({ context: ctx });
+    player.play('clapPattern');
+    player.play('clapPattern');
+    expect(ctx.buffers).toHaveLength(1);
+    expect(distinct(ctx.sources.map((s) => s.buffer))).toEqual(ctx.buffers);
+
+    const noise = (c) => [...c.buffers[0].getChannelData(0)];
+    expect(noise(ctx).some((v) => v !== 0)).toBe(true);
+    expect(noise(ctx).every((v) => v >= -1 && v <= 1)).toBe(true);
+    expect(noise(bellOf('clapPattern'))).toEqual(noise(ctx));
+  });
+
   it('repeats an Alarm for at most 60 seconds', () => {
     const ctx = createFakeAudioContext({ state: 'running' });
     createSoundPlayer({ context: ctx }).schedule([alarm('a1', 20)]);
@@ -54,14 +180,25 @@ describe('School Clock sound player', () => {
     expect(Math.max(...ctx.sources.map((s) => s.stopAt))).toBeLessThanOrEqual(20 + ALARM_MAX_SECONDS + 0.5);
   });
 
+  it.each(SOUNDS)('repeats the %s voice through a ringing Alarm, for at most 60 seconds', (sound) => {
+    const ctx = createFakeAudioContext({ state: 'running' });
+    createSoundPlayer({ context: ctx }).schedule([alarm('a', 20, sound)]);
+    const plays = distinct(ctx.sources.map((s) => s.startAt));
+    expect(Math.min(...plays)).toBe(20);
+    // Even Clock tower, the longest voice (6 s), starts again in the last few seconds.
+    expect(Math.max(...plays)).toBeGreaterThan(20 + ALARM_MAX_SECONDS - 7);
+    expect(Math.max(...ctx.sources.map((s) => s.stopAt))).toBeLessThanOrEqual(20 + ALARM_MAX_SECONDS + 0.5);
+  });
+
   it.each(SOUNDS)('stops a %s ring given its own length right on time, voice and all', (sound) => {
     const ctx = createFakeAudioContext({ state: 'running' });
-    createSoundPlayer({ context: ctx }).schedule([{ key: 'b', at: 20, sound, repeat: true, seconds: 5 }]);
+    // 3 s cuts into every voice, even Swell, which plays once and is done by 3.6 s.
+    createSoundPlayer({ context: ctx }).schedule([{ key: 'b', at: 20, sound, repeat: true, seconds: 3 }]);
 
     expect(Math.min(...ctx.sources.map((s) => s.startAt))).toBe(20);
-    // Nothing sounds past 25 s, even a voice that started just before.
-    expect(sounding(ctx).every((s) => s.stopAt <= 25)).toBe(true);
-    expect(sounding(ctx).some((s) => s.stopAt > 24)).toBe(true);
+    // Nothing sounds past 23 s, even a voice that started just before.
+    expect(sounding(ctx).every((s) => s.stopAt <= 23)).toBe(true);
+    expect(sounding(ctx).some((s) => s.stopAt > 22)).toBe(true);
   });
 
   it('plays a sound now for a given length', () => {

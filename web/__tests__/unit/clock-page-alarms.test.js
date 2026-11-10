@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { initClockApp } from '../../clock/clock.js';
 import { SETTINGS_KEY } from '../../clock/clock-storage.js';
+import { SOUND_NAMES } from '../../clock/sound.js';
 import { createFakeStorage } from '../helpers/fake-storage.js';
 import { createFakeSoundPlayer } from '../helpers/fake-sound-player.js';
 import { accessibleName, field, isShown, setValue, toggle } from '../helpers/clock-dom.js';
@@ -469,6 +470,15 @@ describe('School Clock Alarm editor', () => {
       setValue('Sound', 'buzzer', form());
       button('Preview Sound', form()).click();
       expect(player.played).toEqual([{ sound: 'buzzer', repeat: false }]);
+    });
+
+    it('offers every voice, the new ones too', () => {
+      open();
+      button('Clock Alarm', section()).click();
+      expect([...inForm('Sound').options].map((o) => o.textContent)).toEqual(Object.values(SOUND_NAMES));
+      setValue('Sound', 'songbird', form());
+      button('Preview Sound', form()).click();
+      expect(player.played).toEqual([{ sound: 'songbird', repeat: false }]);
     });
 
     it('is deleted at once from its form, with an Undo that puts it back', () => {

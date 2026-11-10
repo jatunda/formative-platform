@@ -50,6 +50,17 @@ describe('clock settings store', () => {
     expect(createSettingsStore(storage).load()).toEqual(settings);
   });
 
+  it('keeps the newer voices for Bells, Alarms and the timer; settings saved before them load unchanged', () => {
+    const storage = createFakeStorage();
+    const bells = { on: true, sound: 'swell', assemblyEnds: false, untilDismissed: false };
+    const alarms = [{ ...clockAlarm, sound: 'clapPattern' }, { ...periodAlarm, sound: 'levelUp' }];
+    createSettingsStore(storage).save({ ...DEFAULT_SETTINGS, bells, alarms, timerSound: 'songbird' });
+    expect(createSettingsStore(storage).load()).toMatchObject({ bells, alarms, timerSound: 'songbird' });
+    // An earlier save holds only the first eight voices' names, and they still load as saved.
+    const older = { ...DEFAULT_SETTINGS, bells: { ...bells, sound: 'woodBlock' }, alarms: [clockAlarm, periodAlarm], timerSound: 'beep' };
+    expect(storeHolding(older).load()).toEqual(older);
+  });
+
   it('starts with seconds on, the Day Strip on and the dark default theme in its own version, with no swaps', () => {
     expect(DEFAULT_SETTINGS).toMatchObject({
       showSeconds: true, dayStrip: true, theme: 'slate', fontSwap: null, paletteSwap: null, flipped: false,
