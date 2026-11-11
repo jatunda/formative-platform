@@ -23,6 +23,12 @@ const pageText = () => document.getElementById('clockApp').textContent.replace(/
 const displayText = () => document.querySelector('#clockApp .clock-stage').textContent.replace(/\s+/g, ' ').trim();
 /** The line under the Readouts in Off-Hours. */
 const offHoursLine = () => document.querySelector('#clockApp .clock-line').textContent;
+/**
+ * Whether the line under the Readouts steps aside for the Day Bar's heading,
+ * which names the same Next School Day (the stylesheet hides it, except in
+ * the short layout, where the bar is hidden).
+ */
+const lineLeftToBar = () => document.querySelector('#clockApp .clock-line').classList.contains('clock-line--in-bar');
 /** The Day Label and date at the top left. */
 const dayText = () => document.querySelector('#clockApp .clock-day').textContent.replace(/\s+/g, ' ').trim();
 const headingText = () => document.querySelector('#clockApp h1').textContent.replace(/\s+/g, ' ').trim();
@@ -128,6 +134,46 @@ describe('School Clock page', () => {
     expect(headingText()).toBe('After school');
     expect(readoutTexts()).toEqual(['50:00 since school ended']);
     expect(offHoursLine()).toBe('Next: Wed, Oct 28 · Even Day');
+  });
+
+  describe('names the Next School Day once', () => {
+    const barHeading = () => document.querySelector('#clockApp .clock-bar__heading')?.textContent;
+
+    it('after school, in the Day Bar heading, not again under the Readouts', () => {
+      const real = fakeRealClock(new Date(2026, 9, 27, 16, 0, 0));
+      app = start({ realNow: real.now });
+      expect(barHeading()).toBe('Next School Day · Wed, Oct 28 · Even Day');
+      expect(lineLeftToBar()).toBe(true);
+    });
+
+    it('on a day off, in the Day Bar heading, not again under the Readouts', () => {
+      const real = fakeRealClock(new Date(2026, 10, 25, 10, 0, 0));
+      app = start({ realNow: real.now });
+      expect(barHeading()).toBe('Next School Day · Mon, Nov 30 · All Day');
+      expect(lineLeftToBar()).toBe(true);
+    });
+
+    it('under the Readouts while a timer hides the bar, and steps aside again once it is gone', () => {
+      const real = fakeRealClock(new Date(2026, 9, 27, 16, 0, 0));
+      app = start({ realNow: real.now, settings: { timerEndsAt: new Date(2026, 9, 27, 16, 1, 0).getTime() } });
+      expect(barHeading()).toBeUndefined();
+      expect(offHoursLine()).toBe('Next: Wed, Oct 28 · Even Day');
+      expect(lineLeftToBar()).toBe(false);
+      real.advance(61 * 1000);
+      document.querySelector('#clockApp [role="alertdialog"] button').click();
+      expect(lineLeftToBar()).toBe(true);
+    });
+
+    it('under the Readouts in Experience Week, Summer and on an unknown date, where there is no bar', () => {
+      for (const date of [new Date(2027, 0, 20, 10, 0, 0), new Date(2027, 4, 28, 10, 0, 0), new Date(2030, 0, 1, 9, 0, 0)]) {
+        app?.destroy();
+        const real = fakeRealClock(date);
+        app = start({ realNow: real.now });
+        expect(barHeading()).toBeUndefined();
+        expect(offHoursLine()).not.toBe('');
+        expect(lineLeftToBar()).toBe(false);
+      }
+    });
   });
 
   it('says it is before school, and when the first Segment starts', () => {
