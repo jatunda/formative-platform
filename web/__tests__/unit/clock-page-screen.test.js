@@ -498,9 +498,9 @@ describe('School Clock fullscreen, mini player and feedback', () => {
     });
   });
 
-  it('has a "Feedback? Email Eric" link to a new email with the subject filled in, kept out of the projected view', () => {
+  it('has an inviting feedback link to a new email with the subject filled in, kept out of the projected view', () => {
     open();
-    const link = [...mount().querySelectorAll('a')].find((a) => a.textContent === 'Feedback? Email Eric');
+    const link = [...mount().querySelectorAll('a')].find((a) => a.textContent === 'Eric loves feedback! Bugs? New ideas? Random comments? Email him here.');
     expect(link.getAttribute('href')).toBe('mailto:erich@villagechristian.org?subject=Clock%20feedback');
     expect(link.closest('[hidden]')).not.toBeNull();
     button('Settings').click();
