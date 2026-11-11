@@ -13,7 +13,7 @@ const ALL_DAY = [
 function barAt(now, settings = {}) {
   const division = settings.division ?? 'HS';
   const moment = describeMoment(now, SCHOOL_YEARS, { division });
-  return describeBar(now, moment, SCHOOL_YEARS, { division, dayStrip: true, periodLabels: {}, ...settings });
+  return describeBar(now, moment, SCHOOL_YEARS, { division, dayStrip: true, periodLabels: {}, showPeriodEnd: false, ...settings });
 }
 const states = (bar) => Object.fromEntries(bar.blocks.map((b) => [b.name, b.state]));
 
@@ -126,7 +126,7 @@ describe('the bar during Off-Hours', () => {
 describe("the current block's end time (Show when this Period ends)", () => {
   const ending = (bar) => bar.blocks.filter((b) => b.showEnd).map((b) => b.name);
 
-  it('is off by default: no block shows its end', () => {
+  it('when off, no block shows its end', () => {
     expect(ending(barAt(tue(10, 39)))).toEqual([]);
   });
 
@@ -164,7 +164,7 @@ describe('the bar is hidden', () => {
     const years = [...SCHOOL_YEARS, nextYear];
     const moment = describeMoment(july, years, { division: 'HS' });
     expect(moment.nextSchoolDay).not.toBeNull();
-    expect(describeBar(july, moment, years, { division: 'HS', dayStrip: true, periodLabels: {} })).toBeNull();
+    expect(describeBar(july, moment, years, { division: 'HS', dayStrip: true, periodLabels: {}, showPeriodEnd: false })).toBeNull();
   });
 
   it('on a date the clock knows nothing about', () => {

@@ -66,14 +66,14 @@ function shortName(name) {
  * @param {import('./school-years.js').SchoolYear[]} schoolYears
  * @param {{
  *   division: import('./school-years.js').Division, dayStrip: boolean, periodLabels: Record<string, string>,
- *   showPeriodEnd?: boolean,
+ *   showPeriodEnd: boolean,
  * }} settings
  *   `dayStrip`: whole day (true) or just this Segment (false). `showPeriodEnd`:
- *   the current Segment's block shows its end time too (off when missing; just
+ *   the current Segment's block shows its end time too (whole day only; just
  *   this Segment already shows it under the bar's right end).
  * @returns {Bar | null}
  */
-export function describeBar(now, moment, schoolYears, { division, dayStrip, periodLabels, showPeriodEnd = false }) {
+export function describeBar(now, moment, schoolYears, { division, dayStrip, periodLabels, showPeriodEnd }) {
   if (moment.state === 'summer' || moment.state === 'experienceWeek') return null;
   const t = now.getTime();
   const live = moment.state === 'segment' || moment.state === 'passing';
@@ -84,8 +84,11 @@ export function describeBar(now, moment, schoolYears, { division, dayStrip, peri
   const dayLabel = first ? /** @type {import('./clock-model.js').NextSchoolDay} */ (moment.nextSchoolDay).dayLabel
     : /** @type {string} */ (moment.dayLabel);
 
-  /** @param {{ name: string, kind: BarBlock['kind'], start: Date, end: Date }} s @param {BarBlock['state']} state */
-  const block = (s, state, left = 0, width = 100) => ({
+  /**
+   * @param {{ name: string, kind: BarBlock['kind'], start: Date, end: Date }} s
+   * @param {BarBlock['state']} state @param {boolean} showEnd
+   */
+  const block = (s, state, showEnd, left = 0, width = 100) => ({
     name: s.name,
     short: shortName(s.name),
     label: periodLabel(s, periodLabels),
@@ -95,7 +98,7 @@ export function describeBar(now, moment, schoolYears, { division, dayStrip, peri
     state,
     left,
     width,
-    showEnd: false,
+    showEnd,
   });
   const passing = moment.passing && { name: 'Passing Period', kind: /** @type {const} */ ('passing'), ...moment.passing };
   const active = moment.current ?? passing;
@@ -109,7 +112,7 @@ export function describeBar(now, moment, schoolYears, { division, dayStrip, peri
   };
 
   if (!dayStrip && active) {
-    return { ...base, setting: 'segment', blocks: [block(active, 'now')], nowAt: done, end: active.end };
+    return { ...base, setting: 'segment', blocks: [block(active, 'now', false)], nowAt: done, end: active.end };
   }
 
   const t0 = segments[0].start.getTime();
@@ -126,9 +129,9 @@ export function describeBar(now, moment, schoolYears, { division, dayStrip, peri
   };
   const blocks = segments.map((s) => {
     const state = stateOf(s);
-    return { ...block(s, state, pct(s.start), pct(s.end) - pct(s.start)), showEnd: showPeriodEnd && state === 'now' };
+    return block(s, state, showPeriodEnd && state === 'now', pct(s.start), pct(s.end) - pct(s.start));
   });
-  if (passing) blocks.push(block(passing, 'now', pct(passing.start), pct(passing.end) - pct(passing.start)));
+  if (passing) blocks.push(block(passing, 'now', false, pct(passing.start), pct(passing.end) - pct(passing.start)));
   return {
     ...base,
     setting: 'day',
