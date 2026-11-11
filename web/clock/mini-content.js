@@ -6,10 +6,7 @@
 // What's ringing is the mini player's own overlay on top of this.
 import { displayText } from './display-text.js';
 import { formatClockTime, formatSegmentName } from './format.js';
-import { readoutParts, readoutText } from './readouts.js';
-import { timerName } from './timer.js';
-
-const SECOND = 1000;
+import { readoutParts, readoutText, untilEndOf } from './readouts.js';
 
 /** @typedef {ReturnType<typeof readoutParts>} Parts */
 /**
@@ -27,9 +24,12 @@ const SECOND = 1000;
  */
 
 /**
- * @typedef {{ timer: boolean, head: string, readout: Parts, mode: import('./readouts.js').ReadoutMode | null,
- *   foot: MiniFoot }} MiniContent
- * `timer`: the timer has the big Readout (the head is "Timer").
+ * @typedef {{ timer: boolean, head: import('./timer.js').TimerTitle, readout: Parts,
+ *   mode: import('./readouts.js').ReadoutMode | null, foot: MiniFoot }} MiniContent
+ * `head`: the Segment ("Period 3 · AP CSA", all `lead`), or the timer's
+ * heading, its name the `lead` that's cut short where space runs out
+ * ("Quiz" + " · 20:00 timer").
+ * `timer`: the timer has the big Readout.
  * `mode`: the big Readout's mode, which a click cycles; null when there's none
  * to cycle (just the time, or the timer in the big spot).
  */
@@ -41,13 +41,11 @@ const SECOND = 1000;
  *   settings: { use24Hour: boolean, showSeconds: boolean, periodLabels: Record<string, string> },
  *   big: Parts,
  *   mode: BigReadout['mode'],
- *   timer: { remainingMs: number, paused: boolean, totalMs: number | null, label?: string | null,
- *     progress: number } | null,
+ *   timer: import('./timer.js').TimerView | null,
  * }} state `moment` is null before a Division is chosen; `big` is the page's
  *   big Readout (ignored while `timer` shows) and `mode` its mode (null when
- *   it's just the time); `timer` while one runs, is
- *   paused or has just rung, with the length it was started with (null if
- *   unknown), its name (null for none) and the share of it left, 0–1.
+ *   it's just the time); `timer` while one runs, is paused or has just rung
+ *   (`timerRingView`).
  * @returns {MiniContent}
  */
 export function miniContent({ now, moment, settings, big, mode, timer }) {
@@ -56,23 +54,15 @@ export function miniContent({ now, moment, settings, big, mode, timer }) {
   const segmentHead = words ? [words.title, words.tag].filter(Boolean).join(' · ') : '';
   const readout = timer
     // Timers always show seconds, rounded up like the main page's.
-    ? readoutParts({ kind: 'duration', ms: Math.ceil(timer.remainingMs / SECOND) * SECOND, caption: 'left', long: false })
+    ? readoutParts({ kind: 'duration', ms: timer.remainingMs, caption: 'left', long: false })
     : big;
   return {
     timer: Boolean(timer),
-    head: timer ? timerHead(timer) : segmentHead,
+    head: timer ? timer.heading : { lead: segmentHead, tail: '' },
     readout,
     mode: timer ? null : mode,
     foot: footFor(moment, settings, options, timer),
   };
-}
-
-/**
- * "5:00 timer", "Quiz · 5:00 timer", or either "· paused".
- * @param {{ paused: boolean, totalMs: number | null, label?: string | null }} timer
- */
-function timerHead({ paused, totalMs, label }) {
-  return `${timerName(totalMs, label)}${paused ? ' · paused' : ''}`;
 }
 
 /**
@@ -91,7 +81,7 @@ function footFor(moment, settings, options, timer) {
         kind: 'progress',
         label: 'Timer progress',
         percent: Math.round(timer.progress * 100),
-        text: `${readoutText({ kind: 'duration', ms: left, caption: 'until end of', long: false }, options)} ${current.name}`,
+        text: readoutText({ kind: 'duration', ms: left, caption: untilEndOf(current.name), long: false }, options),
       };
     }
     const elapsed = /** @type {number} */ (moment.timeElapsedMs);

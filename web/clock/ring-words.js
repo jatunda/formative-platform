@@ -6,7 +6,7 @@
 // and the Settings drawer's "Next rings today" lines.
 
 import { ringsInWindow } from './clock-model.js';
-import { timerName } from './timer.js';
+import { fullTimerName } from './timer.js';
 import { SOUND_NAMES } from './sound.js';
 
 /** @typedef {{ kind: string, title: string, detail: string }} RingWords */
@@ -64,7 +64,7 @@ export function ringWords(ring, text) {
     default:
       return {
         kind: 'Timer', title: 'Time is up',
-        detail: ring.totalMs || ring.label ? timerName(ring.totalMs, ring.label) : '',
+        detail: ring.totalMs || ring.name ? fullTimerName(ring.totalMs, ring.name) : '',
       };
   }
 }

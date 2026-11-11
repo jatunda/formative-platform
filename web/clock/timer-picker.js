@@ -1,5 +1,5 @@
 // The timer picker: "Start a timer", a modal dialog the top bar's Timer
-// control opens. Four presets start at once; "Recent" holds the last three
+// control opens. Four presets start at once; "Recent" holds the last five
 // custom times (most recent first), each with the name it was last given
 // ("20:00 · Quiz"), which starts it named; the custom row takes minutes and seconds.
 // Built once (so typing survives the ticks). Pause, resume and cancel are on
@@ -7,10 +7,9 @@
 // settings (timer.js).
 import { closeButton } from './controls.js';
 import { el } from './dom.js';
-import { formatDuration } from './format.js';
 import { icon } from './icons.js';
 import { createModal } from './modal.js';
-import { PRESET_MINUTES, parseMinutesSeconds, quickPickLabel, rememberQuickPick, startTimer } from './timer.js';
+import { PRESET_MINUTES, parseMinutesSeconds, quickPickName, quickPickText, rememberQuickPick, startTimer } from './timer.js';
 
 const ID = 'clock-picker';
 const MINUTE = 60 * 1000;
@@ -30,9 +29,9 @@ export function createTimerPicker({ settings, now, update, behind, onChange, onS
    */
   function start(ms, custom) {
     const { quickPicks } = settings();
-    const label = custom ? quickPickLabel(quickPicks, ms) : null;
+    const name = custom ? quickPickName(quickPicks, ms) : null;
     const recent = custom ? { quickPicks: rememberQuickPick(quickPicks, ms) } : {};
-    update({ ...startTimer(ms, now(), label), ...recent });
+    update({ ...startTimer(ms, now(), name), ...recent });
     modal.close();
     onStarted();
   }
@@ -51,9 +50,8 @@ export function createTimerPicker({ settings, now, update, behind, onChange, onS
     const picks = settings().quickPicks;
     recentLabel.hidden = picks.length === 0;
     recent.hidden = picks.length === 0;
-    recent.replaceChildren(...picks.map(({ ms, label }) => el('button', {
-      type: 'button', className: 'clock-pill',
-      textContent: label ? `${formatDuration(ms)} · ${label}` : formatDuration(ms), onclick: () => start(ms, true),
+    recent.replaceChildren(...picks.map((pick) => el('button', {
+      type: 'button', className: 'clock-pill', textContent: quickPickText(pick), onclick: () => start(pick.ms, true),
     })));
   }
 

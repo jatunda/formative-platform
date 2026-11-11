@@ -35,6 +35,16 @@ export function defaultMode(moment) {
   return moment.state === 'afterSchool' ? 'countup' : 'countdown';
 }
 
+/** The caption on a Segment's time left: "43:00 until end". */
+export const UNTIL_END = 'until end';
+
+/**
+ * The caption on a Segment's time left with the Segment named, where the
+ * heading doesn't name it: "until end of Period 3".
+ * @param {string} segmentName
+ */
+export const untilEndOf = (segmentName) => `${UNTIL_END} of ${segmentName}`;
+
 /**
  * What a Readout shows: a length of time with its caption ("43:00 until end",
  * "2:00 since start", "2:40 until Period 4", "4d 22h until Mon, Nov 30"), or
@@ -63,7 +73,7 @@ export function readoutValue(mode, moment, now, periodLabels = {}) {
   if (mode === 'countup' && (moment.state === 'segment' || moment.state === 'passing')) {
     return duration(moment.timeElapsedMs, 'since start');
   }
-  if (moment.state === 'segment') return duration(moment.timeLeftMs, 'until end');
+  if (moment.state === 'segment') return duration(moment.timeLeftMs, UNTIL_END);
   // A Passing Period counts down to the Segment up next.
   if (moment.state === 'passing') {
     const next = /** @type {import('./clock-model.js').TimedSegment} */ (moment.upNext);

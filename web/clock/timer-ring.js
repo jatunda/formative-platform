@@ -1,6 +1,6 @@
 // The running timer in the big spot: C's progress ring around its digits,
-// with the title ("5:00 timer", or "5:00 timer · paused"; the teacher's name
-// for it in its place, "Quiz") and Pause / Resume / Cancel inside. Clicking
+// with the title ("5:00 timer", or "5:00 timer · paused"; with the teacher's
+// name for it, "Quiz · 5:00") and Pause / Resume / Cancel inside. Clicking
 // the title turns it into a field to name the timer: Enter or leaving it
 // saves, Escape keeps the old name. The arc's length is the share of time left (timerRingView), so it
 // drains back toward 12 o'clock; CSS eases it between ticks, except under
@@ -26,7 +26,7 @@ const LONG_TITLE = 16;
 /**
  * @param {{ onPause: () => void, onResume: () => void, onCancel: () => void,
  *   onRename: (text: string) => void }} actions `onRename` gets the typed name (maybe empty)
- * @returns {{ element: HTMLElement, show: (view: ReturnType<typeof import('./timer.js').timerRingView>) => void,
+ * @returns {{ element: HTMLElement, show: (view: import('./timer.js').TimerView) => void,
  *   focus: (name: 'pause' | 'resume') => void }}
  */
 export function createTimerRing({ onPause, onResume, onCancel, onRename }) {
@@ -41,10 +41,13 @@ export function createTimerRing({ onPause, onResume, onCancel, onRename }) {
 
   const pausedIcon = icon('pause');
   /** The teacher's name for the timer as last shown ('' for none), for the field. */
-  let label = '';
+  let shownName = '';
+  // The name wraps where it must; its length (" · 20:00 · paused") stays whole.
+  const titleName = el('span');
+  const titleTail = el('span', { className: 'clock-ring__name-tail' });
   const titleText = el('button', {
     type: 'button', className: 'clock-ring__name', title: 'Name this timer', onclick: () => startEditing(),
-  });
+  }, [titleName, titleTail]);
   const nameField = el('input', {
     className: 'clock-input clock-ring__name-field', type: 'text', maxLength: MAX_NAME_LENGTH, autocomplete: 'off',
     'aria-label': 'Timer name', hidden: true,
@@ -62,7 +65,7 @@ export function createTimerRing({ onPause, onResume, onCancel, onRename }) {
     onblur: () => stopEditing(true),
   });
   function startEditing() {
-    nameField.value = label;
+    nameField.value = shownName;
     titleText.hidden = true;
     nameField.hidden = false;
     nameField.focus();
@@ -97,12 +100,13 @@ export function createTimerRing({ onPause, onResume, onCancel, onRename }) {
     element,
     show(view) {
       const { status, left, title, progress } = view;
-      label = view.timerLabel ?? '';
+      shownName = view.name ?? '';
       element.classList.toggle('is-paused', status === 'paused');
       pausedIcon.style.display = status === 'paused' ? '' : 'none';
-      titleText.textContent = status === 'paused' ? `${title} · paused` : title;
+      titleName.textContent = title.lead;
+      titleTail.textContent = title.tail;
       titleText.disabled = status === 'done';
-      titleText.classList.toggle('is-long', title.length >= LONG_TITLE);
+      titleText.classList.toggle('is-long', title.lead.length + title.tail.length >= LONG_TITLE);
       digits.textContent = left;
       digits.setAttribute('aria-label', view.label);
       // The size rule's glyph counts (as for a Readout's value).

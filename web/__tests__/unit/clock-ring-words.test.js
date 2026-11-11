@@ -15,8 +15,8 @@ describe('what the ring card says about the timer', () => {
   });
 
   it("puts the teacher's name for it first", () => {
-    expect(ringWords({ at, source: 'timer', sound: 'beep', totalMs: 20 * 60 * 1000, label: 'Quiz' }, text).detail)
+    expect(ringWords({ at, source: 'timer', sound: 'beep', totalMs: 20 * 60 * 1000, name: 'Quiz' }, text).detail)
       .toBe('Quiz · 20:00 timer');
-    expect(ringWords({ at, source: 'timer', sound: 'beep', totalMs: null, label: 'Quiz' }, text).detail).toBe('Quiz');
+    expect(ringWords({ at, source: 'timer', sound: 'beep', totalMs: null, name: 'Quiz' }, text).detail).toBe('Quiz');
   });
 });

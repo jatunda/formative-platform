@@ -35,3 +35,9 @@ Built behaviour: closed tickets 13, 22 (timer, picker, quick picks: `timer.js`, 
 - **Decided (the ticket left these open):** one name per length, so typing 20 again also starts "Quiz". Naming a preset (5 min) adds a "5:00 · Warm-up" quick pick, since the name is what's new; tapping the 5 min preset still starts unnamed, and clearing a preset's name removes its quick pick. Naming a timer moves its quick pick to the front. A saved timer of unknown length can be named, but has no quick pick to save it on.
 - **Long names:** 16+ characters set the ring title at 0.72× and it wraps within 56cqw; quick pick pills wrap; the mini player head wraps to 2 lines a little smaller (clamped) under a timer.
 - **Screenshots:** `check:clock` with a running timer named "Read chapter 4 and answer the questions" at all 5 sizes: 5/5 passed (no scroll, 0 axe violations, no errors). A scratch Playwright run covered paused, editing, the picker, the ring card and the mini player (via a stand-in Picture-in-Picture popup) at 1920 × 1080, 480 × 320 and 390 × 844: all fit, 0 axe violations.
+
+**2026-11-10: Eric's decisions after review.**
+
+- **Five quick picks:** "Recent" keeps the last 5 distinct lengths (`QUICK_PICKS` in `timer.js`), up from 3. Presets can still be named, and a named preset still takes one of the 5 slots.
+- **A named timer shows its length:** the ring title reads "Quiz · 20:00" ("Quiz · 20:00 · paused"), not just "Quiz", so the length is on screen and not only in the digits' label. A long name still shrinks and wraps; the length part never breaks. In the mini player only the name is cut short (with an ellipsis), so "· 20:00 timer" always shows.
+- Code now says *name* throughout (`timerName`, `QuickPick.name`, `cleanTimerName`, `quickPickName`, the ring's `name`); saves under the older `timerLabel` / `quickPicks[].label` keys still load.

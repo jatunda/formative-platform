@@ -76,7 +76,7 @@
  * Everything "rings in a window" reads. `division` defaults to HS.
  * `timerEndsAt` is the running classroom timer's end (epoch ms), or
  * null/missing when none is running, and `timerTotalMs` its length and
- * `timerLabel` its name (for the ring card); `timerSound` is its voice (beep
+ * `timerName` its name (for the ring card); `timerSound` is its voice (beep
  * when missing).
  * @typedef {{
  *   division?: Division,
@@ -84,7 +84,7 @@
  *   alarms: Alarm[],
  *   timerEndsAt?: number | null,
  *   timerTotalMs?: number | null,
- *   timerLabel?: string | null,
+ *   timerName?: string | null,
  *   timerSound?: SoundName,
  * }} RingSettings
  */
@@ -99,8 +99,8 @@
  *   `timerEndsAt` is null). See `timer.js`.
  * - `timerTotalMs`: the length the timer was started with (its ring's whole),
  *   or null with no timer.
- * - `timerLabel`: the teacher's name for the timer ("Quiz"), or null.
- * - `quickPicks`: the last 3 distinct custom timer durations (ms), most
+ * - `timerName`: the teacher's name for the timer ("Quiz"), or null.
+ * - `quickPicks`: the last 5 distinct custom timer durations (ms), most
  *   recent first, each with the name it was last given (and any named
  *   preset). An older save's `recentDurations` (bare lengths) loads as these.
  * - `showSeconds`: clock times and countdowns show seconds (a countdown's
@@ -124,7 +124,7 @@
  *   timerEndsAt: number | null,
  *   timerPausedMs: number | null,
  *   timerTotalMs: number | null,
- *   timerLabel: string | null,
+ *   timerName: string | null,
  *   timerSound: SoundName,
  *   quickPicks: import('./timer.js').QuickPick[],
  *   showSeconds: boolean,

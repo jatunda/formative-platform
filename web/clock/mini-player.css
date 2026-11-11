@@ -51,9 +51,23 @@
   white-space: nowrap;
 }
 
-.clock-mini__head > span {
+/* The words: the name part is cut short with an ellipsis, and the rest
+   ("· 20:00 timer · paused") always shows in full. */
+.clock-mini__head-text {
+  display: flex;
+  min-width: 0;
+}
+
+.clock-mini__head-name {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.clock-mini__head-tail {
+  flex: none;
+  /* Keeps its leading space, which a flex item would otherwise drop. */
+  white-space: pre;
 }
 
 .clock-mini.is-ringing .clock-mini__head,
@@ -62,20 +76,10 @@
   font-weight: 700;
 }
 
-/* A named timer ("Read chapter 4 and answer the questions · 20:00 timer")
-   wraps to two lines, a little smaller, rather than losing its length. */
+/* A named timer ("Read chapter 4 and answer the questions · 20:00 timer") is
+   set a little smaller; its name is cut short rather than its length. */
 .clock-mini.has-timer:not(.is-ringing) .clock-mini__head {
   font-size: clamp(12px, calc(7vh * var(--display-scale)), 24px);
-  line-height: 1.2;
-  white-space: normal;
-}
-
-.clock-mini.has-timer:not(.is-ringing) .clock-mini__head > span {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  overflow-wrap: anywhere;
 }
 
 /* The big Readout: a button that cycles its mode, pressed anywhere in the

@@ -360,16 +360,16 @@ describe('School Clock classroom timer', () => {
       expect(field('Minutes').value).toBe('');
     });
 
-    it('the last 3 distinct ones are quick picks, most recent first, kept across reloads', () => {
+    it('the last 5 distinct ones are quick picks, most recent first, kept across reloads', () => {
       open();
       expect(quickPicks()).toEqual([]);
-      for (const [m, s] of [['3', ''], ['7', '30'], ['15', ''], ['3', '00']]) typeDuration(m, s);
-      expect(quickPicks()).toEqual(['3:00', '15:00', '7:30']);
-      typeDuration('20');
-      expect(quickPicks()).toEqual(['20:00', '3:00', '15:00']);
+      for (const [m, s] of [['3', ''], ['7', '30'], ['15', ''], ['3', '00'], ['20', ''], ['25', '']]) typeDuration(m, s);
+      expect(quickPicks()).toEqual(['25:00', '20:00', '3:00', '15:00', '7:30']);
+      typeDuration('30');
+      expect(quickPicks()).toEqual(['30:00', '25:00', '20:00', '3:00', '15:00']);
 
       open();
-      expect(quickPicks()).toEqual(['20:00', '3:00', '15:00']);
+      expect(quickPicks()).toEqual(['30:00', '25:00', '20:00', '3:00', '15:00']);
     });
 
     it('a quick pick starts its timer and moves to the front', () => {
@@ -426,9 +426,9 @@ describe('School Clock classroom timer', () => {
 
       expect(editing()).toBe(false);
       expect(document.activeElement).toBe(titleButton());
-      expect(title()).toBe('Quiz');
+      expect(title()).toBe('Quiz · 20:00');
       expect(digits().getAttribute('aria-label')).toBe('Quiz · 20:00 timer, running, 20:00 to go');
-      expect(saved(storage).timerLabel).toBe('Quiz');
+      expect(saved(storage).timerName).toBe('Quiz');
 
       titleButton().click();
       expect(nameField().value).toBe('Quiz');
@@ -438,24 +438,24 @@ describe('School Clock classroom timer', () => {
       open();
       typeDuration('20');
       rename('Quiz', 'blur');
-      expect(title()).toBe('Quiz');
+      expect(title()).toBe('Quiz · 20:00');
       rename('Test', 'Escape');
       expect(editing()).toBe(false);
-      expect(title()).toBe('Quiz');
+      expect(title()).toBe('Quiz · 20:00');
       expect(document.activeElement).toBe(titleButton());
-      expect(saved(storage).timerLabel).toBe('Quiz');
+      expect(saved(storage).timerName).toBe('Quiz');
       // Escape in the field closes nothing else: the timer keeps the big spot.
       expect(ringShown()).toBe(true);
     });
 
-    it('keeps the name, not a bare "paused", while paused, and through a reload', () => {
+    it('keeps the name and length, not a bare "paused", while paused, and through a reload', () => {
       open();
       typeDuration('20');
       rename('Quiz');
       ringButton('Pause').click();
-      expect(title()).toBe('Quiz · paused');
+      expect(title()).toBe('Quiz · 20:00 · paused');
       open();
-      expect(title()).toBe('Quiz · paused');
+      expect(title()).toBe('Quiz · 20:00 · paused');
       expect(digits().getAttribute('aria-label')).toBe('Quiz · 20:00 timer, paused, 20:00 to go');
     });
 
@@ -467,10 +467,10 @@ describe('School Clock classroom timer', () => {
       ringButton('Cancel').click();
       expect(quickPicks()).toEqual(['20:00 · Quiz', '3:00']);
       pick('20:00 · Quiz');
-      expect(title()).toBe('Quiz');
+      expect(title()).toBe('Quiz · 20:00');
       // Typing the same length starts it named, too.
       typeDuration('20');
-      expect(title()).toBe('Quiz');
+      expect(title()).toBe('Quiz · 20:00');
       // Another quick pick starts without it.
       pick('3:00');
       expect(title()).toBe('3:00 timer');
@@ -484,7 +484,7 @@ describe('School Clock classroom timer', () => {
       pick('5 min');
       expect(title()).toBe('5:00 timer');
       pick('5:00 · Warm-up');
-      expect(title()).toBe('Warm-up');
+      expect(title()).toBe('Warm-up · 5:00');
     });
 
     it('leaving it empty clears the name, on the timer and its quick pick', () => {
@@ -493,7 +493,7 @@ describe('School Clock classroom timer', () => {
       rename('Quiz');
       rename('   ');
       expect(title()).toBe('20:00 timer');
-      expect(saved(storage).timerLabel).toBeNull();
+      expect(saved(storage).timerName).toBeNull();
       expect(quickPicks()).toEqual(['20:00']);
     });
 
@@ -503,8 +503,8 @@ describe('School Clock classroom timer', () => {
       titleButton().click();
       expect(nameField().maxLength).toBe(40);
       rename('Read chapter 4 and answer the questions at the end');
-      expect(title()).toBe('Read chapter 4 and answer the questions');
-      expect(title().length).toBeLessThanOrEqual(40);
+      expect(title()).toBe('Read chapter 4 and answer the questions · 20:00');
+      expect(saved(storage).timerName).toHaveLength(39);
     });
 
     it('is on the ring card when time is up, and the title is not editable then', () => {
@@ -513,7 +513,7 @@ describe('School Clock classroom timer', () => {
       rename('Clean up');
       advance(MIN + SEC);
       expect(ringing().textContent).toContain('Clean up · 1:00 timer');
-      expect(title()).toBe('Clean up');
+      expect(title()).toBe('Clean up · 1:00');
       expect(titleButton().disabled).toBe(true);
     });
 
@@ -522,7 +522,7 @@ describe('School Clock classroom timer', () => {
       pick('1 min');
       rename('Clean up');
       ringButton('Cancel').click();
-      expect(saved(storage).timerLabel).toBeNull();
+      expect(saved(storage).timerName).toBeNull();
       pick('1 min');
       expect(title()).toBe('1:00 timer');
     });

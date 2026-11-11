@@ -7,7 +7,7 @@
 import { createStorageAdapter } from '../storage.js';
 import { SOUNDS } from './sound.js';
 import { DEFAULT_THEME, isFont, isPalette, isTheme, migrateFlipped } from './themes.js';
-import { QUICK_PICKS, cleanTimerLabel } from './timer.js';
+import { QUICK_PICKS, cleanTimerName } from './timer.js';
 
 /** @typedef {import('./clock-settings.js').ClockSettings} ClockSettings */
 /** @typedef {import('./clock-settings.js').Alarm} Alarm */
@@ -26,7 +26,7 @@ export const DEFAULT_SETTINGS = Object.freeze(/** @type {ClockSettings} */ ({
   timerEndsAt: null,
   timerPausedMs: null,
   timerTotalMs: null,
-  timerLabel: null,
+  timerName: null,
   timerSound: 'beep',
   quickPicks: [],
   showSeconds: true,
@@ -49,8 +49,9 @@ const isStringList = (v) => Array.isArray(v) && v.every((s) => typeof s === 'str
 const isFiniteNumber = (v) => typeof v === 'number' && Number.isFinite(v);
 
 /**
- * The saved quick picks: each `{ ms, label? }`, or a bare length in ms as
- * saved (as `recentDurations`) before timers had names.
+ * The saved quick picks: each `{ ms, name? }` (`label` in place of `name` in
+ * an older save), or a bare length in ms as saved (as `recentDurations`)
+ * before timers had names.
  * @param {Record<string, any>} s the saved settings
  * @returns {import('./timer.js').QuickPick[]}
  */
@@ -61,9 +62,19 @@ function parseQuickPicks(s) {
     .filter((p) => isFiniteNumber(p.ms) && p.ms > 0)
     .slice(0, QUICK_PICKS)
     .map((p) => {
-      const label = typeof p.label === 'string' ? cleanTimerLabel(p.label) : null;
-      return label ? { ms: p.ms, label } : { ms: p.ms };
+      const name = savedName(p.name, p.label);
+      return name ? { ms: p.ms, name } : { ms: p.ms };
     });
+}
+
+/**
+ * A saved timer name, cleaned: `name` when it's a string, else the older
+ * save's `label` (timers' names were saved as labels); null for none.
+ * @param {unknown} name @param {unknown} label
+ */
+function savedName(name, label) {
+  const saved = typeof name === 'string' ? name : label;
+  return typeof saved === 'string' ? cleanTimerName(saved) : null;
 }
 
 /** @param {unknown} anchor */
@@ -121,7 +132,8 @@ function parseSettings(saved) {
     timerEndsAt,
     timerPausedMs,
     timerTotalMs: hasTimer && isPositive(s.timerTotalMs) ? s.timerTotalMs : d.timerTotalMs,
-    timerLabel: hasTimer && typeof s.timerLabel === 'string' ? cleanTimerLabel(s.timerLabel) : d.timerLabel,
+    // An older save named it `timerLabel`.
+    timerName: hasTimer ? savedName(s.timerName, s.timerLabel) : d.timerName,
     timerSound: isSound(s.timerSound) ? s.timerSound : d.timerSound,
     quickPicks: parseQuickPicks(s),
     showSeconds: typeof s.showSeconds === 'boolean' ? s.showSeconds : d.showSeconds,

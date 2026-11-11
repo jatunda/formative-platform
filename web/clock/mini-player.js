@@ -75,7 +75,8 @@ export function createMiniPlayer({ pictureInPicture, onOpen, onCycle, onDismiss,
       theme,
       main: el('main', { className: 'clock-mini' }),
       bell: icon('bell'),
-      headText: el('span'),
+      headName: el('span', { className: 'clock-mini__head-name' }),
+      headTail: el('span', { className: 'clock-mini__head-tail' }),
       readoutValue: el('span', { className: 'clock-mini__value' }),
       readoutCaption: el('span', { className: 'clock-mini__caption' }),
       progress: el('div', {
@@ -98,17 +99,16 @@ export function createMiniPlayer({ pictureInPicture, onOpen, onCycle, onDismiss,
     ]);
     parts.main.append(
       el('div', { className: 'clock-mini__flash', 'aria-hidden': 'true' }),
-      el('h1', { className: 'clock-mini__head' }, [parts.bell, parts.headText]),
+      el('h1', { className: 'clock-mini__head' }, [
+        parts.bell, el('span', { className: 'clock-mini__head-text' }, [parts.headName, parts.headTail]),
+      ]),
       parts.readout,
       hint.element,
       el('div', { className: 'clock-mini__foot' }, [parts.progress, parts.sub, parts.next, parts.dismiss]),
     );
     doc.body.replaceChildren(parts.main);
-    // Caught on the way down, before the click cycles (and redraws) the Readout.
-    doc.addEventListener('click', () => hint.dismiss(), true);
-    doc.addEventListener('keydown', (event) => {
-      if (event.key === 'Escape') hint.dismiss();
-    });
+    // The window's listeners go with it.
+    hint.listen(doc);
     // Closed by the user, by this page, or because this tab went away. A
     // window this page already closed may say so after a new one has opened.
     win.addEventListener('pagehide', () => {
@@ -148,7 +148,9 @@ export function createMiniPlayer({ pictureInPicture, onOpen, onCycle, onDismiss,
     mini.main.classList.toggle('is-ringing', ringing !== null);
     // An SVG has no hidden property: set the attribute.
     mini.bell.toggleAttribute('hidden', ringing === null);
-    mini.headText.textContent = ringing === null ? head : `Ringing · ${ringing}`;
+    // The name part is the one cut short; the rest ("· 20:00 timer") always shows.
+    mini.headName.textContent = ringing === null ? head.lead : `Ringing · ${ringing}`;
+    mini.headTail.textContent = ringing === null ? head.tail : '';
     writeValue(mini.readoutValue, readout);
     // The time has no caption; a length of time keeps its own for screen readers.
     mini.readoutCaption.textContent = readout.caption && ` ${readout.caption}`;

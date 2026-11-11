@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
-  MAX_NAME_LENGTH, PRESET_MINUTES, cancelTimer, cleanTimerLabel, durationLabel, nameQuickPick, nameTimer,
-  parseDuration, parseMinutesSeconds, pauseTimer, quickPickLabel, rememberQuickPick, resumeTimer, settleTimer,
-  startTimer, timerName, timerProgress, timerRingView, timerStatus,
+  MAX_NAME_LENGTH, PRESET_MINUTES, QUICK_PICKS, cancelTimer, cleanTimerName, durationLabel, nameQuickPick, nameTimer,
+  parseDuration, parseMinutesSeconds, pauseTimer, quickPickName, quickPickText, rememberQuickPick, resumeTimer, settleTimer,
+  startTimer, fullTimerName, timerProgress, timerRingView, timerStatus,
 } from '../../clock/timer.js';
 
 const MIN = 60 * 1000;
@@ -11,17 +11,17 @@ const t0 = new Date(2026, 9, 27, 10, 0).getTime();
 describe('the classroom timer', () => {
   it('a started timer is its end time, and its time left comes from the current time', () => {
     const timer = startTimer(5 * MIN, t0);
-    expect(timer).toEqual({ timerEndsAt: t0 + 5 * MIN, timerPausedMs: null, timerTotalMs: 5 * MIN, timerLabel: null });
+    expect(timer).toEqual({ timerEndsAt: t0 + 5 * MIN, timerPausedMs: null, timerTotalMs: 5 * MIN, timerName: null });
     expect(timerStatus(timer, t0 + 90 * 1000)).toEqual({ status: 'running', remainingMs: 210 * 1000 });
   });
 
   it('pausing keeps the time left, however long it stays paused; resuming ends that much later', () => {
     const paused = pauseTimer(startTimer(5 * MIN, t0), t0 + 2 * MIN);
-    expect(paused).toEqual({ timerEndsAt: null, timerPausedMs: 3 * MIN, timerTotalMs: 5 * MIN, timerLabel: null });
+    expect(paused).toEqual({ timerEndsAt: null, timerPausedMs: 3 * MIN, timerTotalMs: 5 * MIN, timerName: null });
     expect(timerStatus(paused, t0 + 60 * MIN)).toEqual({ status: 'paused', remainingMs: 3 * MIN });
 
     const resumed = resumeTimer(paused, t0 + 60 * MIN);
-    expect(resumed).toEqual({ timerEndsAt: t0 + 63 * MIN, timerPausedMs: null, timerTotalMs: 5 * MIN, timerLabel: null });
+    expect(resumed).toEqual({ timerEndsAt: t0 + 63 * MIN, timerPausedMs: null, timerTotalMs: 5 * MIN, timerName: null });
     expect(timerStatus(resumed, t0 + 61 * MIN)).toEqual({ status: 'running', remainingMs: 2 * MIN });
   });
 
@@ -79,10 +79,18 @@ describe('the classroom timer', () => {
   });
 
   describe('quick picks', () => {
-    it('keeps the last 3 distinct custom durations, most recent first', () => {
+    it('keeps the last 5 distinct custom durations, most recent first', () => {
       let recent = [];
-      for (const minutes of [3, 7, 15, 7, 20]) recent = rememberQuickPick(recent, minutes * MIN);
-      expect(recent).toEqual([{ ms: 20 * MIN }, { ms: 7 * MIN }, { ms: 15 * MIN }]);
+      for (const minutes of [3, 7, 15, 7, 20, 25, 30, 45]) recent = rememberQuickPick(recent, minutes * MIN);
+      expect(QUICK_PICKS).toBe(5);
+      expect(recent).toEqual([{ ms: 45 * MIN }, { ms: 30 * MIN }, { ms: 25 * MIN }, { ms: 20 * MIN }, { ms: 7 * MIN }]);
+    });
+
+    it('a named preset takes one of the 5 slots', () => {
+      const recent = [3, 7, 15, 20, 25].map((minutes) => ({ ms: minutes * MIN }));
+      expect(nameQuickPick(recent, 5 * MIN, 'Warm-up')).toEqual([
+        { ms: 5 * MIN, name: 'Warm-up' }, { ms: 3 * MIN }, { ms: 7 * MIN }, { ms: 15 * MIN }, { ms: 20 * MIN },
+      ]);
     });
 
     it('a custom duration that is already a preset is not kept again', () => {
@@ -92,25 +100,25 @@ describe('the classroom timer', () => {
     });
 
     it('a quick pick keeps its name when it is used again', () => {
-      const recent = [{ ms: 3 * MIN }, { ms: 20 * MIN, label: 'Quiz' }];
-      expect(rememberQuickPick(recent, 20 * MIN)).toEqual([{ ms: 20 * MIN, label: 'Quiz' }, { ms: 3 * MIN }]);
-      expect(quickPickLabel(recent, 20 * MIN)).toBe('Quiz');
-      expect(quickPickLabel(recent, 3 * MIN)).toBeNull();
-      expect(quickPickLabel(recent, 4 * MIN)).toBeNull();
+      const recent = [{ ms: 3 * MIN }, { ms: 20 * MIN, name: 'Quiz' }];
+      expect(rememberQuickPick(recent, 20 * MIN)).toEqual([{ ms: 20 * MIN, name: 'Quiz' }, { ms: 3 * MIN }]);
+      expect(quickPickName(recent, 20 * MIN)).toBe('Quiz');
+      expect(quickPickName(recent, 3 * MIN)).toBeNull();
+      expect(quickPickName(recent, 4 * MIN)).toBeNull();
     });
 
     it('naming a duration saves the name on its quick pick, at the front', () => {
       const recent = [{ ms: 3 * MIN }, { ms: 20 * MIN }];
-      expect(nameQuickPick(recent, 20 * MIN, 'Quiz')).toEqual([{ ms: 20 * MIN, label: 'Quiz' }, { ms: 3 * MIN }]);
+      expect(nameQuickPick(recent, 20 * MIN, 'Quiz')).toEqual([{ ms: 20 * MIN, name: 'Quiz' }, { ms: 3 * MIN }]);
       // A named preset is worth a quick pick: the name is what's new.
-      expect(nameQuickPick(recent, 5 * MIN, 'Warm-up')).toEqual([{ ms: 5 * MIN, label: 'Warm-up' }, ...recent]);
-      expect(nameQuickPick([{ ms: MIN }, { ms: 2 * MIN }, { ms: 3 * MIN }], 4 * MIN, 'Read')).toHaveLength(3);
+      expect(nameQuickPick(recent, 5 * MIN, 'Warm-up')).toEqual([{ ms: 5 * MIN, name: 'Warm-up' }, ...recent]);
+      expect(nameQuickPick([1, 2, 3, 4, 6].map((m) => ({ ms: m * MIN })), 7 * MIN, 'Read')).toHaveLength(5);
     });
 
     it('clearing the name leaves an unnamed quick pick, or none for a preset', () => {
-      const recent = [{ ms: 20 * MIN, label: 'Quiz' }, { ms: 5 * MIN, label: 'Warm-up' }];
-      expect(nameQuickPick(recent, 20 * MIN, null)).toEqual([{ ms: 20 * MIN }, { ms: 5 * MIN, label: 'Warm-up' }]);
-      expect(nameQuickPick(recent, 5 * MIN, null)).toEqual([{ ms: 20 * MIN, label: 'Quiz' }]);
+      const recent = [{ ms: 20 * MIN, name: 'Quiz' }, { ms: 5 * MIN, name: 'Warm-up' }];
+      expect(nameQuickPick(recent, 20 * MIN, null)).toEqual([{ ms: 20 * MIN }, { ms: 5 * MIN, name: 'Warm-up' }]);
+      expect(nameQuickPick(recent, 5 * MIN, null)).toEqual([{ ms: 20 * MIN, name: 'Quiz' }]);
     });
 
     it.each([
@@ -126,7 +134,7 @@ describe('the classroom timer', () => {
 
   it('cancelling leaves no timer', () => {
     const none = cancelTimer();
-    expect(none).toEqual({ timerEndsAt: null, timerPausedMs: null, timerTotalMs: null, timerLabel: null });
+    expect(none).toEqual({ timerEndsAt: null, timerPausedMs: null, timerTotalMs: null, timerName: null });
     expect(timerStatus(none, t0)).toEqual({ status: 'idle', remainingMs: null });
     expect(timerStatus(cancelTimer(), t0)).toEqual(timerStatus(pauseTimer(none, t0), t0));
   });
@@ -155,70 +163,92 @@ describe('the classroom timer', () => {
 
     it('says what the ring shows: running, paused, and rung', () => {
       const timer = startTimer(5 * MIN, t0);
+      const byLength = { lead: '', tail: '5:00 timer' };
       expect(timerRingView(timer, t0 + 48 * SEC)).toEqual({
-        status: 'running', left: '4:12', title: '5:00 timer', timerLabel: null, name: '5:00 timer', progress: 252 / 300,
-        label: '5:00 timer, running, 4:12 to go',
+        status: 'running', remainingMs: 252 * SEC, left: '4:12', title: byLength, heading: byLength, name: null,
+        fullName: '5:00 timer', progress: 252 / 300, label: '5:00 timer, running, 4:12 to go',
       });
       const paused = pauseTimer(timer, t0 + 175 * SEC);
       expect(timerRingView(paused, t0 + 10 * MIN)).toMatchObject({
-        status: 'paused', left: '2:05', label: '5:00 timer, paused, 2:05 to go',
+        status: 'paused', left: '2:05', title: { lead: '', tail: '5:00 timer · paused' },
+        heading: { lead: '', tail: '5:00 timer · paused' }, label: '5:00 timer, paused, 2:05 to go',
       });
-      expect(timerRingView(cancelTimer(), t0, { rangTotalMs: 5 * MIN })).toEqual({
-        status: 'done', left: '0:00', title: '5:00 timer', timerLabel: null, name: '5:00 timer', progress: 0,
-        label: "5:00 timer, time's up",
+      expect(timerRingView(cancelTimer(), t0, { totalMs: 5 * MIN, name: null })).toEqual({
+        status: 'done', remainingMs: 0, left: '0:00', title: byLength, heading: byLength, name: null,
+        fullName: '5:00 timer', progress: 0, label: "5:00 timer, time's up",
       });
     });
 
     it('rounds the time left up, and is just "Timer" when the length is unknown', () => {
       const view = timerRingView({ timerEndsAt: t0 + MIN, timerPausedMs: null }, t0 + 100);
-      expect(view).toMatchObject({ left: '1:00', name: 'Timer', label: 'Timer, running, 1:00 to go' });
-      expect(timerRingView(cancelTimer(), t0)).toMatchObject({ name: 'Timer', label: "Timer, time's up" });
+      expect(view).toMatchObject({
+        remainingMs: MIN, left: '1:00', fullName: 'Timer', title: { lead: '', tail: 'Timer' },
+        label: 'Timer, running, 1:00 to go',
+      });
+      expect(timerRingView(cancelTimer(), t0)).toMatchObject({ fullName: 'Timer', label: "Timer, time's up" });
     });
   });
 
   describe('a name', () => {
     it('comes before the length wherever the timer is named', () => {
-      expect(timerName(20 * MIN, 'Quiz')).toBe('Quiz · 20:00 timer');
-      expect(timerName(20 * MIN, null)).toBe('20:00 timer');
-      expect(timerName(null, 'Quiz')).toBe('Quiz');
-      expect(timerName(null)).toBe('Timer');
+      expect(fullTimerName(20 * MIN, 'Quiz')).toBe('Quiz · 20:00 timer');
+      expect(fullTimerName(20 * MIN, null)).toBe('20:00 timer');
+      expect(fullTimerName(null, 'Quiz')).toBe('Quiz');
+      expect(fullTimerName(null)).toBe('Timer');
     });
 
     it('is trimmed and capped; an empty one is no name', () => {
-      expect(cleanTimerLabel('  Quiz  ')).toBe('Quiz');
-      expect(cleanTimerLabel('   ')).toBeNull();
-      expect(cleanTimerLabel('x'.repeat(50))).toBe('x'.repeat(MAX_NAME_LENGTH));
+      expect(cleanTimerName('  Quiz  ')).toBe('Quiz');
+      expect(cleanTimerName('   ')).toBeNull();
+      expect(cleanTimerName('x'.repeat(50))).toBe('x'.repeat(MAX_NAME_LENGTH));
       expect(MAX_NAME_LENGTH).toBe(40);
     });
 
     it('starts with the timer, is kept through a pause and resume, and goes when it is cancelled', () => {
       const timer = startTimer(5 * MIN, t0, 'Quiz');
-      expect(timer.timerLabel).toBe('Quiz');
+      expect(timer.timerName).toBe('Quiz');
       const paused = pauseTimer(timer, t0 + MIN);
-      expect(paused.timerLabel).toBe('Quiz');
-      expect(resumeTimer(paused, t0 + 2 * MIN).timerLabel).toBe('Quiz');
-      expect(cancelTimer().timerLabel).toBeNull();
+      expect(paused.timerName).toBe('Quiz');
+      expect(resumeTimer(paused, t0 + 2 * MIN).timerName).toBe('Quiz');
+      expect(cancelTimer().timerName).toBeNull();
     });
 
     it('naming the running timer names it and its quick pick', () => {
       const settings = { ...startTimer(20 * MIN, t0), quickPicks: [{ ms: 3 * MIN }] };
       expect(nameTimer(settings, ' Quiz ')).toEqual({
-        timerLabel: 'Quiz', quickPicks: [{ ms: 20 * MIN, label: 'Quiz' }, { ms: 3 * MIN }],
+        timerName: 'Quiz', quickPicks: [{ ms: 20 * MIN, name: 'Quiz' }, { ms: 3 * MIN }],
       });
       // A timer of unknown length has no quick pick to name.
       const old = { timerEndsAt: t0 + MIN, timerPausedMs: null, quickPicks: [] };
-      expect(nameTimer(old, 'Quiz')).toEqual({ timerLabel: 'Quiz' });
+      expect(nameTimer(old, 'Quiz')).toEqual({ timerName: 'Quiz' });
     });
 
-    it('shows on the ring: the title is the name (kept while paused), the label says it all', () => {
+    it('shows on the ring with its length: "Quiz · 5:00" (and "· paused"), the label says it all', () => {
       const timer = startTimer(5 * MIN, t0, 'Quiz');
       expect(timerRingView(timer, t0)).toMatchObject({
-        title: 'Quiz', timerLabel: 'Quiz', name: 'Quiz · 5:00 timer', label: 'Quiz · 5:00 timer, running, 5:00 to go',
+        title: { lead: 'Quiz', tail: ' · 5:00' }, name: 'Quiz', fullName: 'Quiz · 5:00 timer',
+        label: 'Quiz · 5:00 timer, running, 5:00 to go',
       });
-      expect(timerRingView(pauseTimer(timer, t0), t0)).toMatchObject({ status: 'paused', title: 'Quiz' });
-      expect(timerRingView(cancelTimer(), t0, { rangTotalMs: 5 * MIN, rangLabel: 'Quiz' })).toMatchObject({
-        title: 'Quiz', label: "Quiz · 5:00 timer, time's up",
+      expect(timerRingView(pauseTimer(timer, t0), t0)).toMatchObject({
+        status: 'paused', title: { lead: 'Quiz', tail: ' · 5:00 · paused' },
       });
+      expect(timerRingView(cancelTimer(), t0, { totalMs: 5 * MIN, name: 'Quiz' })).toMatchObject({
+        title: { lead: 'Quiz', tail: ' · 5:00' }, label: "Quiz · 5:00 timer, time's up",
+      });
+      // With its length unknown, the name is all there is.
+      expect(timerRingView({ timerEndsAt: t0 + MIN, timerPausedMs: null, timerName: 'Quiz' }, t0).title)
+        .toEqual({ lead: 'Quiz', tail: '' });
+    });
+
+    it('heads the mini player in full, the name first: "Quiz · 5:00 timer" (and "· paused")', () => {
+      const timer = startTimer(5 * MIN, t0, 'Quiz');
+      expect(timerRingView(timer, t0).heading).toEqual({ lead: 'Quiz', tail: ' · 5:00 timer' });
+      expect(timerRingView(pauseTimer(timer, t0), t0).heading).toEqual({ lead: 'Quiz', tail: ' · 5:00 timer · paused' });
+    });
+
+    it('lists a quick pick by its length, then its name', () => {
+      expect(quickPickText({ ms: 20 * MIN, name: 'Quiz' })).toBe('20:00 · Quiz');
+      expect(quickPickText({ ms: 7.5 * MIN })).toBe('7:30');
     });
   });
 

@@ -304,9 +304,12 @@ describe('School Clock fullscreen, mini player and feedback', () => {
     });
 
     it("puts a named timer's name first", async () => {
-      open({ settings: { division: 'HS', timerPausedMs: 4 * 60 * SEC, timerTotalMs: 20 * 60 * SEC, timerLabel: 'Quiz' } });
+      open({ settings: { division: 'HS', timerPausedMs: 4 * 60 * SEC, timerTotalMs: 20 * 60 * SEC, timerName: 'Quiz' } });
       await openMini();
       expect(head()).toBe('Quiz · 20:00 timer · paused');
+      // Only the name may be cut short: its length is set apart, to show in full.
+      expect(mini().querySelector('.clock-mini__head-name').textContent).toBe('Quiz');
+      expect(mini().querySelector('.clock-mini__head-tail').textContent).toBe(' · 20:00 timer · paused');
     });
 
     it('just says "Timer" for a saved timer whose length is not known', async () => {
