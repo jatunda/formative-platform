@@ -584,7 +584,10 @@ export function initClockApp({
    */
   function renderBar(now, moment, text) {
     const bar = moment && !shownTimer(now)
-      ? describeBar(now, moment, schoolYears, { division: settings.division, dayStrip: settings.dayStrip, periodLabels: settings.periodLabels })
+      ? describeBar(now, moment, schoolYears, {
+        division: settings.division, dayStrip: settings.dayStrip, periodLabels: settings.periodLabels,
+        showPeriodEnd: settings.showPeriodEnd,
+      })
       : null;
     dayBar.show(bar, (date) => text.time(date));
   }

@@ -43,7 +43,10 @@ export function createSettingsDrawer({ settings, update, play, testRing, behind,
     'The last minute of a countdown and the timer always show seconds.',
     (on) => update({ showSeconds: on }));
   const use24Hour = switchControl(`${ID}-24-hour`, '24-hour time', '', (on) => update({ use24Hour: on }));
-  const time = drawerSection('time', 'Time', [seconds.label, use24Hour.label]);
+  const periodEnd = switchControl(`${ID}-period-end`, 'Show when this Period ends',
+    'In the bar along the bottom, the block you’re in shows its end time too, where there’s room.',
+    (on) => update({ showPeriodEnd: on }));
+  const time = drawerSection('time', 'Time', [seconds.label, use24Hour.label, periodEnd.label]);
 
   const bells = switchControl(`${ID}-bells`, 'Bells', 'Start and end of every Period and Break',
     (on) => update({ bells: { ...settings().bells, on } }));
@@ -120,6 +123,7 @@ export function createSettingsDrawer({ settings, update, play, testRing, behind,
     seconds.input.checked = s.showSeconds;
     use24Hour.input.checked = s.use24Hour;
     use24Hour.hint.textContent = s.use24Hour ? 'Clock times show as 13:05.' : 'Clock times show as 1:05.';
+    periodEnd.input.checked = s.showPeriodEnd;
     bells.input.checked = s.bells.on;
     untilDismissed.input.checked = s.bells.untilDismissed === true;
     untilDismissed.input.disabled = !s.bells.on;

@@ -31,6 +31,7 @@ export const DEFAULT_SETTINGS = Object.freeze(/** @type {ClockSettings} */ ({
   quickPicks: [],
   showSeconds: true,
   dayStrip: true,
+  showPeriodEnd: false,
   // The dark muted blue theme, in its own version.
   theme: DEFAULT_THEME,
   fontSwap: null,
@@ -138,6 +139,7 @@ function parseSettings(saved) {
     quickPicks: parseQuickPicks(s),
     showSeconds: typeof s.showSeconds === 'boolean' ? s.showSeconds : d.showSeconds,
     dayStrip: typeof s.dayStrip === 'boolean' ? s.dayStrip : d.dayStrip,
+    showPeriodEnd: typeof s.showPeriodEnd === 'boolean' ? s.showPeriodEnd : d.showPeriodEnd,
     // The earlier 'default' theme (and any id the set doesn't have) is the default.
     theme: isTheme(s.theme) ? s.theme : d.theme,
     fontSwap: isFont(s.fontSwap) ? s.fontSwap : d.fontSwap,

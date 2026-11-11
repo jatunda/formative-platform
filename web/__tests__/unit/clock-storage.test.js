@@ -43,7 +43,7 @@ describe('clock settings store', () => {
       bells: { on: false, sound: 'chime', assemblyEnds: true, untilDismissed: true }, alarms: [clockAlarm, onceAlarm, periodAlarm],
       volume: 0.25, timerEndsAt: 1793000000000, timerPausedMs: null, timerTotalMs: 300000, timerName: 'Quiz',
       timerSound: 'buzzer', quickPicks: [{ ms: 450000, name: 'Quiz' }, { ms: 900000 }],
-      showSeconds: false, dayStrip: false, theme: 'bloom', fontSwap: 'mono', paletteSwap: 'team',
+      showSeconds: false, dayStrip: false, showPeriodEnd: true, theme: 'bloom', fontSwap: 'mono', paletteSwap: 'team',
       flipped: true, themeHint: false,
     };
     createSettingsStore(storage).save(settings);
@@ -61,9 +61,9 @@ describe('clock settings store', () => {
     expect(storeHolding(older).load()).toEqual(older);
   });
 
-  it('starts with seconds on, the Day Strip on and the dark default theme in its own version, with no swaps', () => {
+  it('starts with seconds on, the Day Strip on without the current end time, and the dark default theme in its own version, with no swaps', () => {
     expect(DEFAULT_SETTINGS).toMatchObject({
-      showSeconds: true, dayStrip: true, theme: 'slate', fontSwap: null, paletteSwap: null, flipped: false,
+      showSeconds: true, dayStrip: true, showPeriodEnd: false, theme: 'slate', fontSwap: null, paletteSwap: null, flipped: false,
       themeHint: true,
     });
   });
@@ -92,9 +92,13 @@ describe('clock settings store', () => {
     });
   });
 
+  it('loads a save from before "Show when this Period ends" with it off', () => {
+    expect(storeHolding({ division: 'HS', showSeconds: false, dayStrip: true }).load().showPeriodEnd).toBe(false);
+  });
+
   it('defaults each display preference that is corrupt', () => {
     const settings = storeHolding({
-      division: 'HS', showSeconds: 'no', dayStrip: 0, theme: '', fontSwap: 5, paletteSwap: { id: 'x' },
+      division: 'HS', showSeconds: 'no', dayStrip: 0, showPeriodEnd: 'yes', theme: '', fontSwap: 5, paletteSwap: { id: 'x' },
       colorScheme: 'sepia', flipped: 'yes', themeHint: null,
     }).load();
     expect(settings).toEqual({ ...DEFAULT_SETTINGS, division: 'HS' });

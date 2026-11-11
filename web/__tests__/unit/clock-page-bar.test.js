@@ -171,6 +171,58 @@ describe('School Clock bar', () => {
     });
   });
 
+  describe('Show when this Period ends', () => {
+    const times = () => [...bar().querySelectorAll('.clock-bar__time')].map(words);
+    const agendaTimes = () => [...bar().querySelectorAll('.clock-agenda__time')].map(words);
+
+    it('is off by default: every block shows its start alone', () => {
+      open({ when: at(10, 39) });
+      expect(times()[3]).toBe('10:30');
+      expect(bar().querySelector('.clock-bar__until')).toBeNull();
+      expect(agendaTimes()[3]).toBe('10:30 AM');
+    });
+
+    it('when on, the current block shows start–end and the others their start, in the bar and the agenda', () => {
+      withSettings({ showPeriodEnd: true });
+      open({ when: at(10, 39) });
+      expect(times()).toEqual(['8:30', '9:25', '10:10', '10:30–11:15', '11:20', '12:10', '12:55', '1:35', '2:25']);
+      // The end is its own part, so a block too narrow for both can drop it.
+      expect(words(bar().querySelector('.clock-bar__seg[data-state="now"] .clock-bar__until'))).toBe('–11:15');
+      expect(agendaTimes()[3]).toBe('10:30–11:15 AM');
+      expect(agendaTimes()[2]).toBe('10:10 AM');
+      // The screen-reader text already gave the end.
+      expect(heard()[3]).toBe('Period 3, 10:30 AM to 11:15 AM, now');
+    });
+
+    it('keeps both halves of the agenda time when the block runs across noon, and follows 24-hour time', () => {
+      withSettings({ showPeriodEnd: true });
+      open({ when: at(11, 30) });
+      expect(agendaTimes()[4]).toBe('11:20 AM–12:05 PM');
+      withSettings({ showPeriodEnd: true, use24Hour: true });
+      open({ when: at(14, 30) });
+      expect(times()[8]).toBe('14:25–15:10');
+      expect(agendaTimes()[8]).toBe('14:25–15:10');
+    });
+
+    it('moves to the next block when the current one ends', () => {
+      withSettings({ showPeriodEnd: true });
+      open({ when: at(11, 14) });
+      advance(7 * MIN);
+      expect(times()[3]).toBe('10:30');
+      expect(times()[4]).toBe('11:20–12:05');
+    });
+
+    it('changes nothing on just this Segment or in Off-Hours', () => {
+      withSettings({ showPeriodEnd: true, dayStrip: false });
+      open({ when: at(10, 39) });
+      expect(times()).toEqual(['10:30']);
+      expect(words(bar().querySelector('.clock-bar__end'))).toBe('11:15');
+      withSettings({ showPeriodEnd: true });
+      open({ when: at(7, 50) });
+      expect(bar().querySelector('.clock-bar__until')).toBeNull();
+    });
+  });
+
   describe('during Off-Hours', () => {
     it("before school shows today's Segments under \"Today · All Day\", none current", () => {
       open({ when: at(7, 50) });

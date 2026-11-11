@@ -201,6 +201,23 @@ describe('School Clock settings drawer', () => {
       expect(stageText()).toContain('08:30');
     });
 
+    it('Show when this Period ends: an off-by-default switch after 24-hour time, saved, shown at once', () => {
+      open({ when: at(10, 39) });
+      const name = 'Show when this Period ends';
+      expect(field(name).getAttribute('role')).toBe('switch');
+      expect(field(name).checked).toBe(false);
+      const switches = [...drawer().querySelectorAll('[role="switch"]')].map(accessibleName);
+      expect(switches.indexOf(name)).toBe(switches.indexOf('24-hour time') + 1);
+      const currentTime = () => mount().querySelector('.clock-bar__seg[data-state="now"] .clock-bar__time').textContent;
+      expect(currentTime()).toBe('10:30');
+
+      toggle(name);
+
+      expect(saved(storage).showPeriodEnd).toBe(true);
+      expect(field(name).checked).toBe(true);
+      expect(currentTime()).toBe('10:30–11:15');
+    });
+
     it('Bells: a switch, kept in step with the top bar Bells button', () => {
       open();
       expect(field('Bells').getAttribute('role')).toBe('switch');

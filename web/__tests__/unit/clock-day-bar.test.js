@@ -123,6 +123,32 @@ describe('the bar during Off-Hours', () => {
   });
 });
 
+describe("the current block's end time (Show when this Period ends)", () => {
+  const ending = (bar) => bar.blocks.filter((b) => b.showEnd).map((b) => b.name);
+
+  it('is off by default: no block shows its end', () => {
+    expect(ending(barAt(tue(10, 39)))).toEqual([]);
+  });
+
+  it('when on, only the current block shows its end, whatever its kind', () => {
+    expect(ending(barAt(tue(10, 39), { showPeriodEnd: true }))).toEqual(['Period 3']);
+    expect(ending(barAt(tue(10, 15), { showPeriodEnd: true }))).toEqual(['Nutrition']);
+  });
+
+  it("is never the Passing Period's gap, nor the block up next after it", () => {
+    expect(ending(barAt(tue(9, 22), { showPeriodEnd: true }))).toEqual([]);
+  });
+
+  it('changes nothing on just this Segment, whose end already shows under the bar', () => {
+    expect(ending(barAt(tue(10, 39), { showPeriodEnd: true, dayStrip: false }))).toEqual([]);
+  });
+
+  it('changes nothing in Off-Hours, when nothing is current', () => {
+    expect(ending(barAt(tue(7, 50), { showPeriodEnd: true }))).toEqual([]);
+    expect(ending(barAt(tue(16, 0), { showPeriodEnd: true }))).toEqual([]);
+  });
+});
+
 describe('the bar is hidden', () => {
   it('in Experience Week', () => {
     // HS Experience Week is Tue 1/19 – Fri 1/22 2027.

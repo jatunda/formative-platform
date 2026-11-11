@@ -13,8 +13,23 @@ import { formatShortDate } from './format.js';
 
 const KIND_WORD = { break: 'Break', assembly: 'Assembly' };
 
+/** A 12-hour time's " AM" / " PM". */
+const MERIDIEM = / [AP]M$/;
+
 /** "Period 3 · AP CSA". @param {BarBlock} block */
 const fullName = (block) => (block.label ? `${block.name} · ${block.label}` : block.name);
+
+/**
+ * "10:25–11:15 AM": a block's start and end, saying AM or PM once when both
+ * share it ("11:20 AM–12:05 PM" when not).
+ * @param {BarBlock} block @param {(date: Date) => string} time
+ */
+function timeRange(block, time) {
+  const start = time(block.start);
+  const end = time(block.end);
+  const meridiem = MERIDIEM.exec(start)?.[0];
+  return `${meridiem && end.endsWith(meridiem) ? start.slice(0, -meridiem.length) : start}–${end}`;
+}
 
 /**
  * @returns {{ element: HTMLElement, show: (bar: Bar | null, time: (date: Date) => string) => void }}
@@ -34,7 +49,7 @@ export function createDayBarView() {
   function build(bar, time) {
     // Under the track there's only room for "10:10", not "10:10 AM" (as the
     // design reference shows); the hidden text keeps the full time.
-    const brief = (date) => time(date).replace(/ [AP]M$/, '');
+    const brief = (date) => time(date).replace(MERIDIEM, '');
     const single = bar.setting === 'segment';
     const next = bar.day === 'next';
     const date = formatShortDate(bar.date);
@@ -56,7 +71,11 @@ export function createDayBarView() {
           ]),
           ...(block.label ? [el('span', { className: 'clock-bar__label', textContent: block.label })] : []),
         ]),
-        el('span', { className: 'clock-bar__time', 'aria-hidden': 'true', textContent: brief(block.start) }),
+        el('span', { className: 'clock-bar__time', 'aria-hidden': 'true' }, [
+          brief(block.start),
+          // Its own part, so a block too narrow for both drops it (clock.css).
+          ...(block.showEnd ? [el('span', { className: 'clock-bar__until', textContent: `–${brief(block.end)}` })] : []),
+        ]),
         el('span', {
           className: 'visually-hidden',
           textContent: `${fullName(block)}, ${time(block.start)} to ${time(block.end)}${nowWord}`,
@@ -96,7 +115,7 @@ export function createDayBarView() {
     const rows = bar.blocks.filter((block) => block.kind !== 'passing').map((block) => {
       const pill = { now: 'Now', next: 'Up next' }[block.state];
       const row = el('li', { className: 'clock-agenda__row' }, [
-        el('span', { className: 'clock-agenda__time', textContent: time(block.start) }), ' ',
+        el('span', { className: 'clock-agenda__time', textContent: block.showEnd ? timeRange(block, time) : time(block.start) }), ' ',
         el('span', { className: 'clock-agenda__name' }, [
           fullName(block),
           // Breaks and Assemblies say so in words, not just by colour.
@@ -123,7 +142,7 @@ export function createDayBarView() {
       return;
     }
     const key = JSON.stringify([bar.setting, bar.day, bar.dayLabel, bar.date, time(bar.end),
-      bar.blocks.map((b) => [b.name, b.label, b.state, time(b.start)])]);
+      bar.blocks.map((b) => [b.name, b.label, b.state, time(b.start), b.showEnd && time(b.end)])]);
     if (key !== built) {
       built = key;
       build(bar, time);

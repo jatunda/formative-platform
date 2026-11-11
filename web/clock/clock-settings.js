@@ -107,6 +107,8 @@
  *   last minute and the timer always do).
  * - `dayStrip`: the bar along the bottom shows the whole day (true) or just
  *   this Segment (false). See `day-bar.js`.
+ * - `showPeriodEnd`: on whole day, the current Segment's block shows its end
+ *   time beside its start ("10:25–11:15"), where it fits; off by default.
  * - `theme`: the theme's id (`themes.js`); `fontSwap` / `paletteSwap` swap its
  *   font or palette for another pre-checked one (null keeps the theme's own).
  * - `flipped`: false follows the theme (its palette's own light or dark
@@ -129,6 +131,7 @@
  *   quickPicks: import('./timer.js').QuickPick[],
  *   showSeconds: boolean,
  *   dayStrip: boolean,
+ *   showPeriodEnd: boolean,
  *   theme: string,
  *   fontSwap: string | null,
  *   paletteSwap: string | null,

@@ -771,6 +771,15 @@ button.clock-readout__face:focus-visible {
   bottom: 0;
 }
 
+/* "Show when this Period ends": the current block's "–11:15" after its start,
+   dropped where the block is too narrow for both times (they'd run into the
+   next block's start). */
+@container (max-width: 6.2em) {
+  .clock-bar__until {
+    display: none;
+  }
+}
+
 .clock-bar__seg[data-state="past"] {
   background: transparent;
   border-color: var(--line-soft);
@@ -1129,7 +1138,8 @@ button.clock-readout__face:focus-visible {
 
   .clock-agenda__time {
     flex: none;
-    width: 4.6em;
+    /* At least "10:30 AM", so names line up; the current row's start–end runs wider. */
+    min-width: 4.6em;
     color: var(--muted);
     font-variant-numeric: tabular-nums lining-nums;
   }
