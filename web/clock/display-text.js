@@ -15,12 +15,15 @@ import { formatClockTime, formatDate, formatSegmentName, formatShortDate, period
  *   tag: string,
  *   upNext: { name: string, at: string } | null,
  *   line: string | null,
+ *   namesNextDay: boolean,
  * }} DisplayText
  * - `day`: "All Day · Tue, Oct 27"; just the date when the title already names the day.
  * - `title` and `tag`: "Period 3" and its Period Label "AP CSA" ('' when it has none).
  * - `upNext`: the next Segment and its start, during a Passing Period and before school.
  * - `line`: the Off-Hours line ("Back Mon, Nov 30 · All Day"), or null.
  *   How long until then is a Readout's job (until the Next School Day), not the line's.
+ * - `namesNextDay`: the line only names the Next School Day (after school, a
+ *   day off), as the Day Bar's heading does, so it can step aside for the bar.
  */
 
 /**
@@ -40,7 +43,7 @@ export function displayText(now, moment, { use24Hour, periodLabels }) {
   const back = moment.nextSchoolDay ? formatShortDate(moment.nextSchoolDay.firstSegment.start) : '';
   const nextDayLabel = () => /** @type {import('./clock-model.js').NextSchoolDay} */ (moment.nextSchoolDay).dayLabel;
   /** @type {(fields: Partial<DisplayText>) => DisplayText} */
-  const text = (fields) => ({ day: date, title: '', tag: '', upNext: null, line: null, ...fields });
+  const text = (fields) => ({ day: date, title: '', tag: '', upNext: null, line: null, namesNextDay: false, ...fields });
 
   switch (moment.state) {
     case 'segment': {
@@ -52,9 +55,9 @@ export function displayText(now, moment, { use24Hour, periodLabels }) {
     case 'beforeSchool':
       return text({ day: schoolDay, title: 'Before school', upNext: next });
     case 'afterSchool':
-      return text({ day: schoolDay, title: 'After school', line: `Next: ${back} · ${nextDayLabel()}` });
+      return text({ day: schoolDay, title: 'After school', line: `Next: ${back} · ${nextDayLabel()}`, namesNextDay: true });
     case 'dayOff':
-      return text({ title: /** @type {string} */ (moment.dayLabel), line: `Back ${back} · ${nextDayLabel()}` });
+      return text({ title: /** @type {string} */ (moment.dayLabel), line: `Back ${back} · ${nextDayLabel()}`, namesNextDay: true });
     case 'experienceWeek':
       return text({ title: /** @type {string} */ (moment.dayLabel), line: `It's Experience Week · back ${back}` });
     case 'summer':

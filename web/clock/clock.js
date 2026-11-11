@@ -571,25 +571,26 @@ export function initClockApp({
     banner.replaceChildren(icon('clock'), el('span', {
       textContent: `Simulated time · ${formatShortDate(now)}, ${text.now(now)} · this tab only`,
     }));
-    stageText.show(now, moment, settings);
+    const bar = barFor(now, moment);
+    // A bar of the Next School Day's Segments is headed with its date and Day Label.
+    stageText.show(now, moment, settings, bar?.day === 'next');
     renderMini(now, moment, renderReadouts(now, moment, text));
-    renderBar(now, moment, text);
+    dayBar.show(bar, (date) => text.time(date));
     drawer.showRings(chosen ? nextRingLines(now, schoolYears, settings, text) : []);
   }
 
   /**
    * The bar: hidden before a Division, while the timer has the big spot (the
    * ring needs the height), and wherever describeBar has none.
-   * @param {Date} now @param {import('./clock-model.js').Moment | null} moment @param {ReturnType<typeof textFor>} text
+   * @param {Date} now @param {import('./clock-model.js').Moment | null} moment
    */
-  function renderBar(now, moment, text) {
-    const bar = moment && !shownTimer(now)
+  function barFor(now, moment) {
+    return moment && !shownTimer(now)
       ? describeBar(now, moment, schoolYears, {
         division: settings.division, dayStrip: settings.dayStrip, periodLabels: settings.periodLabels,
         showPeriodEnd: settings.showPeriodEnd,
       })
       : null;
-    dayBar.show(bar, (date) => text.time(date));
   }
 
   /**

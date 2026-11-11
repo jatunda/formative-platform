@@ -23,8 +23,11 @@ export function createStageTextView() {
    * Show the words for `moment` (null before a Division is chosen: just the date).
    * @param {Date} now @param {import('./clock-model.js').Moment | null} moment
    * @param {{ use24Hour: boolean, showSeconds: boolean, periodLabels: Record<string, string> }} settings
+   * @param {boolean} [barNamesNextDay] the Day Bar's heading names the Next School Day. Then a
+   *   line that only names it too is marked to step aside; the stylesheet keeps it in the
+   *   short layout, which hides the bar.
    */
-  function show(now, moment, settings) {
+  function show(now, moment, settings, barNamesNextDay = false) {
     if (!moment) {
       showDay(formatShortDate(now));
       heading.replaceChildren(el('span', { className: 'visually-hidden', textContent: 'School Clock' }));
@@ -44,7 +47,7 @@ export function createStageTextView() {
         el('span', { className: 'clock-next__at', textContent: words.upNext.at }),
       );
     } else {
-      underLine.className = 'clock-line';
+      underLine.className = words.namesNextDay && barNamesNextDay ? 'clock-line clock-line--in-bar' : 'clock-line';
       underLine.textContent = words.line ?? '';
     }
   }

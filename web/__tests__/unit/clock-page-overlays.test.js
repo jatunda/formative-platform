@@ -224,7 +224,9 @@ describe('School Clock overlays', () => {
       expect(dialog.contains(document.activeElement)).toBe(true);
       expect(document.activeElement).toBe(button('Middle School', dialog));
       expect(mount().querySelector('main').hasAttribute('inert')).toBe(true);
-      expect(dialog.querySelector('a[href^="mailto:"]').textContent).toBe('Feedback? Email Eric');
+      const link = dialog.querySelector('a[href^="mailto:"]');
+      expect(link.textContent).toBe('Feedback? Email Eric here.');
+      expect(link.getAttribute('href')).toBe('mailto:erich@villagechristian.org?subject=Clock%20feedback');
     });
 
     it('hands focus back and the page back once a Division is chosen', () => {

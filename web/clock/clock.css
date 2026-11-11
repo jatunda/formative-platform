@@ -551,6 +551,15 @@ button.clock-readout__face:focus-visible {
   color: var(--muted);
 }
 
+/* After school and on a day off the Day Bar's heading names the Next School
+   Day, so the line saying the same steps aside; the short layout hides the
+   bar, so there the line stays. */
+@media (min-height: 521px) {
+  .clock-line--in-bar {
+    display: none;
+  }
+}
+
 /* ---------- bottom row: the bar's place and the window buttons ---------- */
 
 /* The "turn sound on" prompt, while it shows, gets its own line above the

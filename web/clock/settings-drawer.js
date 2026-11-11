@@ -98,7 +98,7 @@ export function createSettingsDrawer({ settings, update, play, testRing, behind,
 
   const about = drawerSection('about', 'About', [
     el('p', { className: 'clock-note', textContent: 'The mini player works in Chrome and Edge on a computer.' }),
-    feedbackLink(),
+    feedbackLink('Eric loves feedback! Bugs? New ideas? Random comments? Email him here.'),
   ]);
   about.classList.add('clock-drawer__section--quiet');
 
