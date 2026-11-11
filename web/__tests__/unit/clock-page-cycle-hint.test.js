@@ -102,6 +102,29 @@ describe('School Clock: the first-time "click to change" tooltip', () => {
     expect(shownHint()).toBeUndefined();
   });
 
+  it('waits while the tab is hidden, so its one showing is not used up unseen', () => {
+    const hide = (doc) => Object.defineProperty(doc, 'visibilityState', { value: 'hidden', configurable: true });
+    hide(document);
+    try {
+      open();
+      advance(10 * SEC);
+      expect(shownHint()).toBeUndefined();
+      // Still unseen after a reload while hidden.
+      open();
+      advance(SEC);
+      expect(shownHint()).toBeUndefined();
+    } finally {
+      delete document.visibilityState;
+    }
+    // Shown, and timed, from when the tab is seen.
+    advance(SEC);
+    expect(shownHint()).toBeDefined();
+    advance(5 * SEC);
+    expect(shownHint()).toBeDefined();
+    advance(2 * SEC);
+    expect(shownHint()).toBeUndefined();
+  });
+
   it('shows (and nothing throws) when storage is unavailable', () => {
     const blocked = () => { throw new Error('SecurityError'); };
     storage = { getItem: blocked, setItem: blocked };
@@ -143,6 +166,23 @@ describe('School Clock: the first-time "click to change" tooltip', () => {
       await openMini();
       advance(7 * SEC);
       expect(shownHint(miniBody())).toBeUndefined();
+    });
+
+    it("waits while the window's own document is hidden", async () => {
+      open();
+      key(document, 'Escape'); // the page's own, seen
+      const openWindow = pip.open;
+      pip.open = async (size) => {
+        const win = await openWindow(size);
+        Object.defineProperty(win.document, 'visibilityState', { value: 'hidden', configurable: true });
+        return win;
+      };
+      await openMini();
+      advance(10 * SEC);
+      expect(shownHint(miniBody())).toBeUndefined();
+      delete pip.window.document.visibilityState;
+      advance(SEC);
+      expect(shownHint(miniBody())).toBeDefined();
     });
 
     it('waits while the Readout cannot be clicked (just the time)', async () => {
