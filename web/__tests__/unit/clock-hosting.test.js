@@ -73,8 +73,12 @@ describe('School Clock hosting', () => {
 
   it('hides an Off-Hours line the Day Bar heading repeats, except in the short layout, which hides the bar', () => {
     const css = readFileSync(resolve(clockDir, 'clock.css'), 'utf8');
-    expect(css).toMatch(/@media \(min-height: 521px\) \{\s*\.clock-line--in-bar\s*\{\s*display:\s*none;/);
-    expect(css.match(/\.clock-line--in-bar/g)).toHaveLength(1);
+    // Hidden at the top level; shown again only in the short layout's block.
+    expect(css).toMatch(/(^|\n)\.clock-line--in-bar\s*\{\s*display:\s*none;/);
+    const start = css.indexOf('@media (max-height: 520px) {');
+    const short = css.slice(start, css.slice(start).search(/\n\}\r?\n/) + start);
+    expect(short).toMatch(/\n {2}\.clock-line--in-bar\s*\{\s*display:\s*block;/);
+    expect(css.match(/\.clock-line--in-bar/g)).toHaveLength(2);
   });
 
   it('keeps the page background in fullscreen', () => {

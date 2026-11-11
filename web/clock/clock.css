@@ -553,11 +553,9 @@ button.clock-readout__face:focus-visible {
 
 /* After school and on a day off the Day Bar's heading names the Next School
    Day, so the line saying the same steps aside; the short layout hides the
-   bar, so there the line stays. */
-@media (min-height: 521px) {
-  .clock-line--in-bar {
-    display: none;
-  }
+   bar, so it shows the line again (see "short" below). */
+.clock-line--in-bar {
+  display: none;
 }
 
 /* ---------- bottom row: the bar's place and the window buttons ---------- */
@@ -900,9 +898,15 @@ button.clock-readout__face:focus-visible {
     font-size: 12px;
   }
 
-  /* The bar is hidden here; the window buttons float in the corner. */
+  /* The bar is hidden here; the window buttons float in the corner. The
+     Off-Hours line the bar's heading would repeat is back, as the only
+     place that names the Next School Day. */
   .clock-bar-slot {
     display: none;
+  }
+
+  .clock-line--in-bar {
+    display: block;
   }
 
   .clock-bottom {
