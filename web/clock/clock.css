@@ -326,9 +326,14 @@ button.clock-readout__face:focus-visible {
   pointer-events: none;
 }
 
+/* Under the first Readout it takes its own room, so it covers nothing below
+   (the line, Up next, the agenda); centred on the Readout even when it is
+   wider than the digits. */
 .clock-readout > .clock-cycle-hint {
-  top: calc(100% + 8px);
+  position: relative;
   left: 50%;
+  width: max-content;
+  margin-top: 8px;
   transform: translateX(-50%);
 }
 
@@ -955,6 +960,14 @@ button.clock-readout__face:focus-visible {
 
   .clock-smalls {
     margin-top: 12px;
+  }
+
+  /* A smaller "Click to change what this shows" pill, so the room it takes
+     under the first Readout fits. */
+  .clock-readout > .clock-cycle-hint {
+    margin-top: 4px;
+    padding: 2px var(--s3);
+    font-size: 12px;
   }
 
   .clock-readout--small .clock-readout__value {
