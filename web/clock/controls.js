@@ -8,8 +8,12 @@ import { SOUNDS, SOUND_NAMES } from './sound.js';
 
 export const FEEDBACK_HREF = `mailto:erich@villagechristian.org?subject=${encodeURIComponent('Clock feedback')}`;
 
-/** The "Feedback? Email Eric" link, a new email with the subject filled in. */
-export const feedbackLink = () => el('a', { className: 'clock-feedback', href: FEEDBACK_HREF, textContent: 'Feedback? Email Eric' });
+/**
+ * The feedback link, a new email with the subject filled in. Each place words
+ * it its own way: the Settings drawer at length, the Division picker briefly.
+ * @param {string} text
+ */
+export const feedbackLink = (text) => el('a', { className: 'clock-feedback', href: FEEDBACK_HREF, textContent: text });
 
 /**
  * One section of the Settings drawer: an uppercase heading that names it,
