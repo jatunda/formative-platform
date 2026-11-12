@@ -1,3 +1,4 @@
+// @ts-check
 // Screenshots and checks the real /clock page in Chromium, across states and sizes.
 //
 //   npm run check:clock                       every default state at every checklist size
@@ -29,27 +30,33 @@
 // It starts its own Vite server on 127.0.0.1 (a free port) and always stops it
 // and the browser on exit, including Ctrl-C, so nothing is left running.
 //
-// For the whole layout matrix (Readouts × edit mode × timer × sound prompt ×
-// sizes, with ticketed failures known), run `npm run check:clock:full`
-// (scripts/clock-check-full.mjs).
-import { mkdirSync, writeFileSync, rmSync } from 'fs';
-import { resolve } from 'path';
-import { startClockCheck, webDir } from './clock-check-browser.mjs';
+// For the whole layout matrix (fullMatrix() in clock-check-matrix.js), run
+// `npm run check:clock:full` (scripts/clock-check-full.mjs).
+import { startClockCheck, outDir, resetOutDir, report } from './clock-check-browser.mjs';
 import { DEFAULT_STATES, DEFAULT_SIZES, describeFailure } from './clock-check-matrix.js';
 
 // Chrome's zoom steps from 67% to 200%: zooming to z leaves a viewport of size / z CSS pixels.
 const ZOOMS = [0.67, 0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2];
 
+/**
+ * @param {string[]} argv
+ * @returns {import('./clock-check-browser.mjs').CheckOptions & { sizes: { label: string, width: number, height: number }[] }}
+ */
 function parseArgs(argv) {
-  const opts = { states: [], sizes: [], division: 'HS', settings: {}, layout: null, timer: false, shots: true, axe: true, editing: false, bars: 0, soundOn: false };
+  /** @type {string[]} */
+  const stateArgs = [];
+  /** @type {string[]} */
+  const sizeArgs = [];
+  /** @type {Omit<import('./clock-check-browser.mjs').CheckOptions, 'states'>} */
+  const opts = { division: 'HS', settings: {}, layout: null, timer: false, shots: true, axe: true, editing: false, bars: 0, soundOn: false };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     const next = () => argv[++i];
-    if (arg === '--state') opts.states.push(next());
-    else if (arg === '--size') opts.sizes.push(next());
+    if (arg === '--state') stateArgs.push(next());
+    else if (arg === '--size') sizeArgs.push(next());
     else if (arg === '--zoom') {
       const [width, height] = next().split('x').map(Number);
-      opts.sizes.push(...ZOOMS.map((z) => `${Math.round(width / z)}x${Math.round(height / z)}`));
+      sizeArgs.push(...ZOOMS.map((z) => `${Math.round(width / z)}x${Math.round(height / z)}`));
     }
     else if (arg === '--division') opts.division = next();
     else if (arg === '--settings') opts.settings = JSON.parse(next());
@@ -62,37 +69,33 @@ function parseArgs(argv) {
     else if (arg === '--no-axe') opts.axe = false;
     else throw new Error(`Unknown option ${arg}`);
   }
-  const states = opts.states.length ? opts.states : Object.keys(DEFAULT_STATES);
-  opts.states = states.map((s) => {
+  const states = (stateArgs.length ? stateArgs : Object.keys(DEFAULT_STATES)).map((s) => {
     if (s.includes('=?')) {
       const [name, query] = [s.slice(0, s.indexOf('=')), s.slice(s.indexOf('=') + 1)];
       return { name, query };
     }
     if (!(s in DEFAULT_STATES)) throw new Error(`Unknown state ${s}; use name=?at=... for a custom one`);
-    return { name: s, query: DEFAULT_STATES[s] };
+    return { name: s, query: DEFAULT_STATES[/** @type {keyof typeof DEFAULT_STATES} */ (s)] };
   });
-  opts.sizes = (opts.sizes.length ? opts.sizes : DEFAULT_SIZES).map((s) => {
+  const sizes = (sizeArgs.length ? sizeArgs : DEFAULT_SIZES).map((s) => {
     const [width, height] = s.split('x').map(Number);
     return { label: s, width, height };
   });
-  return opts;
+  return { ...opts, states, sizes };
 }
 
 const opts = parseArgs(process.argv.slice(2));
-const outDir = resolve(webDir, '.clock-check');
-rmSync(outDir, { recursive: true, force: true });
-mkdirSync(outDir, { recursive: true });
+resetOutDir();
 
 const results = [];
 const check = await startClockCheck();
 try {
-  for (const size of opts.sizes) results.push(...await check.checkSize(opts, size, { outDir }));
+  for (const size of opts.sizes) results.push(...await check.checkSize(opts, size));
 } finally {
   await check.stop();
 }
 
-writeFileSync(resolve(outDir, 'report.json'), JSON.stringify(results, null, 2));
 const failed = results.filter((r) => !r.ok);
-for (const r of failed) console.log(`✗ ${r.state} @ ${r.size}: ${describeFailure(r).join('; ')}`);
+report(results, failed.map((r) => `${r.state} @ ${r.size}: ${describeFailure(r).join('; ')}`));
 console.log(`${results.length - failed.length}/${results.length} renders passed. Screenshots and report.json in ${outDir}`);
 process.exitCode = failed.length ? 1 : 0;

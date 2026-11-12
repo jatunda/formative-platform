@@ -1,3 +1,4 @@
+// @ts-check
 // Drives the real /clock page in Chromium for clock-check.mjs and
 // clock-check-full.mjs: starts a Vite server on 127.0.0.1 (a free port) and
 // the browsers, renders states at a size and checks each render (what the
@@ -8,18 +9,37 @@ import { chromium } from 'playwright';
 import { createRequire } from 'module';
 import { fileURLToPath } from 'url';
 import { resolve, dirname } from 'path';
+import { mkdirSync, writeFileSync, rmSync } from 'fs';
+import { SETTINGS_KEY } from '../clock/clock-storage.js';
+import { LAYOUT_KEY } from '../clock/readout-layout.js';
+import { describeFailure } from './clock-check-matrix.js';
 
-export const webDir = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const webDir =resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const axeSource = createRequire(import.meta.url).resolve('axe-core/axe.min.js');
-const SETTINGS_KEY = 'school-clock-settings-v1';
-const LAYOUT_KEY = 'school-clock-layout-v1';
+
+/** Where screenshots and report.json go (gitignored). */
+export const outDir = resolve(webDir, '.clock-check');
+
+/** Empties outDir for a new run, so it holds only this run's files. */
+export function resetOutDir() {
+  rmSync(outDir, { recursive: true, force: true });
+  mkdirSync(outDir, { recursive: true });
+}
 
 /**
- * @typedef {{ states: { name: string, query: string }[], division: string, settings: object,
- *   layout: string | null, timer: boolean, editing: boolean, soundOn: boolean, bars: number,
- *   axe: boolean, shots: boolean | 'failures' }} CheckOptions
- * `layout` is the Readouts' modes, big one first (e.g. 'countdown,clock'), or
- * null for a new tab's own; `shots: 'failures'` saves only failing renders.
+ * Writes every result to outDir/report.json and prints one ✗ line per failure.
+ * @param {object[]} results @param {string[]} failures what failed, one line each
+ */
+export function report(results, failures) {
+  writeFileSync(resolve(outDir, 'report.json'), JSON.stringify(results, null, 2));
+  for (const line of failures) console.log(`✗ ${line}`);
+}
+
+/**
+ * @typedef {import('./clock-check-matrix.js').Config & { states: { name: string, query: string }[],
+ *   division: string, settings: object, bars: number, axe: boolean, shots: boolean | 'failures' }} CheckOptions
+ * The Config (e.g. layout 'countdown,clock') plus how to check it;
+ * `shots: 'failures'` saves only failing renders.
  */
 
 /** Starts the server; browsers launch on first use (sound-on needs its own). */
@@ -35,14 +55,17 @@ export async function startClockCheck() {
   for (const signal of ['SIGINT', 'SIGTERM']) {
     process.on(signal, () => { stop().finally(() => process.exit(130)); });
   }
+  let port;
   try {
     server = await createServer({ root: webDir, logLevel: 'error', server: { host: '127.0.0.1', port: 0 } });
     await server.listen();
+    const address = server.httpServer?.address();
+    if (!address || typeof address === 'string') throw new Error('The Vite server is not listening on a port');
+    port = address.port;
   } catch (e) {
     await stop();
     throw e;
   }
-  const { port } = /** @type {import('net').AddressInfo} */ (server.httpServer.address());
   const base = `http://127.0.0.1:${port}/clock/`;
   /** @param {boolean} soundOn */
   function browserFor(soundOn) {
@@ -55,9 +78,9 @@ export async function startClockCheck() {
   /**
    * Renders every state in `opts` at `size` and checks each.
    * @param {CheckOptions} opts @param {{ label: string, width: number, height: number }} size
-   * @param {{ outDir: string, prefix?: string }} out where screenshots go, and what their names start with
+   * @param {string} [prefix] what its screenshots' names (in outDir) start with
    */
-  async function checkSize(opts, size, { outDir, prefix = '' }) {
+  async function checkSize(opts, size, prefix = '') {
     const browser = await browserFor(opts.soundOn);
     const context = await browser.newContext({ viewport: { width: size.width, height: size.height } });
     // Skip the first-visit prompts so each render shows the state itself.
@@ -102,6 +125,7 @@ export async function startClockCheck() {
  * @param {import('playwright').Page} page @param {string} url @param {CheckOptions} opts
  */
 async function checkPage(page, url, opts) {
+  /** @type {string[]} */
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await page.goto(url);
@@ -135,10 +159,12 @@ async function checkPage(page, url, opts) {
       range.selectNodeContents(node);
       return range.getBoundingClientRect();
     };
+    /** @param {string} name @param {DOMRect} box @returns {[string, DOMRect]} */
+    const target = (name, box) => [name, box];
     const targets = [
-      ...[...document.querySelectorAll('.clock-top .clock-day')].map((n) => ['Day Label', textBox(n)]),
-      ...[...document.querySelectorAll('.clock-top button')].map((n) => [`"${n.textContent.trim() || n.getAttribute('aria-label')}"`, n.getBoundingClientRect()]),
-      ...[...document.querySelectorAll('.clock-readouts .clock-smalls .clock-readout')].map((n, i) => [`small Readout ${i + 1}`, n.getBoundingClientRect()]),
+      ...[...document.querySelectorAll('.clock-top .clock-day')].map((n) => target('Day Label', textBox(n))),
+      ...[...document.querySelectorAll('.clock-top button')].map((n) => target(`"${n.textContent?.trim() || n.getAttribute('aria-label')}"`, n.getBoundingClientRect())),
+      ...[...document.querySelectorAll('.clock-readouts .clock-smalls .clock-readout')].map((n, i) => target(`small Readout ${i + 1}`, n.getBoundingClientRect())),
     ];
     return targets
       .filter(([, b]) => b.width && b.height)
@@ -168,14 +194,15 @@ async function checkPage(page, url, opts) {
   // on screen with nothing over it (the window button, the sound prompt).
   const agenda = await page.evaluate((bars) => {
     const list = document.querySelector('.clock-agenda');
-    if (!list || !list.getClientRects().length || !list.lastElementChild) return null;
+    const last = list?.lastElementChild;
+    if (!list || !list.getClientRects().length || !last) return null;
     list.scrollTop = list.scrollHeight;
-    const row = list.lastElementChild.getBoundingClientRect();
+    const row = last.getBoundingClientRect();
     const box = list.getBoundingClientRect();
     const x = row.left + row.width / 2;
     const covered = [row.top + 2, row.bottom - 2].some((y) => {
       const hit = document.elementFromPoint(x, y);
-      return !hit || !list.lastElementChild.contains(hit);
+      return !hit || !last.contains(hit);
     });
     const visible = innerHeight - bars;
     // The window button and the sound prompt under it must stay on screen too.
@@ -185,15 +212,17 @@ async function checkPage(page, url, opts) {
     return { reachable: row.top >= box.top - 0.5 && row.bottom <= Math.min(box.bottom, visible) + 0.5 && !covered && below,
       listHeight: Math.round(box.height), rowBottom: row.bottom, listBottom: box.bottom, visible };
   }, opts.bars);
+  /** @type {string[]} */
   let violations = [];
   if (opts.axe) {
     await page.addScriptTag({ path: axeSource });
     violations = await page.evaluate(async () => {
-      // @ts-ignore axe is injected above
-      const { violations } = await window.axe.run(document);
+      // axe is the global the script tag above injects.
+      const { axe } = /** @type {Window & { axe: typeof import('axe-core') }} */ (/** @type {unknown} */ (window));
+      const { violations } = await axe.run(document);
       return violations.map((v) => `${v.id}: ${v.nodes.length} node(s)`);
     });
   }
-  const ok = !scroll.x && !scroll.y && agenda?.reachable !== false && stage?.fits !== false && !overlaps.length && !errors.length && !violations.length;
-  return { ok, scroll, stage, agenda, overlaps, errors, violations };
+  const checked = { scroll, stage, agenda, overlaps, errors, violations };
+  return { ok: describeFailure(checked).length === 0, ...checked };
 }

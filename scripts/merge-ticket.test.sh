@@ -5,6 +5,8 @@
 set -u
 
 SCRIPT="$(cd "$(dirname "$0")" && pwd)/merge-ticket.sh"
+# The default trailer, read from its one home in the script.
+DEFAULT_TRAILER="$(sed -n 's/^DEFAULT_TRAILER="\(.*\)"$/\1/p' "$SCRIPT")"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 
@@ -91,8 +93,8 @@ expect_no_log "identical tree runs no checks"
 [ "$(git rev-list --count --merges HEAD)" = 1 ] && ok "merge is --no-ff" || not_ok "merge is --no-ff"
 MSG="$(git log -1 --format=%B)"
 printf '%s' "$MSG" | grep -q "ticket" && ok "message names the branch" || not_ok "message names the branch" "$MSG"
-printf '%s' "$MSG" | tail -n 1 | grep -qxF "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>" \
-  && ok "message ends with the default trailer" || not_ok "message ends with the default trailer" "$MSG"
+[ -n "$DEFAULT_TRAILER" ] && printf '%s' "$MSG" | tail -n 1 | grep -qxF -- "$DEFAULT_TRAILER" \
+  && ok "message ends with the default trailer" || not_ok "message ends with the default trailer '$DEFAULT_TRAILER'" "$MSG"
 
 echo "# trailer override"
 new_repo 4
@@ -153,6 +155,38 @@ expect_code_nonzero "conflict exits non-zero"
 expect_out "conflicted file is listed" "web/a.txt"
 git rev-parse -q --verify MERGE_HEAD >/dev/null && ok "merge left in progress" || not_ok "merge left in progress"
 expect_no_log "conflict runs no checks"
+
+echo "# already merged"
+new_repo 10
+git checkout -qb ticket && commit_file web/b.txt b && git checkout -q integration
+git merge -q --no-ff -m "merge ticket" ticket
+commit_file web/c.txt c
+BEFORE="$(git rev-parse HEAD)"
+run ticket
+expect_code_zero "already merged exits zero"
+expect_out "already merged says so" "already merged"
+expect_no_log "already merged runs no checks"
+[ "$(git rev-parse HEAD)" = "$BEFORE" ] && ok "already merged makes no commit" || not_ok "already merged makes no commit"
+printf '%s' "$OUT" | grep -q "^Merged" && not_ok "already merged doesn't claim a merge" "$OUT" || ok "already merged doesn't claim a merge"
+
+echo "# a branch named like a path"
+new_repo 11
+git checkout -qb web && commit_file web/b.txt b && git checkout -q integration
+run web
+expect_code_zero "branch named web exits zero"
+expect_out "branch named web compares trees, not paths" "[Ss]kipped"
+expect_no_log "branch named web runs no checks"
+
+echo "# detached HEAD"
+new_repo 12
+git checkout -qb ticket && commit_file web/b.txt b && git checkout -q integration
+git checkout -q --detach
+BEFORE="$(git rev-parse HEAD)"
+run ticket
+expect_code_nonzero "detached HEAD exits non-zero"
+expect_out "detached HEAD says so" "detached"
+expect_no_log "detached HEAD runs no checks"
+[ "$(git rev-parse HEAD)" = "$BEFORE" ] && ok "detached HEAD merges nothing" || not_ok "detached HEAD merges nothing"
 
 cd "$WORK" || exit 1
 echo "# $PASS passed, $FAIL failed"
