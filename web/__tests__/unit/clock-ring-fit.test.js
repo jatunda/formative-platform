@@ -148,6 +148,51 @@ describe('keeping the ring clear of the top bar', () => {
     expect(px(area, '--side-room')).toBe(76 + RING_GAP);
   });
 
+  it('re-measures the side column when a value in it ticks to a new width', async () => {
+    const { area } = setUp();
+    area.classList.add('has-timer');
+    addSmalls(area, [76]);
+    await Promise.resolve();
+    const value = /** @type {HTMLElement} */ (area.querySelector('.clock-readout__value'));
+    rect(value, [0, 0, 90, 30]);
+    value.textContent = '10:40:01 AM';
+    await Promise.resolve();
+    expect(px(area, '--side-room')).toBe(90 + RING_GAP);
+  });
+
+  it("doesn't re-measure for changes outside the side column, like the ring's ticking digits", async () => {
+    const { area, ring } = setUp();
+    area.classList.add('has-timer');
+    area.append(ring);
+    addSmalls(area, [76]);
+    await Promise.resolve();
+    rect(/** @type {HTMLElement} */ (area.querySelector('.clock-readout__value')), [0, 0, 90, 30]);
+    ring.textContent = '4:59';
+    await Promise.resolve();
+    expect(px(area, '--side-room')).toBe(76 + RING_GAP);
+  });
+
+  it("leaves --side-room alone when a tick doesn't change the widest value", async () => {
+    const { area } = setUp();
+    area.classList.add('has-timer');
+    addSmalls(area, [76]);
+    await Promise.resolve();
+    const setProperty = vi.spyOn(area.style, 'setProperty');
+    /** @type {HTMLElement} */ (area.querySelector('.clock-readout__value')).textContent = '10:40:02';
+    await Promise.resolve();
+    expect(setProperty).not.toHaveBeenCalledWith('--side-room', expect.anything());
+  });
+
+  it('clears the side room when the timer hides', () => {
+    const { area } = setUp();
+    area.classList.add('has-timer');
+    addSmalls(area, [76]);
+    callback();
+    area.classList.remove('has-timer');
+    callback();
+    expect(area.style.getPropertyValue('--side-room')).toBe('');
+  });
+
   it('with no side column it needs no side room', () => {
     const { area } = setUp();
     area.classList.add('has-timer');
