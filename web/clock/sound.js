@@ -161,6 +161,35 @@ function strike(ctx, out, track, freq, t, partials) {
 }
 
 /**
+ * A bell rattled by a clapper (or an alarm clock's hammer): struck `rate`
+ * times a second for `ring` s from `t`, each strike jumping its level to `hit`
+ * over `rise` s and falling back to `rest` by the next, then dying away over
+ * `tail` s. The bell's `partials` (`[freq, mix]`, `mix` times `level`) are
+ * each one sine, or two `detune` Hz either side so they beat.
+ * @param {BaseAudioContext} ctx @param {AudioNode} out @param {Track} track
+ * @param {{ t: number, rate: number, ring: number, offset?: number, hit: number, rise: number, rest: number,
+ *   tail: number, level: number, partials: number[][], detune?: number }} bell
+ *   `offset`: every strike lands that fraction of a strike late (the second of
+ *   two bells struck in turn).
+ */
+function rattlingBell(ctx, out, track, { t, rate, ring, offset = 0, hit, rise, rest, tail, level, partials, detune = 0 }) {
+  const clapper = ctx.createGain();
+  clapper.connect(out);
+  clapper.gain.setValueAtTime(0.0001, t);
+  for (let i = 0; i < ring * rate; i += 1) {
+    const at = t + (i + offset) / rate;
+    clapper.gain.linearRampToValueAtTime(hit, at + rise);
+    clapper.gain.exponentialRampToValueAtTime(rest, at + 1 / rate);
+  }
+  clapper.gain.exponentialRampToValueAtTime(0.0001, t + ring + tail);
+  for (const [freq, mix] of partials) {
+    for (const f of detune ? [freq - detune, freq + detune] : [freq]) {
+      tone(ctx, clapper, track, { freq: f, t, length: ring + tail, peak: mix * level, envelope: 'steady' });
+    }
+  }
+}
+
+/**
  * A pulse wave (a narrow square, like an old game console's) with only its
  * first few harmonics, so even a high note keeps its energy under about 3 kHz.
  * @param {BaseAudioContext} ctx @param {number} duty 0–1 @param {number} harmonics
@@ -358,26 +387,11 @@ const VOICES = {
   // short bursts. Gentler than a hallway bell: pure tones, a lower pitch, a
   // shallow flutter rather than a hard rattle, and a gap to breathe.
   softBell(ctx, out, t, track) {
-    const RATE = 10;
-    for (const [from, to] of [[t, t + 0.8], [t + 1.2, t + 2.0]]) {
-      const env = ctx.createGain();
-      env.connect(out);
-      env.gain.setValueAtTime(0.0001, from);
-      for (let at = from; at < to; at += 1 / RATE) {
-        env.gain.linearRampToValueAtTime(0.32, at + 0.005);
-        env.gain.exponentialRampToValueAtTime(0.2, at + 1 / RATE);
-      }
-      env.gain.exponentialRampToValueAtTime(0.0001, to + 0.6);
-      for (const [ratio, mix] of [[1, 1], [2.76, 0.3], [5.4, 0.1]]) {
-        const osc = ctx.createOscillator();
-        const level = ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(880 * ratio, from);
-        level.gain.setValueAtTime(mix * 0.85, from);
-        osc.connect(level);
-        level.connect(env);
-        track(osc, from, to + 0.6);
-      }
+    for (const from of [t, t + 1.2]) {
+      rattlingBell(ctx, out, track, {
+        t: from, rate: 10, ring: 0.8, hit: 0.32, rise: 0.005, rest: 0.2, tail: 0.6, level: 0.85,
+        partials: [[880, 1], [880 * 2.76, 0.3], [880 * 5.4, 0.1]],
+      });
     }
     return 3;
   },
@@ -387,28 +401,10 @@ const VOICES = {
   // tune with each other, as metal is, each two sines a hair apart so they
   // beat; the highest stays near 3 kHz and the lowest well above any bass.
   hallwayBell(ctx, out, t, track) {
-    const [RATE, RING, TAIL] = [20, 3, 0.4];
-    const PARTIALS = [[760, 1], [1763, 0.6], [2356, 0.4], [3040, 0.15]];
-    const env = ctx.createGain();
-    env.connect(out);
-    env.gain.setValueAtTime(0.0001, t);
-    for (let i = 0; i < RING * RATE; i += 1) {
-      const at = t + i / RATE;
-      env.gain.linearRampToValueAtTime(0.6, at + 0.002);
-      env.gain.exponentialRampToValueAtTime(0.2, at + 1 / RATE);
-    }
-    env.gain.exponentialRampToValueAtTime(0.0001, t + RING + TAIL);
-    for (const [freq, mix] of PARTIALS) {
-      for (const detune of [-2, 2]) {
-        const osc = ctx.createOscillator();
-        const level = ctx.createGain();
-        osc.frequency.setValueAtTime(freq + detune, t);
-        level.gain.setValueAtTime(mix * 0.2, t);
-        osc.connect(level);
-        level.connect(env);
-        track(osc, t, t + RING + TAIL);
-      }
-    }
+    rattlingBell(ctx, out, track, {
+      t, rate: 20, ring: 3, hit: 0.6, rise: 0.002, rest: 0.2, tail: 0.4, level: 0.2, detune: 2,
+      partials: [[760, 1], [1763, 0.6], [2356, 0.4], [3040, 0.15]],
+    });
     return 4;
   },
   // Digital alarm clock: the bedside alarm from the movies. Beep-beep-beep-
@@ -425,29 +421,10 @@ const VOICES = {
   // a little apart in pitch (about a semitone), each a bright fundamental and
   // one out-of-tune partial, two sines a hair apart so they beat.
   twinBell(ctx, out, t, track) {
-    const [RATE, RING, TAIL] = [16, 2, 0.3];
-    [1100, 1180].forEach((freq, b) => {
-      const hammer = ctx.createGain();
-      hammer.connect(out);
-      hammer.gain.setValueAtTime(0.0001, t);
-      for (let i = 0; i < RING * RATE; i += 1) {
-        const at = t + (i + b / 2) / RATE;
-        hammer.gain.linearRampToValueAtTime(0.5, at + 0.002);
-        hammer.gain.exponentialRampToValueAtTime(0.12, at + 1 / RATE);
-      }
-      hammer.gain.exponentialRampToValueAtTime(0.0001, t + RING + TAIL);
-      for (const [ratio, mix] of [[1, 1], [2.4, 0.4]]) {
-        for (const detune of [-3, 3]) {
-          const osc = ctx.createOscillator();
-          const level = ctx.createGain();
-          osc.frequency.setValueAtTime(freq * ratio + detune, t);
-          level.gain.setValueAtTime(mix * 0.2, t);
-          osc.connect(level);
-          level.connect(hammer);
-          track(osc, t, t + RING + TAIL);
-        }
-      }
-    });
+    [1100, 1180].forEach((freq, b) => rattlingBell(ctx, out, track, {
+      t, rate: 16, ring: 2, offset: b / 2, hit: 0.5, rise: 0.002, rest: 0.12, tail: 0.3, level: 0.2, detune: 3,
+      partials: [[freq, 1], [freq * 2.4, 0.4]],
+    }));
     return 3;
   },
   // Ship's klaxon: a navy general-alarm horn. Ah-OO-gah: a harsh horn note

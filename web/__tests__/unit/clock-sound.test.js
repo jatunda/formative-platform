@@ -33,6 +33,14 @@ describe('School Clock sound player', () => {
     expect(SOUND_NAMES.hallwayBell).toBe('School bell');
   });
 
+  it('strikes the Soft bell eight times in each burst, whenever it starts', () => {
+    const ctx = createFakeAudioContext({ state: 'running' });
+    createSoundPlayer({ context: ctx }).play('softBell');
+    // One flutter per burst: the gain every partial of that burst passes through.
+    const flutters = distinct(ctx.sources.map((s) => s.connected[0].connected[0]));
+    expect(flutters.map((gain) => gain.gain.events.filter((e) => e.kind === 'linear').length)).toEqual([8, 8]);
+  });
+
   describe('School bell (the loud hallway bell)', () => {
     /** The gain that hammers the gong: the one in the voice's path with a rise for every strike. */
     const clapper = (source) => pathOf(source).find((n) => (n.gain?.events ?? []).filter((e) => e.kind === 'linear').length > 10);
