@@ -392,7 +392,7 @@ export function initClockApp({
   const drawer = createSettingsDrawer({
     settings: () => settings,
     update: updateSettings,
-    play: (sound) => soundPlayer.play(sound),
+    play: (sound) => soundPlayer.preview(sound),
     testRing: () => {
       const seconds = ringSeconds('bell', settings.bells);
       soundPlayer.play(settings.bells.sound, { repeat: true, ...(seconds === undefined ? {} : { seconds }) });
@@ -402,7 +402,7 @@ export function initClockApp({
     behind: () => behindAll(drawer.elements, ringCard.elements),
     onChange: (open) => settingsControl.setAttribute('aria-expanded', String(open)),
     alarms: createAlarmEditor({
-      settings: () => settings, update: updateSettings, play: (sound) => soundPlayer.play(sound),
+      settings: () => settings, update: updateSettings, play: (sound) => soundPlayer.preview(sound),
       now: () => new Date(clock.now()), schoolYears,
     }),
   });

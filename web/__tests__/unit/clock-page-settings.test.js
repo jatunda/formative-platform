@@ -316,7 +316,8 @@ describe('School Clock settings drawer', () => {
 
       expect(saved(storage).bells).toEqual({ on: true, sound: 'chime', assemblyEnds: false, untilDismissed: false });
       expect(saved(storage).timerSound).toBe('buzzer');
-      expect(player.played.map((p) => p.sound)).toEqual(['chime', 'buzzer']);
+      expect(player.previewed).toEqual(['chime', 'buzzer']);
+      expect(player.played).toEqual([]);
       expect(drawer().textContent).toContain('3:10 PM · Bell · Period 7 ends · Chime');
     });
 
@@ -341,7 +342,9 @@ describe('School Clock settings drawer', () => {
       open();
       button('Settings').click();
       button('Test ring').click();
+      // A real ring (shown, dismissed like a Bell), so a preview never stops it.
       expect(player.played).toEqual([{ sound: 'softBell', repeat: true, seconds: 5 }]);
+      expect(player.previewed).toEqual([]);
       expect(mount().querySelector('[role="alertdialog"]').hidden).toBe(false);
       advance(4 * SEC);
     });
