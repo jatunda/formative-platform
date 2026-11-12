@@ -46,7 +46,8 @@ export const BELL_AUTO_DISMISS_SECONDS = 5;
  * @typedef {{ key: string, at: number, sound: SoundName, repeat: boolean, seconds?: number }} ScheduledRing
  *   `key` names the ring across reschedules; `at` is audio-clock seconds;
  *   `repeat` rings until dismissed (every Bell, Alarm and the timer) rather than about 3 s (a preview);
- *   `seconds`, when given, is exactly how long it rings (a Bell that stops on its own), cut off mid-voice.
+ *   `seconds`, when given, is when it starts no new pass (a Bell that stops on its own); the pass
+ *   playing then finishes naturally, so the ring lasts `ringLength(sound, seconds)`.
  */
 
 /** @typedef {'suspended' | 'running' | 'closed' | 'unavailable'} SoundState */
@@ -66,7 +67,7 @@ export const BELL_AUTO_DISMISS_SECONDS = 5;
  */
 
 /**
- * Starts a source at `start` and stops it at `stop` (or sooner, where the ring is cut off).
+ * Starts a source at `start` and stops it at `stop`.
  * @typedef {(source: AudioScheduledSourceNode, start: number, stop: number) => void} Track
  */
 
@@ -237,13 +238,14 @@ const VOICES = {
   },
   // The second half of the Westminster chime on tubular bells, once per Bell:
   // two phrases (G#, E, F#, B, then B, F#, G#, E), each ending on a held note.
-  // It fits inside a Bell's 5 seconds.
+  // A strike every 0.6 s, unhurried like a real tower; one pass takes 6.6 s,
+  // so a Bell plays it once, past its 5 seconds, to the end.
   clockTower(ctx, out, t, track) {
     const [gSharp, fSharp, e, b] = [830.61, 739.99, 659.25, 493.88];
     [[gSharp, e, fSharp, b], [b, fSharp, gSharp, e]].forEach((phrase, p) => {
-      phrase.forEach((freq, i) => strike(ctx, out, track, freq, t + p * 2.2 + i * 0.45, TUBULAR));
+      phrase.forEach((freq, i) => strike(ctx, out, track, freq, t + p * 3 + i * 0.6, TUBULAR));
     });
-    return 6;
+    return 7.5;
   },
   // A quick rising arpeggio (C, E, G, C) on a wooden bar, twice per Bell.
   marimba(ctx, out, t, track) {
@@ -277,7 +279,7 @@ const VOICES = {
   },
   // Level up: a fast rising run of three little arpeggios, each a step higher,
   // then a held C6 with a wobble, on a narrow pulse wave like an old game
-  // console. Three times per Bell; the third run ends before the Bell's cut.
+  // console. Three times per Bell; a Bell starts no fourth at 6 s.
   levelUp(ctx, out, t, track) {
     const wave = pulseWave(ctx, 0.25, 4);
     const RUN = [523.25, 659.25, 783.99, 587.33, 739.99, 880, 659.25, 830.61, 987.77];
@@ -368,6 +370,57 @@ const VOICES = {
   },
 };
 
+/**
+ * Plays `voice` from `at` pass after pass, starting no new pass once `limit`
+ * seconds have gone by; the last pass plays to its natural end.
+ * @param {BaseAudioContext} ctx @param {AudioNode} out @param {Voice} voice
+ * @param {number} at @param {number} limit @param {Track} track
+ * @returns {number} when its last source stops (audio-clock seconds)
+ */
+function ringOut(ctx, out, voice, at, limit, track) {
+  let end = at;
+  /** @type {Track} */
+  const measured = (source, start, stop) => {
+    end = Math.max(end, stop);
+    track(source, start, stop);
+  };
+  let offset = 0;
+  do offset += voice(ctx, out, at + offset, measured); while (offset < limit);
+  return end;
+}
+
+/**
+ * A stand-in audio context that makes no sound, for measuring how long a
+ * voice plays without one.
+ * @returns {BaseAudioContext}
+ */
+function silentContext() {
+  const param = () => ({ value: 0, setValueAtTime() {}, linearRampToValueAtTime() {}, exponentialRampToValueAtTime() {} });
+  const node = () => ({ connect() {}, setPeriodicWave() {}, gain: param(), frequency: param(), Q: param() });
+  return /** @type {BaseAudioContext} */ (/** @type {unknown} */ ({
+    sampleRate: 1,
+    createGain: node,
+    createOscillator: node,
+    createBiquadFilter: node,
+    createBufferSource: node,
+    createPeriodicWave: () => ({}),
+    createBuffer: (/** @type {number[]} */ ...args) => ({ getChannelData: () => new Float32Array(args[1]) }),
+  }));
+}
+
+/**
+ * How long a ring of `sound` lasts when it starts no new pass after `seconds`
+ * (a Bell that stops on its own): to the natural end of its last pass. Worked
+ * out from the voice itself, so the page can close the ring card when the
+ * sound ends, even in a throttled tab.
+ * @param {SoundName} sound @param {number} seconds
+ * @returns {number} seconds
+ */
+export function ringLength(sound, seconds) {
+  const ctx = silentContext();
+  return ringOut(ctx, ctx.createGain(), VOICES[sound], 0, seconds, () => {});
+}
+
 /** @returns {SoundPlayer} */
 function unavailablePlayer() {
   return {
@@ -415,29 +468,17 @@ function playerOn(ctx, volume) {
 
   /** @param {ScheduledRing} ring */
   function add({ key, at, sound, repeat, seconds }) {
-    const voice = VOICES[sound];
     const limit = seconds ?? (repeat ? ALARM_MAX_SECONDS : BELL_SECONDS);
-    const cut = seconds === undefined ? Infinity : at + seconds;
     /** @type {AudioScheduledSourceNode[]} */
     const sources = [];
     /** @type {Track} */
     const track = (source, start, stop) => {
       source.start(start);
-      source.stop(Math.max(start, Math.min(stop, cut)));
+      source.stop(stop);
       sources.push(source);
     };
-    let out = /** @type {AudioNode} */ (master);
-    if (seconds !== undefined) {
-      // A short fade into the cut, so it doesn't click.
-      const fade = ctx.createGain();
-      fade.gain.setValueAtTime(1, Math.max(at, cut - 0.05));
-      fade.gain.linearRampToValueAtTime(0, cut);
-      fade.connect(master);
-      out = fade;
-    }
-    let offset = 0;
-    while (offset < limit) offset += voice(ctx, out, at + offset, track);
-    rings.set(key, { at, end: Math.min(at + offset, cut), sources, done: false });
+    const end = ringOut(ctx, master, VOICES[sound], at, limit, track);
+    rings.set(key, { at, end, sources, done: false });
   }
 
   /** @param {Playing} ring */
