@@ -110,6 +110,20 @@ describe('School Clock page', () => {
     expect(displayText()).toContain('Up next Period 3 10:30 AM');
   });
 
+  it('says when the current Segment ends under the Readouts, with Show when this Segment ends on', () => {
+    const real = fakeRealClock(new Date(2026, 9, 27, 13, 0, 0));
+    app = start({ realNow: real.now, settings: { showPeriodEnd: true } });
+
+    expect(headingText()).toBe('Lunch');
+    expect(displayText()).toContain('Ends 1:30 PM');
+
+    // Into the Passing Period after it, the line is Up next again.
+    real.advance(31 * 60 * 1000);
+    expect(headingText()).toBe('Passing Period');
+    expect(displayText()).toContain('Up next Period 6 1:35 PM');
+    expect(displayText()).not.toContain('Ends');
+  });
+
   it('counts up from the start of a Passing Period when the Readout is tapped', () => {
     const real = fakeRealClock(new Date(2026, 9, 27, 10, 27, 20));
     app = start({ realNow: real.now });
@@ -151,6 +165,17 @@ describe('School Clock page', () => {
       app = start({ realNow: real.now });
       expect(barHeading()).toBe('Next School Day · Mon, Nov 30 · All Day');
       expect(lineLeftToBar()).toBe(true);
+    });
+
+    it("in the countdown bar's heading on just this Segment, after school and on a day off", () => {
+      for (const date of [new Date(2026, 9, 27, 16, 0, 0), new Date(2026, 10, 25, 10, 0, 0)]) {
+        app?.destroy();
+        const real = fakeRealClock(date);
+        app = start({ realNow: real.now, settings: { dayStrip: false } });
+        expect(document.querySelector('#clockApp .clock-bar--segment')).not.toBeNull();
+        expect(barHeading()).toMatch(/^Next School Day · /);
+        expect(lineLeftToBar()).toBe(true);
+      }
     });
 
     it('under the Readouts while a timer hides the bar, and steps aside again once it is gone', () => {
@@ -361,7 +386,7 @@ describe('School Clock page', () => {
 
     it('lists every upcoming ring of the saved Bells and Alarms with its time, source and sound', () => {
       const settings = {
-        bells: { on: true, sound: 'schoolBell' },
+        bells: { on: true, sound: 'softBell' },
         alarms: [
           { id: 'check-email', kind: 'clock', label: 'Check email', enabled: true, sound: 'chime',
             bellSchedules: null, time: '08:20', repeat: 'everySchoolDay' },
@@ -377,18 +402,18 @@ describe('School Clock page', () => {
 
       expect(pageText()).toContain('Next rings today');
       expect(ringLines()).toEqual([
-        '1:40 PM · Bell · Lunch ends · School bell',
-        '1:45 PM · Bell · Period 6 starts · School bell',
+        '1:40 PM · Bell · Lunch ends · Soft bell',
+        '1:45 PM · Bell · Period 6 starts · Soft bell',
         '2:27:30 PM · Period Alarm · Mid-period walk · Period 6, halfway · Buzzer',
         '3:05 PM · Period Alarm · Period 6, 5 min before the end · Beep',
-        '3:10 PM · Bell · Period 6 ends · School bell',
+        '3:10 PM · Bell · Period 6 ends · Soft bell',
       ]);
     });
 
     it('drops a ring once its moment has passed, and drops the list when nothing is left', () => {
       const real = fakeRealClock(new Date(2026, 9, 27, 15, 9, 59));
       app = start({ realNow: real.now });
-      expect(ringLines()).toEqual(['3:10 PM · Bell · Period 7 ends · School bell']);
+      expect(ringLines()).toEqual(['3:10 PM · Bell · Period 7 ends · Soft bell']);
 
       real.advance(1000); // 3:10:00, the ring's own moment
       expect(ringLines()).toHaveLength(1);
@@ -569,7 +594,7 @@ describe('School Clock page', () => {
         expect(headingText()).toBe('Period 3 · AP CSA');
         const text = pageText();
         expect(text).toContain('11:10 AM · Period Alarm · Period 3 · AP CSA, 5 min before the end · Buzzer');
-        expect(text).toContain('11:15 AM · Bell · Period 3 · AP CSA ends · School bell');
+        expect(text).toContain('11:15 AM · Bell · Period 3 · AP CSA ends · Soft bell');
         expect(labelInput('Period 3').value).toBe('AP CSA');
       });
 
@@ -623,7 +648,7 @@ describe('School Clock page', () => {
       it('shows the next rings in 24-hour form', () => {
         const real = fakeRealClock(new Date(2026, 9, 27, 15, 9, 0));
         app = start({ realNow: real.now, settings: { use24Hour: true } });
-        expect(pageText()).toContain('15:10 · Bell · Period 7 ends · School bell');
+        expect(pageText()).toContain('15:10 · Bell · Period 7 ends · Soft bell');
       });
     });
 
@@ -719,7 +744,7 @@ describe('School Clock page', () => {
         expect(readoutsControl().textContent.trim()).toBe('Done');
         expect(addButton()).toBeDefined();
         expect(editNote().hidden).toBe(false);
-        expect(editNote().textContent).toBe('Tap a Readout to change what it shows');
+        expect(editNote().textContent).toBe('Tap a Readout or the bar to change what it shows');
         // One Readout can't be removed.
         expect(removeButtons()).toHaveLength(0);
 

@@ -11,8 +11,9 @@
 /** @typedef {import('./clock-settings.js').SoundName} SoundName */
 
 /**
- * Every voice's name for people, in the order the page lists them (gentlest
- * first). Its keys are the `SoundName`s.
+ * Every voice's name for people. Its keys are the `SoundName`s, which are what
+ * a save holds, so a key never changes once shipped (the page lists voices by
+ * these names, A to Z, not in this order).
  */
 export const SOUND_NAMES = Object.freeze({
   swell: 'Swell',
@@ -25,14 +26,30 @@ export const SOUND_NAMES = Object.freeze({
   woodBlock: 'Wood block',
   levelUp: 'Level up',
   clapPattern: 'Clap pattern',
-  schoolBell: 'School bell',
+  // The gentle bell, saved as `schoolBell` until the loud hallway bell took
+  // that name (clock-storage.js loads the old key as this one).
+  softBell: 'Soft bell',
+  hallwayBell: 'School bell',
+  digitalAlarm: 'Digital alarm clock',
+  twinBell: 'Twin-bell alarm clock',
+  klaxon: "Ship's klaxon",
+  singingBowl: 'Singing bowl',
+  musicBox: 'Music box',
+  sparkle: 'Sparkle',
+  cuckoo: 'Cuckoo clock',
+  bubblePops: 'Bubble pops',
+  taDa: 'Ta-da',
   beep: 'Beep',
   buzzer: 'Buzzer',
 });
 
-/** Every voice, in the order the page lists them. */
+/**
+ * Every voice, in the order every sound picker lists them: A to Z by the name
+ * people see, so a new voice lands in its place without anyone sorting it.
+ */
 /** @type {readonly SoundName[]} */
-export const SOUNDS = Object.freeze(/** @type {SoundName[]} */ (Object.keys(SOUND_NAMES)));
+export const SOUNDS = Object.freeze(/** @type {SoundName[]} */ (Object.keys(SOUND_NAMES))
+  .sort((a, b) => SOUND_NAMES[a].localeCompare(SOUND_NAMES[b])));
 
 /** How long a preview (or any ring not set to repeat) plays, in seconds. */
 export const BELL_SECONDS = 3;
@@ -46,7 +63,8 @@ export const BELL_AUTO_DISMISS_SECONDS = 5;
  * @typedef {{ key: string, at: number, sound: SoundName, repeat: boolean, seconds?: number }} ScheduledRing
  *   `key` names the ring across reschedules; `at` is audio-clock seconds;
  *   `repeat` rings until dismissed (every Bell, Alarm and the timer) rather than about 3 s (a preview);
- *   `seconds`, when given, is exactly how long it rings (a Bell that stops on its own), cut off mid-voice.
+ *   `seconds`, when given, is when it starts no new pass (a Bell that stops on its own); the pass
+ *   playing then finishes naturally, so the ring lasts `ringLength(sound, seconds)`.
  */
 
 /** @typedef {'suspended' | 'running' | 'closed' | 'unavailable'} SoundState */
@@ -66,7 +84,7 @@ export const BELL_AUTO_DISMISS_SECONDS = 5;
  */
 
 /**
- * Starts a source at `start` and stops it at `stop` (or sooner, where the ring is cut off).
+ * Starts a source at `start` and stops it at `stop`.
  * @typedef {(source: AudioScheduledSourceNode, start: number, stop: number) => void} Track
  */
 
@@ -143,6 +161,35 @@ function strike(ctx, out, track, freq, t, partials) {
 }
 
 /**
+ * A bell rattled by a clapper (or an alarm clock's hammer): struck `rate`
+ * times a second for `ring` s from `t`, each strike jumping its level to `hit`
+ * over `rise` s and falling back to `rest` by the next, then dying away over
+ * `tail` s. The bell's `partials` (`[freq, mix]`, `mix` times `level`) are
+ * each one sine, or two `detune` Hz either side so they beat.
+ * @param {BaseAudioContext} ctx @param {AudioNode} out @param {Track} track
+ * @param {{ t: number, rate: number, ring: number, offset?: number, hit: number, rise: number, rest: number,
+ *   tail: number, level: number, partials: number[][], detune?: number }} bell
+ *   `offset`: every strike lands that fraction of a strike late (the second of
+ *   two bells struck in turn).
+ */
+function rattlingBell(ctx, out, track, { t, rate, ring, offset = 0, hit, rise, rest, tail, level, partials, detune = 0 }) {
+  const clapper = ctx.createGain();
+  clapper.connect(out);
+  clapper.gain.setValueAtTime(0.0001, t);
+  for (let i = 0; i < ring * rate; i += 1) {
+    const at = t + (i + offset) / rate;
+    clapper.gain.linearRampToValueAtTime(hit, at + rise);
+    clapper.gain.exponentialRampToValueAtTime(rest, at + 1 / rate);
+  }
+  clapper.gain.exponentialRampToValueAtTime(0.0001, t + ring + tail);
+  for (const [freq, mix] of partials) {
+    for (const f of detune ? [freq - detune, freq + detune] : [freq]) {
+      tone(ctx, clapper, track, { freq: f, t, length: ring + tail, peak: mix * level, envelope: 'steady' });
+    }
+  }
+}
+
+/**
  * A pulse wave (a narrow square, like an old game console's) with only its
  * first few harmonics, so even a high note keeps its energy under about 3 kHz.
  * @param {BaseAudioContext} ctx @param {number} duty 0–1 @param {number} harmonics
@@ -192,7 +239,14 @@ const MARIMBA_BAR = /** @type {[number, number, number][]} */ ([[1, 0.38, 0.5], 
 // laptop and projector speakers are loud and the ear cuts through room chatter
 // best; none lingers on a steady harsh tone; each has its own rhythm and
 // timbre so different Alarms are told apart; and each leaves a gap before it
-// repeats, so an Alarm ringing for a minute keeps breathing.
+// repeats, so an Alarm ringing for a minute keeps breathing. The loud voices
+// (School bell, Digital alarm clock, Twin-bell alarm clock, Ship's klaxon) are
+// deliberately harsh, for an Alarm nobody can miss, but keep to the same
+// range. None may sound like a fire alarm or an emergency siren (a rising-
+// and-falling wail, or a horn in threes): on a school projector that could
+// start a real panic. The calm and cute voices (Singing bowl, Music box,
+// Sparkle, Cuckoo clock, Bubble pops, Ta-da) are named for how they sound,
+// never for who they're for, as Themes are.
 /** @type {Record<SoundName, Voice>} */
 const VOICES = {
   // A soft pad: an open A-major chord that fades in over a second and out over
@@ -237,13 +291,14 @@ const VOICES = {
   },
   // The second half of the Westminster chime on tubular bells, once per Bell:
   // two phrases (G#, E, F#, B, then B, F#, G#, E), each ending on a held note.
-  // It fits inside a Bell's 5 seconds.
+  // A strike every 0.6 s, unhurried like a real tower; one pass takes 6.6 s,
+  // so a Bell plays it once, past its 5 seconds, to the end.
   clockTower(ctx, out, t, track) {
     const [gSharp, fSharp, e, b] = [830.61, 739.99, 659.25, 493.88];
     [[gSharp, e, fSharp, b], [b, fSharp, gSharp, e]].forEach((phrase, p) => {
-      phrase.forEach((freq, i) => strike(ctx, out, track, freq, t + p * 2.2 + i * 0.45, TUBULAR));
+      phrase.forEach((freq, i) => strike(ctx, out, track, freq, t + p * 3 + i * 0.6, TUBULAR));
     });
-    return 6;
+    return 7.5;
   },
   // A quick rising arpeggio (C, E, G, C) on a wooden bar, twice per Bell.
   marimba(ctx, out, t, track) {
@@ -277,7 +332,7 @@ const VOICES = {
   },
   // Level up: a fast rising run of three little arpeggios, each a step higher,
   // then a held C6 with a wobble, on a narrow pulse wave like an old game
-  // console. Three times per Bell; the third run ends before the Bell's cut.
+  // console. Three times per Bell; a Bell starts no fourth at 6 s.
   levelUp(ctx, out, t, track) {
     const wave = pulseWave(ctx, 0.25, 4);
     const RUN = [523.25, 659.25, 783.99, 587.33, 739.99, 880, 659.25, 830.61, 987.77];
@@ -328,32 +383,140 @@ const VOICES = {
     }
     return 2.5;
   },
-  // Ring-ring: a bell struck about ten times a second, in two short bursts.
-  // Gentler than a hallway bell: pure tones, a lower pitch, a shallow
-  // flutter rather than a hard rattle, and a gap to breathe.
-  schoolBell(ctx, out, t, track) {
-    const RATE = 10;
-    for (const [from, to] of [[t, t + 0.8], [t + 1.2, t + 2.0]]) {
-      const env = ctx.createGain();
-      env.connect(out);
-      env.gain.setValueAtTime(0.0001, from);
-      for (let at = from; at < to; at += 1 / RATE) {
-        env.gain.linearRampToValueAtTime(0.32, at + 0.005);
-        env.gain.exponentialRampToValueAtTime(0.2, at + 1 / RATE);
-      }
-      env.gain.exponentialRampToValueAtTime(0.0001, to + 0.6);
-      for (const [ratio, mix] of [[1, 1], [2.76, 0.3], [5.4, 0.1]]) {
-        const osc = ctx.createOscillator();
-        const level = ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(880 * ratio, from);
-        level.gain.setValueAtTime(mix * 0.85, from);
-        osc.connect(level);
-        level.connect(env);
-        track(osc, from, to + 0.6);
-      }
+  // Soft bell. Ring-ring: a bell struck about ten times a second, in two
+  // short bursts. Gentler than a hallway bell: pure tones, a lower pitch, a
+  // shallow flutter rather than a hard rattle, and a gap to breathe.
+  softBell(ctx, out, t, track) {
+    for (const from of [t, t + 1.2]) {
+      rattlingBell(ctx, out, track, {
+        t: from, rate: 10, ring: 0.8, hit: 0.32, rise: 0.005, rest: 0.2, tail: 0.6, level: 0.85,
+        partials: [[880, 1], [880 * 2.76, 0.3], [880 * 5.4, 0.1]],
+      });
     }
     return 3;
+  },
+  // School bell: a real hallway bell. A hard clapper hammers a metal gong 20
+  // times a second, so it rattles, in one long continuous ring of 3 s, then a
+  // short gap before it repeats. The gong's partials are bright and out of
+  // tune with each other, as metal is, each two sines a hair apart so they
+  // beat; the highest stays near 3 kHz and the lowest well above any bass.
+  hallwayBell(ctx, out, t, track) {
+    rattlingBell(ctx, out, track, {
+      t, rate: 20, ring: 3, hit: 0.6, rise: 0.002, rest: 0.2, tail: 0.4, level: 0.2, detune: 2,
+      partials: [[760, 1], [1763, 0.6], [2356, 0.4], [3040, 0.15]],
+    });
+    return 4;
+  },
+  // Digital alarm clock: the bedside alarm from the movies. Beep-beep-beep-
+  // beep, four quick square-wave beeps at 1 kHz, then a pause, once a second.
+  // Only the square's first and third harmonics, so it stays at 3 kHz.
+  digitalAlarm(ctx, out, t, track) {
+    const wave = pulseWave(ctx, 0.5, 3);
+    for (let i = 0; i < 4; i += 1) tone(ctx, out, track, { wave, freq: 1000, t: t + i * 0.12, length: 0.07, peak: 0.35, envelope: 'gate' });
+    return 1;
+  },
+  // Twin-bell alarm clock: the wind-up clock with two bells on top. Its hammer
+  // rattles between them 32 times a second, so each bell is struck 16 times a
+  // second, in turn, in one 2 s jangling trill, then a short gap, once every 3 s. The bells are
+  // a little apart in pitch (about a semitone), each a bright fundamental and
+  // one out-of-tune partial, two sines a hair apart so they beat.
+  twinBell(ctx, out, t, track) {
+    [1100, 1180].forEach((freq, b) => rattlingBell(ctx, out, track, {
+      t, rate: 16, ring: 2, offset: b / 2, hit: 0.5, rise: 0.002, rest: 0.12, tail: 0.3, level: 0.2, detune: 3,
+      partials: [[freq, 1], [freq * 2.4, 0.4]],
+    }));
+    return 3;
+  },
+  // Ship's klaxon: a navy general-alarm horn. Ah-OO-gah: a harsh horn note
+  // that sweeps up quickly from 420 to 640 Hz and holds for about a second,
+  // then a long gap, once every 2 s. A sawtooth and a square a few hertz
+  // apart make it buzz; a low-pass filter keeps the buzz under 3 kHz. One
+  // rise per honk and a gap after, never a rising-and-falling wail, so it
+  // can't be taken for a siren.
+  klaxon(ctx, out, t, track) {
+    for (const [type, detune] of /** @type {[OscillatorType, number][]} */ ([['sawtooth', 0], ['square', 3]])) {
+      tone(ctx, out, track, {
+        type, freq: 420 + detune, bendTo: 640 + detune, bendLength: 0.35, t, length: 1.1, peak: 0.22, envelope: 'gate',
+        filter: { from: 2800, to: 1800, over: 1.1, q: 0.8 },
+      });
+    }
+    return 2;
+  },
+  // Singing bowl: one struck meditation bowl. A low-mid note and two partials
+  // that sit between harmonics, as on real metal, each two sines under a
+  // hertz apart so they beat slowly ("wah-wah"), dying away over 6 s. Once per
+  // Bell; on repeat, a quiet breath before the next strike.
+  singingBowl(ctx, out, t, track) {
+    for (const [ratio, peak, length] of [[1, 0.22, 6], [2.71, 0.1, 4], [5.2, 0.04, 2.5]]) {
+      for (const detune of [-0.4, 0.4]) tone(ctx, out, track, { freq: 420 * ratio + detune, t, length, peak, attack: 0.02 });
+    }
+    return 7.5;
+  },
+  // Music box: the first line of "Twinkle, Twinkle, Little Star" (the
+  // 18th-century French tune "Ah! vous dirai-je, maman", public domain) on
+  // plucked metal tines: each note a sine, a quieter twin a hair sharp, and a
+  // short partial three times up. Once per Bell, then a gap.
+  musicBox(ctx, out, t, track) {
+    const [C, D, E, F, G, A] = [523.25, 587.33, 659.25, 698.46, 783.99, 880];
+    const BEAT = 0.3;
+    [C, C, G, G, A, A, G, F, F, E, E, D, D, C].forEach((freq, i) => {
+      // The seventh note is held a beat longer, ending the line's first half.
+      const at = t + (i + (i > 6 ? 1 : 0)) * BEAT;
+      const length = i === 13 ? 1.6 : 1;
+      tone(ctx, out, track, { freq, t: at, length, peak: 0.3, attack: 0.005 });
+      tone(ctx, out, track, { freq: freq + 1.2, t: at, length, peak: 0.12, attack: 0.005 });
+      tone(ctx, out, track, { freq: freq * 3, t: at, length: 0.25, peak: 0.05, attack: 0.005 });
+    });
+    return 7.5;
+  },
+  // Sparkle: fairy dust. Ten high, pure bell notes (E6 to E7, a pentatonic
+  // scale) skipping about rather than walking up, each ringing into the next
+  // and a twin a few hertz off so they shimmer, quieter and quieter. Twice per
+  // Bell.
+  sparkle(ctx, out, t, track) {
+    const [e6, g6, a6, c7, d7, e7] = [1318.51, 1567.98, 1760, 2093, 2349.32, 2637.02];
+    [c7, e6, a6, d7, g6, e7, a6, c7, e6, g6].forEach((freq, i) => {
+      const at = t + i * 0.08;
+      const peak = 0.2 * 0.82 ** i;
+      tone(ctx, out, track, { freq, t: at, length: 0.9, peak, attack: 0.004 });
+      tone(ctx, out, track, { freq: freq + 3, t: at, length: 0.9, peak: peak / 2, attack: 0.004 });
+    });
+    return 2.5;
+  },
+  // Cuckoo clock: "cuck-oo", a falling minor third (F#5 to D#5) on a soft,
+  // hollow tone, a triangle wave through a low-pass filter, breathed in
+  // rather than struck. Three calls, then a long quiet gap, so a Bell plays
+  // the three once.
+  cuckoo(ctx, out, t, track) {
+    const filter = { from: 2000, to: 1400, over: 0.4, q: 0.5 };
+    for (const at of [t, t + 0.85, t + 1.7]) {
+      tone(ctx, out, track, { type: 'triangle', freq: 739.99, t: at, length: 0.16, peak: 0.35, attack: 0.03, filter });
+      tone(ctx, out, track, { type: 'triangle', freq: 622.25, t: at + 0.2, length: 0.4, peak: 0.35, attack: 0.03, filter });
+    }
+    return 5.5;
+  },
+  // Bubble pops: five quick, soft bloops, each a sine gliding up fast (as a
+  // bubble does when it pops), each pop higher than the last, in an uneven,
+  // bubbly rhythm. Four times per Bell.
+  bubblePops(ctx, out, t, track) {
+    [[0, 480], [0.13, 600], [0.22, 760], [0.38, 950], [0.47, 1200]].forEach(([offset, freq]) => {
+      tone(ctx, out, track, { freq, bendTo: freq * 1.9, t: t + offset, length: 0.06, peak: 0.3, attack: 0.005 });
+    });
+    return 1.5;
+  },
+  // Ta-da: a cheerful xylophone flourish (G, A, B, quick) up to a bright
+  // C-major chord. Each bar a struck sine and its partial three times up
+  // (a xylophone's tuning), left out where it would go over 3 kHz. Twice per
+  // Bell.
+  taDa(ctx, out, t, track) {
+    /** @param {number} freq @param {number} at @param {number} length */
+    const bar = (freq, at, length) => {
+      tone(ctx, out, track, { freq, t: at, length, peak: 0.25, attack: 0.004 });
+      if (freq * 3 <= 3000) tone(ctx, out, track, { freq: freq * 3, t: at, length: length / 4, peak: 0.06, attack: 0.004 });
+    };
+    [783.99, 880, 987.77].forEach((freq, i) => bar(freq, t + i * 0.07, 0.35));
+    for (const freq of [523.25, 783.99, 1046.5, 1318.51]) bar(freq, t + 0.3, 1.2);
+    return 2.5;
   },
   // Beep-beep.
   beep(ctx, out, t, track) {
@@ -367,6 +530,94 @@ const VOICES = {
     return 0.75;
   },
 };
+
+/**
+ * Plays `voice` from `at` pass after pass, starting no new pass once `limit`
+ * seconds have gone by; the last pass plays to its natural end.
+ * @param {BaseAudioContext} ctx @param {AudioNode} out @param {Voice} voice
+ * @param {number} at @param {number} limit @param {Track} track
+ * @returns {number} when its last source stops (audio-clock seconds)
+ */
+function ringOut(ctx, out, voice, at, limit, track) {
+  let end = at;
+  /** @type {Track} */
+  const measured = (source, start, stop) => {
+    end = Math.max(end, stop);
+    track(source, start, stop);
+  };
+  let offset = 0;
+  do offset += voice(ctx, out, at + offset, measured); while (offset < limit);
+  return end;
+}
+
+/**
+ * Proxy traps for `silentContext`: every property read is another stub (so
+ * any node, param or method a voice reaches for exists), every call returns
+ * one, every write is dropped, and in arithmetic a stub is NaN (so a loop
+ * bounded by a buffer's length never runs).
+ * @type {ProxyHandler<() => void>}
+ */
+const SILENT = {
+  get: (_target, key) => {
+    if (key === Symbol.toPrimitive) return () => NaN;
+    // Never a thenable or anything else a symbol names.
+    return typeof key === 'symbol' || key === 'then' ? undefined : silentStub();
+  },
+  set: () => true,
+  apply: () => silentStub(),
+};
+
+function silentStub() {
+  return new Proxy(() => {}, SILENT);
+}
+
+/**
+ * A stand-in audio context that makes no sound, for measuring how long a
+ * voice plays without one. It takes any node or param call, so a voice using
+ * a node no other voice has used yet still measures rather than throwing.
+ * @returns {BaseAudioContext}
+ */
+export function silentContext() {
+  return /** @type {BaseAudioContext} */ (/** @type {unknown} */ (silentStub()));
+}
+
+/**
+ * How long a ring of `sound` lasts when it starts no new pass after `seconds`
+ * (a Bell that stops on its own): to the natural end of its last pass. Worked
+ * out from the voice itself, so the page can close the ring card when the
+ * sound ends, even in a throttled tab.
+ * @param {SoundName} sound @param {number} seconds
+ * @returns {number} seconds
+ */
+export function ringLength(sound, seconds) {
+  const ctx = silentContext();
+  return ringOut(ctx, ctx.createGain(), VOICES[sound], 0, seconds, () => {});
+}
+
+/**
+ * When a ring of this kind starts no new pass of its sound, for one that
+ * stops on its own sooner than an Alarm's minute: a Bell's 5 s, unless the
+ * teacher keeps Bells ringing until dismissed. Undefined for every other ring.
+ * @param {import('./clock-model.js').Ring['source']} source
+ * @param {{ untilDismissed?: boolean }} bells the Bells settings
+ * @returns {number | undefined}
+ */
+export function ringSeconds(source, bells) {
+  return source === 'bell' && !bells.untilDismissed ? BELL_AUTO_DISMISS_SECONDS : undefined;
+}
+
+/**
+ * How long a ring of this kind shows on screen when it stops on its own:
+ * until its sound's last pass has played to the end. Undefined when it rings
+ * an Alarm's minute.
+ * @param {import('./clock-model.js').Ring['source']} source @param {SoundName} sound
+ * @param {{ untilDismissed?: boolean }} bells the Bells settings
+ * @returns {number | undefined}
+ */
+export function shownSeconds(source, sound, bells) {
+  const seconds = ringSeconds(source, bells);
+  return seconds === undefined ? undefined : ringLength(sound, seconds);
+}
 
 /** @returns {SoundPlayer} */
 function unavailablePlayer() {
@@ -415,29 +666,17 @@ function playerOn(ctx, volume) {
 
   /** @param {ScheduledRing} ring */
   function add({ key, at, sound, repeat, seconds }) {
-    const voice = VOICES[sound];
     const limit = seconds ?? (repeat ? ALARM_MAX_SECONDS : BELL_SECONDS);
-    const cut = seconds === undefined ? Infinity : at + seconds;
     /** @type {AudioScheduledSourceNode[]} */
     const sources = [];
     /** @type {Track} */
     const track = (source, start, stop) => {
       source.start(start);
-      source.stop(Math.max(start, Math.min(stop, cut)));
+      source.stop(stop);
       sources.push(source);
     };
-    let out = /** @type {AudioNode} */ (master);
-    if (seconds !== undefined) {
-      // A short fade into the cut, so it doesn't click.
-      const fade = ctx.createGain();
-      fade.gain.setValueAtTime(1, Math.max(at, cut - 0.05));
-      fade.gain.linearRampToValueAtTime(0, cut);
-      fade.connect(master);
-      out = fade;
-    }
-    let offset = 0;
-    while (offset < limit) offset += voice(ctx, out, at + offset, track);
-    rings.set(key, { at, end: Math.min(at + offset, cut), sources, done: false });
+    const end = ringOut(ctx, master, VOICES[sound], at, limit, track);
+    rings.set(key, { at, end, sources, done: false });
   }
 
   /** @param {Playing} ring */

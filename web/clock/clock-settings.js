@@ -16,7 +16,7 @@
  * The built-in Bells, turned on or off as a whole. `assemblyEnds`: they also
  * ring when an Assembly ends (never when one starts); off when missing.
  * `untilDismissed`: a Bell rings until dismissed (up to a minute, like an
- * Alarm) rather than stopping on its own after `BELL_AUTO_DISMISS_SECONDS`
+ * Alarm) rather than stopping on its own once its sound, which starts no new pass after `BELL_AUTO_DISMISS_SECONDS`, ends
  * (`sound.js`); off when missing.
  * @typedef {{ on: boolean, sound: SoundName, assemblyEnds?: boolean, untilDismissed?: boolean }} BellsSettings
  */
@@ -107,8 +107,10 @@
  *   last minute and the timer always do).
  * - `dayStrip`: the bar along the bottom shows the whole day (true) or just
  *   this Segment (false). See `day-bar.js`.
- * - `showPeriodEnd`: on whole day, the current Segment's block shows its end
- *   time beside its start ("10:25–11:15"), where it fits; off by default.
+ * - `showPeriodEnd`: "Show when this Segment ends" (any Segment, not just a
+ *   Period; the saved key keeps its first name). On whole day, the current
+ *   Segment's block shows its end time beside its start ("10:25–11:15"), where
+ *   it fits, and the line under the Readouts says it too; off by default.
  * - `theme`: the theme's id (`themes.js`); `fontSwap` / `paletteSwap` swap its
  *   font or palette for another pre-checked one (null keeps the theme's own).
  * - `flipped`: false follows the theme (its palette's own light or dark

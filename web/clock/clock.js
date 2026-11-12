@@ -31,7 +31,7 @@ import { createWakeLockKeeper, detectCapabilities } from './screen.js';
 import { createAlarmEditor } from './alarm-editor.js';
 import { createSettingsDrawer } from './settings-drawer.js';
 import { applyLook, createLookSheet, decorations } from './look-sheet.js';
-import { ALARM_MAX_SECONDS, BELL_AUTO_DISMISS_SECONDS, createSoundPlayer } from './sound.js';
+import { ALARM_MAX_SECONDS, createSoundPlayer, ringSeconds, shownSeconds } from './sound.js';
 import { cancelTimer, nameTimer, pauseTimer, resumeTimer, settleTimer, timerRingView, timerStatus } from './timer.js';
 import { createTimerPicker } from './timer-picker.js';
 import { createTimerRing } from './timer-ring.js';
@@ -185,7 +185,7 @@ export function initClockApp({
       : [];
     const audioNow = soundPlayer.currentTime();
     soundPlayer.schedule(rings.map((ring) => {
-      const seconds = ringSeconds(ring.source);
+      const seconds = ringSeconds(ring.source, settings.bells);
       return {
         key: ringKey(ring),
         at: audioNow + (ring.at.getTime() - t) / 1000 / clock.speed,
@@ -194,17 +194,6 @@ export function initClockApp({
         ...(seconds === undefined ? {} : { seconds }),
       };
     }));
-  }
-
-  /**
-   * How long a ring of this kind rings before stopping on its own, when that's
-   * shorter than an Alarm's minute: a Bell's few seconds, unless the teacher
-   * keeps Bells ringing until dismissed.
-   * @param {import('./clock-model.js').Ring['source']} source
-   * @returns {number | undefined}
-   */
-  function ringSeconds(source) {
-    return source === 'bell' && !settings.bells.untilDismissed ? BELL_AUTO_DISMISS_SECONDS : undefined;
   }
 
   // What's ringing on screen: a flash (or a steady highlight) and the ring
@@ -321,7 +310,7 @@ export function initClockApp({
       readoutsView.focusReadout(layout.readouts.length - 1);
     },
   });
-  const editNote = el('p', { className: 'clock-edit-note', textContent: 'Tap a Readout to change what it shows' });
+  const editNote = el('p', { className: 'clock-edit-note' });
   /** @param {boolean} on */
   function setEditing(on) {
     editing = on;
@@ -405,9 +394,9 @@ export function initClockApp({
     update: updateSettings,
     play: (sound) => soundPlayer.play(sound),
     testRing: () => {
-      const seconds = ringSeconds('bell');
+      const seconds = ringSeconds('bell', settings.bells);
       soundPlayer.play(settings.bells.sound, { repeat: true, ...(seconds === undefined ? {} : { seconds }) });
-      startRinging(TEST_RING_WORDS, { seconds });
+      startRinging(TEST_RING_WORDS, { seconds: shownSeconds('bell', settings.bells.sound, settings.bells) });
     },
     // A ring shows over the drawer too, so it can be seen, heard and dismissed.
     behind: () => behindAll(drawer.elements, ringCard.elements),
@@ -480,7 +469,8 @@ export function initClockApp({
   // The main screen: the "Simulated time" banner (with ?at=), the top bar,
   // the stage (heading, Readouts, the line under them) and the bottom row
   // (the bar, then the window buttons).
-  const dayBar = createDayBarView();
+  // In the Readouts' edit mode a tap on the bar switches its saved setting.
+  const dayBar = createDayBarView({ onSwitch: () => updateSettings({ dayStrip: !settings.dayStrip }) });
   const banner = el('p', { className: 'clock-banner' });
   const stageText = createStageTextView();
   const stage = el('section', { className: 'clock-stage', 'aria-label': 'Clock' }, [
@@ -530,10 +520,11 @@ export function initClockApp({
         if (ring.source === 'timer') {
           rangTimer = { totalMs: ring.totalMs, name: ring.name ?? null };
         }
-        const seconds = ringSeconds(ring.source);
+        const seconds = shownSeconds(ring.source, ring.sound, settings.bells);
         startRinging(ringWords(ring, text), {
           seconds,
-          // A Bell that stops on its own does so on time, as its sound does.
+          // A Bell that stops on its own does so when its sound ends, counted
+          // from when it came due as its sound is, even in a throttled tab.
           lateMs: seconds === undefined ? 0 : (now.getTime() - ring.at.getTime()) / clock.speed,
           timer: ring.source === 'timer',
         });
@@ -575,7 +566,9 @@ export function initClockApp({
     // A bar of the Next School Day's Segments is headed with its date and Day Label.
     stageText.show(now, moment, settings, bar?.day === 'next');
     renderMini(now, moment, renderReadouts(now, moment, text));
-    dayBar.show(bar, (date) => text.time(date));
+    dayBar.show(bar, (date) => text.time(date), { editing });
+    // The edit note names the bar too while there's one to tap.
+    editNote.textContent = `Tap a Readout${bar ? ' or the bar' : ''} to change what it shows`;
     drawer.showRings(chosen ? nextRingLines(now, schoolYears, settings, text) : []);
   }
 

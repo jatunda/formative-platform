@@ -102,7 +102,7 @@
   display: flex;
   flex-direction: column;
   width: min(400px, 40vw);
-  max-height: calc(100vh - var(--edge-y) * 2 - var(--tap) - var(--s2));
+  max-height: calc(100dvh - var(--edge-y) * 2 - var(--tap) - var(--s2));
   border: 1px solid var(--line-soft);
   border-radius: var(--radius);
   background: var(--surface);
@@ -114,7 +114,7 @@
 /* Below the "Simulated time" banner too, when it shows. */
 .clock-screen.is-simulated ~ .clock-look {
   top: calc(var(--edge-y) + var(--tap) + var(--s2) + 40px);
-  max-height: calc(100vh - var(--edge-y) * 2 - var(--tap) - var(--s2) - 40px);
+  max-height: calc(100dvh - var(--edge-y) * 2 - var(--tap) - var(--s2) - 40px);
 }
 
 .clock-look__head {

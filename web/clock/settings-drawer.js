@@ -43,15 +43,15 @@ export function createSettingsDrawer({ settings, update, play, testRing, behind,
     'The last minute of a countdown and the timer always show seconds.',
     (on) => update({ showSeconds: on }));
   const use24Hour = switchControl(`${ID}-24-hour`, '24-hour time', '', (on) => update({ use24Hour: on }));
-  const periodEnd = switchControl(`${ID}-period-end`, 'Show when this Period ends',
-    'In the bar along the bottom, the block you’re in shows its end time too, where there’s room.',
+  const periodEnd = switchControl(`${ID}-period-end`, 'Show when this Segment ends',
+    'The line under the clock says when this Segment ends. In the bar along the bottom, the block you’re in shows its end time too, where there’s room.',
     (on) => update({ showPeriodEnd: on }));
   const time = drawerSection('time', 'Time', [seconds.label, use24Hour.label, periodEnd.label]);
 
   const bells = switchControl(`${ID}-bells`, 'Bells', 'Start and end of every Period and Break',
     (on) => update({ bells: { ...settings().bells, on } }));
   const untilDismissed = switchControl(`${ID}-until-dismissed`, 'Ring Bells until you dismiss them',
-    `Otherwise each Bell stops on its own after ${BELL_AUTO_DISMISS_SECONDS} seconds. Alarms and the timer always ring until dismissed.`,
+    `Otherwise each Bell plays for about ${BELL_AUTO_DISMISS_SECONDS} seconds, finishes its sound, then stops on its own. Alarms and the timer always ring until dismissed.`,
     (on) => update({ bells: { ...settings().bells, untilDismissed: on } }));
   const assemblyEnds = switchControl(`${ID}-assembly-ends`, 'Bell when an Assembly ends',
     'Chapel, Convocation and Pep Rally. Never when one starts.',

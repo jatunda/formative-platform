@@ -30,7 +30,7 @@ describe('clock settings store', () => {
     const settings = createSettingsStore(createFakeStorage()).load();
     expect(settings).toEqual(DEFAULT_SETTINGS);
     expect(settings).toMatchObject({
-      division: null, use24Hour: false, periodLabels: {}, bells: { on: true, sound: 'schoolBell' },
+      division: null, use24Hour: false, periodLabels: {}, bells: { on: true, sound: 'softBell' },
       alarms: [], timerEndsAt: null, timerSound: 'beep',
     });
     expect(settings.volume).toBeGreaterThan(0);
@@ -59,6 +59,41 @@ describe('clock settings store', () => {
     // An earlier save holds only the first eight voices' names, and they still load as saved.
     const older = { ...DEFAULT_SETTINGS, bells: { ...bells, sound: 'woodBlock' }, alarms: [clockAlarm, periodAlarm], timerSound: 'beep' };
     expect(storeHolding(older).load()).toEqual(older);
+  });
+
+  it('loads a save that picked the gentle bell (saved as `schoolBell` before it was Soft bell) as Soft bell, not the loud School bell', () => {
+    const settings = storeHolding({
+      ...DEFAULT_SETTINGS,
+      bells: { on: true, sound: 'schoolBell', assemblyEnds: false, untilDismissed: false },
+      alarms: [{ ...clockAlarm, sound: 'schoolBell' }, { ...periodAlarm, sound: 'schoolBell' }],
+      timerSound: 'schoolBell',
+    }).load();
+    expect(settings.bells.sound).toBe('softBell');
+    expect(settings.alarms.map((a) => a.sound)).toEqual(['softBell', 'softBell']);
+    expect(settings.timerSound).toBe('softBell');
+  });
+
+  it('round-trips the loud School bell', () => {
+    const storage = createFakeStorage();
+    const bells = { on: true, sound: 'hallwayBell', assemblyEnds: false, untilDismissed: false };
+    createSettingsStore(storage).save({ ...DEFAULT_SETTINGS, bells, timerSound: 'hallwayBell' });
+    expect(createSettingsStore(storage).load()).toMatchObject({ bells, timerSound: 'hallwayBell' });
+  });
+
+  it('round-trips the loud alarm voices', () => {
+    const storage = createFakeStorage();
+    const bells = { on: true, sound: 'twinBell', assemblyEnds: false, untilDismissed: false };
+    const alarms = [{ ...clockAlarm, sound: 'digitalAlarm' }, { ...periodAlarm, sound: 'klaxon' }];
+    createSettingsStore(storage).save({ ...DEFAULT_SETTINGS, bells, alarms, timerSound: 'klaxon' });
+    expect(createSettingsStore(storage).load()).toMatchObject({ bells, alarms, timerSound: 'klaxon' });
+  });
+
+  it('round-trips the calm, cute and sparkly voices', () => {
+    const storage = createFakeStorage();
+    const bells = { on: true, sound: 'singingBowl', assemblyEnds: false, untilDismissed: false };
+    const alarms = ['musicBox', 'sparkle', 'cuckoo', 'bubblePops'].map((sound, i) => ({ ...(i % 2 ? periodAlarm : clockAlarm), id: `a${i}`, sound }));
+    createSettingsStore(storage).save({ ...DEFAULT_SETTINGS, bells, alarms, timerSound: 'taDa' });
+    expect(createSettingsStore(storage).load()).toMatchObject({ bells, alarms, timerSound: 'taDa' });
   });
 
   it('starts with seconds on, the Day Strip on without the current end time, and the dark default theme in its own version, with no swaps', () => {
@@ -92,7 +127,7 @@ describe('clock settings store', () => {
     });
   });
 
-  it('loads a save from before "Show when this Period ends" with it off', () => {
+  it('loads a save from before "Show when this Segment ends" with it off', () => {
     expect(storeHolding({ division: 'HS', showSeconds: false, dayStrip: true }).load().showPeriodEnd).toBe(false);
   });
 

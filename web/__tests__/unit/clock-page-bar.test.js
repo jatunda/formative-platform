@@ -171,7 +171,7 @@ describe('School Clock bar', () => {
     });
   });
 
-  describe('Show when this Period ends', () => {
+  describe('Show when this Segment ends', () => {
     const times = () => [...bar().querySelectorAll('.clock-bar__time')].map(words);
     const agendaTimes = () => [...bar().querySelectorAll('.clock-agenda__time')].map(words);
 
@@ -232,12 +232,136 @@ describe('School Clock bar', () => {
       expect(heard()[0]).toBe('Period 1, 8:30 AM to 9:20 AM');
     });
 
-    it('after school shows the Next School Day, labelled with its date, on either setting', () => {
-      withSettings({ dayStrip: false });
+    it('after school shows the Next School Day, labelled with its date', () => {
       open({ when: at(16, 0) });
       expect(bar().getAttribute('aria-label')).toBe('Segments on Wed, Oct 28');
       expect(words(bar().querySelector('.clock-bar__heading'))).toBe('Next School Day · Wed, Oct 28 · Even Day');
       expect(bar().querySelector('.clock-bar__now')).toBeNull();
+    });
+
+    describe('on just this Segment, a countdown to the Next School Day', () => {
+      beforeEach(() => withSettings({ dayStrip: false, periodLabels: { 'Period 2': 'AP CSA' } }));
+      const times = () => [...bar().querySelectorAll('.clock-bar__time')].map(words);
+
+      it("after school counts from the end of school to the first Segment, under the next day's heading", () => {
+        open({ when: at(16, 0) });
+        expect(bar().classList).toContain('clock-bar--segment');
+        expect(bar().getAttribute('aria-label')).toBe('Until Period 2 · AP CSA');
+        expect(words(bar().querySelector('.clock-bar__heading'))).toBe('Next School Day · Wed, Oct 28 · Even Day');
+        expect(heard()).toEqual(['Until Period 2 · AP CSA, Wed, Oct 28 at 8:30 AM']);
+        expect(times()).toEqual(['3:10']);
+        expect(words(bar().querySelector('.clock-bar__end'))).toBe('8:30');
+        expect(bar().querySelector('.clock-agenda')).toBeNull();
+        // 15:10 → 8:30 is 1040 minutes; 50 are done.
+        expect(progress().getAttribute('aria-valuenow')).toBe('5');
+        advance(52 * MIN);
+        expect(progress().getAttribute('aria-valuenow')).toBe('10');
+      });
+
+      it("before school counts down to today's first Segment", () => {
+        open({ when: at(7, 50) });
+        expect(words(bar().querySelector('.clock-bar__heading'))).toBe('Today · All Day');
+        expect(heard()).toEqual(['Until Period 1, today at 8:30 AM']);
+        expect(times()).toEqual(['3:10']);
+        expect(bar().querySelector('.clock-bar__now')).not.toBeNull();
+      });
+
+      it('gives way to the Segment once school starts', () => {
+        open({ when: at(8, 29) });
+        advance(2 * MIN);
+        expect(bar().getAttribute('aria-label')).toBe('Period 1');
+        expect(bar().querySelector('.clock-bar__heading')).toBeNull();
+      });
+    });
+  });
+
+  describe('in Readouts edit mode', () => {
+    const control = (name) => [...mount().querySelectorAll('button')].find((b) => words(b) === name);
+    const edit = () => control('Readouts').click();
+    /** The bar's own button, while it shows. */
+    const switchButton = () => {
+      const button = bar()?.querySelector('button');
+      return button && isShown(button) ? button : null;
+    };
+
+    it('a tap anywhere on the bar switches whole day and just this Segment, saves it, and the Look sheet shows it', () => {
+      open({ when: at(10, 39) });
+      edit();
+      bar().querySelector('.clock-bar__track li').click();
+      expect(saved(storage).dayStrip).toBe(false);
+      expect(radio('Just this Segment').checked).toBe(true);
+      expect(heard()).toEqual(['Period 3 · AP CSA, 10:30 AM to 11:15 AM, now']);
+      bar().click();
+      expect(saved(storage).dayStrip).toBe(true);
+      expect(radio('Whole day').checked).toBe(true);
+      expect(heard()).toHaveLength(9);
+      open();
+      expect(radio('Whole day').checked).toBe(true);
+    });
+
+    it('has a button for the keyboard and screen readers that says what a tap does, and keeps focus', () => {
+      open({ when: at(10, 39) });
+      expect(switchButton()).toBeNull();
+      edit();
+      expect(words(switchButton())).toBe('Bottom bar: Whole day. Switch to Just this Segment');
+      switchButton().focus();
+      // Enter and Space press a button by clicking it.
+      switchButton().click();
+      expect(saved(storage).dayStrip).toBe(false);
+      expect(document.activeElement).toBe(switchButton());
+      expect(words(switchButton())).toBe('Bottom bar: Just this Segment. Switch to Whole day');
+      // The bar stays a labelled section, and the agenda stays in reach.
+      expect(bar().getAttribute('aria-label')).toBe('Period 3 · AP CSA');
+      switchButton().click();
+      expect(bar().querySelector('.clock-agenda').tabIndex).toBe(0);
+    });
+
+    it('looks editable and is named in the edit note', () => {
+      open({ when: at(10, 39) });
+      expect(bar().classList).not.toContain('is-editing');
+      edit();
+      expect(bar().classList).toContain('is-editing');
+      expect(words(mount().querySelector('.clock-edit-note'))).toBe('Tap a Readout or the bar to change what it shows');
+    });
+
+    it("isn't interactive outside edit mode", () => {
+      open({ when: at(10, 39) });
+      bar().click();
+      expect(radio('Whole day').checked).toBe(true);
+      expect(storage.getItem(SETTINGS_KEY)).not.toContain('"dayStrip":false');
+      edit();
+      control('Done').click();
+      bar().click();
+      expect(radio('Whole day').checked).toBe(true);
+      expect(bar().classList).not.toContain('is-editing');
+      expect(switchButton()).toBeNull();
+    });
+
+    it('switches during a Passing Period and in Off-Hours, to and from the countdown', () => {
+      open({ when: at(10, 27) });
+      edit();
+      bar().click();
+      expect(heard()).toEqual(['Passing Period, 10:25 AM to 10:30 AM, now']);
+      open({ when: at(16, 0) });
+      edit();
+      expect(heard()).toEqual(['Until Period 2, Wed, Oct 28 at 8:30 AM']);
+      bar().click();
+      expect(saved(storage).dayStrip).toBe(true);
+      expect(bar().classList).toContain('clock-bar--day');
+      expect(words(switchButton())).toBe('Bottom bar: Whole day. Switch to Just this Segment');
+    });
+
+    it('has nothing to tap while the bar is hidden, and the edit note leaves it out', () => {
+      withSettings({ timerEndsAt: at(10, 44) });
+      open({ when: at(10, 39) });
+      edit();
+      expect(bar()).toBeNull();
+      expect(mount().querySelector('.clock-bar').classList).not.toContain('is-editing');
+      expect(words(mount().querySelector('.clock-edit-note'))).toBe('Tap a Readout to change what it shows');
+      open({ when: new Date(2027, 6, 1, 10, 0).getTime() });
+      edit();
+      expect(bar()).toBeNull();
+      expect(mount().querySelector('.clock-bar').classList).not.toContain('is-editing');
     });
   });
 

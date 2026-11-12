@@ -9,6 +9,12 @@ const clockDir = resolve(webDir, 'clock');
 const firebase = JSON.parse(readFileSync(resolve(webDir, '../firebase.json'), 'utf8'));
 const rewrites = firebase.hosting.rewrites;
 
+/** The short layout's block (laptop corner, landscape phone) in a stylesheet. */
+function shortLayout(css) {
+  const start = css.indexOf('@media (max-height: 520px) {');
+  return css.slice(start, css.slice(start).search(/\n\}\r?\n/) + start);
+}
+
 describe('School Clock hosting', () => {
   it.each(['/clock', '/clock/'])('serves %s from a static page via a rewrite above the catch-all', (source) => {
     const index = rewrites.findIndex((r) => r.source === source);
@@ -75,10 +81,43 @@ describe('School Clock hosting', () => {
     const css = readFileSync(resolve(clockDir, 'clock.css'), 'utf8');
     // Hidden at the top level; shown again only in the short layout's block.
     expect(css).toMatch(/(^|\n)\.clock-line--in-bar\s*\{\s*display:\s*none;/);
-    const start = css.indexOf('@media (max-height: 520px) {');
-    const short = css.slice(start, css.slice(start).search(/\n\}\r?\n/) + start);
+    const short = shortLayout(css);
     expect(short).toMatch(/\n {2}\.clock-line--in-bar\s*\{\s*display:\s*block;/);
     expect(css.match(/\.clock-line--in-bar/g)).toHaveLength(2);
+  });
+
+  it("fits the screen to the visible height, so a phone's browser bars never hide the agenda's end", () => {
+    const css = readFileSync(resolve(clockDir, 'clock.css'), 'utf8');
+    // html, body and #clockApp are 100% (the visible height, with the bars);
+    // 100vh is the height without them, so a screen that tall runs under them.
+    expect(css).toMatch(/(^|\n)html,\s*body\s*\{[^}]*height:\s*100%;/);
+    expect(css).toMatch(/(^|\n)#clockApp\s*\{[^}]*height:\s*100%;/);
+    expect(css).toMatch(/(^|\n)\.clock-screen\s*\{[^}]*height:\s*100%;/);
+    // On a phone, while the agenda and the sound prompt both show, the digits
+    // also fit the visible height (svh), not the bars-hidden one (vh).
+    expect(css).toMatch(/\.clock-screen:has\(\.clock-bar--day:not\(\[hidden\]\)\):has\(> \.clock-bottom > \.clock-sound-prompt:not\(\[hidden\]\)\)\s*\{\s*--type-digits:\s*\d+svh;/);
+    // Nor may a panel's height reach for 100vh.
+    for (const sheet of ['clock.css', 'settings-drawer.css', 'timer.css', 'look-sheet.css', 'alarm-editor.css']) {
+      const rules = readFileSync(resolve(clockDir, sheet), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+      expect(rules, sheet).not.toMatch(/\b100vh\b/);
+    }
+  });
+
+  it("shrinks the short layout's digits by the room the cycle hint and the simulated-time banner take, so the stage stays clear of the top bar and the line clear of the sound prompt", () => {
+    const css = readFileSync(resolve(clockDir, 'clock.css'), 'utf8');
+    const short = shortLayout(css);
+    // Both the short layout's digit sizes (with and without the sound prompt) give the room back.
+    const sizes = [...short.matchAll(/--type-digits:\s*([^;]+);/g)].map((m) => m[1]);
+    expect(sizes.filter((size) => /var\(--hint-room\)/.test(size) && /var\(--banner-room\)/.test(size))).toHaveLength(2);
+    // The rooms are set only while the hint or the banner is there.
+    expect(short).toMatch(/\.clock-screen:has\(\.clock-readout > \.clock-cycle-hint:not\(\[hidden\]\)\)\s*\{\s*--hint-room:\s*\d+px;/);
+    expect(short).toMatch(/\.clock-screen\.is-simulated\s*\{\s*--banner-room:\s*\d+px;/);
+  });
+
+  it("lets the short layout's line use the full width while the sound prompt holds the window buttons in its row", () => {
+    const css = readFileSync(resolve(clockDir, 'clock.css'), 'utf8');
+    const short = shortLayout(css);
+    expect(short).toMatch(/\.clock-screen:has\(> \.clock-bottom > \.clock-sound-prompt:not\(\[hidden\]\)\) :is\(\.clock-next, \.clock-line\)\s*\{\s*max-width:\s*none;/);
   });
 
   it('keeps the page background in fullscreen', () => {

@@ -201,9 +201,9 @@ describe('School Clock settings drawer', () => {
       expect(stageText()).toContain('08:30');
     });
 
-    it('Show when this Period ends: an off-by-default switch after 24-hour time, saved, shown at once', () => {
+    it('Show when this Segment ends: an off-by-default switch after 24-hour time, saved, shown at once', () => {
       open({ when: at(10, 39) });
-      const name = 'Show when this Period ends';
+      const name = 'Show when this Segment ends';
       expect(field(name).getAttribute('role')).toBe('switch');
       expect(field(name).checked).toBe(false);
       const switches = [...drawer().querySelectorAll('[role="switch"]')].map(accessibleName);
@@ -216,6 +216,30 @@ describe('School Clock settings drawer', () => {
       expect(saved(storage).showPeriodEnd).toBe(true);
       expect(field(name).checked).toBe(true);
       expect(currentTime()).toBe('10:30–11:15');
+    });
+
+    it('Show when this Segment ends: the line under the Readouts says when the Segment ends, and the hint says so', () => {
+      open({ when: at(10, 39) });
+      const name = 'Show when this Segment ends';
+      const hint = document.getElementById(field(name).getAttribute('aria-describedby')).textContent;
+      expect(hint).toMatch(/under the clock/);
+      // Every Segment, Lunch included: never "this Period".
+      expect(hint).toMatch(/when this Segment ends/);
+      expect(hint).not.toMatch(/Period/);
+      expect(hint).toMatch(/bar along the bottom/);
+      const line = () => mount().querySelector('.clock-stage .clock-next');
+      expect(line()).toBeNull();
+
+      toggle(name);
+
+      expect(line().textContent.replace(/\s+/g, ' ').trim()).toBe('Ends 11:15 AM');
+      expect(line().querySelector('.clock-next__label').textContent).toBe('Ends');
+      expect(line().querySelector('.clock-next__at').textContent).toBe('11:15 AM');
+      toggle('24-hour time');
+      expect(line().textContent.replace(/\s+/g, ' ').trim()).toBe('Ends 11:15');
+
+      toggle(name);
+      expect(line()).toBeNull();
     });
 
     it('Bells: a switch, kept in step with the top bar Bells button', () => {
@@ -239,7 +263,7 @@ describe('School Clock settings drawer', () => {
       expect(switches.indexOf('Ring Bells until you dismiss them')).toBe(switches.indexOf('Bells') + 1);
 
       toggle('Ring Bells until you dismiss them');
-      expect(saved(storage).bells).toEqual({ on: true, sound: 'schoolBell', assemblyEnds: false, untilDismissed: true });
+      expect(saved(storage).bells).toEqual({ on: true, sound: 'softBell', assemblyEnds: false, untilDismissed: true });
       expect(untilDismissed().checked).toBe(true);
 
       toggle('Bells');
@@ -256,15 +280,15 @@ describe('School Clock settings drawer', () => {
       const assemblyEnds = () => field('Bell when an Assembly ends');
       expect(assemblyEnds().getAttribute('role')).toBe('switch');
       expect(assemblyEnds().checked).toBe(false);
-      expect(ringLines()[0]).toBe('11:00 AM · Bell · Period 4 starts · School bell');
+      expect(ringLines()[0]).toBe('11:00 AM · Bell · Period 4 starts · Soft bell');
 
       toggle('Bell when an Assembly ends');
 
-      expect(saved(storage).bells).toEqual({ on: true, sound: 'schoolBell', assemblyEnds: true, untilDismissed: false });
+      expect(saved(storage).bells).toEqual({ on: true, sound: 'softBell', assemblyEnds: true, untilDismissed: false });
       expect(assemblyEnds().checked).toBe(true);
       expect(ringLines().slice(0, 2)).toEqual([
-        '10:55 AM · Bell · Chapel ends · School bell',
-        '11:00 AM · Bell · Period 4 starts · School bell',
+        '10:55 AM · Bell · Chapel ends · Soft bell',
+        '11:00 AM · Bell · Period 4 starts · Soft bell',
       ]);
     });
 
@@ -281,7 +305,7 @@ describe('School Clock settings drawer', () => {
 
     it('Bell sound and Timer sound: each saved, each with a Preview of the voice chosen', () => {
       open();
-      expect(field('Bell sound').value).toBe('schoolBell');
+      expect(field('Bell sound').value).toBe('softBell');
       expect(field('Timer sound').value).toBe('beep');
 
       setValue('Bell sound', 'chime');
@@ -317,7 +341,7 @@ describe('School Clock settings drawer', () => {
       open();
       button('Settings').click();
       button('Test ring').click();
-      expect(player.played).toEqual([{ sound: 'schoolBell', repeat: true, seconds: 5 }]);
+      expect(player.played).toEqual([{ sound: 'softBell', repeat: true, seconds: 5 }]);
       expect(mount().querySelector('[role="alertdialog"]').hidden).toBe(false);
       advance(4 * SEC);
     });

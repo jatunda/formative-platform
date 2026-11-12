@@ -371,12 +371,15 @@ describe('School Clock fullscreen, mini player and feedback', () => {
       expect(miniMain().classList.contains('is-ringing')).toBe(false);
     });
 
-    it('stops showing a Bell 5 s after it rang, as the main page does', async () => {
+    it('stops showing a Bell when its sound ends, as the main page does', async () => {
       open();
       await openMini();
       advance(3 * 60 * SEC + SEC); // 11:15:01
       expect(head()).toBe('Ringing · Period 3 ends');
+      // Soft bell rings out until 5.6 s.
       advance(4 * SEC); // 11:15:05
+      expect(head()).toBe('Ringing · Period 3 ends');
+      advance(SEC); // 11:15:06
       expect(button('Dismiss', mini())).toBeUndefined();
       expect(head()).toBe('Passing Period');
       expect(miniMain().classList.contains('is-ringing')).toBe(false);

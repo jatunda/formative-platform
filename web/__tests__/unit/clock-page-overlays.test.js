@@ -78,7 +78,7 @@ describe('School Clock overlays', () => {
     it.each([
       ['a Bell', at(11, 14, 59), {}, 'Bell', 'Period 3 ends'],
       ['an unnamed Period Alarm', at(10, 52, 29), {
-        bells: { on: false, sound: 'schoolBell' },
+        bells: { on: false, sound: 'softBell' },
         alarms: [{ ...wrapUp, label: undefined, anchor: { from: 'halfway' } }],
       }, 'Period Alarm', 'Period 3', 'halfway through Period 3'],
       ['a Period Alarm counted from the start', at(10, 39, 59), {

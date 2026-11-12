@@ -101,14 +101,17 @@ body {
 
 /* Three rows: the top bar (Day Label, controls, Division), the stage, and
    the bottom row (the bar, then the icon-only window buttons); four with
-   the "Simulated time" banner. */
+   the "Simulated time" banner. It is as tall as #clockApp, the visible
+   height: on a phone 100vh is the height with the browser bars hidden, so a
+   screen that tall ran its bottom (the agenda's end, the window button)
+   under the bars, where the page, which never scrolls, couldn't reach. */
 .clock-screen {
   position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto minmax(0, 1fr) auto;
   grid-template-areas: "top" "stage" "bottom";
-  height: 100vh;
+  height: 100%;
   padding: var(--edge-y) var(--edge-x);
   row-gap: var(--gap-sm);
   /* The width the Readouts may use: the screen, less the Look sheet while
@@ -622,6 +625,33 @@ button.clock-readout__face:focus-visible {
   min-width: 0;
 }
 
+/* In the Readouts' edit mode a tap on the bar switches it: outlined the way
+   the Readouts are there. Its button lies over it for the keyboard but lets
+   taps and scrolls through to the bar. */
+.clock-bar.is-editing {
+  outline: 1.5px dashed var(--line);
+  outline-offset: 6px;
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.clock-bar.is-editing:has(.clock-bar__switch:focus-visible) {
+  outline: var(--focus-width) solid var(--focus);
+}
+
+.clock-bar__switch {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  pointer-events: none;
+}
+
+.clock-bar__switch:focus-visible {
+  outline: none;
+}
+
 .clock-bar__heading {
   margin-bottom: 0.3em;
   font-size: var(--type-strip-small);
@@ -783,7 +813,7 @@ button.clock-readout__face:focus-visible {
   bottom: 0;
 }
 
-/* "Show when this Period ends": the current block's "–11:15" after its start,
+/* "Show when this Segment ends": the current block's "–11:15" after its start,
    dropped where the block is too narrow for both times (they'd run into the
    next block's start). */
 @container (max-width: 6.2em) {
@@ -864,10 +894,15 @@ button.clock-readout__face:focus-visible {
 
 /* short: laptop corner (480x320), landscape phone */
 @media (max-height: 520px) {
+  /* The digits give back the room the cycle hint (under the first Readout)
+     and the simulated-time banner take while they show, so the stage stays
+     clear of the top bar and the line clear of the sound prompt. */
   .clock-screen {
     --edge-y: 6px;
     --edge-x: 12px;
-    --type-digits: 40vh;
+    --hint-room: 0px;
+    --banner-room: 0px;
+    --type-digits: calc(40vh - var(--hint-room) - var(--banner-room));
     row-gap: 4px;
     padding: 6px 12px 4px;
   }
@@ -935,7 +970,19 @@ button.clock-readout__face:focus-visible {
   }
 
   .clock-screen:has(> .clock-bottom > .clock-sound-prompt:not([hidden])) {
-    --type-digits: 34vh;
+    --type-digits: calc(34vh - var(--hint-room) - var(--banner-room));
+  }
+
+  /* About the height each takes here, over the digits' 0.95 line height:
+     the hint pill below (12px text, 2px padding, its border and 4px margin)
+     and the banner (12px text, 2px padding, its border and the row gap).
+     check:clock's stage check catches them going stale. */
+  .clock-screen:has(.clock-readout > .clock-cycle-hint:not([hidden])) {
+    --hint-room: 30px;
+  }
+
+  .clock-screen.is-simulated {
+    --banner-room: 28px;
   }
 
   .clock-title {
@@ -956,6 +1003,12 @@ button.clock-readout__face:focus-visible {
     font-size: clamp(14px, 5.5vh, 30px);
     line-height: 1.2;
     text-wrap: balance;
+  }
+
+  /* While the sound prompt shows, the window buttons sit in its row, not
+     over the stage, so the line has the full width and stays on one line. */
+  .clock-screen:has(> .clock-bottom > .clock-sound-prompt:not([hidden])) :is(.clock-next, .clock-line) {
+    max-width: none;
   }
 
   .clock-smalls {
@@ -1103,6 +1156,12 @@ button.clock-readout__face:focus-visible {
 
   .clock-screen:has(.clock-bar--day:not([hidden])) .clock-stage {
     justify-content: flex-start;
+  }
+
+  /* While the sound prompt shows too, the Readout's digits also fit the
+     height, so on a short phone the agenda keeps room for whole rows. */
+  .clock-screen:has(.clock-bar--day:not([hidden])):has(> .clock-bottom > .clock-sound-prompt:not([hidden])) {
+    --type-digits: 12svh;
   }
 
   /* The window button under the bar on the right; the sound prompt, while
@@ -1287,7 +1346,7 @@ button.clock-readout__face:focus-visible {
   top: 50%;
   transform: translate(-50%, -50%);
   width: min(520px, calc(100vw - 32px));
-  max-height: calc(100vh - 32px);
+  max-height: calc(100dvh - 32px);
   overflow: auto;
   padding: var(--s5);
   border: 1px solid var(--line-soft);

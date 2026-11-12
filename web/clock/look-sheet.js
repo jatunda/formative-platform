@@ -11,6 +11,7 @@
 // the clock closes it too. Every name is a look description from themes.js,
 // never who a theme is for.
 import { closeButton, fieldset, switchControl } from './controls.js';
+import { BAR_SETTING_NAMES } from './day-bar.js';
 import { SVG_NS, el } from './dom.js';
 import { icon } from './icons.js';
 import { createModal } from './modal.js';
@@ -99,7 +100,7 @@ export function createLookSheet({ settings, update, behind, onChange }) {
     'Flips this theme. Picking a theme shows its own version again.', (on) => update({ flipped: on }));
 
   // The bar's setting (day-bar.js): whole day is the saved dayStrip on.
-  const barInputs = /** @type {[string, boolean][]} */ ([['Whole day', true], ['Just this Segment', false]]).map(([name, on]) => {
+  const barInputs = /** @type {[string, boolean][]} */ ([[BAR_SETTING_NAMES.day, true], [BAR_SETTING_NAMES.segment, false]]).map(([name, on]) => {
     const input = el('input', { type: 'radio', name: `${ID}-bar`, onchange: () => update({ dayStrip: on }) });
     return { on, input, label: el('label', { className: 'clock-segment' }, [input, el('span', { textContent: name })]) };
   });
