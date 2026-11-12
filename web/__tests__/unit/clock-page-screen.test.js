@@ -376,7 +376,7 @@ describe('School Clock fullscreen, mini player and feedback', () => {
       await openMini();
       advance(3 * 60 * SEC + SEC); // 11:15:01
       expect(head()).toBe('Ringing · Period 3 ends');
-      // School bell rings out until 5.6 s.
+      // Soft bell rings out until 5.6 s.
       advance(4 * SEC); // 11:15:05
       expect(head()).toBe('Ringing · Period 3 ends');
       advance(SEC); // 11:15:06

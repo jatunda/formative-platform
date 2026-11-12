@@ -20,7 +20,7 @@ export const DEFAULT_SETTINGS = Object.freeze(/** @type {ClockSettings} */ ({
   division: null,
   use24Hour: false,
   periodLabels: {},
-  bells: { on: true, sound: 'schoolBell', assemblyEnds: false, untilDismissed: false },
+  bells: { on: true, sound: 'softBell', assemblyEnds: false, untilDismissed: false },
   alarms: [],
   volume: 0.8,
   timerEndsAt: null,
@@ -42,7 +42,22 @@ export const DEFAULT_SETTINGS = Object.freeze(/** @type {ClockSettings} */ ({
 
 /** @param {unknown} v @returns {v is Record<string, any>} */
 const isObject = (v) => typeof v === 'object' && v !== null && !Array.isArray(v);
-/** @param {unknown} v */
+/**
+ * Voices saved under a key they no longer have: the gentle bell was
+ * `schoolBell` until the loud hallway bell was added as School bell.
+ */
+const RENAMED_SOUNDS = Object.freeze({ schoolBell: 'softBell' });
+/**
+ * A saved voice as it is now named, or the saved value as is.
+ * @param {unknown} v @returns {unknown}
+ */
+const savedSound = (v) => (typeof v === 'string' && Object.hasOwn(RENAMED_SOUNDS, v) ? RENAMED_SOUNDS[v] : v);
+/**
+ * A saved Bells or Alarm object with its voice as it is now named.
+ * @param {unknown} v @returns {unknown}
+ */
+const withSavedSound = (v) => (isObject(v) ? { ...v, sound: savedSound(v.sound) } : v);
+/** @param {unknown} v @returns {v is import('./clock-settings.js').SoundName} */
 const isSound = (v) => SOUNDS.includes(/** @type {import('./clock-settings.js').SoundName} */ (v));
 /** @param {unknown} v */
 const isStringList = (v) => Array.isArray(v) && v.every((s) => typeof s === 'string');
@@ -115,7 +130,8 @@ function parseSettings(saved) {
       if (typeof label === 'string') periodLabels[name] = label;
     }
   }
-  const bells = s.bells;
+  const bells = withSavedSound(s.bells);
+  const timerSound = savedSound(s.timerSound);
   const timerEndsAt = isFiniteNumber(s.timerEndsAt) ? s.timerEndsAt : d.timerEndsAt;
   const isPositive = (v) => isFiniteNumber(v) && v > 0;
   // One timer at a time: a running one wins over a paused one.
@@ -128,14 +144,14 @@ function parseSettings(saved) {
     bells: isObject(bells) && typeof bells.on === 'boolean' && isSound(bells.sound)
       ? { on: bells.on, sound: bells.sound, assemblyEnds: bells.assemblyEnds === true, untilDismissed: bells.untilDismissed === true }
       : { ...d.bells },
-    alarms: Array.isArray(s.alarms) ? s.alarms.filter(isAlarm) : [],
+    alarms: Array.isArray(s.alarms) ? s.alarms.map(withSavedSound).filter(isAlarm) : [],
     volume: isFiniteNumber(s.volume) && s.volume >= 0 && s.volume <= 1 ? s.volume : d.volume,
     timerEndsAt,
     timerPausedMs,
     timerTotalMs: hasTimer && isPositive(s.timerTotalMs) ? s.timerTotalMs : d.timerTotalMs,
     // An older save named it `timerLabel`.
     timerName: hasTimer ? savedName(s.timerName, s.timerLabel) : d.timerName,
-    timerSound: isSound(s.timerSound) ? s.timerSound : d.timerSound,
+    timerSound: isSound(timerSound) ? timerSound : d.timerSound,
     quickPicks: parseQuickPicks(s),
     showSeconds: typeof s.showSeconds === 'boolean' ? s.showSeconds : d.showSeconds,
     dayStrip: typeof s.dayStrip === 'boolean' ? s.dayStrip : d.dayStrip,

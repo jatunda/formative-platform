@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { createSoundPlayer, ringLength, SOUNDS, SOUND_NAMES, BELL_SECONDS, ALARM_MAX_SECONDS } from '../../clock/sound.js';
 import { createFakeAudioContext, audibleStarts } from '../helpers/fake-audio.js';
 
-const bell = (key, at, sound = 'schoolBell') => ({ key, at, sound, repeat: false });
+const bell = (key, at, sound = 'softBell') => ({ key, at, sound, repeat: false });
 const alarm = (key, at, sound = 'beep') => ({ key, at, sound, repeat: true });
 /** A 5-second Bell of `sound` at 20 s, as the page rings one that stops on its own. */
 const bellOf = (sound) => {
@@ -20,11 +20,66 @@ const attackOf = (source) => {
 const distinct = (values) => [...new Set(values)];
 
 describe('School Clock sound player', () => {
-  it('lists thirteen voices, gentlest first', () => {
+  it('lists fourteen voices, A to Z by the name people see', () => {
     expect(SOUNDS.map((sound) => SOUND_NAMES[sound])).toEqual([
-      'Swell', 'Chime', 'Harp', 'Clock tower', 'Marimba', 'Songbird', 'Desk bell',
-      'Wood block', 'Level up', 'Clap pattern', 'School bell', 'Beep', 'Buzzer',
+      'Beep', 'Buzzer', 'Chime', 'Clap pattern', 'Clock tower', 'Desk bell', 'Harp',
+      'Level up', 'Marimba', 'School bell', 'Soft bell', 'Songbird', 'Swell', 'Wood block',
     ]);
+  });
+
+  it('keeps the gentle bell as Soft bell and names the loud hallway bell School bell', () => {
+    expect(SOUND_NAMES.softBell).toBe('Soft bell');
+    expect(SOUND_NAMES.hallwayBell).toBe('School bell');
+  });
+
+  describe('School bell (the loud hallway bell)', () => {
+    /** The gain that hammers the gong: the one in the voice's path with a rise for every strike. */
+    const clapper = (source) => pathOf(source).find((n) => (n.gain?.events ?? []).filter((e) => e.kind === 'linear').length > 10);
+    const strikes = (source) => clapper(source).gain.events.filter((e) => e.kind === 'linear').map((e) => e.at);
+
+    it('hammers a metal gong fast enough to rattle, in one long continuous ring', () => {
+      const ctx = createFakeAudioContext({ state: 'running' });
+      createSoundPlayer({ context: ctx }).play('hallwayBell');
+      const hits = strikes(ctx.sources[0]);
+      const gaps = hits.slice(1).map((at, i) => at - hits[i]);
+      // About 20 strikes a second: a rattle, not a flutter.
+      expect(gaps.every((gap) => gap >= 1 / 30 && gap <= 1 / 15)).toBe(true);
+      // One ring of about 3 s, with no break in the strikes.
+      expect(hits[hits.length - 1] - hits[0]).toBeGreaterThanOrEqual(2.8);
+      // Every strike lands hard: the level jumps well above where the last one left it.
+      const rises = clapper(ctx.sources[0]).gain.events.filter((e) => e.kind === 'linear').map((e) => e.value);
+      const falls = clapper(ctx.sources[0]).gain.events.filter((e) => e.kind === 'exponential' && e.value > 0.001).map((e) => e.value);
+      expect(Math.min(...rises)).toBeGreaterThan(2 * Math.max(...falls));
+    });
+
+    it('rings bright metal partials that laptop and projector speakers play cleanly', () => {
+      const ctx = createFakeAudioContext({ state: 'running' });
+      createSoundPlayer({ context: ctx }).play('hallwayBell');
+      const freqs = ctx.sources.map((s) => s.frequency.value);
+      expect(Math.min(...freqs)).toBeGreaterThanOrEqual(400);
+      expect(Math.max(...freqs)).toBeLessThanOrEqual(3200);
+      // Inharmonic partials, as on a struck gong, not a pure tone or its octaves.
+      const ratios = distinct(freqs.map((f) => +(f / Math.min(...freqs)).toFixed(1)));
+      expect(ratios.length).toBeGreaterThanOrEqual(3);
+      expect(ratios.some((r) => !Number.isInteger(r))).toBe(true);
+    });
+
+    it('rings once as a preview, twice as a Bell that stops on its own, and repeats with a short gap as an Alarm', () => {
+      const preview = createFakeAudioContext({ state: 'running' });
+      createSoundPlayer({ context: preview }).play('hallwayBell');
+      expect(distinct(preview.sources.map((s) => s.startAt))).toEqual([0]);
+
+      const bell = bellOf('hallwayBell');
+      expect(distinct(bell.sources.map((s) => s.startAt))).toEqual([20, 24]);
+      expect(Math.max(...bell.sources.map((s) => s.stopAt))).toBeCloseTo(20 + ringLength('hallwayBell', 5));
+
+      const ctx = createFakeAudioContext({ state: 'running' });
+      createSoundPlayer({ context: ctx }).schedule([alarm('a', 20, 'hallwayBell')]);
+      const firstEnds = Math.max(...ctx.sources.filter((s) => s.startAt < 24).map((s) => s.stopAt));
+      // A short gap of quiet before it rings again.
+      expect(24 - firstEnds).toBeGreaterThanOrEqual(0.3);
+      expect(24 - firstEnds).toBeLessThanOrEqual(1);
+    });
   });
 
   it('plays a scheduled Bell at its audio time for about 3 seconds, then stops on its own', () => {
@@ -221,8 +276,8 @@ describe('School Clock sound player', () => {
 
   it('works out how long a ring lasts: a long voice past its 5 s, a short one repeating until 5 s then finishing', () => {
     expect(ringLength('clockTower', 5)).toBeCloseTo(6.6);
-    // School bell: passes at 0 and 3 s, each ringing 2.6 s.
-    expect(ringLength('schoolBell', 5)).toBeCloseTo(5.6);
+    // Soft bell: passes at 0 and 3 s, each ringing 2.6 s.
+    expect(ringLength('softBell', 5)).toBeCloseTo(5.6);
     // Chime: passes at 0, 1.5, 3 and 4.5 s, each 1.5 s.
     expect(ringLength('chime', 5)).toBeCloseTo(6);
     // Beep: ten passes, the last at 4.5 s.
