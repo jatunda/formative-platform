@@ -20,7 +20,9 @@ cat > "$STUB" <<'EOF'
 #!/usr/bin/env bash
 echo "$(basename "$PWD") $*" >> "$STUB_LOG"
 case "$*" in
-  "npm run test:coverage") mkdir -p coverage; echo "      Tests  42 passed (42)" ;;
+  # vitest colours its summary even when piped
+  "npm run test:coverage") mkdir -p coverage
+    printf '\033[2m      Tests \033[22m \033[1m\033[32m42 passed\033[39m\033[22m\033[90m (42)\033[39m\n' ;;
   "npm test") echo "# pass 7" ;;
 esac
 case " ${STUB_FAIL:-} " in *" $* "*) echo "stub: $* failed"; exit 1 ;; esac

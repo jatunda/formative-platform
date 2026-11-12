@@ -66,7 +66,7 @@ check() { # check <dir> <label> <command...>
     echo "---- $dir: $* failed; last lines:"
     tail -n 30 "$LOG"
   fi
-  count="$(grep -aoE 'Tests +[0-9]+ (passed|failed)[^)]*\)?|^(# |ℹ )(pass|fail) [0-9]+' "$LOG" | sed 's/^# //; s/^ℹ //' | paste -sd ',' - | sed 's/,/, /g')"
+  count="$(sed $'s/\033\\[[0-9;]*m//g' "$LOG" | grep -aoE 'Tests +[0-9]+ (passed|failed)[^)]*\)?|^(# |ℹ )(pass|fail) [0-9]+' | sed 's/^# //; s/^ℹ //' | paste -sd ',' - | sed 's/,/, /g')"
   SUMMARY="$SUMMARY  $label: $result${count:+ ($count)}"$'\n'
 }
 
