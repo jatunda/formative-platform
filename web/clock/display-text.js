@@ -72,3 +72,17 @@ export function displayText(now, moment, { use24Hour, periodLabels, showPeriodEn
       return text({ day: formatDate(now), title: formatDate(now), line: 'No school calendar for this date yet' });
   }
 }
+
+/**
+ * Just the heading at `now`, as one line ("Period 3 · AP CSA", "Passing
+ * Period"), for a view with no room for the rest (the mini player).
+ * @param {Date} now
+ * @param {Moment} moment `describeMoment(now, ...)`
+ * @param {Record<string, string>} periodLabels
+ * @returns {string}
+ */
+export function headingText(now, moment, periodLabels) {
+  // The heading never depends on the time format or the end-time setting.
+  const { title, tag } = displayText(now, moment, { use24Hour: false, periodLabels, showPeriodEnd: false });
+  return [title, tag].filter(Boolean).join(' · ');
+}
