@@ -191,7 +191,7 @@ describe('School Clock sound', () => {
 
   describe('ringing', () => {
     it('flashes the screen and says what rang when a Bell comes due, then stops on its own when its sound ends', () => {
-      // Soft bell plays passes at 0 and 3 s, the second ringing out until 5.6 s.
+      // School bell (softer) plays passes at 0 and 3 s, the second ringing out until 5.6 s.
       open({ when: at(11, 14, 59) });
       expect(ringing().hidden).toBe(true);
 
@@ -207,13 +207,13 @@ describe('School Clock sound', () => {
     });
 
     it('keeps a Clock tower Bell on screen past 5 s, until its chime has played to the end', () => {
-      // One pass of Clock tower lasts 6.6 s.
+      // One pass of Clock tower lasts 7.4 s.
       open({ when: at(11, 14, 59), settings: { bells: { on: true, sound: 'clockTower' } } });
       real.advance(2 * SEC); // 11:15:01
-      for (let i = 0; i < 5; i += 1) real.advance(SEC); // 11:15:06
+      for (let i = 0; i < 6; i += 1) real.advance(SEC); // 11:15:07
       expect(ringing().hidden).toBe(false);
       expect(ringing().textContent).toContain('Period 3 ends');
-      real.advance(SEC); // 11:15:07
+      real.advance(SEC); // 11:15:08
       expect(ringing().hidden).toBe(true);
       expect(player.dismissals).toBe(0);
     });
@@ -226,7 +226,7 @@ describe('School Clock sound', () => {
       expect(ringing().textContent).toContain('Period 3 ends');
       real.advance(2 * SEC); // 11:15:06.5: the chime still has a moment to go
       expect(ringing().hidden).toBe(false);
-      real.advance(SEC); // 11:15:07.5, not 6.6 s after the page saw it
+      real.advance(SEC); // 11:15:07.5, not 7.4 s after the page saw it
       expect(ringing().hidden).toBe(true);
     });
 
@@ -464,7 +464,7 @@ describe('School Clock sound', () => {
       open();
       openSettings();
       const listed = (name) => [...field(name).options].map((o) => o.textContent);
-      expect(listed('Bell sound')).toEqual(['Beep', 'Bubble pops', 'Buzzer', 'Chime', 'Clap pattern', 'Clock tower', 'Cuckoo clock', 'Desk bell', 'Digital alarm clock', 'Harp', 'Level up', 'Marimba', 'Music box', 'School bell', "Ship's klaxon", 'Singing bowl', 'Soft bell', 'Songbird', 'Sparkle', 'Swell', 'Ta-da', 'Twin-bell alarm clock', 'Wood block']);
+      expect(listed('Bell sound')).toEqual(['Beep', 'Bubble pops', 'Buzzer', 'Chime', 'Clap pattern', 'Clock tower', 'Cuckoo clock', 'Desk bell', 'Digital alarm clock', 'Harp', 'Level up', 'Marimba', 'Music box', 'School bell', 'School bell (softer)', "Ship's klaxon", 'Singing bowl', 'Songbird', 'Sparkle', 'Swell', 'Ta-da', 'Twin-bell alarm clock', 'Wood block']);
       expect(listed('Timer sound')).toEqual(listed('Bell sound'));
       // Each option plays the voice it names.
       expect([...field('Bell sound').options].every((o) => SOUND_NAMES[o.value] === o.textContent)).toBe(true);

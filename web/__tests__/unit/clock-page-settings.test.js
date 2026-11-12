@@ -320,15 +320,15 @@ describe('School Clock settings drawer', () => {
       expect(assemblyEnds().checked).toBe(false);
       expect(description('Bell when an Assembly ends'))
         .toBe('Chapel, Convocation and Pep Rally. Bells never ring at the start of an assembly.');
-      expect(ringLines()[0]).toBe('11:00 AM · Bell · Period 4 starts · Soft bell');
+      expect(ringLines()[0]).toBe('11:00 AM · Bell · Period 4 starts · School bell (softer)');
 
       toggle('Bell when an Assembly ends');
 
       expect(saved(storage).bells).toEqual({ on: true, sound: 'softBell', assemblyEnds: true, untilDismissed: false });
       expect(assemblyEnds().checked).toBe(true);
       expect(ringLines().slice(0, 2)).toEqual([
-        '10:55 AM · Bell · Chapel ends · Soft bell',
-        '11:00 AM · Bell · Period 4 starts · Soft bell',
+        '10:55 AM · Bell · Chapel ends · School bell (softer)',
+        '11:00 AM · Bell · Period 4 starts · School bell (softer)',
       ]);
     });
 

@@ -61,7 +61,7 @@ describe('clock settings store', () => {
     expect(storeHolding(older).load()).toEqual(older);
   });
 
-  it('loads a save that picked the gentle bell (saved as `schoolBell` before it was Soft bell) as Soft bell, not the loud School bell', () => {
+  it('loads a save that picked the gentle bell (saved as `schoolBell` before ticket 37) as School bell (softer), not the loud School bell', () => {
     const settings = storeHolding({
       ...DEFAULT_SETTINGS,
       bells: { on: true, sound: 'schoolBell', assemblyEnds: false, untilDismissed: false },
