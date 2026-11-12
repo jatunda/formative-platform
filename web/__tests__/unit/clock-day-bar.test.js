@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { describeMoment } from '../../clock/clock-model.js';
-import { describeBar } from '../../clock/day-bar.js';
+import { barSetting, dayStripOf, describeBar } from '../../clock/day-bar.js';
 import { SCHOOL_YEARS } from '../../clock/school-years.js';
 
 // Tue 2026-10-27 is an All Day: Period 1 8:30–9:20 … Period 7 14:25–15:10.
@@ -229,5 +229,14 @@ describe('the bar is hidden', () => {
 
   it('on a date the clock knows nothing about', () => {
     expect(barAt(new Date(2040, 0, 1, 10, 0))).toBeNull();
+  });
+});
+
+describe('the bar setting and the saved dayStrip', () => {
+  it('names whole day for dayStrip on and just this Segment for off, and back', () => {
+    expect(barSetting(true)).toBe('day');
+    expect(barSetting(false)).toBe('segment');
+    expect(dayStripOf('day')).toBe(true);
+    expect(dayStripOf('segment')).toBe(false);
   });
 });

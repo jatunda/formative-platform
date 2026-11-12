@@ -11,7 +11,7 @@
 // made by the page and handed in.
 import { DIVISIONS, LABELLED_PERIODS } from './clock-settings.js';
 import { closeButton, drawerSection, feedbackLink, fieldset, segmented, soundChoice, switchControl } from './controls.js';
-import { BAR_SETTING_NAMES } from './day-bar.js';
+import { BAR_SETTING_NAMES, barSetting, dayStripOf } from './day-bar.js';
 import { el } from './dom.js';
 import { createModal } from './modal.js';
 import { BELL_AUTO_DISMISS_SECONDS } from './sound.js';
@@ -39,9 +39,9 @@ export function createSettingsDrawer({ settings, update, play, testRing, behind,
   const use24Hour = switchControl(`${ID}-24-hour`, '24-hour time', '', (on) => update({ use24Hour: on }));
   // When the current Segment (any Segment, not just a Period) ends, under the clock and in the bar.
   const periodEnd = switchControl(`${ID}-period-end`, 'Show period end time', '', (on) => update({ showPeriodEnd: on }));
-  // The bar's setting (day-bar.js): whole day is the saved dayStrip on.
-  const bar = segmented(`${ID}-bar`, 'Bottom bar', [['day', BAR_SETTING_NAMES.day], ['segment', BAR_SETTING_NAMES.segment]],
-    'day', () => update({ dayStrip: bar.value() === 'day' }));
+  // The bar's setting (day-bar.js), saved as dayStrip.
+  const bar = segmented(`${ID}-bar`, 'Bottom bar', Object.entries(BAR_SETTING_NAMES),
+    barSetting(true), () => update({ dayStrip: dayStripOf(bar.value()) }));
   const time = drawerSection('time', 'Time', [seconds.label, use24Hour.label, periodEnd.label, fieldset('Bottom bar', [bar.group])]);
 
   const bells = switchControl(`${ID}-bells`, 'Bells', 'Start and end of every Period and Break',
@@ -119,7 +119,7 @@ export function createSettingsDrawer({ settings, update, play, testRing, behind,
     seconds.input.checked = s.showSeconds;
     use24Hour.input.checked = s.use24Hour;
     periodEnd.input.checked = s.showPeriodEnd;
-    bar.choose(s.dayStrip ? 'day' : 'segment');
+    bar.choose(barSetting(s.dayStrip));
     bells.input.checked = s.bells.on;
     untilDismissed.input.checked = s.bells.untilDismissed === true;
     untilDismissed.input.disabled = !s.bells.on;

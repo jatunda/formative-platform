@@ -8,7 +8,7 @@
 // Readouts' edit mode a tap anywhere on the bar switches it between whole day
 // and just this Segment; a button laid over it (letting taps and scrolls
 // through to the bar) does the same for the keyboard and screen readers.
-import { BAR_SETTING_NAMES } from './day-bar.js';
+import { BAR_SETTING_NAMES, barSetting, dayStripOf } from './day-bar.js';
 import { el } from './dom.js';
 import { formatShortDate } from './format.js';
 
@@ -173,7 +173,7 @@ export function createDayBarView({ onSwitch }) {
       built = key;
       build(bar, time);
     }
-    const other = bar.setting === 'day' ? 'segment' : 'day';
+    const other = barSetting(!dayStripOf(bar.setting));
     switchName.textContent = `Bottom bar: ${BAR_SETTING_NAMES[bar.setting]}. Switch to ${BAR_SETTING_NAMES[other]}`;
     // A current block (and so a fill) exactly when something is current.
     if (current) {
