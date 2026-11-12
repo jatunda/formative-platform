@@ -10,7 +10,7 @@ Built behaviour: closed tickets 44 (the short layout and its prompt crowding) an
 
 **Blocked by:** None (can start immediately)
 
-**Status:** needs-triage
+**Status:** ready-for-agent
 
 - [ ] `npm run check:clock -- --size 480x320 --timer --sound-on --layout countdown,clock,countup` passes
 - [ ] `npm run check:clock -- --size 480x320 --timer --sound-on` passes
@@ -20,3 +20,5 @@ Built behaviour: closed tickets 44 (the short layout and its prompt crowding) an
 ## Comments
 
 Found by the first `npm run check:clock:full` run (agent-tooling ticket 01).
+
+**2026-11-12: triaged.** Eric: yes, build it.
