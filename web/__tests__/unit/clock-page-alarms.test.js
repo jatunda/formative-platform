@@ -469,7 +469,8 @@ describe('School Clock Alarm editor', () => {
       expect(inForm('Sound').value).toBe('chime');
       setValue('Sound', 'buzzer', form());
       button('Preview Sound', form()).click();
-      expect(player.played).toEqual([{ sound: 'buzzer', repeat: false }]);
+      expect(player.previewed).toEqual(['buzzer']);
+      expect(player.played).toEqual([]);
     });
 
     it('offers every voice, the new ones too, A to Z by name', () => {
@@ -479,7 +480,7 @@ describe('School Clock Alarm editor', () => {
       expect([...inForm('Sound').options].every((o) => SOUND_NAMES[o.value] === o.textContent)).toBe(true);
       setValue('Sound', 'songbird', form());
       button('Preview Sound', form()).click();
-      expect(player.played).toEqual([{ sound: 'songbird', repeat: false }]);
+      expect(player.previewed).toEqual(['songbird']);
     });
 
     it('is deleted at once from its form, with an Undo that puts it back', () => {

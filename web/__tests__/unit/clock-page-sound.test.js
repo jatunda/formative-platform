@@ -477,7 +477,7 @@ describe('School Clock sound', () => {
         setValue('Bell sound', sound);
         button('Preview Bell sound').click();
       }
-      expect(player.played.map((p) => p.sound)).toEqual(SOUNDS);
+      expect(player.previewed).toEqual(SOUNDS);
     });
 
     it('chooses the Bells sound, which is saved and used for the coming Bells', () => {

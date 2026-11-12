@@ -755,6 +755,71 @@ describe('School Clock sound player', () => {
     expect(Math.max(...ctx.sources.map((s) => s.stopAt))).toBeLessThanOrEqual(42 + BELL_SECONDS + 0.5);
   });
 
+  describe('a preview', () => {
+    it('plays the voice now, for about 3 seconds', () => {
+      const ctx = createFakeAudioContext({ state: 'running' });
+      ctx.currentTime = 42;
+      createSoundPlayer({ context: ctx }).preview('chime');
+      expect(Math.min(...ctx.sources.map((s) => s.startAt))).toBe(42);
+      expect(Math.max(...ctx.sources.map((s) => s.stopAt))).toBeLessThanOrEqual(42 + BELL_SECONDS + 0.5);
+    });
+
+    it('stops the preview still playing before it, so two previews never overlap', () => {
+      const ctx = createFakeAudioContext({ state: 'running' });
+      const player = createSoundPlayer({ context: ctx });
+      ctx.currentTime = 10;
+      player.preview('clockTower');
+      const first = ctx.sources.length;
+
+      ctx.currentTime = 11;
+      player.preview('chime');
+
+      expect(ctx.sources.slice(0, first).every((s) => s.stopAt <= 11)).toBe(true);
+      expect(audibleStarts(ctx, 11).filter((t) => t >= 11)).not.toHaveLength(0);
+      expect(audibleStarts(ctx, 11).every((t) => t >= 11)).toBe(true);
+    });
+
+    it('never stops a ringing Bell, nor the Bell a preview over it', () => {
+      const ctx = createFakeAudioContext({ state: 'running' });
+      const player = createSoundPlayer({ context: ctx });
+      player.schedule([{ key: 'b', at: 20, sound: 'clockTower', repeat: true, seconds: 5 }]);
+      const bellStops = ctx.sources.map((s) => s.stopAt);
+
+      ctx.currentTime = 21;
+      player.preview('chime');
+      ctx.currentTime = 22;
+      player.preview('beep');
+
+      expect(ctx.sources.slice(0, bellStops.length).map((s) => s.stopAt)).toEqual(bellStops);
+      expect(Math.max(...bellStops)).toBeGreaterThan(25);
+    });
+
+    it('never stops an Alarm or the timer ringing, nor one that just came due', () => {
+      const ctx = createFakeAudioContext({ state: 'running' });
+      const player = createSoundPlayer({ context: ctx });
+      player.schedule([alarm('a', 20)]);
+      ctx.currentTime = 30;
+      player.play('buzzer', { repeat: true });
+      const ringingStops = ctx.sources.map((s) => s.stopAt);
+
+      player.preview('chime');
+      ctx.currentTime = 31;
+      player.preview('beep');
+
+      expect(ctx.sources.slice(0, ringingStops.length).map((s) => s.stopAt)).toEqual(ringingStops);
+      expect(Math.max(...ringingStops)).toBeGreaterThan(ALARM_MAX_SECONDS);
+    });
+
+    it('is dismissed with whatever else is sounding', () => {
+      const ctx = createFakeAudioContext({ state: 'running' });
+      const player = createSoundPlayer({ context: ctx });
+      player.preview('clockTower');
+      ctx.currentTime = 1;
+      player.dismiss();
+      expect(audibleStarts(ctx)).toEqual([]);
+    });
+  });
+
   it('sets one volume for every sound', () => {
     const ctx = createFakeAudioContext({ state: 'running' });
     const player = createSoundPlayer({ context: ctx, volume: 0.8 });

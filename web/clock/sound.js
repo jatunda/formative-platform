@@ -78,6 +78,7 @@ export const BELL_AUTO_DISMISS_SECONDS = 5;
  *   setVolume: (volume: number) => void,
  *   schedule: (rings: ScheduledRing[]) => void,
  *   play: (sound: SoundName, options?: { repeat?: boolean, seconds?: number }) => void,
+ *   preview: (sound: SoundName) => void,
  *   dismiss: () => void,
  *   close: () => void,
  * }} SoundPlayer
@@ -629,6 +630,7 @@ function unavailablePlayer() {
     setVolume: () => {},
     schedule: () => {},
     play: () => {},
+    preview: () => {},
     dismiss: () => {},
     close: () => {},
   };
@@ -663,8 +665,10 @@ function playerOn(ctx, volume) {
   const listeners = [];
   ctx.onstatechange = () => listeners.forEach((listener) => listener(/** @type {SoundState} */ (ctx.state)));
   let plays = 0;
+  /** The last preview, which the next one stops if it is still playing. @type {Playing | null} */
+  let lastPreview = null;
 
-  /** @param {ScheduledRing} ring */
+  /** @param {ScheduledRing} ring @returns {Playing} */
   function add({ key, at, sound, repeat, seconds }) {
     const limit = seconds ?? (repeat ? ALARM_MAX_SECONDS : BELL_SECONDS);
     /** @type {AudioScheduledSourceNode[]} */
@@ -676,7 +680,9 @@ function playerOn(ctx, volume) {
       sources.push(source);
     };
     const end = ringOut(ctx, master, VOICES[sound], at, limit, track);
-    rings.set(key, { at, end, sources, done: false });
+    const playing = { at, end, sources, done: false };
+    rings.set(key, playing);
+    return playing;
   }
 
   /** @param {Playing} ring */
@@ -709,6 +715,13 @@ function playerOn(ctx, volume) {
     play(sound, { repeat = false, seconds } = {}) {
       plays += 1;
       add({ key: `play:${plays}`, at: ctx.currentTime, sound, repeat, seconds });
+    },
+    // A preview stops only the preview before it: never a Bell, an Alarm or
+    // the timer that is really ringing.
+    preview(sound) {
+      if (lastPreview && !lastPreview.done) silence(lastPreview);
+      plays += 1;
+      lastPreview = add({ key: `play:${plays}`, at: ctx.currentTime, sound, repeat: false });
     },
     dismiss() {
       const now = ctx.currentTime;
