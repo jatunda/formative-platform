@@ -129,6 +129,7 @@ new_repo 7
 git checkout -qb ticket && commit_file functions/g.txt g && git checkout -q integration
 commit_file web/c.txt c
 run ticket
+expect_log "functions npm ci when its node_modules is missing" "functions npm ci"
 expect_log "functions tests run" "functions npm test"
 expect_out "summary reports functions test count" "pass 7"
 

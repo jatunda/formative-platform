@@ -11,7 +11,8 @@
 #   - If the merged tree equals <branch>'s tree, the branch already passed the
 #     checks on this tip: skips them.
 #   - Otherwise, in web/: npm ci (if node_modules is missing), lint, typecheck,
-#     test:coverage; in functions/: npm test, only if the merge changed it.
+#     test:coverage; in functions/, only if the merge changed it: npm ci (if
+#     node_modules is missing), npm test.
 #     Deletes web/coverage/ afterwards. Exits 1 if any check fails.
 #   - Never pushes, deletes branches or removes worktrees.
 #
@@ -75,6 +76,7 @@ check web typecheck npm run typecheck
 check web "test:coverage" npm run test:coverage
 rm -rf "$ROOT/web/coverage"
 if ! git diff --quiet HEAD^1 HEAD -- functions; then
+  [ -d "$ROOT/functions/node_modules" ] || check functions "functions npm ci" npm ci
   check functions "functions npm test" npm test
 fi
 
