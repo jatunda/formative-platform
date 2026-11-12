@@ -356,6 +356,19 @@ describe('School Clock bar', () => {
       expect(words(mount().querySelector('.clock-edit-note'))).toBe('Tap a Readout or the bar to change what it shows');
     });
 
+    it('still looks editable straight after a switch, with no wait for the next tick', () => {
+      open({ when: at(10, 39) });
+      edit();
+      bar().click();
+      expect(bar().classList).toContain('clock-bar--segment');
+      expect(bar().classList).toContain('is-editing');
+      switchButton().focus();
+      switchButton().click();
+      expect(bar().classList).toContain('clock-bar--day');
+      expect(bar().classList).toContain('is-editing');
+      expect(document.activeElement).toBe(switchButton());
+    });
+
     it("isn't interactive outside edit mode", () => {
       open({ when: at(10, 39) });
       bar().click();
