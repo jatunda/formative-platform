@@ -98,9 +98,25 @@ export const BELL_AUTO_DISMISS_SECONDS = 5;
 /**
  * How a tone's level moves: `decay` rises over its attack and dies away to
  * silence by its end; `gate` starts at its peak, holds, and cuts off over the
- * last 12 ms; `steady` stays at its peak (for a voice that shapes it after).
+ * last `GATE_FADE_SECONDS`; `steady` stays at its peak (for a voice that shapes it after).
  * @typedef {'decay' | 'gate' | 'steady'} Envelope
  */
+
+/** How long a `gate` tone takes to cut off at its end (s): short enough to sound like a hard stop, long enough not to click. */
+const GATE_FADE_SECONDS = 0.012;
+
+/**
+ * The highest a voice's energy goes (Hz): laptop and projector speakers play
+ * up to here cleanly, and anything above turns piercing or distorts.
+ */
+const SPEAKER_CEILING_HZ = 3000;
+
+/**
+ * Where a low-pass sits to keep a broadband sound (noise, or a buzzy wave
+ * full of harmonics) under `SPEAKER_CEILING_HZ` (Hz): a little below it, since
+ * a filter's slope still lets some through above its cutoff.
+ */
+const LOWPASS_CAP_HZ = 2800;
 
 /**
  * One tone: an oscillator through a low-pass filter (if given) and its own
@@ -137,7 +153,7 @@ function tone(ctx, out, track, {
   } else {
     env.gain.setValueAtTime(peak, t);
     if (envelope === 'gate') {
-      env.gain.setValueAtTime(peak, t + length - 0.012);
+      env.gain.setValueAtTime(peak, t + length - GATE_FADE_SECONDS);
       env.gain.linearRampToValueAtTime(0.0001, t + length);
     }
   }
@@ -174,7 +190,7 @@ function strike(ctx, out, track, freq, t, partials) {
  *   clatter?: { freq: number, q: number, mix: number } }} bell
  *   `offset`: every strike lands that fraction of a strike late (the second of
  *   two bells struck in turn). `clatter` adds noise band-passed around `freq`
- *   Hz (and capped under 3 kHz), `mix` times `level`, through the same
+ *   Hz (and capped under `SPEAKER_CEILING_HZ`), `mix` times `level`, through the same
  *   clapper, so every strike clangs as well as rings.
  */
 function rattlingBell(ctx, out, track, {
@@ -205,7 +221,7 @@ function rattlingBell(ctx, out, track, {
     band.frequency.value = clatter.freq;
     band.Q.value = clatter.q;
     cap.type = 'lowpass';
-    cap.frequency.value = 2800;
+    cap.frequency.value = LOWPASS_CAP_HZ;
     mix.gain.value = clatter.mix * level;
     source.connect(band);
     band.connect(cap);
@@ -310,7 +326,7 @@ const VOICES = {
       const last = i === SCALE.length - 1;
       tone(ctx, out, track, {
         type: 'sawtooth', freq, t: at, length: last ? 1.6 : 1.1, peak: last ? 0.22 : 0.16, attack: 0.004,
-        filter: { from: Math.min(freq * 4, 3000), to: freq * 1.2, over: 0.35, q: 0.7 },
+        filter: { from: Math.min(freq * 4, SPEAKER_CEILING_HZ), to: freq * 1.2, over: 0.35, q: 0.7 },
       });
     });
     return 2.5;
@@ -459,17 +475,20 @@ const VOICES = {
   },
   // Ship's klaxon: a navy general-alarm horn. Ah-OO-gah: a harsh horn note
   // that sweeps up quickly from 420 to 640 Hz and holds, 1.25 s a honk, each
-  // honk running straight into the next (its 12 ms fade-out under the next
+  // honk running straight into the next (its gate's fade-out under the next
   // one's start), so it blares on with no break. A sawtooth and a square a
   // few hertz apart make it buzz; a low-pass filter keeps the buzz under
   // 3 kHz. The pitch only ever sweeps up and jumps back down, never a
   // rising-and-falling wail, so it can't be taken for a siren.
   klaxon(ctx, out, t, track) {
     const HONK = 1.25;
+    // Each honk runs on past the next one's start by its own fade-out, so the
+    // fade hides under the next honk and the blare never dips.
+    const OVERLAP = GATE_FADE_SECONDS;
     for (const [type, detune] of /** @type {[OscillatorType, number][]} */ ([['sawtooth', 0], ['square', 3]])) {
       tone(ctx, out, track, {
-        type, freq: 420 + detune, bendTo: 640 + detune, bendLength: 0.35, t, length: HONK + 0.012, peak: 0.22,
-        envelope: 'gate', filter: { from: 2800, to: 1800, over: HONK, q: 0.8 },
+        type, freq: 420 + detune, bendTo: 640 + detune, bendLength: 0.35, t, length: HONK + OVERLAP, peak: 0.22,
+        envelope: 'gate', filter: { from: LOWPASS_CAP_HZ, to: 1800, over: HONK, q: 0.8 },
       });
     }
     return HONK;
@@ -544,7 +563,7 @@ const VOICES = {
     /** @param {number} freq @param {number} at @param {number} length */
     const bar = (freq, at, length) => {
       tone(ctx, out, track, { freq, t: at, length, peak: 0.25, attack: 0.004 });
-      if (freq * 3 <= 3000) tone(ctx, out, track, { freq: freq * 3, t: at, length: length / 4, peak: 0.06, attack: 0.004 });
+      if (freq * 3 <= SPEAKER_CEILING_HZ) tone(ctx, out, track, { freq: freq * 3, t: at, length: length / 4, peak: 0.06, attack: 0.004 });
     };
     [783.99, 880, 987.77].forEach((freq, i) => bar(freq, t + i * 0.07, 0.35));
     for (const freq of [523.25, 783.99, 1046.5, 1318.51]) bar(freq, t + 0.3, 1.2);
@@ -716,6 +735,16 @@ function playerOn(ctx, volume) {
     return playing;
   }
 
+  /**
+   * Starts `sound` now under a key of its own, so no reschedule ever drops it.
+   * @param {SoundName} sound @param {{ repeat?: boolean, seconds?: number }} [options]
+   * @returns {Playing}
+   */
+  function playNow(sound, { repeat = false, seconds } = {}) {
+    plays += 1;
+    return add({ key: `play:${plays}`, at: ctx.currentTime, sound, repeat, seconds });
+  }
+
   /** @param {Playing} ring */
   function silence(ring) {
     const now = ctx.currentTime;
@@ -743,16 +772,14 @@ function playerOn(ctx, volume) {
       }
       for (const ring of wanted) if (!rings.has(ring.key)) add(ring);
     },
-    play(sound, { repeat = false, seconds } = {}) {
-      plays += 1;
-      add({ key: `play:${plays}`, at: ctx.currentTime, sound, repeat, seconds });
+    play(sound, options) {
+      playNow(sound, options);
     },
     // A preview stops only the preview before it: never a Bell, an Alarm or
     // the timer that is really ringing.
     preview(sound) {
       if (lastPreview && !lastPreview.done) silence(lastPreview);
-      plays += 1;
-      lastPreview = add({ key: `play:${plays}`, at: ctx.currentTime, sound, repeat: false });
+      lastPreview = playNow(sound);
     },
     dismiss() {
       const now = ctx.currentTime;
