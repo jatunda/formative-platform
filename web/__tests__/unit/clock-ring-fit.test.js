@@ -118,6 +118,43 @@ describe('keeping the ring clear of the top bar', () => {
     expect(area.style.getPropertyValue('--ring-shift')).toBe('');
   });
 
+  /** Adds a side column of small Readouts whose values are these widths. */
+  function addSmalls(area, widths) {
+    const smalls = document.createElement('div');
+    smalls.className = 'clock-smalls';
+    for (const width of widths) {
+      const value = document.createElement('span');
+      value.className = 'clock-readout__value';
+      rect(value, [0, 0, width, 30]);
+      smalls.append(value);
+    }
+    area.append(smalls);
+  }
+
+  it('leaves the side column room for its widest small Readout, short screens included', () => {
+    const { area } = setUp();
+    area.classList.add('has-timer');
+    addSmalls(area, [76, 110, 105]);
+    rect(area, [0, 120, 1000, 600]);
+    callback();
+    expect(px(area, '--side-room')).toBe(110 + RING_GAP);
+  });
+
+  it('re-measures the side column when a small Readout changes', async () => {
+    const { area } = setUp();
+    area.classList.add('has-timer');
+    addSmalls(area, [76]);
+    await Promise.resolve();
+    expect(px(area, '--side-room')).toBe(76 + RING_GAP);
+  });
+
+  it('with no side column it needs no side room', () => {
+    const { area } = setUp();
+    area.classList.add('has-timer');
+    callback();
+    expect(px(area, '--side-room')).toBe(0);
+  });
+
   it('does nothing where the browser has no ResizeObserver', () => {
     vi.stubGlobal('ResizeObserver', undefined);
     const area = document.createElement('div');

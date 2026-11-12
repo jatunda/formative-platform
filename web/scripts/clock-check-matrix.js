@@ -89,10 +89,6 @@ export const KNOWN_FAILURES = [
   { ticket: 52, match: { sizes: ['360x740'], editing: true, timer: false, soundOn: false, layouts: ['countdown,clock,countup'] } },
   { ticket: 52, match: { sizes: ['360x740'], editing: true, timer: false, soundOn: false, layouts: ['countdown,clock'], states: ['after', 'before', 'dayoff', 'experience', 'passing', 'weekend'] } },
   { ticket: 52, match: { sizes: ['360x740'], editing: true, timer: true, soundOn: false, layouts: ['countdown,clock,countup'], states: ['before', 'dayoff'] } },
-  // .scratch/school-clock/issues/53-small-landscape-ring-overlap.md: with sound
-  // on (no prompt) the timer's ring grows into the side Readouts.
-  { ticket: 53, match: { sizes: ['480x320'], editing: false, timer: true, soundOn: true, layouts: ['countdown,clock,countup'], states: ['assembly', 'break', 'dayoff', 'period', 'summer', 'weekend'] } },
-  { ticket: 53, match: { sizes: ['480x320'], editing: false, timer: true, soundOn: true, layouts: [null], states: ['summer'] } },
 ];
 
 /** A Config's on/off fields, which a Match names as is. @type {('editing' | 'timer' | 'soundOn')[]} */
