@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createSoundPlayer, ringLength, SOUNDS, SOUND_NAMES, BELL_SECONDS, ALARM_MAX_SECONDS } from '../../clock/sound.js';
+import { createSoundPlayer, ringLength, silentContext, SOUNDS, SOUND_NAMES, BELL_SECONDS, ALARM_MAX_SECONDS } from '../../clock/sound.js';
 import { createFakeAudioContext, audibleStarts } from '../helpers/fake-audio.js';
 
 const bell = (key, at, sound = 'softBell') => ({ key, at, sound, repeat: false });
@@ -617,6 +617,28 @@ describe('School Clock sound player', () => {
     expect(ringLength('chime', 5)).toBeCloseTo(6);
     // Beep: ten passes, the last at 4.5 s.
     expect(ringLength('beep', 5)).toBeCloseTo(4.9);
+  });
+
+  it('measures a ring on a silent context that takes any node or param call a voice could make', () => {
+    const ctx = silentContext();
+    const out = ctx.createDynamicsCompressor();
+    const reverb = ctx.createConvolver();
+    reverb.buffer = ctx.createBuffer(2, ctx.sampleRate * 2, ctx.sampleRate);
+    reverb.connect(out).connect(ctx.destination);
+    const panner = ctx.createStereoPanner();
+    panner.pan.setTargetAtTime(0.5, 0, 0.1);
+    panner.pan.cancelScheduledValues(0);
+    const osc = ctx.createOscillator();
+    osc.detune.value = 5;
+    osc.frequency.setValueCurveAtTime(new Float32Array([1, 2]), 0, 1);
+    osc.connect(panner);
+    osc.start(0);
+    expect(() => osc.stop(1)).not.toThrow();
+    // A number read from it is no number, so a loop over a buffer's samples never runs...
+    expect(ctx.createBuffer(1, 10, 48000).getChannelData(0).length + 1).toBeNaN();
+    // ...and nothing on it is a promise or an iterable.
+    expect(osc.then).toBeUndefined();
+    expect(osc[Symbol.iterator]).toBeUndefined();
   });
 
   it("repeats a short voice until a Bell's 5 s, then finishes its last pass", () => {

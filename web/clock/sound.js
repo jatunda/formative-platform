@@ -551,22 +551,34 @@ function ringOut(ctx, out, voice, at, limit, track) {
 }
 
 /**
+ * Proxy traps for `silentContext`: every property read is another stub (so
+ * any node, param or method a voice reaches for exists), every call returns
+ * one, every write is dropped, and in arithmetic a stub is NaN (so a loop
+ * bounded by a buffer's length never runs).
+ * @type {ProxyHandler<() => void>}
+ */
+const SILENT = {
+  get: (_target, key) => {
+    if (key === Symbol.toPrimitive) return () => NaN;
+    // Never a thenable or anything else a symbol names.
+    return typeof key === 'symbol' || key === 'then' ? undefined : silentStub();
+  },
+  set: () => true,
+  apply: () => silentStub(),
+};
+
+function silentStub() {
+  return new Proxy(() => {}, SILENT);
+}
+
+/**
  * A stand-in audio context that makes no sound, for measuring how long a
- * voice plays without one.
+ * voice plays without one. It takes any node or param call, so a voice using
+ * a node no other voice has used yet still measures rather than throwing.
  * @returns {BaseAudioContext}
  */
-function silentContext() {
-  const param = () => ({ value: 0, setValueAtTime() {}, linearRampToValueAtTime() {}, exponentialRampToValueAtTime() {} });
-  const node = () => ({ connect() {}, setPeriodicWave() {}, gain: param(), frequency: param(), Q: param() });
-  return /** @type {BaseAudioContext} */ (/** @type {unknown} */ ({
-    sampleRate: 1,
-    createGain: node,
-    createOscillator: node,
-    createBiquadFilter: node,
-    createBufferSource: node,
-    createPeriodicWave: () => ({}),
-    createBuffer: (/** @type {number[]} */ ...args) => ({ getChannelData: () => new Float32Array(args[1]) }),
-  }));
+export function silentContext() {
+  return /** @type {BaseAudioContext} */ (/** @type {unknown} */ (silentStub()));
 }
 
 /**
