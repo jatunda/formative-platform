@@ -20,10 +20,11 @@ const attackOf = (source) => {
 const distinct = (values) => [...new Set(values)];
 
 describe('School Clock sound player', () => {
-  it('lists fourteen voices, A to Z by the name people see', () => {
+  it('lists seventeen voices, A to Z by the name people see', () => {
     expect(SOUNDS.map((sound) => SOUND_NAMES[sound])).toEqual([
-      'Beep', 'Buzzer', 'Chime', 'Clap pattern', 'Clock tower', 'Desk bell', 'Harp',
-      'Level up', 'Marimba', 'School bell', 'Soft bell', 'Songbird', 'Swell', 'Wood block',
+      'Beep', 'Buzzer', 'Chime', 'Clap pattern', 'Clock tower', 'Desk bell', 'Digital alarm clock', 'Harp',
+      'Level up', 'Marimba', 'School bell', "Ship's klaxon", 'Soft bell', 'Songbird', 'Swell',
+      'Twin-bell alarm clock', 'Wood block',
     ]);
   });
 
@@ -79,6 +80,128 @@ describe('School Clock sound player', () => {
       // A short gap of quiet before it rings again.
       expect(24 - firstEnds).toBeGreaterThanOrEqual(0.3);
       expect(24 - firstEnds).toBeLessThanOrEqual(1);
+    });
+  });
+
+  describe('Digital alarm clock (loud)', () => {
+    it('beeps a square wave in quick groups of four, then a short pause', () => {
+      const ctx = createFakeAudioContext({ state: 'running' });
+      createSoundPlayer({ context: ctx }).play('digitalAlarm');
+      const group = ctx.sources.filter((s) => s.startAt < 1).sort((a, b) => a.startAt - b.startAt);
+      expect(group).toHaveLength(4);
+      // Quick beeps, each cut off cleanly before the next.
+      const gaps = group.slice(1).map((s, i) => s.startAt - group[i].startAt);
+      expect(gaps.every((gap) => gap >= 0.1 && gap <= 0.15)).toBe(true);
+      expect(group.every((s, i) => i === 0 || s.startAt > group[i - 1].stopAt)).toBe(true);
+      // A pause of at least a beep group's length before the next group.
+      const next = ctx.sources.filter((s) => s.startAt >= 1 && s.startAt < 2);
+      expect(next.length).toBe(4);
+      expect(Math.min(...next.map((s) => s.startAt)) - group[3].stopAt).toBeGreaterThanOrEqual(0.4);
+    });
+
+    it('beeps a square wave a laptop speaker plays cleanly, higher than Beep', () => {
+      const ctx = createFakeAudioContext({ state: 'running' });
+      createSoundPlayer({ context: ctx }).play('digitalAlarm');
+      for (const s of ctx.sources) {
+        // A square wave has only odd harmonics; it keeps them under about 3 kHz.
+        const harmonics = s.wave.imag.map((h, n) => (Math.abs(h) > 1e-6 ? n : 0)).filter(Boolean);
+        expect(harmonics).toEqual([1, 3]);
+        expect(s.frequency.value * Math.max(...harmonics)).toBeLessThanOrEqual(3200);
+        expect(s.frequency.value).toBeGreaterThan(880);
+      }
+    });
+
+    it('plays five groups in a Bell that stops on its own, and repeats on an Alarm', () => {
+      const bell = bellOf('digitalAlarm');
+      const groups = distinct(bell.sources.map((s) => Math.floor(s.startAt - 20)));
+      expect(groups).toEqual([0, 1, 2, 3, 4]);
+      const ctx = createFakeAudioContext({ state: 'running' });
+      createSoundPlayer({ context: ctx }).schedule([alarm('a', 20, 'digitalAlarm')]);
+      expect(ctx.sources).toHaveLength(60 * 4);
+    });
+  });
+
+  describe('Twin-bell alarm clock (loud)', () => {
+    /** Each bell's hammer: the gain in a source's path that rises once per strike. */
+    const hammer = (source) => pathOf(source).find((n) => (n.gain?.events ?? []).filter((e) => e.kind === 'linear').length > 10);
+    const play = () => {
+      const ctx = createFakeAudioContext({ state: 'running' });
+      createSoundPlayer({ context: ctx }).play('twinBell');
+      return ctx.sources.filter((s) => s.startAt === 0);
+    };
+
+    it('rings two small bells a little apart in pitch, in a range laptop speakers play cleanly', () => {
+      const sources = play();
+      const freqs = sources.map((s) => s.frequency.value);
+      expect(Math.min(...freqs)).toBeGreaterThanOrEqual(400);
+      expect(Math.max(...freqs)).toBeLessThanOrEqual(3200);
+      const hammers = distinct(sources.map(hammer));
+      expect(hammers).toHaveLength(2);
+      const [low, high] = hammers.map((h) => Math.min(...sources.filter((s) => hammer(s) === h).map((s) => s.frequency.value))).sort((a, b) => a - b);
+      // Slightly different bells: under a whole tone apart, but not the same note.
+      expect(high / low).toBeGreaterThan(1.03);
+      expect(high / low).toBeLessThan(1.12);
+    });
+
+    it('rattles the hammer very fast between the two bells, a jangling trill', () => {
+      const [first, second] = distinct(play().map(hammer));
+      const hits = (h) => h.gain.events.filter((e) => e.kind === 'linear').map((e) => e.at);
+      const all = [...hits(first).map((at) => [at, 1]), ...hits(second).map((at) => [at, 2])].sort((a, b) => a[0] - b[0]);
+      // The hammer goes back and forth: every strike hits the other bell.
+      expect(all.every(([, bell], i) => i === 0 || bell !== all[i - 1][1])).toBe(true);
+      // Faster than School bell's 20 strikes a second.
+      const gaps = all.slice(1).map(([at], i) => at - all[i][0]);
+      expect(gaps.every((gap) => gap > 0 && gap <= 1 / 25)).toBe(true);
+      expect(all[all.length - 1][0] - all[0][0]).toBeGreaterThanOrEqual(1.8);
+    });
+
+    it('rings twice in a Bell that stops on its own, and repeats with a short gap on an Alarm', () => {
+      const bell = bellOf('twinBell');
+      expect(distinct(bell.sources.map((s) => s.startAt))).toEqual([20, 23]);
+      const ctx = createFakeAudioContext({ state: 'running' });
+      createSoundPlayer({ context: ctx }).schedule([alarm('a', 20, 'twinBell')]);
+      const firstEnds = Math.max(...ctx.sources.filter((s) => s.startAt < 23).map((s) => s.stopAt));
+      expect(23 - firstEnds).toBeGreaterThanOrEqual(0.3);
+    });
+  });
+
+  describe("Ship's klaxon (loud)", () => {
+    const honks = (ctx) => distinct(ctx.sources.map((s) => s.startAt));
+
+    it('honks a harsh, buzzy horn: layered buzzy waves, a hair apart, filtered under 3 kHz', () => {
+      const ctx = createFakeAudioContext({ state: 'running' });
+      createSoundPlayer({ context: ctx }).play('klaxon');
+      const honk = ctx.sources.filter((s) => s.startAt === 0);
+      expect(honk.map((s) => s.type).sort()).toEqual(['sawtooth', 'square']);
+      expect(honk[0].frequency.value).not.toBe(honk[1].frequency.value);
+      for (const s of honk) {
+        const filter = pathOf(s).find((n) => n.isFilter);
+        expect(filter.type).toBe('lowpass');
+        expect(Math.max(...filter.frequency.events.map((e) => e.value))).toBeLessThanOrEqual(3000);
+      }
+    });
+
+    it('sweeps up once per honk ("ah-OO-gah") and holds, never wailing up and down like a siren', () => {
+      const ctx = createFakeAudioContext({ state: 'running' });
+      createSoundPlayer({ context: ctx }).play('klaxon');
+      for (const s of ctx.sources) {
+        const pitches = s.frequency.events.map((e) => e.value);
+        expect(pitches).toHaveLength(2);
+        expect(pitches[1] / pitches[0]).toBeGreaterThan(1.3);
+        expect(Math.min(...pitches)).toBeGreaterThanOrEqual(400);
+        // The sweep is quick; most of the honk holds the top note.
+        const [, rise] = s.frequency.events;
+        expect(rise.at - s.startAt).toBeLessThan((s.stopAt - s.startAt) / 2);
+      }
+    });
+
+    it('honks three times in a Bell that stops on its own, with a long gap after each honk', () => {
+      const bell = bellOf('klaxon');
+      expect(honks(bell)).toEqual([20, 22, 24]);
+      const ctx = createFakeAudioContext({ state: 'running' });
+      createSoundPlayer({ context: ctx }).schedule([alarm('a', 20, 'klaxon')]);
+      const firstEnds = Math.max(...ctx.sources.filter((s) => s.startAt < 22).map((s) => s.stopAt));
+      expect(22 - firstEnds).toBeGreaterThanOrEqual(0.75);
     });
   });
 

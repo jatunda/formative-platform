@@ -475,7 +475,7 @@ describe('School Clock Alarm editor', () => {
     it('offers every voice, the new ones too, A to Z by name', () => {
       open();
       button('Clock Alarm', section()).click();
-      expect([...inForm('Sound').options].map((o) => o.textContent)).toEqual(['Beep', 'Buzzer', 'Chime', 'Clap pattern', 'Clock tower', 'Desk bell', 'Harp', 'Level up', 'Marimba', 'School bell', 'Soft bell', 'Songbird', 'Swell', 'Wood block']);
+      expect([...inForm('Sound').options].map((o) => o.textContent)).toEqual(['Beep', 'Buzzer', 'Chime', 'Clap pattern', 'Clock tower', 'Desk bell', 'Digital alarm clock', 'Harp', 'Level up', 'Marimba', 'School bell', "Ship's klaxon", 'Soft bell', 'Songbird', 'Swell', 'Twin-bell alarm clock', 'Wood block']);
       expect([...inForm('Sound').options].every((o) => SOUND_NAMES[o.value] === o.textContent)).toBe(true);
       setValue('Sound', 'songbird', form());
       button('Preview Sound', form()).click();

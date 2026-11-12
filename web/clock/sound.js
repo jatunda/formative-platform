@@ -30,6 +30,9 @@ export const SOUND_NAMES = Object.freeze({
   // that name (clock-storage.js loads the old key as this one).
   softBell: 'Soft bell',
   hallwayBell: 'School bell',
+  digitalAlarm: 'Digital alarm clock',
+  twinBell: 'Twin-bell alarm clock',
+  klaxon: "Ship's klaxon",
   beep: 'Beep',
   buzzer: 'Buzzer',
 });
@@ -201,9 +204,12 @@ const MARIMBA_BAR = /** @type {[number, number, number][]} */ ([[1, 0.38, 0.5], 
 // laptop and projector speakers are loud and the ear cuts through room chatter
 // best; none lingers on a steady harsh tone; each has its own rhythm and
 // timbre so different Alarms are told apart; and each leaves a gap before it
-// repeats, so an Alarm ringing for a minute keeps breathing. School bell is
-// the one deliberately harsh voice (a real hallway bell is meant to be loud),
-// but it keeps to the same range.
+// repeats, so an Alarm ringing for a minute keeps breathing. The loud voices
+// (School bell, Digital alarm clock, Twin-bell alarm clock, Ship's klaxon) are
+// deliberately harsh, for an Alarm nobody can miss, but keep to the same
+// range. None may sound like a fire alarm or an emergency siren (a rising-
+// and-falling wail, or a horn in threes): on a school projector that could
+// start a real panic.
 /** @type {Record<SoundName, Voice>} */
 const VOICES = {
   // A soft pad: an open A-major chord that fades in over a second and out over
@@ -396,6 +402,60 @@ const VOICES = {
       }
     }
     return 4;
+  },
+  // Digital alarm clock: the bedside alarm from the movies. Beep-beep-beep-
+  // beep, four quick square-wave beeps at 1 kHz, then a pause, once a second.
+  // Only the square's first and third harmonics, so it stays at 3 kHz.
+  digitalAlarm(ctx, out, t, track) {
+    const wave = pulseWave(ctx, 0.5, 3);
+    for (let i = 0; i < 4; i += 1) tone(ctx, out, track, { wave, freq: 1000, t: t + i * 0.12, length: 0.07, peak: 0.35, envelope: 'gate' });
+    return 1;
+  },
+  // Twin-bell alarm clock: the wind-up clock with two bells on top. Its hammer
+  // rattles between them 32 times a second, so each bell is struck 16 times a
+  // second, in turn, in one 2 s jangling trill, then a short gap, once every 3 s. The bells are
+  // a little apart in pitch (about a semitone), each a bright fundamental and
+  // one out-of-tune partial, two sines a hair apart so they beat.
+  twinBell(ctx, out, t, track) {
+    const [RATE, RING, TAIL] = [16, 2, 0.3];
+    [1100, 1180].forEach((freq, b) => {
+      const hammer = ctx.createGain();
+      hammer.connect(out);
+      hammer.gain.setValueAtTime(0.0001, t);
+      for (let i = 0; i < RING * RATE; i += 1) {
+        const at = t + (i + b / 2) / RATE;
+        hammer.gain.linearRampToValueAtTime(0.5, at + 0.002);
+        hammer.gain.exponentialRampToValueAtTime(0.12, at + 1 / RATE);
+      }
+      hammer.gain.exponentialRampToValueAtTime(0.0001, t + RING + TAIL);
+      for (const [ratio, mix] of [[1, 1], [2.4, 0.4]]) {
+        for (const detune of [-3, 3]) {
+          const osc = ctx.createOscillator();
+          const level = ctx.createGain();
+          osc.frequency.setValueAtTime(freq * ratio + detune, t);
+          level.gain.setValueAtTime(mix * 0.2, t);
+          osc.connect(level);
+          level.connect(hammer);
+          track(osc, t, t + RING + TAIL);
+        }
+      }
+    });
+    return 3;
+  },
+  // Ship's klaxon: a navy general-alarm horn. Ah-OO-gah: a harsh horn note
+  // that sweeps up quickly from 420 to 640 Hz and holds for about a second,
+  // then a long gap, once every 2 s. A sawtooth and a square a few hertz
+  // apart make it buzz; a low-pass filter keeps the buzz under 3 kHz. One
+  // rise per honk and a gap after, never a rising-and-falling wail, so it
+  // can't be taken for a siren.
+  klaxon(ctx, out, t, track) {
+    for (const [type, detune] of /** @type {[OscillatorType, number][]} */ ([['sawtooth', 0], ['square', 3]])) {
+      tone(ctx, out, track, {
+        type, freq: 420 + detune, bendTo: 640 + detune, bendLength: 0.35, t, length: 1.1, peak: 0.22, envelope: 'gate',
+        filter: { from: 2800, to: 1800, over: 1.1, q: 0.8 },
+      });
+    }
+    return 2;
   },
   // Beep-beep.
   beep(ctx, out, t, track) {
