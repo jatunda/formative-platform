@@ -8,12 +8,31 @@ import { chromium } from 'playwright';
 import { createRequire } from 'module';
 import { fileURLToPath } from 'url';
 import { resolve, dirname } from 'path';
+import { mkdirSync, writeFileSync, rmSync } from 'fs';
 import { SETTINGS_KEY } from '../clock/clock-storage.js';
 import { LAYOUT_KEY } from '../clock/readout-layout.js';
 import { describeFailure } from './clock-check-matrix.js';
 
-export const webDir = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const webDir =resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const axeSource = createRequire(import.meta.url).resolve('axe-core/axe.min.js');
+
+/** Where screenshots and report.json go (gitignored). */
+export const outDir = resolve(webDir, '.clock-check');
+
+/** Empties outDir for a new run, so it holds only this run's files. */
+export function resetOutDir() {
+  rmSync(outDir, { recursive: true, force: true });
+  mkdirSync(outDir, { recursive: true });
+}
+
+/**
+ * Writes every result to outDir/report.json and prints one ✗ line per failure.
+ * @param {object[]} results @param {string[]} failures what failed, one line each
+ */
+export function report(results, failures) {
+  writeFileSync(resolve(outDir, 'report.json'), JSON.stringify(results, null, 2));
+  for (const line of failures) console.log(`✗ ${line}`);
+}
 
 /**
  * @typedef {import('./clock-check-matrix.js').Config & { states: { name: string, query: string }[],
@@ -55,9 +74,9 @@ export async function startClockCheck() {
   /**
    * Renders every state in `opts` at `size` and checks each.
    * @param {CheckOptions} opts @param {{ label: string, width: number, height: number }} size
-   * @param {{ outDir: string, prefix?: string }} out where screenshots go, and what their names start with
+   * @param {string} [prefix] what its screenshots' names (in outDir) start with
    */
-  async function checkSize(opts, size, { outDir, prefix = '' }) {
+  async function checkSize(opts, size, prefix = '') {
     const browser = await browserFor(opts.soundOn);
     const context = await browser.newContext({ viewport: { width: size.width, height: size.height } });
     // Skip the first-visit prompts so each render shows the state itself.

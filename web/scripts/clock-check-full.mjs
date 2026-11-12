@@ -22,9 +22,7 @@
 //
 // It starts its own Vite server and browsers and always stops them on exit,
 // including Ctrl-C, so nothing is left running.
-import { mkdirSync, writeFileSync, rmSync } from 'fs';
-import { resolve } from 'path';
-import { startClockCheck, webDir } from './clock-check-browser.mjs';
+import { startClockCheck, outDir, resetOutDir, report } from './clock-check-browser.mjs';
 import { DEFAULT_STATES, fullMatrix, classify, describeFailure, parseFullArgs, fullRunFailed } from './clock-check-matrix.js';
 
 let jobs;
@@ -35,9 +33,7 @@ try {
   process.exit(1);
 }
 
-const outDir = resolve(webDir, '.clock-check');
-rmSync(outDir, { recursive: true, force: true });
-mkdirSync(outDir, { recursive: true });
+resetOutDir();
 
 // One task per run × size: a browser context rendering that run's states.
 const tasks = fullMatrix().flatMap((run) => run.sizes.map((label) => {
@@ -57,7 +53,7 @@ try {
         ...run.config, states: run.states.map((name) => ({ name, query: DEFAULT_STATES[name] })),
         division: 'HS', settings: {}, bars: 0, axe: true, shots: /** @type {const} */ ('failures'),
       };
-      const checked = await check.checkSize(opts, size, { outDir, prefix: `${run.name}-` });
+      const checked = await check.checkSize(opts, size, `${run.name}-`);
       for (const r of checked) {
         const render = { run: run.name, config: run.config, ...r };
         results.push({ ...render, ...classify(render) });
@@ -70,10 +66,12 @@ try {
 }
 const seconds = Math.round((Date.now() - started) / 1000);
 
-writeFileSync(resolve(outDir, 'report.json'), JSON.stringify(results, null, 2));
+/** @param {string} outcome */
 const by = (outcome) => results.filter((r) => r.outcome === outcome);
-for (const r of by('unexpected')) console.log(`✗ ${r.run} ${r.state} @ ${r.size}: ${describeFailure(r).join('; ')}`);
-for (const r of by('stale')) console.log(`✗ ${r.run} ${r.state} @ ${r.size}: passes, but is listed as known (ticket ${r.ticket}); remove it from KNOWN_FAILURES`);
+report(results, [
+  ...by('unexpected').map((r) => `${r.run} ${r.state} @ ${r.size}: ${describeFailure(r).join('; ')}`),
+  ...by('stale').map((r) => `${r.run} ${r.state} @ ${r.size}: passes, but is listed as known (ticket ${r.ticket}); remove it from KNOWN_FAILURES`),
+]);
 const known = by('known');
 const tickets = [...new Set(known.map((r) => r.ticket))];
 const knownText = tickets.map((t) => `${known.filter((r) => r.ticket === t).length} known (ticket ${t})`).join(', ');

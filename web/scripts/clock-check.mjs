@@ -32,9 +32,7 @@
 // For the whole layout matrix (Readouts × edit mode × timer × sound prompt ×
 // sizes, with ticketed failures known), run `npm run check:clock:full`
 // (scripts/clock-check-full.mjs).
-import { mkdirSync, writeFileSync, rmSync } from 'fs';
-import { resolve } from 'path';
-import { startClockCheck, webDir } from './clock-check-browser.mjs';
+import { startClockCheck, outDir, resetOutDir, report } from './clock-check-browser.mjs';
 import { DEFAULT_STATES, DEFAULT_SIZES, describeFailure } from './clock-check-matrix.js';
 
 // Chrome's zoom steps from 67% to 200%: zooming to z leaves a viewport of size / z CSS pixels.
@@ -79,20 +77,17 @@ function parseArgs(argv) {
 }
 
 const opts = parseArgs(process.argv.slice(2));
-const outDir = resolve(webDir, '.clock-check');
-rmSync(outDir, { recursive: true, force: true });
-mkdirSync(outDir, { recursive: true });
+resetOutDir();
 
 const results = [];
 const check = await startClockCheck();
 try {
-  for (const size of opts.sizes) results.push(...await check.checkSize(opts, size, { outDir }));
+  for (const size of opts.sizes) results.push(...await check.checkSize(opts, size));
 } finally {
   await check.stop();
 }
 
-writeFileSync(resolve(outDir, 'report.json'), JSON.stringify(results, null, 2));
 const failed = results.filter((r) => !r.ok);
-for (const r of failed) console.log(`✗ ${r.state} @ ${r.size}: ${describeFailure(r).join('; ')}`);
+report(results, failed.map((r) => `${r.state} @ ${r.size}: ${describeFailure(r).join('; ')}`));
 console.log(`${results.length - failed.length}/${results.length} renders passed. Screenshots and report.json in ${outDir}`);
 process.exitCode = failed.length ? 1 : 0;
