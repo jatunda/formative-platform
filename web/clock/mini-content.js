@@ -50,7 +50,8 @@ import { readoutParts, readoutText, untilEndOf } from './readouts.js';
  */
 export function miniContent({ now, moment, settings, big, mode, timer }) {
   const options = { use24Hour: settings.use24Hour, seconds: settings.showSeconds };
-  const words = moment ? displayText(now, moment, settings) : null;
+  // Only the heading is used; the foot already says when the Segment ends.
+  const words = moment ? displayText(now, moment, { ...settings, showPeriodEnd: false }) : null;
   const segmentHead = words ? [words.title, words.tag].filter(Boolean).join(' · ') : '';
   const readout = timer
     // Timers always show seconds, rounded up like the main page's.
