@@ -319,13 +319,13 @@ const VOICES = {
   // two phrases (G#, E, F#, B, then B, F#, G#, E), each ending on a held note.
   // A strike every 0.7 s, unhurried like a real tower; one pass takes 7.4 s,
   // so a Bell plays it once, past its 5 seconds, to the end. It repeats every
-  // 8.8 s, so an Alarm's last pass (at 52.8 s) still ends inside its minute.
+  // 8.6 s, so an Alarm's last pass (at 51.6 s) ends at 59 s, inside its minute.
   clockTower(ctx, out, t, track) {
     const [gSharp, fSharp, e, b] = [830.61, 739.99, 659.25, 493.88];
     [[gSharp, e, fSharp, b], [b, fSharp, gSharp, e]].forEach((phrase, p) => {
       phrase.forEach((freq, i) => strike(ctx, out, track, freq, t + p * 3.5 + i * 0.7, TUBULAR));
     });
-    return 8.8;
+    return 8.6;
   },
   // A quick rising arpeggio (C, E, G, C) on a wooden bar, twice per Bell.
   marimba(ctx, out, t, track) {

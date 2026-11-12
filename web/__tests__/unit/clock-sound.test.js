@@ -500,10 +500,16 @@ describe('School Clock sound player', () => {
 
     const ctx = createFakeAudioContext({ state: 'running' });
     createSoundPlayer({ context: ctx }).schedule([alarm('a', 20, 'clockTower')]);
-    const second = ctx.sources.filter((s) => s.startAt >= 28.8 && s.startAt < 36);
-    expect(Math.min(...second.map((s) => s.startAt))).toBeCloseTo(28.8);
+    const second = ctx.sources.filter((s) => s.startAt >= 28.6 && s.startAt < 36);
+    expect(Math.min(...second.map((s) => s.startAt))).toBeCloseTo(28.6);
     // The first pass has died away before the second starts.
-    expect(ctx.sources.filter((s) => s.startAt < 28.7).every((s) => s.stopAt <= 28.8)).toBe(true);
+    expect(ctx.sources.filter((s) => s.startAt < 28.5).every((s) => s.stopAt <= 28.6)).toBe(true);
+  });
+
+  it("ends Clock tower's last Alarm pass inside the Alarm's minute", () => {
+    const ctx = createFakeAudioContext({ state: 'running' });
+    createSoundPlayer({ context: ctx }).schedule([alarm('a', 20, 'clockTower')]);
+    expect(Math.max(...ctx.sources.map((s) => s.stopAt))).toBeLessThanOrEqual(20 + ALARM_MAX_SECONDS);
   });
 
   it('fades Swell in over about a second, an A-major chord that shimmers, once per Bell', () => {
