@@ -14,15 +14,19 @@ Built behaviour: closed tickets 12 (sound engine), 31/32 (how voices are built a
 
 **Blocked by:** 36 (both change the sound engine; 36 also changes how a Bell's last pass ends, which the new voice should be checked against)
 
-**Status:** ready-for-agent
+**Status:** closed
 
-- [ ] The old gentle voice shows as "Soft bell"; a save that picked it (for Bells, the timer, or any Alarm) still plays that same voice
-- [ ] A new loud "School bell" voice, built like the other voices (Web Audio, no files), plays once (preview), as a Bell that stops on its own (ticket 36's rule), and on repeat as an Alarm
-- [ ] Every sound picker lists sounds A–Z by display name, and stays sorted when 38 and 39 add more
-- [ ] Defaults are unchanged (the default Bell and timer sounds stay what they are today)
-- [ ] Tests cover: the rename keeping old saves, the new voice's shape (its rattle rate and range), the A–Z order in every picker
-- [ ] `npm run lint`, `npm run typecheck`, `npm run test:coverage` in `web/` pass
+- [x] The old gentle voice shows as "Soft bell"; a save that picked it (for Bells, the timer, or any Alarm) still plays that same voice
+- [x] A new loud "School bell" voice, built like the other voices (Web Audio, no files), plays once (preview), as a Bell that stops on its own (ticket 36's rule), and on repeat as an Alarm
+- [x] Every sound picker lists sounds A–Z by display name, and stays sorted when 38 and 39 add more
+- [x] Defaults are unchanged (the default Bell and timer sounds stay what they are today)
+- [x] Tests cover: the rename keeping old saves, the new voice's shape (its rattle rate and range), the A–Z order in every picker
+- [x] `npm run lint`, `npm run typecheck`, `npm run test:coverage` in `web/` pass
 
 ## Comments
 
 **2026-11-11: decided in grilling.** Eric chose to keep the gentle bell (renamed) and add the loud one, rather than replace it. "Soft bell" is Claude's proposed name; Eric can change it when he listens.
+
+**2026-11-11: built.** The gentle voice keeps its sound as "Soft bell" (internal key `softBell`; saves holding the old key `schoolBell` load as Soft bell, in `clock-storage.js`). The new loud "School bell" (key `hallwayBell`) is a gong hammered 20 times a second for one 3 s ring, then a 0.6 s gap; partials between about 760 Hz and 3 kHz, so no bass and no piercing highs. Every picker now lists sounds A to Z by name (`SOUNDS` in `sound.js` sorts itself, so new voices land in place). Defaults are unchanged: Bells use Soft bell, the timer uses Beep.
+
+**For Eric:** please listen to the new School bell on laptop speakers (Settings, Bell sound, School bell, Preview, and once as a Bell). Check it's loud and rattly but doesn't distort, and that "Soft bell" is a name you like for the gentle one.

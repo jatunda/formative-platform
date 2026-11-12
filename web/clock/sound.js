@@ -11,8 +11,9 @@
 /** @typedef {import('./clock-settings.js').SoundName} SoundName */
 
 /**
- * Every voice's name for people, in the order the page lists them (gentlest
- * first). Its keys are the `SoundName`s.
+ * Every voice's name for people. Its keys are the `SoundName`s, which are what
+ * a save holds, so a key never changes once shipped (the page lists voices by
+ * these names, A to Z, not in this order).
  */
 export const SOUND_NAMES = Object.freeze({
   swell: 'Swell',
@@ -25,14 +26,21 @@ export const SOUND_NAMES = Object.freeze({
   woodBlock: 'Wood block',
   levelUp: 'Level up',
   clapPattern: 'Clap pattern',
-  schoolBell: 'School bell',
+  // The gentle bell, saved as `schoolBell` until the loud hallway bell took
+  // that name (clock-storage.js loads the old key as this one).
+  softBell: 'Soft bell',
+  hallwayBell: 'School bell',
   beep: 'Beep',
   buzzer: 'Buzzer',
 });
 
-/** Every voice, in the order the page lists them. */
+/**
+ * Every voice, in the order every sound picker lists them: A to Z by the name
+ * people see, so a new voice lands in its place without anyone sorting it.
+ */
 /** @type {readonly SoundName[]} */
-export const SOUNDS = Object.freeze(/** @type {SoundName[]} */ (Object.keys(SOUND_NAMES)));
+export const SOUNDS = Object.freeze(/** @type {SoundName[]} */ (Object.keys(SOUND_NAMES))
+  .sort((a, b) => SOUND_NAMES[a].localeCompare(SOUND_NAMES[b])));
 
 /** How long a preview (or any ring not set to repeat) plays, in seconds. */
 export const BELL_SECONDS = 3;
@@ -193,7 +201,9 @@ const MARIMBA_BAR = /** @type {[number, number, number][]} */ ([[1, 0.38, 0.5], 
 // laptop and projector speakers are loud and the ear cuts through room chatter
 // best; none lingers on a steady harsh tone; each has its own rhythm and
 // timbre so different Alarms are told apart; and each leaves a gap before it
-// repeats, so an Alarm ringing for a minute keeps breathing.
+// repeats, so an Alarm ringing for a minute keeps breathing. School bell is
+// the one deliberately harsh voice (a real hallway bell is meant to be loud),
+// but it keeps to the same range.
 /** @type {Record<SoundName, Voice>} */
 const VOICES = {
   // A soft pad: an open A-major chord that fades in over a second and out over
@@ -330,10 +340,10 @@ const VOICES = {
     }
     return 2.5;
   },
-  // Ring-ring: a bell struck about ten times a second, in two short bursts.
-  // Gentler than a hallway bell: pure tones, a lower pitch, a shallow
-  // flutter rather than a hard rattle, and a gap to breathe.
-  schoolBell(ctx, out, t, track) {
+  // Soft bell. Ring-ring: a bell struck about ten times a second, in two
+  // short bursts. Gentler than a hallway bell: pure tones, a lower pitch, a
+  // shallow flutter rather than a hard rattle, and a gap to breathe.
+  softBell(ctx, out, t, track) {
     const RATE = 10;
     for (const [from, to] of [[t, t + 0.8], [t + 1.2, t + 2.0]]) {
       const env = ctx.createGain();
@@ -356,6 +366,36 @@ const VOICES = {
       }
     }
     return 3;
+  },
+  // School bell: a real hallway bell. A hard clapper hammers a metal gong 20
+  // times a second, so it rattles, in one long continuous ring of 3 s, then a
+  // short gap before it repeats. The gong's partials are bright and out of
+  // tune with each other, as metal is, each two sines a hair apart so they
+  // beat; the highest stays near 3 kHz and the lowest well above any bass.
+  hallwayBell(ctx, out, t, track) {
+    const [RATE, RING, TAIL] = [20, 3, 0.4];
+    const PARTIALS = [[760, 1], [1763, 0.6], [2356, 0.4], [3040, 0.15]];
+    const env = ctx.createGain();
+    env.connect(out);
+    env.gain.setValueAtTime(0.0001, t);
+    for (let i = 0; i < RING * RATE; i += 1) {
+      const at = t + i / RATE;
+      env.gain.linearRampToValueAtTime(0.6, at + 0.002);
+      env.gain.exponentialRampToValueAtTime(0.2, at + 1 / RATE);
+    }
+    env.gain.exponentialRampToValueAtTime(0.0001, t + RING + TAIL);
+    for (const [freq, mix] of PARTIALS) {
+      for (const detune of [-2, 2]) {
+        const osc = ctx.createOscillator();
+        const level = ctx.createGain();
+        osc.frequency.setValueAtTime(freq + detune, t);
+        level.gain.setValueAtTime(mix * 0.2, t);
+        osc.connect(level);
+        level.connect(env);
+        track(osc, t, t + RING + TAIL);
+      }
+    }
+    return 4;
   },
   // Beep-beep.
   beep(ctx, out, t, track) {

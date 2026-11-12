@@ -34,7 +34,7 @@ const PERIOD_ALARM = {
   periods: ['Period 1', 'Period 2', 'Period 3', 'Period 4', 'Period 5', 'Period 6', 'Period 7'],
 };
 const CLOCK_ALARM = {
-  id: 'alarm-2', kind: 'clock', label: 'Morning duty', enabled: true, sound: 'schoolBell',
+  id: 'alarm-2', kind: 'clock', label: 'Morning duty', enabled: true, sound: 'softBell',
   bellSchedules: null, time: '07:55', repeat: 'everySchoolDay',
 };
 
@@ -202,7 +202,7 @@ describe('School Clock Alarm editor', () => {
 
     it('is edited in place of its list item, and Cancel keeps it as it was', () => {
       open({ settings: { alarms: [CLOCK_ALARM, PERIOD_ALARM] } });
-      expect(listed()[0]).toEqual({ name: 'Morning duty', hint: '7:55 AM · every School Day · School bell' });
+      expect(listed()[0]).toEqual({ name: 'Morning duty', hint: '7:55 AM · every School Day · Soft bell' });
       button('Edit Morning duty').click();
 
       const item = section().querySelector('.clock-alarm-item--editing');
@@ -211,7 +211,7 @@ describe('School Clock Alarm editor', () => {
       expect(document.activeElement).toBe(inForm('Name'));
       expect([inForm('Name').value, inForm('Hour').value, inForm('Minute').value]).toEqual(['Morning duty', '7', '55']);
       expect(inForm('AM').checked).toBe(true);
-      expect(inForm('Sound').value).toBe('schoolBell');
+      expect(inForm('Sound').value).toBe('softBell');
       expect(field('Only on some Bell Schedules', form()).checked).toBe(false);
 
       setValue('Hour', '8', form());
@@ -440,7 +440,7 @@ describe('School Clock Alarm editor', () => {
   describe('every Alarm', () => {
     it('has an on/off switch: off is saved and leaves the Next rings and the sound schedule', () => {
       open({ settings: { alarms: [{ ...CLOCK_ALARM, time: '10:35' }, PERIOD_ALARM] } });
-      const ringsNow = () => player.scheduled.filter((ring) => ring.sound === 'schoolBell' && ring.repeat);
+      const ringsNow = () => player.scheduled.filter((ring) => ring.sound === 'softBell' && ring.repeat);
       expect(field('Morning duty on').getAttribute('role')).toBe('switch');
       expect(field('Morning duty on').checked).toBe(true);
       expect(ringsNow()).toHaveLength(1);
@@ -460,7 +460,7 @@ describe('School Clock Alarm editor', () => {
       open({ settings: { alarms: [rang] } });
       toggle('Morning duty on');
       expect(savedAlarms(storage)[0]).toEqual({ ...rang, enabled: true, date: '2026-10-27' });
-      expect(listed()[0].hint).toBe('11:00 AM · once, Tue, Oct 27 · School bell');
+      expect(listed()[0].hint).toBe('11:00 AM · once, Tue, Oct 27 · Soft bell');
     });
 
     it('has its own sound, with a Preview of the sound chosen', () => {
@@ -472,10 +472,11 @@ describe('School Clock Alarm editor', () => {
       expect(player.played).toEqual([{ sound: 'buzzer', repeat: false }]);
     });
 
-    it('offers every voice, the new ones too', () => {
+    it('offers every voice, the new ones too, A to Z by name', () => {
       open();
       button('Clock Alarm', section()).click();
-      expect([...inForm('Sound').options].map((o) => o.textContent)).toEqual(Object.values(SOUND_NAMES));
+      expect([...inForm('Sound').options].map((o) => o.textContent)).toEqual(['Beep', 'Buzzer', 'Chime', 'Clap pattern', 'Clock tower', 'Desk bell', 'Harp', 'Level up', 'Marimba', 'School bell', 'Soft bell', 'Songbird', 'Swell', 'Wood block']);
+      expect([...inForm('Sound').options].every((o) => SOUND_NAMES[o.value] === o.textContent)).toBe(true);
       setValue('Sound', 'songbird', form());
       button('Preview Sound', form()).click();
       expect(player.played).toEqual([{ sound: 'songbird', repeat: false }]);

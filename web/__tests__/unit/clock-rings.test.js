@@ -7,7 +7,7 @@ import { BLOCK_DAYS, DEFAULT_ALARM_PERIODS } from '../../clock/clock-settings.js
 const tue = (h, m, s = 0) => new Date(2026, 9, 27, h, m, s);
 const wed = (h, m, s = 0) => new Date(2026, 9, 28, h, m, s);
 
-const BELLS_ONLY = { bells: { on: true, sound: 'schoolBell' }, alarms: [] };
+const BELLS_ONLY = { bells: { on: true, sound: 'softBell' }, alarms: [] };
 const times = (rings) => rings.map((r) => r.at);
 
 describe('ringsInWindow: Bells', () => {
@@ -25,7 +25,7 @@ describe('ringsInWindow: Bells', () => {
       tue(13, 35), tue(14, 20), // Period 6
       tue(14, 25), tue(15, 10), // Period 7
     ]);
-    expect(rings.every((r) => r.source === 'bell' && r.sound === 'schoolBell')).toBe(true);
+    expect(rings.every((r) => r.source === 'bell' && r.sound === 'softBell')).toBe(true);
   });
 
   it('names the Segments a shared-edge Bell ends and starts', () => {
@@ -60,7 +60,7 @@ describe('ringsInWindow: Bells', () => {
   });
 
   it('Assembly-end Bells ring nothing with Bells off', () => {
-    const settings = { bells: { on: false, sound: 'schoolBell', assemblyEnds: true }, alarms: [] };
+    const settings = { bells: { on: false, sound: 'softBell', assemblyEnds: true }, alarms: [] };
     expect(ringsInWindow(wed(10, 0), wed(11, 30), SCHOOL_YEARS, settings)).toEqual([]);
   });
 
@@ -71,7 +71,7 @@ describe('ringsInWindow: Bells', () => {
 
   it('rings nothing with Bells off, or on a day off', () => {
     expect(ringsInWindow(tue(0, 0), tue(23, 59), SCHOOL_YEARS, {
-      bells: { on: false, sound: 'schoolBell' }, alarms: [],
+      bells: { on: false, sound: 'softBell' }, alarms: [],
     })).toEqual([]);
     // Sat 10/31 is a Weekend; Fri 10/9 is Teacher In-Service.
     expect(ringsInWindow(new Date(2026, 9, 31), new Date(2026, 10, 1), SCHOOL_YEARS, BELLS_ONLY)).toEqual([]);
@@ -79,7 +79,7 @@ describe('ringsInWindow: Bells', () => {
   });
 });
 
-const NO_BELLS = { on: false, sound: 'schoolBell' };
+const NO_BELLS = { on: false, sound: 'softBell' };
 const withAlarms = (...alarms) => ({ bells: NO_BELLS, alarms });
 const clockAlarm = (fields) => ({
   id: 'a1', kind: 'clock', enabled: true, sound: 'chime', bellSchedules: null,

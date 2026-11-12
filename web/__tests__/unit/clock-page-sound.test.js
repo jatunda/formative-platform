@@ -100,7 +100,7 @@ describe('School Clock sound', () => {
 
       // 11:15 is 3 minutes away: 180 s after the audio clock's 100.
       expect(player.scheduled).toEqual([
-        expect.objectContaining({ at: 280, sound: 'schoolBell', repeat: true }),
+        expect.objectContaining({ at: 280, sound: 'softBell', repeat: true }),
       ]);
     });
 
@@ -129,7 +129,7 @@ describe('School Clock sound', () => {
       open({
         sound: { state: 'running', time: 0 },
         settings: {
-          bells: { on: false, sound: 'schoolBell' },
+          bells: { on: false, sound: 'softBell' },
           alarms: [{ id: 'a', kind: 'clock', time: '11:14', repeat: 'everySchoolDay', enabled: true, sound: 'chime', bellSchedules: null }],
         },
       });
@@ -191,7 +191,7 @@ describe('School Clock sound', () => {
 
   describe('ringing', () => {
     it('flashes the screen and says what rang when a Bell comes due, then stops on its own when its sound ends', () => {
-      // School bell plays passes at 0 and 3 s, the second ringing out until 5.6 s.
+      // Soft bell plays passes at 0 and 3 s, the second ringing out until 5.6 s.
       open({ when: at(11, 14, 59) });
       expect(ringing().hidden).toBe(true);
 
@@ -237,7 +237,7 @@ describe('School Clock sound', () => {
       });
       const [alarm, bell] = player.scheduled;
       expect(alarm).toEqual({ key: expect.any(String), at: 60, sound: 'chime', repeat: true });
-      expect(bell).toEqual({ key: expect.any(String), at: 120, sound: 'schoolBell', repeat: true, seconds: 5 });
+      expect(bell).toEqual({ key: expect.any(String), at: 120, sound: 'softBell', repeat: true, seconds: 5 });
     });
 
     it('can still be dismissed early while it would stop on its own', () => {
@@ -290,7 +290,7 @@ describe('School Clock sound', () => {
     });
 
     it('with "Ring Bells until you dismiss them" on, a Bell keeps ringing like an Alarm, up to 60 s', () => {
-      open({ when: at(11, 14, 59), sound: { state: 'running', time: 0 }, settings: { bells: { on: true, sound: 'schoolBell', untilDismissed: true } } });
+      open({ when: at(11, 14, 59), sound: { state: 'running', time: 0 }, settings: { bells: { on: true, sound: 'softBell', untilDismissed: true } } });
       expect(player.scheduled[0]).not.toHaveProperty('seconds');
       expect(mount().classList.contains('clock-ringing')).toBe(false);
       expect(ringing().hidden).toBe(true);
@@ -327,7 +327,7 @@ describe('School Clock sound', () => {
     it('stops ringing an Alarm on its own after 60 s', () => {
       open({
         when: at(11, 13, 59),
-        settings: { bells: { on: false, sound: 'schoolBell' }, alarms: [{ id: 'a', kind: 'clock', time: '11:14', repeat: 'everySchoolDay', enabled: true, sound: 'chime', bellSchedules: null }] },
+        settings: { bells: { on: false, sound: 'softBell' }, alarms: [{ id: 'a', kind: 'clock', time: '11:14', repeat: 'everySchoolDay', enabled: true, sound: 'chime', bellSchedules: null }] },
       });
       real.advance(2 * SEC);
       real.advance(55 * SEC);
@@ -460,12 +460,14 @@ describe('School Clock sound', () => {
       expect(saved(storage).volume).toBe(0.2);
     });
 
-    it('lists every voice, gentlest first, for Bells and the timer', () => {
+    it('lists every voice A to Z by name, for Bells and the timer', () => {
       open();
       openSettings();
-      const listed = (name) => [...field(name).options].map((o) => [o.value, o.textContent]);
-      expect(listed('Bell sound')).toEqual(Object.entries(SOUND_NAMES));
-      expect(listed('Timer sound')).toEqual(Object.entries(SOUND_NAMES));
+      const listed = (name) => [...field(name).options].map((o) => o.textContent);
+      expect(listed('Bell sound')).toEqual(['Beep', 'Buzzer', 'Chime', 'Clap pattern', 'Clock tower', 'Desk bell', 'Harp', 'Level up', 'Marimba', 'School bell', 'Soft bell', 'Songbird', 'Swell', 'Wood block']);
+      expect(listed('Timer sound')).toEqual(listed('Bell sound'));
+      // Each option plays the voice it names.
+      expect([...field('Bell sound').options].every((o) => SOUND_NAMES[o.value] === o.textContent)).toBe(true);
     });
 
     it('previews each voice', () => {
@@ -481,7 +483,7 @@ describe('School Clock sound', () => {
     it('chooses the Bells sound, which is saved and used for the coming Bells', () => {
       open({ sound: { state: 'running' } });
       const select = field('Bell sound');
-      expect(select.value).toBe('schoolBell');
+      expect(select.value).toBe('softBell');
 
       select.value = 'chime';
       select.dispatchEvent(new Event('change'));

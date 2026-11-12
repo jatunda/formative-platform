@@ -30,7 +30,7 @@ describe('clock settings store', () => {
     const settings = createSettingsStore(createFakeStorage()).load();
     expect(settings).toEqual(DEFAULT_SETTINGS);
     expect(settings).toMatchObject({
-      division: null, use24Hour: false, periodLabels: {}, bells: { on: true, sound: 'schoolBell' },
+      division: null, use24Hour: false, periodLabels: {}, bells: { on: true, sound: 'softBell' },
       alarms: [], timerEndsAt: null, timerSound: 'beep',
     });
     expect(settings.volume).toBeGreaterThan(0);
@@ -59,6 +59,25 @@ describe('clock settings store', () => {
     // An earlier save holds only the first eight voices' names, and they still load as saved.
     const older = { ...DEFAULT_SETTINGS, bells: { ...bells, sound: 'woodBlock' }, alarms: [clockAlarm, periodAlarm], timerSound: 'beep' };
     expect(storeHolding(older).load()).toEqual(older);
+  });
+
+  it('loads a save that picked the gentle bell (saved as `schoolBell` before it was Soft bell) as Soft bell, not the loud School bell', () => {
+    const settings = storeHolding({
+      ...DEFAULT_SETTINGS,
+      bells: { on: true, sound: 'schoolBell', assemblyEnds: false, untilDismissed: false },
+      alarms: [{ ...clockAlarm, sound: 'schoolBell' }, { ...periodAlarm, sound: 'schoolBell' }],
+      timerSound: 'schoolBell',
+    }).load();
+    expect(settings.bells.sound).toBe('softBell');
+    expect(settings.alarms.map((a) => a.sound)).toEqual(['softBell', 'softBell']);
+    expect(settings.timerSound).toBe('softBell');
+  });
+
+  it('round-trips the loud School bell', () => {
+    const storage = createFakeStorage();
+    const bells = { on: true, sound: 'hallwayBell', assemblyEnds: false, untilDismissed: false };
+    createSettingsStore(storage).save({ ...DEFAULT_SETTINGS, bells, timerSound: 'hallwayBell' });
+    expect(createSettingsStore(storage).load()).toMatchObject({ bells, timerSound: 'hallwayBell' });
   });
 
   it('starts with seconds on, the Day Strip on without the current end time, and the dark default theme in its own version, with no swaps', () => {
