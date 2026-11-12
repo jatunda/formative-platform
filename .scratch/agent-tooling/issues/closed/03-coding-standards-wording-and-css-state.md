@@ -11,8 +11,8 @@ Why: in the last session a review fix renamed a setting against Eric's wording (
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** closed
 
-- [ ] Both rules are in `CODING_STANDARDS.md`, each with its reason and one concrete pointer
-- [ ] Nothing else in the file changes, and the file stays short
-- [ ] Docs only: no code changes, so no checks to run
+- [x] Both rules are in `CODING_STANDARDS.md`, each with its reason and one concrete pointer
+- [x] Nothing else in the file changes, and the file stays short
+- [x] Docs only: no code changes, so no checks to run

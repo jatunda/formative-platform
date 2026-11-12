@@ -37,10 +37,6 @@ jobs:
       working-directory: ./web
       run: npm run typecheck
 
-    - name: Run tests
-      working-directory: ./web
-      run: npm run test:run
-
     - name: Generate coverage report
       working-directory: ./web
       run: npm run test:coverage
