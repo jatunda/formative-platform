@@ -3,11 +3,12 @@
 // Day Strip and the progress bar. "Whole day" shows the day's Segments in
 // proportion, the current one filling left to right with a Now marker above
 // it; "just this Segment" is the current Segment (or Passing Period) alone,
-// full width. During Off-Hours both show the Next School Day's Segments
-// (today's, before school); in Summer, Experience Week and on an unknown date
+// full width. During Off-Hours whole day shows the Next School Day's Segments
+// (today's, before school), and just this Segment one block counting down to
+// that day's first Segment; in Summer, Experience Week and on an unknown date
 // there is no bar. Pure: a moment from the clock model and the settings give
 // what to draw (positions in percent of the bar's width).
-import { segmentsOn } from './clock-model.js';
+import { isoDate, localMidnight, segmentsOn } from './clock-model.js';
 import { periodLabel } from './format.js';
 
 /** @typedef {import('./clock-model.js').Moment} Moment */
@@ -17,7 +18,7 @@ import { periodLabel } from './format.js';
  * One block of the bar.
  * @typedef {{
  *   name: string, short: string, label: string,
- *   kind: import('./school-years.js').SegmentKind | 'passing',
+ *   kind: import('./school-years.js').SegmentKind | 'passing' | 'countdown',
  *   start: Date, end: Date,
  *   state: 'past' | 'now' | 'next' | 'later',
  *   left: number, width: number,
@@ -25,6 +26,8 @@ import { periodLabel } from './format.js';
  * }} BarBlock
  * - `short`: the name for a tight block ("P3", "Nutr."); never shorter.
  * - `label`: the Period's Period Label ('' for none, and for every Break and Assembly).
+ * - `countdown`: the Off-Hours block on just this Segment, "Until Period 1",
+ *   from the last School Day's end to the Next School Day's first Segment.
  * - `state`: `next` is the Segment after a Passing Period.
  * - `left` / `width`: percent of the bar.
  * - `showEnd`: it shows its end time beside its start, where that fits
@@ -41,12 +44,14 @@ import { periodLabel } from './format.js';
  *   done: number | null,
  *   nowAt: number | null,
  *   end: Date,
+ *   offHours: boolean,
  * }} Bar
- * - `setting`: whole day or just this Segment (Off-Hours are always whole day).
+ * - `setting`: whole day or just this Segment (in Off-Hours, the countdown).
  * - `day`: today's Segments, or the Next School Day's (`date`, `dayLabel`).
  * - `done`: percent of the current block elapsed (null with nothing current).
  * - `nowAt`: where the Now marker sits, in percent (null with nothing current).
  * - `end`: the time under the bar's right end.
+ * - `offHours`: the bar is of a day still to come (headed with that day).
  */
 
 /**
@@ -101,7 +106,15 @@ export function describeBar(now, moment, schoolYears, { division, dayStrip, peri
     showEnd,
   });
   const passing = moment.passing && { name: 'Passing Period', kind: /** @type {const} */ ('passing'), ...moment.passing };
-  const active = moment.current ?? passing;
+  const countdown = !dayStrip && first && {
+    ...block(first, 'now', false),
+    name: `Until ${first.name}`,
+    short: `Until ${shortName(first.name)}`,
+    kind: /** @type {const} */ ('countdown'),
+    start: countdownStart(moment.schoolEndedAt, first.start, schoolYears),
+    end: first.start,
+  };
+  const active = moment.current ?? passing ?? countdown;
   const done = active ? ((t - active.start.getTime()) / (active.end.getTime() - active.start.getTime())) * 100 : null;
   /** @type {Omit<Bar, 'setting' | 'blocks' | 'nowAt' | 'end'>} */
   const base = {
@@ -109,8 +122,10 @@ export function describeBar(now, moment, schoolYears, { division, dayStrip, peri
     date: new Date(day.getFullYear(), day.getMonth(), day.getDate()),
     dayLabel,
     done,
+    offHours: !live,
   };
 
+  if (countdown) return { ...base, setting: 'segment', blocks: [countdown], nowAt: done, end: countdown.end };
   if (!dayStrip && active) {
     return { ...base, setting: 'segment', blocks: [block(active, 'now', false)], nowAt: done, end: active.end };
   }
@@ -145,3 +160,18 @@ export function describeBar(now, moment, schoolYears, { division, dayStrip, peri
 function sameDate(a, b) {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
+
+/**
+ * Where the Off-Hours countdown to `firstStart` begins: the last School Day's
+ * end, or midnight on the first day of `firstStart`'s School Year when none
+ * of that year's School Days has ended yet (the first day of the year).
+ * @param {Date | null} schoolEndedAt @param {Date} firstStart
+ * @param {import('./school-years.js').SchoolYear[]} schoolYears
+ */
+function countdownStart(schoolEndedAt, firstStart, schoolYears) {
+  const date = isoDate(firstStart);
+  const year = /** @type {import('./school-years.js').SchoolYear} */ (schoolYears.find((y) => y.start <= date && date <= y.end));
+  const yearBegan = localMidnight(year.start);
+  return schoolEndedAt && schoolEndedAt > yearBegan ? schoolEndedAt : yearBegan;
+}
+
