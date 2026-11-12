@@ -20,11 +20,11 @@ const attackOf = (source) => {
 const distinct = (values) => [...new Set(values)];
 
 describe('School Clock sound player', () => {
-  it('lists seventeen voices, A to Z by the name people see', () => {
+  it('lists twenty-three voices, A to Z by the name people see', () => {
     expect(SOUNDS.map((sound) => SOUND_NAMES[sound])).toEqual([
-      'Beep', 'Buzzer', 'Chime', 'Clap pattern', 'Clock tower', 'Desk bell', 'Digital alarm clock', 'Harp',
-      'Level up', 'Marimba', 'School bell', "Ship's klaxon", 'Soft bell', 'Songbird', 'Swell',
-      'Twin-bell alarm clock', 'Wood block',
+      'Beep', 'Bubble pops', 'Buzzer', 'Chime', 'Clap pattern', 'Clock tower', 'Cuckoo clock', 'Desk bell',
+      'Digital alarm clock', 'Harp', 'Level up', 'Marimba', 'Music box', 'School bell', "Ship's klaxon",
+      'Singing bowl', 'Soft bell', 'Songbird', 'Sparkle', 'Swell', 'Ta-da', 'Twin-bell alarm clock', 'Wood block',
     ]);
   });
 
@@ -202,6 +202,210 @@ describe('School Clock sound player', () => {
       createSoundPlayer({ context: ctx }).schedule([alarm('a', 20, 'klaxon')]);
       const firstEnds = Math.max(...ctx.sources.filter((s) => s.startAt < 22).map((s) => s.stopAt));
       expect(22 - firstEnds).toBeGreaterThanOrEqual(0.75);
+    });
+  });
+
+  describe('Singing bowl (calm)', () => {
+    const strikeOf = (ctx) => ctx.sources.filter((s) => s.startAt === 0);
+
+    it('strikes one bowl: a low-mid note with out-of-tune partials, each two sines a hair apart so they beat slowly', () => {
+      const ctx = createFakeAudioContext({ state: 'running' });
+      createSoundPlayer({ context: ctx }).play('singingBowl');
+      const freqs = strikeOf(ctx).map((s) => s.frequency.value).sort((a, b) => a - b);
+      expect(freqs[0]).toBeGreaterThanOrEqual(400);
+      expect(freqs[0]).toBeLessThan(600);
+      expect(freqs[freqs.length - 1]).toBeLessThanOrEqual(3000);
+      // In pairs a hair apart: a slow "wah-wah" beat of under 2 a second.
+      const pairs = [];
+      for (let i = 0; i < freqs.length; i += 2) pairs.push([freqs[i], freqs[i + 1]]);
+      expect(pairs.length).toBeGreaterThanOrEqual(3);
+      expect(pairs.every(([a, b]) => b - a > 0.2 && b - a < 2)).toBe(true);
+      // The partials sit between harmonics, as on real metal.
+      const ratios = pairs.slice(1).map(([a, b]) => (a + b) / (pairs[0][0] + pairs[0][1]));
+      expect(ratios.every((r) => Math.abs(r - Math.round(r)) > 0.1)).toBe(true);
+    });
+
+    it('fades slowly, over several seconds', () => {
+      const ctx = createFakeAudioContext({ state: 'running' });
+      createSoundPlayer({ context: ctx }).play('singingBowl');
+      expect(Math.max(...strikeOf(ctx).map((s) => s.stopAt))).toBeGreaterThanOrEqual(5);
+    });
+
+    it('strikes once per Bell, and again after a quiet gap on an Alarm', () => {
+      expect(distinct(bellOf('singingBowl').sources.map((s) => s.startAt))).toEqual([20]);
+      const ctx = createFakeAudioContext({ state: 'running' });
+      createSoundPlayer({ context: ctx }).schedule([alarm('a', 20, 'singingBowl')]);
+      const strikes = distinct(ctx.sources.map((s) => s.startAt));
+      const firstEnds = Math.max(...ctx.sources.filter((s) => s.startAt === 20).map((s) => s.stopAt));
+      expect(strikes[1] - firstEnds).toBeGreaterThanOrEqual(1);
+    });
+  });
+
+  describe('Music box (calm)', () => {
+    // Twinkle, Twinkle, Little Star's first line, in C: C C G G A A G, F F E E D D C.
+    const [C, D, E, F, G, A] = [523.25, 587.33, 659.25, 698.46, 783.99, 880];
+    const TWINKLE = [C, C, G, G, A, A, G, F, F, E, E, D, D, C];
+    const tune = (ctx) => ctx.sources.filter((s) => TWINKLE.includes(s.frequency.value)).sort((a, b) => a.startAt - b.startAt);
+
+    it('plays the first line of Twinkle, Twinkle, Little Star (public domain), holding the end of each half', () => {
+      const ctx = createFakeAudioContext({ state: 'running' });
+      createSoundPlayer({ context: ctx }).play('musicBox');
+      const notes = tune(ctx);
+      expect(notes.map((s) => s.frequency.value)).toEqual(TWINKLE);
+      const gap = (i) => +(notes[i + 1].startAt - notes[i].startAt).toFixed(3);
+      // Even beats, but the seventh note is held twice as long.
+      expect(gap(6)).toBeCloseTo(2 * gap(0));
+      expect([0, 1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 12].map(gap).every((g) => g === gap(0))).toBe(true);
+    });
+
+    it('plucks bright metal tines: a quick attack, a little detuned, with a high partial under 3 kHz', () => {
+      const ctx = createFakeAudioContext({ state: 'running' });
+      createSoundPlayer({ context: ctx }).play('musicBox');
+      const first = ctx.sources.filter((s) => s.startAt === 0);
+      expect(first.every((s) => attackOf(s) < 0.02)).toBe(true);
+      const freqs = first.map((s) => s.frequency.value).sort((a, b) => a - b);
+      expect(freqs[0]).toBe(C);
+      // A twin a hair sharp, and a partial up high.
+      expect(freqs[1] - C).toBeGreaterThan(0.5);
+      expect(freqs[1] - C).toBeLessThan(5);
+      expect(freqs[freqs.length - 1]).toBeGreaterThan(2 * C);
+      expect(ctx.sources.every((s) => s.frequency.value <= 3000)).toBe(true);
+    });
+
+    it('plays the tune once per Bell, and again after a gap on an Alarm', () => {
+      expect(tune(bellOf('musicBox')).filter((s) => s.frequency.value === G)).toHaveLength(3);
+      const ctx = createFakeAudioContext({ state: 'running' });
+      createSoundPlayer({ context: ctx }).schedule([alarm('a', 20, 'musicBox')]);
+      const second = tune(ctx)[TWINKLE.length].startAt;
+      expect(Math.max(...ctx.sources.filter((s) => s.startAt < second).map((s) => s.stopAt))).toBeLessThanOrEqual(second - 0.5);
+    });
+  });
+
+  describe('Sparkle (sparkly)', () => {
+    const peakOf = (s) => Math.max(...pathOf(s).flatMap((n) => n.gain?.events ?? []).map((e) => e.value));
+    const run = () => {
+      const ctx = createFakeAudioContext({ state: 'running' });
+      createSoundPlayer({ context: ctx }).play('sparkle');
+      return ctx.sources.filter((s) => s.startAt < 2).sort((a, b) => a.startAt - b.startAt);
+    };
+
+    it('twinkles a quick run of high, pure, bell-like notes under 3 kHz that ring into each other', () => {
+      const notes = run();
+      const starts = distinct(notes.map((s) => s.startAt));
+      expect(starts.length).toBeGreaterThanOrEqual(8);
+      expect(notes.every((s) => s.type === 'sine')).toBe(true);
+      expect(notes.every((s) => s.frequency.value >= 1200 && s.frequency.value <= 3000)).toBe(true);
+      // Each note still rings when the next ones start: a shimmer, not a tune.
+      const first = notes.filter((s) => s.startAt === starts[0]);
+      expect(first.every((s) => s.stopAt > starts[2])).toBe(true);
+      // It jumps around rather than walking up a scale.
+      const pitches = starts.map((t) => Math.min(...notes.filter((s) => s.startAt === t).map((s) => s.frequency.value)));
+      const ups = pitches.slice(1).map((p, i) => p > pitches[i]);
+      expect(ups).toContain(true);
+      expect(ups).toContain(false);
+    });
+
+    it('fades as it goes, like fairy dust settling', () => {
+      const notes = run();
+      expect(peakOf(notes[notes.length - 1])).toBeLessThan(peakOf(notes[0]) / 2);
+    });
+
+    it('twinkles twice per Bell', () => {
+      const starts = distinct(bellOf('sparkle').sources.map((s) => s.startAt));
+      expect(starts.filter((t) => t === 20 || t === 22.5)).toEqual([20, 22.5]);
+      expect(Math.max(...starts)).toBeLessThan(25);
+    });
+  });
+
+  describe('Cuckoo clock (cute)', () => {
+    const calls = (ctx) => {
+      const notes = [...ctx.sources].sort((a, b) => a.startAt - b.startAt);
+      const out = [];
+      for (let i = 0; i < notes.length; i += 2) out.push([notes[i], notes[i + 1]]);
+      return out;
+    };
+
+    it('calls "cuck-oo": a falling minor third on a soft, hollow, flute-like tone', () => {
+      const ctx = createFakeAudioContext({ state: 'running' });
+      createSoundPlayer({ context: ctx }).play('cuckoo');
+      const [[cuck, oo]] = calls(ctx);
+      expect(cuck.frequency.value / oo.frequency.value).toBeCloseTo(2 ** (3 / 12), 3);
+      expect(oo.startAt).toBeGreaterThan(cuck.stopAt - 0.05);
+      expect(oo.stopAt - oo.startAt).toBeGreaterThan(cuck.stopAt - cuck.startAt);
+      for (const s of ctx.sources) {
+        expect(s.type).toBe('triangle');
+        expect(s.frequency.value).toBeGreaterThanOrEqual(400);
+        const filter = pathOf(s).find((n) => n.isFilter);
+        expect(Math.max(...filter.frequency.events.map((e) => e.value))).toBeLessThanOrEqual(3000);
+        // Soft: it breathes in, rather than striking.
+        expect(attackOf(s)).toBeGreaterThanOrEqual(0.02);
+      }
+    });
+
+    it('calls three times in a Bell that stops on its own, then a long quiet gap on an Alarm', () => {
+      expect(calls(bellOf('cuckoo'))).toHaveLength(3);
+      const ctx = createFakeAudioContext({ state: 'running' });
+      createSoundPlayer({ context: ctx }).schedule([alarm('a', 20, 'cuckoo')]);
+      const all = calls(ctx);
+      expect(all[3][0].startAt - all[2][1].stopAt).toBeGreaterThanOrEqual(2);
+    });
+  });
+
+  describe('Bubble pops (cute)', () => {
+    const pops = () => {
+      const ctx = createFakeAudioContext({ state: 'running' });
+      createSoundPlayer({ context: ctx }).play('bubblePops');
+      return ctx.sources.filter((s) => s.startAt < 1).sort((a, b) => a.startAt - b.startAt);
+    };
+
+    it('pops a few quick, soft bubbles, each a short upward bloop, rising pop to pop', () => {
+      const all = pops();
+      expect(all.length).toBeGreaterThanOrEqual(4);
+      for (const s of all) {
+        const [from, to] = s.frequency.events.map((e) => e.value);
+        expect(to).toBeGreaterThan(from);
+        expect(from).toBeGreaterThanOrEqual(400);
+        expect(to).toBeLessThanOrEqual(3000);
+        expect(s.stopAt - s.startAt).toBeLessThan(0.1);
+      }
+      const froms = all.map((s) => s.frequency.value);
+      expect(froms).toEqual([...froms].sort((a, b) => a - b));
+      expect(new Set(froms).size).toBe(froms.length);
+      // An uneven, bubbly rhythm, not a steady beat.
+      const gaps = all.slice(1).map((s, i) => +(s.startAt - all[i].startAt).toFixed(3));
+      expect(new Set(gaps).size).toBeGreaterThan(1);
+    });
+
+    it('pops four times in a Bell that stops on its own', () => {
+      const lowest = pops()[0].frequency.value;
+      const firstPops = bellOf('bubblePops').sources.filter((s) => s.frequency.value === lowest);
+      expect(firstPops.map((s) => s.startAt - 20)).toEqual([0, 1.5, 3, 4.5]);
+    });
+  });
+
+  describe('Ta-da (cute)', () => {
+    const [C5, G5, C6, E6] = [523.25, 783.99, 1046.5, 1318.51];
+
+    it('flourishes up a few quick xylophone notes, then ends on a bright C-major chord', () => {
+      const ctx = createFakeAudioContext({ state: 'running' });
+      createSoundPlayer({ context: ctx }).play('taDa');
+      const starts = distinct(ctx.sources.filter((s) => s.startAt < 2).map((s) => s.startAt)).sort((a, b) => a - b);
+      const at = (t) => ctx.sources.filter((s) => s.startAt === t).map((s) => s.frequency.value);
+      const chordAt = starts[starts.length - 1];
+      expect([C5, G5, C6, E6].every((f) => at(chordAt).includes(f))).toBe(true);
+      const lead = starts.slice(0, -1).map((t) => Math.min(...at(t)));
+      expect(lead.length).toBeGreaterThanOrEqual(3);
+      expect(lead).toEqual([...lead].sort((a, b) => a - b));
+      // Each bar is struck: a quick attack, with a partial three times up, kept under 3 kHz.
+      expect(ctx.sources.every((s) => attackOf(s) < 0.02)).toBe(true);
+      expect(ctx.sources.every((s) => s.frequency.value <= 3000)).toBe(true);
+      expect(ctx.sources.some((s) => s.frequency.value === 3 * C5)).toBe(true);
+    });
+
+    it('plays twice per Bell', () => {
+      const chords = bellOf('taDa').sources.filter((s) => s.frequency.value === E6).map((s) => s.startAt);
+      expect(chords).toHaveLength(2);
+      expect(chords[1] - chords[0]).toBeCloseTo(2.5);
     });
   });
 
