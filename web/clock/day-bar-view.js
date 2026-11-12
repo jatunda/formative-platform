@@ -78,13 +78,14 @@ export function createDayBarView({ onSwitch }) {
     const items = bar.blocks.map((block) => {
       const nowWord = { now: ', now', next: ', up next' }[block.state] ?? '';
       const item = el('li', { className: 'clock-bar__seg' }, [
-        el('span', { className: 'clock-bar__text', 'aria-hidden': 'true' }, [
+        // Just this Segment is a thin bar with no name: the stage names it.
+        ...(single ? [] : [el('span', { className: 'clock-bar__text', 'aria-hidden': 'true' }, [
           el('span', { className: 'clock-bar__name' }, [
             el('span', { className: 'clock-bar__long', textContent: block.name }),
             el('span', { className: 'clock-bar__short', textContent: block.short }),
           ]),
           ...(block.label ? [el('span', { className: 'clock-bar__label', textContent: block.label })] : []),
-        ]),
+        ])]),
         el('span', { className: 'clock-bar__time', 'aria-hidden': 'true' }, [
           brief(block.start),
           // Its own part, so a block too narrow for both drops it (clock.css).
