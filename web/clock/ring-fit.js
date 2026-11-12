@@ -11,6 +11,12 @@
 //   clears it, so a ring that fits in the middle stays there.
 // Both come from the ring's region and the top bar, never from where the ring
 // itself ends up, so the measuring never feeds back into itself.
+// It also gives `--side-room`, the width the column of small Readouts beside
+// the ring needs: its widest value plus RING_GAP, on every screen where the
+// timer shows. timer.css keeps the ring that much clear of each side, so a
+// wide value ("10:40:01 AM") doesn't spill out of the column into the ring.
+// A value is only as wide as its own text, never its column, so this doesn't
+// feed back either.
 
 /** Clear space between the ring and the nearest piece of the top bar, in px. */
 export const RING_GAP = 12;
@@ -71,9 +77,10 @@ export function ringShift(region, boxes, gap, size) {
 }
 
 /**
- * Re-measures whenever the ring, its region, the top bar or any piece of it changes size.
- * Only while the ring shares the top bar's row; elsewhere the ring keeps to the stage and
- * nothing is set.
+ * Re-measures whenever the ring, its region, the top bar or any piece of it changes size,
+ * and whenever the Readouts change, while the timer shows. `--side-room` is set wherever the
+ * ring shows; `--ring-room` and `--ring-shift` only while the ring shares the top bar's row
+ * (elsewhere the ring keeps to the stage).
  * @param {HTMLElement} region the Readouts (`.has-timer` while the ring shows)
  * @param {HTMLElement} ring the timer's ring
  * @param {HTMLElement} topBar the top bar: the Day Label and the controls
@@ -83,6 +90,9 @@ export function keepRingClear(region, ring, topBar) {
   const pieces = [...topBar.querySelectorAll('.clock-day, button')];
   const update = () => {
     if (!region.classList.contains('has-timer')) return;
+    const values = [...region.querySelectorAll('.clock-smalls .clock-readout__value')];
+    const widest = Math.max(0, ...values.map((value) => value.getBoundingClientRect().width));
+    region.style.setProperty('--side-room', `${widest && widest + RING_GAP}px`);
     const area = region.getBoundingClientRect();
     if (area.top >= topBar.getBoundingClientRect().bottom) {
       region.style.removeProperty('--ring-room');
@@ -99,4 +109,6 @@ export function keepRingClear(region, ring, topBar) {
   };
   const observer = new ResizeObserver(update);
   for (const node of [region, ring, topBar, ...pieces]) observer.observe(node);
+  // The small Readouts are rebuilt and their values tick, without the region changing size.
+  new MutationObserver(update).observe(region, { childList: true, characterData: true, subtree: true });
 }
