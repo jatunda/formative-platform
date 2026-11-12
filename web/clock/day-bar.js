@@ -54,6 +54,9 @@ import { periodLabel } from './format.js';
  * - `offHours`: the bar is of a day still to come (headed with that day).
  */
 
+/** What the bar's two settings are called, wherever the clock names them. */
+export const BAR_SETTING_NAMES = /** @type {const} */ ({ day: 'Whole day', segment: 'Just this Segment' });
+
 /**
  * A Segment's name for a tight block: "Period 3" is "P3", "Nutrition" is
  * "Nutr." (never "Nut"); every other name stays whole.
