@@ -225,7 +225,7 @@ describe('School Clock overlays', () => {
       expect(document.activeElement).toBe(button('Middle School', dialog));
       expect(mount().querySelector('main').hasAttribute('inert')).toBe(true);
       const link = dialog.querySelector('a[href^="mailto:"]');
-      expect(link.textContent).toBe('Feedback? Email Eric here.');
+      expect(link.textContent).toBe('Feedback? Email Mr. Hsieh here.');
       expect(link.getAttribute('href')).toBe('mailto:erich@villagechristian.org?subject=Clock%20feedback');
     });
 

@@ -53,7 +53,7 @@ export function createDivisionPrompt({ onChoose }) {
       textContent: "The clock follows your Division's bell times. You can switch any time.",
     }),
     el('div', { className: 'clock-first__choices' }, choices),
-    feedbackLink('Feedback? Email Eric here.'),
+    feedbackLink('Feedback? Email Mr. Hsieh here.'),
   ]);
   const element = el('div', { className: 'clock-overlay', hidden: true }, [
     el('div', { className: 'clock-first-scrim', 'aria-hidden': 'true' }),
