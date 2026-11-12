@@ -377,9 +377,11 @@ button.clock-readout__face:focus-visible {
   color: var(--muted);
 }
 
-/* As tall as --type-digits, but capped so the value fits the width. */
+/* As tall as --type-digits, but capped so the value fits the width, and
+   at --edit-cap in edit mode (each layout sets it there, so edit mode never
+   has to outrank a layout's --type-digits). */
 .clock-readout--big .clock-readout__value {
-  font-size: min(var(--type-digits), calc(var(--fit-w) * 0.94 * var(--digits-fit) / (var(--units) * var(--glyph-em))));
+  font-size: min(var(--type-digits), var(--edit-cap, var(--type-digits)), calc(var(--fit-w) * 0.94 * var(--digits-fit) / (var(--units) * var(--glyph-em))));
 }
 
 .clock-readout--small .clock-readout__value {
@@ -392,7 +394,8 @@ button.clock-readout__face:focus-visible {
 }
 
 /* Below (the default): small Readouts in one centred row under the big one,
-   with hairline dividers. The row keeps a wide gap above it, so the big
+   with hairline dividers between Readouts (never on edit mode's Add slot,
+   whose own dashed outline would lose its left side). The row keeps a wide gap above it, so the big
    Readout's caption reads as its own and not as a label for the row. */
 .clock-readouts {
   display: flex;
@@ -407,7 +410,7 @@ button.clock-readout__face:focus-visible {
   margin-top: var(--gap-lg);
 }
 
-.clock-smalls > * + * {
+.clock-smalls > .clock-readout + .clock-readout {
   border-left: 1px solid var(--line-soft);
   padding-left: clamp(16px, 4vw, 80px);
 }
@@ -430,13 +433,19 @@ button.clock-readout__face:focus-visible {
     border-left: 1px solid var(--line-soft);
   }
 
-  .clock-readouts.has-smalls .clock-smalls > * + * {
+  .clock-readouts.has-smalls .clock-smalls > .clock-readout + .clock-readout {
     border-left: 0;
     padding-left: 0;
   }
 
   .clock-readouts.has-smalls .clock-readout--small .clock-readout__value {
     font-size: clamp(26px, 9.5vh, 112px);
+  }
+
+  /* Editing: each one in the column also has its Remove button under it,
+     so the numbers step down to keep the column inside the stage. */
+  .is-editing .clock-readouts.has-smalls .clock-readout--small .clock-readout__value {
+    font-size: clamp(22px, 6vh, 72px);
   }
 
   /* With the Look sheet open beside the clock (.has-sheet) there is no
@@ -511,14 +520,10 @@ button.clock-readout__face:focus-visible {
   height: 1.8em;
 }
 
-.clock-smalls > .clock-readout-add {
-  border-left: 1.5px dashed var(--line);
-}
-
 /* While editing, the big Readout steps down to make room for the buttons;
    editing is a teacher moment, not a projected one. */
 .clock-screen.is-editing {
-  --type-digits: 24vh;
+  --edit-cap: 24vh;
 }
 
 .is-editing .clock-readout--big {
@@ -680,10 +685,6 @@ button.clock-readout__face:focus-visible {
   list-style: none;
 }
 
-.clock-bar--segment .clock-bar__track {
-  height: max(32px, 5.5vh);
-}
-
 .clock-bar__seg {
   position: absolute;
   top: 0;
@@ -708,17 +709,6 @@ button.clock-readout__face:focus-visible {
   padding: 0 0.6em;
 }
 
-.clock-bar--segment .clock-bar__text {
-  flex-direction: row;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 0.5em;
-}
-
-.clock-bar--segment .clock-bar__label::before {
-  content: "\00B7  ";
-}
-
 /* Breaks are hatched with a dashed edge, Assemblies dotted: pattern, not colour. */
 .clock-bar__seg[data-kind="break"] {
   background: repeating-linear-gradient(-45deg, var(--bg) 0 6px, var(--hatch) 6px 12px);
@@ -732,8 +722,7 @@ button.clock-readout__face:focus-visible {
 }
 
 /* On whole day a Passing Period is the gap between two blocks: no box of
-   its own and no time (the blocks either side show it). On just this
-   Segment it's a bordered block of its own. */
+   its own and no time (the blocks either side show it). */
 .clock-bar--day .clock-bar__seg[data-kind="passing"] {
   border: 0;
   background: transparent;
@@ -741,10 +730,6 @@ button.clock-readout__face:focus-visible {
 
 .clock-bar--day .clock-bar__seg[data-kind="passing"] .clock-bar__time {
   display: none;
-}
-
-.clock-bar--segment .clock-bar__seg[data-kind="passing"] {
-  background: var(--bg);
 }
 
 .clock-bar__name {
@@ -813,7 +798,7 @@ button.clock-readout__face:focus-visible {
   bottom: 0;
 }
 
-/* "Show when this Segment ends": the current block's "–11:15" after its start,
+/* "Show period end time": the current block's "–11:15" after its start,
    dropped where the block is too narrow for both times (they'd run into the
    next block's start). */
 @container (max-width: 6.2em) {
@@ -852,6 +837,24 @@ button.clock-readout__face:focus-visible {
     linear-gradient(var(--accent), var(--accent)) left bottom / var(--done, 0%) 5px no-repeat,
     linear-gradient(var(--track), var(--track)) left bottom / 100% 5px no-repeat,
     linear-gradient(to right, var(--accent-soft) var(--done, 0%), transparent var(--done, 0%));
+}
+
+/* Just this Segment is one thin solid bar, whatever the block (a Segment, a
+   Passing Period or the Off-Hours countdown): no box, no pattern and no name
+   (the stage already names it), only the elapsed part in solid accent. */
+.clock-bar--segment .clock-bar__track {
+  height: max(10px, 1vh);
+}
+
+.clock-bar--segment .clock-bar__seg,
+.clock-bar--segment .clock-bar__seg[data-state="now"] {
+  border: 0;
+  border-radius: 999px;
+  background: var(--track);
+}
+
+.clock-bar--segment .clock-bar__fill {
+  background: linear-gradient(var(--accent), var(--accent)) left / var(--done, 0%) 100% no-repeat;
 }
 
 /* The Now marker: a thin notch above the track, so it never crosses text. */
@@ -902,7 +905,8 @@ button.clock-readout__face:focus-visible {
     --edge-x: 12px;
     --hint-room: 0px;
     --banner-room: 0px;
-    --type-digits: calc(40vh - var(--hint-room) - var(--banner-room));
+    --edit-room: 0px;
+    --type-digits: calc(40vh - var(--hint-room) - var(--banner-room) - var(--edit-room));
     row-gap: 4px;
     padding: 6px 12px 4px;
   }
@@ -970,7 +974,7 @@ button.clock-readout__face:focus-visible {
   }
 
   .clock-screen:has(> .clock-bottom > .clock-sound-prompt:not([hidden])) {
-    --type-digits: calc(34vh - var(--hint-room) - var(--banner-room));
+    --type-digits: calc(34vh - var(--hint-room) - var(--banner-room) - var(--edit-room));
   }
 
   /* About the height each takes here, over the digits' 0.95 line height:
@@ -1031,9 +1035,21 @@ button.clock-readout__face:focus-visible {
     font-size: 10px;
   }
 
-  /* Editing: the Readouts sit in one row, everything else steps away. */
+  /* Editing: the Readouts sit in one row, everything else steps away. The
+     digits give back --edit-room too, stepping down from 40vh / 34vh (with
+     the sound prompt) to 30vh / 24vh, so a big Readout too wide to share the
+     row leaves room for the row wrapped under it and every Remove button.
+     The room takes the place of the wider layouts' cap. */
   .clock-screen.is-editing {
-    --type-digits: 22vh;
+    --edit-room: 10vh;
+    --edit-cap: initial;
+  }
+
+  /* A smaller Remove pill, the height of the short layout's other buttons. */
+  .clock-readout__remove {
+    min-height: 32px;
+    padding: 0 var(--s3) 0 var(--s2);
+    font-size: 13px;
   }
 
   .is-editing .clock-readouts,
@@ -1063,7 +1079,7 @@ button.clock-readout__face:focus-visible {
     margin-top: 0;
   }
 
-  .is-editing .clock-smalls > * + * {
+  .is-editing .clock-smalls > .clock-readout + .clock-readout {
     padding-left: 12px;
   }
 
@@ -1131,7 +1147,7 @@ button.clock-readout__face:focus-visible {
     gap: 16px;
   }
 
-  .clock-smalls > * + * {
+  .clock-smalls > .clock-readout + .clock-readout {
     padding-left: 16px;
   }
 
@@ -1162,6 +1178,22 @@ button.clock-readout__face:focus-visible {
      height, so on a short phone the agenda keeps room for whole rows. */
   .clock-screen:has(.clock-bar--day:not([hidden])):has(> .clock-bottom > .clock-sound-prompt:not([hidden])) {
     --type-digits: 12svh;
+  }
+
+  /* Editing: the Readouts step down further, so with their Remove buttons
+     and the edit note they leave the agenda room for whole rows (with the
+     sound prompt or not: the cap is under its 12svh), and without it still
+     fit the stage. */
+  .clock-screen.is-editing {
+    --edit-cap: 16vh;
+  }
+
+  .clock-screen.is-editing:has(.clock-bar--day:not([hidden])) {
+    --edit-cap: 8svh;
+  }
+
+  .is-editing .clock-readout--small .clock-readout__value {
+    font-size: 26px;
   }
 
   /* The window button under the bar on the right; the sound prompt, while

@@ -110,7 +110,7 @@ describe('School Clock page', () => {
     expect(displayText()).toContain('Up next Period 3 10:30 AM');
   });
 
-  it('says when the current Segment ends under the Readouts, with Show when this Segment ends on', () => {
+  it('says when the current Segment ends under the Readouts, with Show period end time on', () => {
     const real = fakeRealClock(new Date(2026, 9, 27, 13, 0, 0));
     app = start({ realNow: real.now, settings: { showPeriodEnd: true } });
 
@@ -402,18 +402,18 @@ describe('School Clock page', () => {
 
       expect(pageText()).toContain('Next rings today');
       expect(ringLines()).toEqual([
-        '1:40 PM · Bell · Lunch ends · Soft bell',
-        '1:45 PM · Bell · Period 6 starts · Soft bell',
+        '1:40 PM · Bell · Lunch ends · School bell (softer)',
+        '1:45 PM · Bell · Period 6 starts · School bell (softer)',
         '2:27:30 PM · Period Alarm · Mid-period walk · Period 6, halfway · Buzzer',
         '3:05 PM · Period Alarm · Period 6, 5 min before the end · Beep',
-        '3:10 PM · Bell · Period 6 ends · Soft bell',
+        '3:10 PM · Bell · Period 6 ends · School bell (softer)',
       ]);
     });
 
     it('drops a ring once its moment has passed, and drops the list when nothing is left', () => {
       const real = fakeRealClock(new Date(2026, 9, 27, 15, 9, 59));
       app = start({ realNow: real.now });
-      expect(ringLines()).toEqual(['3:10 PM · Bell · Period 7 ends · Soft bell']);
+      expect(ringLines()).toEqual(['3:10 PM · Bell · Period 7 ends · School bell (softer)']);
 
       real.advance(1000); // 3:10:00, the ring's own moment
       expect(ringLines()).toHaveLength(1);
@@ -594,7 +594,7 @@ describe('School Clock page', () => {
         expect(headingText()).toBe('Period 3 · AP CSA');
         const text = pageText();
         expect(text).toContain('11:10 AM · Period Alarm · Period 3 · AP CSA, 5 min before the end · Buzzer');
-        expect(text).toContain('11:15 AM · Bell · Period 3 · AP CSA ends · Soft bell');
+        expect(text).toContain('11:15 AM · Bell · Period 3 · AP CSA ends · School bell (softer)');
         expect(labelInput('Period 3').value).toBe('AP CSA');
       });
 
@@ -648,7 +648,7 @@ describe('School Clock page', () => {
       it('shows the next rings in 24-hour form', () => {
         const real = fakeRealClock(new Date(2026, 9, 27, 15, 9, 0));
         app = start({ realNow: real.now, settings: { use24Hour: true } });
-        expect(pageText()).toContain('15:10 · Bell · Period 7 ends · Soft bell');
+        expect(pageText()).toContain('15:10 · Bell · Period 7 ends · School bell (softer)');
       });
     });
 

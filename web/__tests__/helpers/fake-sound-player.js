@@ -17,6 +17,8 @@ export function createFakeSoundPlayer({ state = 'suspended', time = 0 } = {}) {
     get scheduled() { return player.schedules.at(-1) ?? []; },
     /** Sounds played straight away: { sound, repeat } (and `seconds` when given) */
     played: [],
+    /** Voices previewed from a sound picker, oldest first. */
+    previewed: [],
     dismissals: 0,
     volume: null,
     closed: false,
@@ -34,6 +36,7 @@ export function createFakeSoundPlayer({ state = 'suspended', time = 0 } = {}) {
     play: (sound, { repeat = false, seconds } = {}) => {
       player.played.push(seconds === undefined ? { sound, repeat } : { sound, repeat, seconds });
     },
+    preview: (sound) => { player.previewed.push(sound); },
     dismiss: () => { player.dismissals += 1; },
     close: () => { player.closed = true; },
   };

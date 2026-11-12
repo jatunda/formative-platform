@@ -31,12 +31,12 @@ import { periodLabel } from './format.js';
  * - `state`: `next` is the Segment after a Passing Period.
  * - `left` / `width`: percent of the bar.
  * - `showEnd`: it shows its end time beside its start, where that fits
- *   ("Show when this Segment ends": the current Segment, on whole day only).
+ *   ("Show period end time": the current Segment, on whole day only).
  */
 
 /**
  * @typedef {{
- *   setting: 'day' | 'segment',
+ *   setting: BarSetting,
  *   day: 'today' | 'next',
  *   date: Date,
  *   dayLabel: string,
@@ -56,6 +56,20 @@ import { periodLabel } from './format.js';
 
 /** What the bar's two settings are called, wherever the clock names them. */
 export const BAR_SETTING_NAMES = /** @type {const} */ ({ day: 'Whole day', segment: 'Just this Segment' });
+
+/** @typedef {keyof typeof BAR_SETTING_NAMES} BarSetting */
+
+/**
+ * The bar's setting for the saved `dayStrip`: whole day when it's on.
+ * @param {boolean} dayStrip @returns {BarSetting}
+ */
+export const barSetting = (dayStrip) => (dayStrip ? 'day' : 'segment');
+
+/**
+ * The saved `dayStrip` for a bar setting (the reverse of `barSetting()`).
+ * @param {BarSetting} setting @returns {boolean}
+ */
+export const dayStripOf = (setting) => setting === 'day';
 
 /**
  * A Segment's name for a tight block: "Period 3" is "P3", "Nutrition" is
@@ -128,9 +142,9 @@ export function describeBar(now, moment, schoolYears, { division, dayStrip, peri
     offHours: !live,
   };
 
-  if (countdown) return { ...base, setting: 'segment', blocks: [countdown], nowAt: done, end: countdown.end };
+  if (countdown) return { ...base, setting: barSetting(dayStrip), blocks: [countdown], nowAt: done, end: countdown.end };
   if (!dayStrip && active) {
-    return { ...base, setting: 'segment', blocks: [block(active, 'now', false)], nowAt: done, end: active.end };
+    return { ...base, setting: barSetting(dayStrip), blocks: [block(active, 'now', false)], nowAt: done, end: active.end };
   }
 
   const t0 = segments[0].start.getTime();

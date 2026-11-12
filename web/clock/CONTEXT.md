@@ -16,6 +16,7 @@ One named span of time within a Bell Schedule, with a start and an end — the c
 **Period**:
 A Segment where teachers teach in their own rooms: the numbered Periods (Period 1 through Period 7), Seminar, and Super Seminar. A finals-day exam block is the Period it's named for. A teacher may give a Period a Period Label.
 _Avoid_: Class — in the root context that's a course section; here it would wrongly suggest a Period belongs to one teacher's course. Also avoid using Period for Nutrition or Lunch (those are Breaks) or for Chapel (an Assembly).
+The one exception is the "Show period end time" setting: it shows when the current Segment ends, whatever kind it is, but says "period" by Eric's choice, since that's the word teachers use for it.
 
 **Break**:
 A Segment with no class: Nutrition and Lunch.

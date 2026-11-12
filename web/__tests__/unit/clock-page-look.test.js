@@ -174,9 +174,11 @@ describe('School Clock look', () => {
       expect(button('Done')).toBeDefined();
     });
 
-    it('has the place for the bar setting (whole day / just this Segment)', () => {
+    it('keeps only how the clock looks: the Bottom bar choice is in Settings, not here', () => {
       open();
-      expect(openLook().querySelector('.clock-look__bar')).not.toBeNull();
+      const legends = [...openLook().querySelectorAll('legend')].map((l) => l.textContent);
+      expect(legends).toEqual(['Theme', 'Font', 'Colours']);
+      expect(sheet().textContent).not.toMatch(/Bottom bar|Whole day|Just this Segment/);
     });
   });
 

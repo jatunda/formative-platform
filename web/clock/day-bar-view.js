@@ -8,7 +8,7 @@
 // Readouts' edit mode a tap anywhere on the bar switches it between whole day
 // and just this Segment; a button laid over it (letting taps and scrolls
 // through to the bar) does the same for the keyboard and screen readers.
-import { BAR_SETTING_NAMES } from './day-bar.js';
+import { BAR_SETTING_NAMES, barSetting, dayStripOf } from './day-bar.js';
 import { el } from './dom.js';
 import { formatShortDate } from './format.js';
 
@@ -70,7 +70,8 @@ export function createDayBarView({ onSwitch }) {
     let name = "Today's Segments";
     if (single) name = fullName(bar.blocks[0]);
     else if (next) name = `Segments on ${date}`;
-    element.className = `clock-bar clock-bar--${bar.setting}${next ? ' clock-bar--next' : ''}`;
+    // Keeps edit mode's outline: a switch rebuilds the bar mid-edit.
+    element.className = `clock-bar clock-bar--${bar.setting}${next ? ' clock-bar--next' : ''}${editing ? ' is-editing' : ''}`;
     element.setAttribute('aria-label', name);
     current = null;
     fill = null;
@@ -78,13 +79,14 @@ export function createDayBarView({ onSwitch }) {
     const items = bar.blocks.map((block) => {
       const nowWord = { now: ', now', next: ', up next' }[block.state] ?? '';
       const item = el('li', { className: 'clock-bar__seg' }, [
-        el('span', { className: 'clock-bar__text', 'aria-hidden': 'true' }, [
+        // Just this Segment is a thin bar with no name: the stage names it.
+        ...(single ? [] : [el('span', { className: 'clock-bar__text', 'aria-hidden': 'true' }, [
           el('span', { className: 'clock-bar__name' }, [
             el('span', { className: 'clock-bar__long', textContent: block.name }),
             el('span', { className: 'clock-bar__short', textContent: block.short }),
           ]),
           ...(block.label ? [el('span', { className: 'clock-bar__label', textContent: block.label })] : []),
-        ]),
+        ])]),
         el('span', { className: 'clock-bar__time', 'aria-hidden': 'true' }, [
           brief(block.start),
           // Its own part, so a block too narrow for both drops it (clock.css).
@@ -171,7 +173,7 @@ export function createDayBarView({ onSwitch }) {
       built = key;
       build(bar, time);
     }
-    const other = bar.setting === 'day' ? 'segment' : 'day';
+    const other = barSetting(!dayStripOf(bar.setting));
     switchName.textContent = `Bottom bar: ${BAR_SETTING_NAMES[bar.setting]}. Switch to ${BAR_SETTING_NAMES[other]}`;
     // A current block (and so a fill) exactly when something is current.
     if (current) {

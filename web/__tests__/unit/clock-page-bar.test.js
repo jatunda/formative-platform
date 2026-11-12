@@ -16,9 +16,17 @@ const bar = () => {
 const words = (node) => node.textContent.replace(/\s+/g, ' ').trim();
 /** Each block's hidden text, as a screen reader hears the bar. */
 const heard = () => [...bar().querySelectorAll('.clock-bar__track > li .visually-hidden')].map(words);
+/** What the bar shows on screen: its text minus the hidden, screen-reader-only parts. */
+const shown = () => {
+  const copy = bar().cloneNode(true);
+  copy.querySelectorAll('.visually-hidden, button').forEach((node) => node.remove());
+  return [...copy.querySelectorAll('*')].filter((node) => !node.children.length)
+    .map(words).filter(Boolean).join(' ');
+};
 const progress = () => bar().querySelector('[role="progressbar"]');
-const radio = (name) =>
-  [...mount().querySelectorAll('label')].find((l) => l.textContent.trim() === name).querySelector('input');
+/** A radio of the Bottom bar choice in Settings → Time. */
+const radio = (name) => [...mount().querySelectorAll('#clock-settings-time label')]
+  .find((l) => l.textContent.trim() === name).querySelector('input');
 const choose = (name) => {
   const input = radio(name);
   input.checked = true;
@@ -161,6 +169,25 @@ describe('School Clock bar', () => {
       expect(heard()).toHaveLength(9);
     });
 
+    it('is a thin solid bar with no Segment name: the stage already names it', () => {
+      withSettings({ dayStrip: false, showPeriodEnd: true, periodLabels: { 'Period 3': 'AP CSA', 'Period 2': 'Prep' } });
+      // A Segment, a Passing Period, before school and after school.
+      const cases = [
+        [at(10, 39), '10:30 11:15', 'Period 3 · AP CSA, 10:30 AM to 11:15 AM, now', 'Period 3 progress'],
+        [at(10, 27), '10:25 10:30', 'Passing Period, 10:25 AM to 10:30 AM, now', 'Passing Period progress'],
+        [at(7, 50), 'Today · All Day 3:10 8:30', 'Until Period 1, today at 8:30 AM', 'Until Period 1 progress'],
+        [at(16, 0), 'Next School Day · Wed, Oct 28 · Even Day 3:10 8:30',
+          'Until Period 2 · Prep, Wed, Oct 28 at 8:30 AM', 'Until Period 2 progress'],
+      ];
+      for (const [when, seen, said, progressName] of cases) {
+        open({ when });
+        expect(shown()).toBe(seen);
+        expect(bar().querySelector('.clock-bar__name, .clock-bar__label')).toBeNull();
+        expect(heard()).toEqual([said]);
+        expect(progress().getAttribute('aria-label')).toBe(progressName);
+      }
+    });
+
     it('leaves the look preferences it does not show as they were saved', () => {
       withSettings({ theme: 'bloom', fontSwap: 'mono', paletteSwap: 'team', flipped: true });
       open({ when: at(10, 32) });
@@ -171,7 +198,7 @@ describe('School Clock bar', () => {
     });
   });
 
-  describe('Show when this Segment ends', () => {
+  describe('Show period end time', () => {
     const times = () => [...bar().querySelectorAll('.clock-bar__time')].map(words);
     const agendaTimes = () => [...bar().querySelectorAll('.clock-agenda__time')].map(words);
 
@@ -284,13 +311,18 @@ describe('School Clock bar', () => {
       return button && isShown(button) ? button : null;
     };
 
-    it('a tap anywhere on the bar switches whole day and just this Segment, saves it, and the Look sheet shows it', () => {
+    it('a tap anywhere on the bar switches whole day and just this Segment, saves it, and Settings shows it', () => {
       open({ when: at(10, 39) });
       edit();
       bar().querySelector('.clock-bar__track li').click();
       expect(saved(storage).dayStrip).toBe(false);
       expect(radio('Just this Segment').checked).toBe(true);
       expect(heard()).toEqual(['Period 3 · AP CSA, 10:30 AM to 11:15 AM, now']);
+      // The thin bar itself takes the tap too.
+      bar().querySelector('.clock-bar__track li').click();
+      expect(saved(storage).dayStrip).toBe(true);
+      bar().click();
+      expect(saved(storage).dayStrip).toBe(false);
       bar().click();
       expect(saved(storage).dayStrip).toBe(true);
       expect(radio('Whole day').checked).toBe(true);
@@ -322,6 +354,19 @@ describe('School Clock bar', () => {
       edit();
       expect(bar().classList).toContain('is-editing');
       expect(words(mount().querySelector('.clock-edit-note'))).toBe('Tap a Readout or the bar to change what it shows');
+    });
+
+    it('still looks editable straight after a switch, with no wait for the next tick', () => {
+      open({ when: at(10, 39) });
+      edit();
+      bar().click();
+      expect(bar().classList).toContain('clock-bar--segment');
+      expect(bar().classList).toContain('is-editing');
+      switchButton().focus();
+      switchButton().click();
+      expect(bar().classList).toContain('clock-bar--day');
+      expect(bar().classList).toContain('is-editing');
+      expect(document.activeElement).toBe(switchButton());
     });
 
     it("isn't interactive outside edit mode", () => {

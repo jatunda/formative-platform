@@ -1,7 +1,7 @@
 // The form controls the School Clock's panels share (the Settings drawer, its
 // Alarms section, the Look sheet and the timer picker): a drawer section, an
-// on/off switch, a voice choice with Preview, a titled fieldset, an icon-only
-// Close button and the feedback link.
+// on/off switch, a segmented choice of a few, a voice choice with Preview, a
+// titled fieldset, an icon-only Close button and the feedback link.
 import { el } from './dom.js';
 import { icon } from './icons.js';
 import { SOUNDS, SOUND_NAMES } from './sound.js';
@@ -29,21 +29,46 @@ export function drawerSection(key, title, children) {
 }
 
 /**
- * An on/off switch named `name`, with an optional hint under the name.
+ * An on/off switch named `name`, with a hint under the name unless `hint` is
+ * empty (then there is nothing to describe it).
  * @param {string} id @param {string} name @param {string} hint @param {(on: boolean) => void} onChange
  */
 export function switchControl(id, name, hint, onChange) {
-  const hintText = el('span', { className: 'clock-hint', id: `${id}-hint`, textContent: hint });
+  const hintText = hint === '' ? null : el('span', { className: 'clock-hint', id: `${id}-hint`, textContent: hint });
   const input = el('input', {
-    type: 'checkbox', role: 'switch', id, 'aria-labelledby': `${id}-name`, 'aria-describedby': hintText.id,
+    type: 'checkbox', role: 'switch', id, 'aria-labelledby': `${id}-name`,
+    ...(hintText ? { 'aria-describedby': hintText.id } : {}),
     onchange: () => onChange(input.checked),
   });
   const label = el('label', { className: 'clock-switch' }, [
-    el('span', { className: 'clock-switch__text' }, [el('span', { id: `${id}-name`, textContent: name }), hintText]),
+    el('span', { className: 'clock-switch__text' }, [el('span', { id: `${id}-name`, textContent: name }), ...(hintText ? [hintText] : [])]),
     input,
     el('span', { className: 'clock-switch__track', 'aria-hidden': 'true' }),
   ]);
-  return { label, input, hint: hintText };
+  return { label, input };
+}
+
+/**
+ * Radios shown as a segmented control. @param {string} name
+ * @param {string | { labelledBy: string }} groupLabel the group's name, or the id of the element that names it
+ * @param {readonly (readonly [string, string])[]} options value and words @param {string} chosen @param {() => void} [onChange]
+ */
+export function segmented(name, groupLabel, options, chosen, onChange) {
+  const inputs = options.map(([value, words]) => {
+    const input = el('input', { type: 'radio', name, value, checked: value === chosen, onchange: onChange });
+    return { input, label: el('label', { className: 'clock-segment' }, [input, el('span', { textContent: words })]) };
+  });
+  const named = typeof groupLabel === 'string' ? { 'aria-label': groupLabel } : { 'aria-labelledby': groupLabel.labelledBy };
+  const group = el('div', { className: 'clock-segmented', role: 'radiogroup', ...named }, inputs.map(({ label }) => label));
+  const checked = () => inputs.find(({ input }) => input.checked)?.input;
+  return {
+    group,
+    value: () => checked()?.value,
+    /** The radio chosen, if any. */
+    checked,
+    /** @param {string} value */
+    choose: (value) => { for (const { input } of inputs) input.checked = input.value === value; },
+  };
 }
 
 /**

@@ -202,7 +202,7 @@ describe('School Clock Alarm editor', () => {
 
     it('is edited in place of its list item, and Cancel keeps it as it was', () => {
       open({ settings: { alarms: [CLOCK_ALARM, PERIOD_ALARM] } });
-      expect(listed()[0]).toEqual({ name: 'Morning duty', hint: '7:55 AM · every School Day · Soft bell' });
+      expect(listed()[0]).toEqual({ name: 'Morning duty', hint: '7:55 AM · every School Day · School bell (softer)' });
       button('Edit Morning duty').click();
 
       const item = section().querySelector('.clock-alarm-item--editing');
@@ -460,7 +460,7 @@ describe('School Clock Alarm editor', () => {
       open({ settings: { alarms: [rang] } });
       toggle('Morning duty on');
       expect(savedAlarms(storage)[0]).toEqual({ ...rang, enabled: true, date: '2026-10-27' });
-      expect(listed()[0].hint).toBe('11:00 AM · once, Tue, Oct 27 · Soft bell');
+      expect(listed()[0].hint).toBe('11:00 AM · once, Tue, Oct 27 · School bell (softer)');
     });
 
     it('has its own sound, with a Preview of the sound chosen', () => {
@@ -469,17 +469,18 @@ describe('School Clock Alarm editor', () => {
       expect(inForm('Sound').value).toBe('chime');
       setValue('Sound', 'buzzer', form());
       button('Preview Sound', form()).click();
-      expect(player.played).toEqual([{ sound: 'buzzer', repeat: false }]);
+      expect(player.previewed).toEqual(['buzzer']);
+      expect(player.played).toEqual([]);
     });
 
     it('offers every voice, the new ones too, A to Z by name', () => {
       open();
       button('Clock Alarm', section()).click();
-      expect([...inForm('Sound').options].map((o) => o.textContent)).toEqual(['Beep', 'Bubble pops', 'Buzzer', 'Chime', 'Clap pattern', 'Clock tower', 'Cuckoo clock', 'Desk bell', 'Digital alarm clock', 'Harp', 'Level up', 'Marimba', 'Music box', 'School bell', "Ship's klaxon", 'Singing bowl', 'Soft bell', 'Songbird', 'Sparkle', 'Swell', 'Ta-da', 'Twin-bell alarm clock', 'Wood block']);
+      expect([...inForm('Sound').options].map((o) => o.textContent)).toEqual(['Beep', 'Bubble pops', 'Buzzer', 'Chime', 'Clap pattern', 'Clock tower', 'Cuckoo clock', 'Desk bell', 'Digital alarm clock', 'Harp', 'Level up', 'Marimba', 'Music box', 'School bell', 'School bell (softer)', "Ship's klaxon", 'Singing bowl', 'Songbird', 'Sparkle', 'Swell', 'Ta-da', 'Twin-bell alarm clock', 'Wood block']);
       expect([...inForm('Sound').options].every((o) => SOUND_NAMES[o.value] === o.textContent)).toBe(true);
       setValue('Sound', 'songbird', form());
       button('Preview Sound', form()).click();
-      expect(player.played).toEqual([{ sound: 'songbird', repeat: false }]);
+      expect(player.previewed).toEqual(['songbird']);
     });
 
     it('is deleted at once from its form, with an Undo that puts it back', () => {
