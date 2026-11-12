@@ -31,7 +31,7 @@ import { createWakeLockKeeper, detectCapabilities } from './screen.js';
 import { createAlarmEditor } from './alarm-editor.js';
 import { createSettingsDrawer } from './settings-drawer.js';
 import { applyLook, createLookSheet, decorations } from './look-sheet.js';
-import { ALARM_MAX_SECONDS, BELL_AUTO_DISMISS_SECONDS, createSoundPlayer, ringLength } from './sound.js';
+import { ALARM_MAX_SECONDS, createSoundPlayer, ringSeconds, shownSeconds } from './sound.js';
 import { cancelTimer, nameTimer, pauseTimer, resumeTimer, settleTimer, timerRingView, timerStatus } from './timer.js';
 import { createTimerPicker } from './timer-picker.js';
 import { createTimerRing } from './timer-ring.js';
@@ -185,7 +185,7 @@ export function initClockApp({
       : [];
     const audioNow = soundPlayer.currentTime();
     soundPlayer.schedule(rings.map((ring) => {
-      const seconds = ringSeconds(ring.source);
+      const seconds = ringSeconds(ring.source, settings.bells);
       return {
         key: ringKey(ring),
         at: audioNow + (ring.at.getTime() - t) / 1000 / clock.speed,
@@ -194,29 +194,6 @@ export function initClockApp({
         ...(seconds === undefined ? {} : { seconds }),
       };
     }));
-  }
-
-  /**
-   * When a ring of this kind starts no new pass of its sound, for one that
-   * stops on its own sooner than an Alarm's minute: a Bell's 5 s, unless the
-   * teacher keeps Bells ringing until dismissed.
-   * @param {import('./clock-model.js').Ring['source']} source
-   * @returns {number | undefined}
-   */
-  function ringSeconds(source) {
-    return source === 'bell' && !settings.bells.untilDismissed ? BELL_AUTO_DISMISS_SECONDS : undefined;
-  }
-
-  /**
-   * How long a ring of this kind shows on screen when it stops on its own:
-   * until its sound's last pass has played to the end. Undefined when it rings
-   * an Alarm's minute.
-   * @param {import('./clock-model.js').Ring['source']} source @param {import('./clock-settings.js').SoundName} sound
-   * @returns {number | undefined}
-   */
-  function shownSeconds(source, sound) {
-    const seconds = ringSeconds(source);
-    return seconds === undefined ? undefined : ringLength(sound, seconds);
   }
 
   // What's ringing on screen: a flash (or a steady highlight) and the ring
@@ -417,9 +394,9 @@ export function initClockApp({
     update: updateSettings,
     play: (sound) => soundPlayer.play(sound),
     testRing: () => {
-      const seconds = ringSeconds('bell');
+      const seconds = ringSeconds('bell', settings.bells);
       soundPlayer.play(settings.bells.sound, { repeat: true, ...(seconds === undefined ? {} : { seconds }) });
-      startRinging(TEST_RING_WORDS, { seconds: shownSeconds('bell', settings.bells.sound) });
+      startRinging(TEST_RING_WORDS, { seconds: shownSeconds('bell', settings.bells.sound, settings.bells) });
     },
     // A ring shows over the drawer too, so it can be seen, heard and dismissed.
     behind: () => behindAll(drawer.elements, ringCard.elements),
@@ -543,7 +520,7 @@ export function initClockApp({
         if (ring.source === 'timer') {
           rangTimer = { totalMs: ring.totalMs, name: ring.name ?? null };
         }
-        const seconds = shownSeconds(ring.source, ring.sound);
+        const seconds = shownSeconds(ring.source, ring.sound, settings.bells);
         startRinging(ringWords(ring, text), {
           seconds,
           // A Bell that stops on its own does so when its sound ends, counted

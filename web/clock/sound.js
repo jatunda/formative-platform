@@ -594,6 +594,31 @@ export function ringLength(sound, seconds) {
   return ringOut(ctx, ctx.createGain(), VOICES[sound], 0, seconds, () => {});
 }
 
+/**
+ * When a ring of this kind starts no new pass of its sound, for one that
+ * stops on its own sooner than an Alarm's minute: a Bell's 5 s, unless the
+ * teacher keeps Bells ringing until dismissed. Undefined for every other ring.
+ * @param {import('./clock-model.js').Ring['source']} source
+ * @param {{ untilDismissed?: boolean }} bells the Bells settings
+ * @returns {number | undefined}
+ */
+export function ringSeconds(source, bells) {
+  return source === 'bell' && !bells.untilDismissed ? BELL_AUTO_DISMISS_SECONDS : undefined;
+}
+
+/**
+ * How long a ring of this kind shows on screen when it stops on its own:
+ * until its sound's last pass has played to the end. Undefined when it rings
+ * an Alarm's minute.
+ * @param {import('./clock-model.js').Ring['source']} source @param {SoundName} sound
+ * @param {{ untilDismissed?: boolean }} bells the Bells settings
+ * @returns {number | undefined}
+ */
+export function shownSeconds(source, sound, bells) {
+  const seconds = ringSeconds(source, bells);
+  return seconds === undefined ? undefined : ringLength(sound, seconds);
+}
+
 /** @returns {SoundPlayer} */
 function unavailablePlayer() {
   return {
