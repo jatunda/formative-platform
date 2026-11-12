@@ -1,5 +1,5 @@
 {
-  // Type-checks plain JS from its JSDoc, no build step. Every JS file is
+  // Type-checks plain JS from its JSDoc, no build step. Every .js and .mjs file is
   // included, but with checkJs off only files whose first line is
   // `// @ts-check` are checked, so that header alone opts a module in.
   "compilerOptions": {
@@ -14,6 +14,6 @@
     "strict": false,
     "strictNullChecks": true
   },
-  "include": ["**/*.js", "firebase-database.d.ts"],
+  "include": ["**/*.js", "**/*.mjs", "firebase-database.d.ts"],
   "exclude": ["node_modules", "coverage", "dist", "__tests__"]
 }

@@ -37,10 +37,6 @@ jobs:
       working-directory: ./web
       run: npm run typecheck
 
-    - name: Run tests
-      working-directory: ./web
-      run: npm run test:run
-
     - name: Generate coverage report
       working-directory: ./web
       run: npm run test:coverage
@@ -73,3 +69,13 @@ jobs:
     - name: Run link-preview function tests
       working-directory: ./functions
       run: npm test
+
+  scripts:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v7
+
+    - name: Test merge-ticket script
+      run: bash scripts/merge-ticket.test.sh
