@@ -377,9 +377,11 @@ button.clock-readout__face:focus-visible {
   color: var(--muted);
 }
 
-/* As tall as --type-digits, but capped so the value fits the width. */
+/* As tall as --type-digits, but capped so the value fits the width, and
+   at --edit-cap in edit mode (each layout sets it there, so edit mode never
+   has to outrank a layout's --type-digits). */
 .clock-readout--big .clock-readout__value {
-  font-size: min(var(--type-digits), calc(var(--fit-w) * 0.94 * var(--digits-fit) / (var(--units) * var(--glyph-em))));
+  font-size: min(var(--type-digits), var(--edit-cap, var(--type-digits)), calc(var(--fit-w) * 0.94 * var(--digits-fit) / (var(--units) * var(--glyph-em))));
 }
 
 .clock-readout--small .clock-readout__value {
@@ -521,7 +523,7 @@ button.clock-readout__face:focus-visible {
 /* While editing, the big Readout steps down to make room for the buttons;
    editing is a teacher moment, not a projected one. */
 .clock-screen.is-editing {
-  --type-digits: 24vh;
+  --edit-cap: 24vh;
 }
 
 .is-editing .clock-readout--big {
@@ -903,7 +905,8 @@ button.clock-readout__face:focus-visible {
     --edge-x: 12px;
     --hint-room: 0px;
     --banner-room: 0px;
-    --type-digits: calc(40vh - var(--hint-room) - var(--banner-room));
+    --edit-room: 0px;
+    --type-digits: calc(40vh - var(--hint-room) - var(--banner-room) - var(--edit-room));
     row-gap: 4px;
     padding: 6px 12px 4px;
   }
@@ -971,7 +974,7 @@ button.clock-readout__face:focus-visible {
   }
 
   .clock-screen:has(> .clock-bottom > .clock-sound-prompt:not([hidden])) {
-    --type-digits: calc(34vh - var(--hint-room) - var(--banner-room));
+    --type-digits: calc(34vh - var(--hint-room) - var(--banner-room) - var(--edit-room));
   }
 
   /* About the height each takes here, over the digits' 0.95 line height:
@@ -1033,16 +1036,13 @@ button.clock-readout__face:focus-visible {
   }
 
   /* Editing: the Readouts sit in one row, everything else steps away. The
-     digits step down from 40vh / 34vh (with the sound prompt) to 30vh / 24vh,
-     so a big Readout too wide to share the row leaves room for the row
-     wrapped under it and every Remove button. The prompt's version repeats
-     the prompt rule's selector, which would otherwise outrank edit mode's. */
+     digits give back --edit-room too, stepping down from 40vh / 34vh (with
+     the sound prompt) to 30vh / 24vh, so a big Readout too wide to share the
+     row leaves room for the row wrapped under it and every Remove button.
+     The room takes the place of the wider layouts' cap. */
   .clock-screen.is-editing {
-    --type-digits: calc(30vh - var(--hint-room) - var(--banner-room));
-  }
-
-  .clock-screen.is-editing:has(> .clock-bottom > .clock-sound-prompt:not([hidden])) {
-    --type-digits: calc(24vh - var(--hint-room) - var(--banner-room));
+    --edit-room: 10vh;
+    --edit-cap: initial;
   }
 
   /* A smaller Remove pill, the height of the short layout's other buttons. */
@@ -1181,16 +1181,15 @@ button.clock-readout__face:focus-visible {
   }
 
   /* Editing: the Readouts step down further, so with their Remove buttons
-     and the edit note they leave the agenda room for whole rows, and
-     without it still fit the stage. The agenda's version (with and without
-     the sound prompt) repeats the selectors that would otherwise outrank it. */
+     and the edit note they leave the agenda room for whole rows (with the
+     sound prompt or not: the cap is under its 12svh), and without it still
+     fit the stage. */
   .clock-screen.is-editing {
-    --type-digits: 16vh;
+    --edit-cap: 16vh;
   }
 
-  .clock-screen.is-editing:has(.clock-bar--day:not([hidden])),
-  .clock-screen.is-editing:has(.clock-bar--day:not([hidden])):has(> .clock-bottom > .clock-sound-prompt:not([hidden])) {
-    --type-digits: 8svh;
+  .clock-screen.is-editing:has(.clock-bar--day:not([hidden])) {
+    --edit-cap: 8svh;
   }
 
   .is-editing .clock-readout--small .clock-readout__value {

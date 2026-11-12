@@ -106,34 +106,40 @@ describe('School Clock hosting', () => {
   it("shrinks the short layout's digits by the room the cycle hint and the simulated-time banner take, so the stage stays clear of the top bar and the line clear of the sound prompt", () => {
     const css = readFileSync(resolve(clockDir, 'clock.css'), 'utf8');
     const short = shortLayout(css);
-    // Every one of the short layout's digit sizes (with and without the sound prompt, in and out of edit mode) gives the room back.
+    // Both the short layout's digit sizes (with and without the sound prompt) give the room back.
     const sizes = [...short.matchAll(/--type-digits:\s*([^;]+);/g)].map((m) => m[1]);
-    expect(sizes).toHaveLength(4);
-    expect(sizes.filter((size) => /var\(--hint-room\)/.test(size) && /var\(--banner-room\)/.test(size))).toHaveLength(4);
+    expect(sizes).toHaveLength(2);
+    expect(sizes.filter((size) => /var\(--hint-room\)/.test(size) && /var\(--banner-room\)/.test(size))).toHaveLength(2);
     // The rooms are set only while the hint or the banner is there.
     expect(short).toMatch(/\.clock-screen:has\(\.clock-readout > \.clock-cycle-hint:not\(\[hidden\]\)\)\s*\{\s*--hint-room:\s*\d+px;/);
     expect(short).toMatch(/\.clock-screen\.is-simulated\s*\{\s*--banner-room:\s*\d+px;/);
   });
 
-  it('steps the Readouts down further in edit mode, with rules the sound prompt and agenda sizes cannot outrank, so the stage keeps inside its row', () => {
+  it('steps the Readouts down further in edit mode through room and cap properties the digit sizes read, so no edit rule has to outrank them', () => {
     const css = readFileSync(resolve(clockDir, 'clock.css'), 'utf8');
+    const rules = css.replace(/\/\*[\s\S]*?\*\//g, '');
+    // Edit mode never sets --type-digits itself: every layout's size stays the one rule for it.
+    const selectorsOf = (property) => [...rules.matchAll(new RegExp(`([^{}]+)[{][^}]*${property}:`, 'g'))].map((m) => m[1].trim());
+    expect(selectorsOf('--type-digits').filter((selector) => selector.includes('is-editing'))).toEqual([]);
+    // The big Readout is capped by edit mode's --edit-cap, when one is set.
+    expect(css).toMatch(/\.clock-readout--big \.clock-readout__value\s*\{\s*font-size:\s*min\(var\(--type-digits\),\s*var\(--edit-cap,\s*var\(--type-digits\)\)/);
+    // Edit mode only sets the room and the cap, and never repeats the sound prompt's condition to do it.
+    const editRules = [...selectorsOf('--edit-cap'), ...selectorsOf('--edit-room')].filter((selector) => selector.includes('is-editing'));
+    expect(editRules.length).toBeGreaterThan(0);
+    expect(editRules.filter((selector) => selector.includes('clock-sound-prompt'))).toEqual([]);
+
     const short = shortLayout(css);
-    const digits = (selector) => {
-      const m = short.match(new RegExp(`\\n {2}${selector}\\s*\\{[^}]*--type-digits:\\s*calc\\((\\d+)vh`));
-      return m ? Number(m[1]) : null;
-    };
-    const prompt = String.raw`\.clock-screen:has\(> \.clock-bottom > \.clock-sound-prompt:not\(\[hidden\]\)\)`;
-    const editingPrompt = String.raw`\.clock-screen\.is-editing:has\(> \.clock-bottom > \.clock-sound-prompt:not\(\[hidden\]\)\)`;
-    // Short layout: smaller than outside edit mode, the prompt's version
-    // repeating the prompt rule's selector (which outranks a bare .is-editing).
-    expect(digits(String.raw`\.clock-screen\.is-editing`)).toBeLessThan(digits(String.raw`\.clock-screen`));
-    expect(digits(editingPrompt)).toBeLessThan(digits(prompt));
+    // Short layout: both digit sizes (with and without the sound prompt) give back edit mode's room.
+    const sizes = [...short.matchAll(/--type-digits:\s*([^;]+);/g)].map((m) => m[1]);
+    expect(sizes.every((size) => /var\(--edit-room\)/.test(size))).toBe(true);
+    expect(short).toMatch(/\.clock-screen\s*\{[^}]*--edit-room:\s*0px;/);
+    expect(short).toMatch(/\.clock-screen\.is-editing\s*\{[^}]*--edit-room:\s*\d+vh;/);
     // The Remove buttons are as tall as the short layout's other buttons.
     expect(short).toMatch(/\.clock-readout__remove\s*\{[^}]*min-height:\s*32px;/);
     // Beside layout: the column of small Readouts steps down too.
     expect(css).toMatch(/\.is-editing \.clock-readouts\.has-smalls \.clock-readout--small \.clock-readout__value\s*\{\s*font-size:/);
-    // Phone: the agenda's version names both agenda selectors it must beat.
-    expect(css).toMatch(/\.clock-screen\.is-editing:has\(\.clock-bar--day:not\(\[hidden\]\)\),\s*\n\s*\.clock-screen\.is-editing:has\(\.clock-bar--day:not\(\[hidden\]\)\):has\(> \.clock-bottom > \.clock-sound-prompt:not\(\[hidden\]\)\)\s*\{\s*--type-digits:/);
+    // Phone: one cap in edit mode, a smaller one with the agenda, whether the sound prompt shows or not.
+    expect(css).toMatch(/\.clock-screen\.is-editing:has\(\.clock-bar--day:not\(\[hidden\]\)\)\s*\{\s*--edit-cap:/);
     // Short layout with the timer: the other Readouts wrap in rows beside the ring, not one tall column.
     const timer = shortLayout(readFileSync(resolve(clockDir, 'timer.css'), 'utf8'));
     expect(timer).toMatch(/\.is-editing \.clock-readouts\.has-timer \.clock-smalls\s*\{[^}]*flex-direction:\s*row;[^}]*flex-wrap:\s*wrap;/);
