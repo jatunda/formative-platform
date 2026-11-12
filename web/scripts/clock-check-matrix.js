@@ -19,7 +19,7 @@ export const DEFAULT_STATES = {
   unknown: '?at=2030-01-15T12:00',     // outside every School Year
 };
 export const DEFAULT_SIZES = ['1920x1080', '1440x900', '1280x720', '480x320', '390x844'];
-/** Phones shorter than 390 × 844, where edit mode's stage runs out of height. */
+/** Phones shorter than 390 × 844, where the stage and the agenda's three rows have least room. */
 export const SHORT_PHONES = ['375x667', '360x740'];
 
 /** The Readouts each run shows: null is a new tab's one Readout (the state's own mode). */
@@ -77,18 +77,6 @@ export function fullMatrix() {
  * @type {KnownFailure[]}
  */
 export const KNOWN_FAILURES = [
-  // .scratch/school-clock/issues/52-short-phone-edit-mode.md: on the short
-  // phones the stage's Readouts (and edit mode's Remove buttons and note) leave
-  // the agenda no room, or spill out of the stage's row.
-  { ticket: 52, match: { sizes: ['375x667'], editing: true, timer: false, soundOn: false, layouts: ['countdown,clock', 'countdown,clock,countup'] } },
-  { ticket: 52, match: { sizes: ['375x667'], editing: true, timer: false, soundOn: false, layouts: [null], states: ['before', 'experience', 'passing'] } },
-  { ticket: 52, match: { sizes: ['375x667'], editing: true, timer: false, soundOn: true, layouts: ['countdown,clock', 'countdown,clock,countup'], states: ['before', 'experience', 'passing'] } },
-  { ticket: 52, match: { sizes: ['375x667'], editing: true, timer: true, soundOn: false, layouts: ['countdown,clock,countup'] } },
-  { ticket: 52, match: { sizes: ['375x667'], editing: true, timer: true, soundOn: false, layouts: ['countdown,clock'], states: ['break', 'period'] } },
-  { ticket: 52, match: { sizes: ['375x667'], editing: false, timer: false, soundOn: false, layouts: ['countdown,clock', 'countdown,clock,countup'], states: ['before'] } },
-  { ticket: 52, match: { sizes: ['360x740'], editing: true, timer: false, soundOn: false, layouts: ['countdown,clock,countup'] } },
-  { ticket: 52, match: { sizes: ['360x740'], editing: true, timer: false, soundOn: false, layouts: ['countdown,clock'], states: ['after', 'before', 'dayoff', 'experience', 'passing', 'weekend'] } },
-  { ticket: 52, match: { sizes: ['360x740'], editing: true, timer: true, soundOn: false, layouts: ['countdown,clock,countup'], states: ['before', 'dayoff'] } },
   // .scratch/school-clock/issues/53-small-landscape-ring-overlap.md: with sound
   // on (no prompt) the timer's ring grows into the side Readouts.
   { ticket: 53, match: { sizes: ['480x320'], editing: false, timer: true, soundOn: true, layouts: ['countdown,clock,countup'], states: ['assembly', 'break', 'dayoff', 'period', 'summer', 'weekend'] } },
