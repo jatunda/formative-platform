@@ -51,7 +51,7 @@ export function createSettingsDrawer({ settings, update, play, testRing, behind,
   const bells = switchControl(`${ID}-bells`, 'Bells', 'Start and end of every Period and Break',
     (on) => update({ bells: { ...settings().bells, on } }));
   const untilDismissed = switchControl(`${ID}-until-dismissed`, 'Ring Bells until you dismiss them',
-    `Otherwise each Bell stops on its own after ${BELL_AUTO_DISMISS_SECONDS} seconds. Alarms and the timer always ring until dismissed.`,
+    `Otherwise each Bell plays for about ${BELL_AUTO_DISMISS_SECONDS} seconds, finishes its sound, then stops on its own. Alarms and the timer always ring until dismissed.`,
     (on) => update({ bells: { ...settings().bells, untilDismissed: on } }));
   const assemblyEnds = switchControl(`${ID}-assembly-ends`, 'Bell when an Assembly ends',
     'Chapel, Convocation and Pep Rally. Never when one starts.',
