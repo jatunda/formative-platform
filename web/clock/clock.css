@@ -440,6 +440,12 @@ button.clock-readout__face:focus-visible {
     font-size: clamp(26px, 9.5vh, 112px);
   }
 
+  /* Editing: each one in the column also has its Remove button under it,
+     so the numbers step down to keep the column inside the stage. */
+  .is-editing .clock-readouts.has-smalls .clock-readout--small .clock-readout__value {
+    font-size: clamp(22px, 6vh, 72px);
+  }
+
   /* With the Look sheet open beside the clock (.has-sheet) there is no
      room for both. */
   .has-sheet .clock-readouts.has-smalls {
@@ -1026,9 +1032,24 @@ button.clock-readout__face:focus-visible {
     font-size: 10px;
   }
 
-  /* Editing: the Readouts sit in one row, everything else steps away. */
+  /* Editing: the Readouts sit in one row, everything else steps away. The
+     digits step down from 40vh / 34vh (with the sound prompt) to 30vh / 24vh,
+     so a big Readout too wide to share the row leaves room for the row
+     wrapped under it and every Remove button. The prompt's version repeats
+     the prompt rule's selector, which would otherwise outrank edit mode's. */
   .clock-screen.is-editing {
-    --type-digits: 22vh;
+    --type-digits: calc(30vh - var(--hint-room) - var(--banner-room));
+  }
+
+  .clock-screen.is-editing:has(> .clock-bottom > .clock-sound-prompt:not([hidden])) {
+    --type-digits: calc(24vh - var(--hint-room) - var(--banner-room));
+  }
+
+  /* A smaller Remove pill, the height of the short layout's other buttons. */
+  .clock-readout__remove {
+    min-height: 32px;
+    padding: 0 var(--s3) 0 var(--s2);
+    font-size: 13px;
   }
 
   .is-editing .clock-readouts,
@@ -1157,6 +1178,23 @@ button.clock-readout__face:focus-visible {
      height, so on a short phone the agenda keeps room for whole rows. */
   .clock-screen:has(.clock-bar--day:not([hidden])):has(> .clock-bottom > .clock-sound-prompt:not([hidden])) {
     --type-digits: 12svh;
+  }
+
+  /* Editing: the Readouts step down further, so with their Remove buttons
+     and the edit note they leave the agenda room for whole rows, and
+     without it still fit the stage. The agenda's version (with and without
+     the sound prompt) repeats the selectors that would otherwise outrank it. */
+  .clock-screen.is-editing {
+    --type-digits: 16vh;
+  }
+
+  .clock-screen.is-editing:has(.clock-bar--day:not([hidden])),
+  .clock-screen.is-editing:has(.clock-bar--day:not([hidden])):has(> .clock-bottom > .clock-sound-prompt:not([hidden])) {
+    --type-digits: 8svh;
+  }
+
+  .is-editing .clock-readout--small .clock-readout__value {
+    font-size: 26px;
   }
 
   /* The window button under the bar on the right; the sound prompt, while
