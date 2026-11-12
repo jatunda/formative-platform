@@ -622,6 +622,33 @@ button.clock-readout__face:focus-visible {
   min-width: 0;
 }
 
+/* In the Readouts' edit mode a tap on the bar switches it: outlined the way
+   the Readouts are there. Its button lies over it for the keyboard but lets
+   taps and scrolls through to the bar. */
+.clock-bar.is-editing {
+  outline: 1.5px dashed var(--line);
+  outline-offset: 6px;
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.clock-bar.is-editing:has(.clock-bar__switch:focus-visible) {
+  outline: var(--focus-width) solid var(--focus);
+}
+
+.clock-bar__switch {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  pointer-events: none;
+}
+
+.clock-bar__switch:focus-visible {
+  outline: none;
+}
+
 .clock-bar__heading {
   margin-bottom: 0.3em;
   font-size: var(--type-strip-small);

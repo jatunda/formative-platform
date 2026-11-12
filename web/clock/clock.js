@@ -333,7 +333,7 @@ export function initClockApp({
       readoutsView.focusReadout(layout.readouts.length - 1);
     },
   });
-  const editNote = el('p', { className: 'clock-edit-note', textContent: 'Tap a Readout to change what it shows' });
+  const editNote = el('p', { className: 'clock-edit-note' });
   /** @param {boolean} on */
   function setEditing(on) {
     editing = on;
@@ -492,7 +492,8 @@ export function initClockApp({
   // The main screen: the "Simulated time" banner (with ?at=), the top bar,
   // the stage (heading, Readouts, the line under them) and the bottom row
   // (the bar, then the window buttons).
-  const dayBar = createDayBarView();
+  // In the Readouts' edit mode a tap on the bar switches its saved setting.
+  const dayBar = createDayBarView({ onSwitch: () => updateSettings({ dayStrip: !settings.dayStrip }) });
   const banner = el('p', { className: 'clock-banner' });
   const stageText = createStageTextView();
   const stage = el('section', { className: 'clock-stage', 'aria-label': 'Clock' }, [
@@ -588,7 +589,9 @@ export function initClockApp({
     // A bar of the Next School Day's Segments is headed with its date and Day Label.
     stageText.show(now, moment, settings, bar?.day === 'next');
     renderMini(now, moment, renderReadouts(now, moment, text));
-    dayBar.show(bar, (date) => text.time(date));
+    dayBar.show(bar, (date) => text.time(date), { editing });
+    // The edit note names the bar too while there's one to tap.
+    editNote.textContent = `Tap a Readout${bar ? ' or the bar' : ''} to change what it shows`;
     drawer.showRings(chosen ? nextRingLines(now, schoolYears, settings, text) : []);
   }
 
