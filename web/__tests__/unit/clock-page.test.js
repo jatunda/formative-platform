@@ -153,6 +153,17 @@ describe('School Clock page', () => {
       expect(lineLeftToBar()).toBe(true);
     });
 
+    it("in the countdown bar's heading on just this Segment, after school and on a day off", () => {
+      for (const date of [new Date(2026, 9, 27, 16, 0, 0), new Date(2026, 10, 25, 10, 0, 0)]) {
+        app?.destroy();
+        const real = fakeRealClock(date);
+        app = start({ realNow: real.now, settings: { dayStrip: false } });
+        expect(document.querySelector('#clockApp .clock-bar--segment')).not.toBeNull();
+        expect(barHeading()).toMatch(/^Next School Day · /);
+        expect(lineLeftToBar()).toBe(true);
+      }
+    });
+
     it('under the Readouts while a timer hides the bar, and steps aside again once it is gone', () => {
       const real = fakeRealClock(new Date(2026, 9, 27, 16, 0, 0));
       app = start({ realNow: real.now, settings: { timerEndsAt: new Date(2026, 9, 27, 16, 1, 0).getTime() } });

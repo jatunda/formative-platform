@@ -86,14 +86,14 @@ const NOTHING = {
   summerDay: null,
 };
 
-/** @param {Date} d */
-function isoDate(d) {
+/** "YYYY-MM-DD" for `d`'s local date. @param {Date} d */
+export function isoDate(d) {
   const pad = (/** @type {number} */ n) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
 /** @param {string} iso "YYYY-MM-DD" */
-function localMidnight(iso) {
+export function localMidnight(iso) {
   const [y, m, d] = iso.split('-').map(Number);
   return new Date(y, m - 1, d);
 }

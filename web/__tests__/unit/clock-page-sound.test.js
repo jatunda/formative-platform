@@ -190,7 +190,8 @@ describe('School Clock sound', () => {
   });
 
   describe('ringing', () => {
-    it('flashes the screen and says what rang when a Bell comes due, then stops on its own 5 s after it started', () => {
+    it('flashes the screen and says what rang when a Bell comes due, then stops on its own when its sound ends', () => {
+      // School bell plays passes at 0 and 3 s, the second ringing out until 5.6 s.
       open({ when: at(11, 14, 59) });
       expect(ringing().hidden).toBe(true);
 
@@ -198,14 +199,38 @@ describe('School Clock sound', () => {
       expect(mount().classList.contains('clock-ringing--flash')).toBe(true);
       expect(ringing().textContent).toContain('Period 3 ends');
 
-      real.advance(3 * SEC); // 11:15:04
+      real.advance(4 * SEC); // 11:15:05
       expect(ringing().hidden).toBe(false);
-      real.advance(SEC); // 11:15:05
+      real.advance(SEC); // 11:15:06
       expect(mount().classList.contains('clock-ringing')).toBe(false);
       expect(ringing().hidden).toBe(true);
     });
 
-    it("schedules a Bell's sound to stop on its own after 5 s, but an Alarm's to ring until dismissed", () => {
+    it('keeps a Clock tower Bell on screen past 5 s, until its chime has played to the end', () => {
+      // One pass of Clock tower lasts 6.6 s.
+      open({ when: at(11, 14, 59), settings: { bells: { on: true, sound: 'clockTower' } } });
+      real.advance(2 * SEC); // 11:15:01
+      for (let i = 0; i < 5; i += 1) real.advance(SEC); // 11:15:06
+      expect(ringing().hidden).toBe(false);
+      expect(ringing().textContent).toContain('Period 3 ends');
+      real.advance(SEC); // 11:15:07
+      expect(ringing().hidden).toBe(true);
+      expect(player.dismissals).toBe(0);
+    });
+
+    it('closes a Bell when its sound ends in a throttled tab, counted from when it came due', () => {
+      open({ when: at(11, 14, 58), settings: { bells: { on: true, sound: 'clockTower' } } });
+      real.advance(SEC); // 11:14:59
+      real.jump(4.5 * SEC); // no ticks while throttled
+      real.advance(SEC); // 11:15:04.5: the page first sees the 11:15 Bell
+      expect(ringing().textContent).toContain('Period 3 ends');
+      real.advance(2 * SEC); // 11:15:06.5: the chime still has a moment to go
+      expect(ringing().hidden).toBe(false);
+      real.advance(SEC); // 11:15:07.5, not 6.6 s after the page saw it
+      expect(ringing().hidden).toBe(true);
+    });
+
+    it("schedules a Bell's sound to start no new pass after 5 s, but an Alarm's to ring until dismissed", () => {
       open({
         when: at(11, 13), sound: { state: 'running', time: 0 },
         settings: { alarms: [{ id: 'a', kind: 'clock', time: '11:14', repeat: 'everySchoolDay', enabled: true, sound: 'chime', bellSchedules: null }] },
@@ -218,6 +243,14 @@ describe('School Clock sound', () => {
     it('can still be dismissed early while it would stop on its own', () => {
       open({ when: at(11, 14, 59) });
       real.advance(2 * SEC);
+      button('Dismiss').click();
+      expect(player.dismissals).toBe(1);
+      expect(ringing().hidden).toBe(true);
+    });
+
+    it('can be dismissed while it finishes its last pass after 5 s, stopping the sound at once', () => {
+      open({ when: at(11, 14, 59), settings: { bells: { on: true, sound: 'clockTower' } } });
+      for (let i = 0; i < 7; i += 1) real.advance(SEC); // 11:15:06
       button('Dismiss').click();
       expect(player.dismissals).toBe(1);
       expect(ringing().hidden).toBe(true);
@@ -382,7 +415,7 @@ describe('School Clock sound', () => {
       });
     });
 
-    it('a test ring plays the Bells sound now and rings like a Bell, stopping on its own after 5 s', () => {
+    it('a test ring plays the Bells sound now and rings like a Bell, stopping on its own when its sound ends', () => {
       open({ settings: { bells: { on: true, sound: 'buzzer' } } });
       openSettings();
 
@@ -390,7 +423,8 @@ describe('School Clock sound', () => {
 
       expect(player.played).toEqual([{ sound: 'buzzer', repeat: true, seconds: 5 }]);
       expect(ringing().textContent).toContain('Test ring');
-      real.advance(4 * SEC);
+      // Buzzer's last pass starts at 4.5 s and ends at 5.1 s.
+      real.advance(5 * SEC);
       expect(mount().classList.contains('clock-ringing')).toBe(true);
       real.advance(SEC);
       expect(mount().classList.contains('clock-ringing')).toBe(false);

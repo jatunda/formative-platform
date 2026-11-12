@@ -232,12 +232,46 @@ describe('School Clock bar', () => {
       expect(heard()[0]).toBe('Period 1, 8:30 AM to 9:20 AM');
     });
 
-    it('after school shows the Next School Day, labelled with its date, on either setting', () => {
-      withSettings({ dayStrip: false });
+    it('after school shows the Next School Day, labelled with its date', () => {
       open({ when: at(16, 0) });
       expect(bar().getAttribute('aria-label')).toBe('Segments on Wed, Oct 28');
       expect(words(bar().querySelector('.clock-bar__heading'))).toBe('Next School Day · Wed, Oct 28 · Even Day');
       expect(bar().querySelector('.clock-bar__now')).toBeNull();
+    });
+
+    describe('on just this Segment, a countdown to the Next School Day', () => {
+      beforeEach(() => withSettings({ dayStrip: false, periodLabels: { 'Period 2': 'AP CSA' } }));
+      const times = () => [...bar().querySelectorAll('.clock-bar__time')].map(words);
+
+      it("after school counts from the end of school to the first Segment, under the next day's heading", () => {
+        open({ when: at(16, 0) });
+        expect(bar().classList).toContain('clock-bar--segment');
+        expect(bar().getAttribute('aria-label')).toBe('Until Period 2 · AP CSA');
+        expect(words(bar().querySelector('.clock-bar__heading'))).toBe('Next School Day · Wed, Oct 28 · Even Day');
+        expect(heard()).toEqual(['Until Period 2 · AP CSA, Wed, Oct 28 at 8:30 AM']);
+        expect(times()).toEqual(['3:10']);
+        expect(words(bar().querySelector('.clock-bar__end'))).toBe('8:30');
+        expect(bar().querySelector('.clock-agenda')).toBeNull();
+        // 15:10 → 8:30 is 1040 minutes; 50 are done.
+        expect(progress().getAttribute('aria-valuenow')).toBe('5');
+        advance(52 * MIN);
+        expect(progress().getAttribute('aria-valuenow')).toBe('10');
+      });
+
+      it("before school counts down to today's first Segment", () => {
+        open({ when: at(7, 50) });
+        expect(words(bar().querySelector('.clock-bar__heading'))).toBe('Today · All Day');
+        expect(heard()).toEqual(['Until Period 1, today at 8:30 AM']);
+        expect(times()).toEqual(['3:10']);
+        expect(bar().querySelector('.clock-bar__now')).not.toBeNull();
+      });
+
+      it('gives way to the Segment once school starts', () => {
+        open({ when: at(8, 29) });
+        advance(2 * MIN);
+        expect(bar().getAttribute('aria-label')).toBe('Period 1');
+        expect(bar().querySelector('.clock-bar__heading')).toBeNull();
+      });
     });
   });
 
