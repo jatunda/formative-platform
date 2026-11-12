@@ -1,6 +1,6 @@
 // The bar along the bottom of the School Clock, drawn from day-bar.js's
-// description: the blocks in proportion (or the one current block), the
-// fill and Now marker, the times under them, and the agenda list a phone
+// description: the blocks in proportion (or the one current block, or the
+// Off-Hours countdown), the fill and Now marker, the times under them, and the agenda list a phone
 // shows instead. It rebuilds only when what's listed changes (a Segment
 // starts or ends, the setting or time format changes), so focus and a screen
 // reader's place survive the ticks; otherwise each tick just moves the fill
@@ -78,7 +78,10 @@ export function createDayBarView() {
         ]),
         el('span', {
           className: 'visually-hidden',
-          textContent: `${fullName(block)}, ${time(block.start)} to ${time(block.end)}${nowWord}`,
+          // The Off-Hours countdown says what it counts down to: "Until Period 1, Mon, Nov 16 at 8:30 AM".
+          textContent: block.kind === 'countdown'
+            ? `${fullName(block)}, ${bar.day === 'today' ? 'today' : date} at ${time(block.end)}`
+            : `${fullName(block)}, ${time(block.start)} to ${time(block.end)}${nowWord}`,
         }),
       ]);
       item.dataset.kind = block.kind;
@@ -99,8 +102,8 @@ export function createDayBarView() {
 
     const heading = bar.day === 'today' ? `Today · ${bar.dayLabel}` : `Next School Day · ${date} · ${bar.dayLabel}`;
     element.replaceChildren(
-      // Off-Hours say whose Segments these are; in school the stage already does.
-      ...(bar.done === null ? [el('p', { className: 'clock-bar__heading', textContent: heading })] : []),
+      // Off-Hours say which day the bar is of; in school the stage already does.
+      ...(bar.offHours ? [el('p', { className: 'clock-bar__heading', textContent: heading })] : []),
       el('div', { className: 'clock-bar__day' }, [
         el('ol', { className: 'clock-bar__track' }, items),
         ...(marker ? [marker] : []),
@@ -141,7 +144,7 @@ export function createDayBarView() {
       built = '';
       return;
     }
-    const key = JSON.stringify([bar.setting, bar.day, bar.dayLabel, bar.date, time(bar.end),
+    const key = JSON.stringify([bar.setting, bar.offHours, bar.day, bar.dayLabel, bar.date, time(bar.end),
       bar.blocks.map((b) => [b.name, b.label, b.state, time(b.start), b.showEnd && time(b.end)])]);
     if (key !== built) {
       built = key;
