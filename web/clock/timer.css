@@ -45,8 +45,10 @@
   container-type: size;
   /* No wider than the stage allows (the Look sheet narrows it), leaving room
      for the side column, and clear of the top bar's text and buttons
-     (ring-fit.js measures --ring-room while the ring shares their row). */
-  --ring-d: min(100cqh, 56vw, 60cqw, var(--ring-room, 100cqh));
+     (ring-fit.js measures --ring-room while the ring shares their row), and
+     leaving the side column the width of its widest value (--side-room, also
+     ring-fit.js) on each side. */
+  --ring-d: min(100cqh, 56vw, 60cqw, var(--ring-room, 100cqh), 100cqw - 2 * var(--side-room, 0px));
 }
 
 .clock-readouts.has-timer .clock-smalls {
@@ -365,7 +367,7 @@
   }
 
   .clock-readouts.has-timer {
-    --ring-d: min(100cqh, 60vw);
+    --ring-d: min(100cqh, 60vw, 100cqw - 2 * var(--side-room, 0px));
   }
 
   .clock-ring__actions .clock-btn {

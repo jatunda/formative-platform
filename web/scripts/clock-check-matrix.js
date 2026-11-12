@@ -76,12 +76,7 @@ export function fullMatrix() {
  * passing fails the run, so a fix shows up here and its entry is removed.
  * @type {KnownFailure[]}
  */
-export const KNOWN_FAILURES = [
-  // .scratch/school-clock/issues/53-small-landscape-ring-overlap.md: with sound
-  // on (no prompt) the timer's ring grows into the side Readouts.
-  { ticket: 53, match: { sizes: ['480x320'], editing: false, timer: true, soundOn: true, layouts: ['countdown,clock,countup'], states: ['assembly', 'break', 'dayoff', 'period', 'summer', 'weekend'] } },
-  { ticket: 53, match: { sizes: ['480x320'], editing: false, timer: true, soundOn: true, layouts: [null], states: ['summer'] } },
-];
+export const KNOWN_FAILURES = [];
 
 /** A Config's on/off fields, which a Match names as is. @type {('editing' | 'timer' | 'soundOn')[]} */
 const FLAGS = ['editing', 'timer', 'soundOn'];
