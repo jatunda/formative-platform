@@ -25,13 +25,14 @@
 import { mkdirSync, writeFileSync, rmSync } from 'fs';
 import { resolve } from 'path';
 import { startClockCheck, webDir } from './clock-check-browser.mjs';
-import { DEFAULT_STATES, fullMatrix, classify, describeFailure } from './clock-check-matrix.js';
+import { DEFAULT_STATES, fullMatrix, classify, describeFailure, parseFullArgs, fullRunFailed } from './clock-check-matrix.js';
 
-const args = process.argv.slice(2);
-let jobs = 6;
-for (let i = 0; i < args.length; i++) {
-  if (args[i] === '--jobs') jobs = Number(args[++i]);
-  else throw new Error(`Unknown option ${args[i]}`);
+let jobs;
+try {
+  ({ jobs } = parseFullArgs(process.argv.slice(2)));
+} catch (e) {
+  console.error(`check:clock:full: ${e.message}`);
+  process.exit(1);
 }
 
 const outDir = resolve(webDir, '.clock-check');
@@ -79,4 +80,4 @@ const tickets = [...new Set(known.map((r) => r.ticket))];
 const knownText = tickets.map((t) => `${known.filter((r) => r.ticket === t).length} known (ticket ${t})`).join(', ');
 console.log(`${by('passed').length}/${results.length} renders passed${knownText ? `, ${knownText}` : ''}, `
   + `${by('unexpected').length} unexpected, ${by('stale').length} stale, in ${seconds}s. Failing screenshots and report.json in ${outDir}`);
-process.exitCode = by('unexpected').length || by('stale').length ? 1 : 0;
+process.exitCode = fullRunFailed(results) ? 1 : 0;

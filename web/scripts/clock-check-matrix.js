@@ -120,6 +120,32 @@ export function classify(render, known = KNOWN_FAILURES) {
 }
 
 /**
+ * The full run's options: `--jobs N`, how many pages render at a time (6
+ * unless given). Anything but a positive whole number would start no pages and
+ * pass having checked nothing, so it throws instead.
+ * @param {string[]} argv @returns {{ jobs: number }}
+ */
+export function parseFullArgs(argv) {
+  let jobs = 6;
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] !== '--jobs') throw new Error(`Unknown option ${argv[i]}`);
+    const value = argv[++i];
+    jobs = Number(value);
+    if (!/^\d+$/.test(value ?? '') || jobs < 1) throw new Error(`--jobs takes a positive whole number, not ${value ?? 'nothing'}`);
+  }
+  return { jobs };
+}
+
+/**
+ * Whether the full run fails: on any unexpected or stale render, or when it
+ * checked no renders at all (nothing checked is not a pass).
+ * @param {{ outcome: string }[]} results
+ */
+export function fullRunFailed(results) {
+  return !results.length || results.some((r) => r.outcome === 'unexpected' || r.outcome === 'stale');
+}
+
+/**
  * What went wrong in one checked render, one phrase per problem (none when it's clean).
  * @param {{ scroll: { x: boolean, y: boolean },
  *   stage: { fits: boolean, above: number, below: number } | null,

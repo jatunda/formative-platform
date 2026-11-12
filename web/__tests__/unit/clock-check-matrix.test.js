@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { fullMatrix, describeFailure, classify, KNOWN_FAILURES } from '../../scripts/clock-check-matrix.js';
+import { fullMatrix, describeFailure, classify, KNOWN_FAILURES, parseFullArgs, fullRunFailed } from '../../scripts/clock-check-matrix.js';
 
 describe('fullMatrix', () => {
   const runs = fullMatrix();
@@ -101,5 +101,40 @@ describe('classify', () => {
 describe('KNOWN_FAILURES', () => {
   it('are each owned by a ticket', () => {
     for (const known of KNOWN_FAILURES) expect(known.ticket).toEqual(expect.any(Number));
+  });
+});
+
+describe('parseFullArgs', () => {
+  it('runs 6 pages at a time by default', () => {
+    expect(parseFullArgs([])).toEqual({ jobs: 6 });
+  });
+
+  it('takes --jobs as a positive whole number', () => {
+    expect(parseFullArgs(['--jobs', '3'])).toEqual({ jobs: 3 });
+  });
+
+  it.each([[['--jobs', 'abc']], [['--jobs', '0']], [['--jobs', '-2']], [['--jobs', '1.5']], [['--jobs']]])(
+    'refuses %j, which would start no pages', (argv) => {
+      expect(() => parseFullArgs(argv)).toThrow(/--jobs takes a positive whole number/);
+    },
+  );
+
+  it('refuses an unknown option', () => {
+    expect(() => parseFullArgs(['--job', '3'])).toThrow(/Unknown option --job/);
+  });
+});
+
+describe('fullRunFailed', () => {
+  it('fails a run that checked no renders', () => {
+    expect(fullRunFailed([])).toBe(true);
+  });
+
+  it('passes a run of passed and known renders', () => {
+    expect(fullRunFailed([{ outcome: 'passed' }, { outcome: 'known', ticket: 52 }])).toBe(false);
+  });
+
+  it('fails on any unexpected or stale render', () => {
+    expect(fullRunFailed([{ outcome: 'passed' }, { outcome: 'unexpected' }])).toBe(true);
+    expect(fullRunFailed([{ outcome: 'passed' }, { outcome: 'stale', ticket: 53 }])).toBe(true);
   });
 });
