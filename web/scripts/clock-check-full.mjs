@@ -1,3 +1,4 @@
+// @ts-check
 // Runs the School Clock's browser check (clock-check.mjs, which lists the
 // checks) across the whole layout matrix, where layout bugs have hidden:
 //
