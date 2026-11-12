@@ -9,11 +9,20 @@
 //   npm run check:clock -- --editing          in the Readouts' edit mode
 //   npm run check:clock -- --zoom 1366x768    that screen at every browser zoom, 67% to 200%
 //                                             (the viewport it leaves: 2039x1146 … 683x384; repeatable)
+//   npm run check:clock -- --size 375x667 --bars 100   a phone with its browser bars showing:
+//                                             html's 100% drops by 100px while 100vh stays the full
+//                                             screen (what a phone's browser does). Desktop Chromium
+//                                             can't shrink svh with it, so to see an svh-sized layout
+//                                             as that phone shows it, use --size 375x567 instead
+//   npm run check:clock -- --sound-on         sound already allowed, so no sound prompt
 //   npm run check:clock -- --no-shots         checks only, no PNGs
 //
 // For each state × size it saves a screenshot, runs axe, checks the page doesn't
-// scroll, checks the timer's ring (when one shows) runs into nothing in the top
-// bar or the side Readouts, and records page errors. Results go to .clock-check/ (gitignored):
+// scroll, checks the phone's agenda (when it shows) scrolls until its last row is
+// fully on screen and uncovered, with the window button and sound prompt on screen
+// below it (the screenshot is taken scrolled to the end), checks the timer's ring
+// (when one shows) runs into nothing in the top bar or the side Readouts, and
+// records page errors. Results go to .clock-check/ (gitignored):
 // one PNG per render plus report.json. Exits 1 if anything failed.
 //
 // It starts its own Vite server on 127.0.0.1 (a free port) and always stops it
@@ -49,7 +58,7 @@ const DEFAULT_SIZES = ['1920x1080', '1440x900', '1280x720', '480x320', '390x844'
 const ZOOMS = [0.67, 0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2];
 
 function parseArgs(argv) {
-  const opts = { states: [], sizes: [], division: 'HS', settings: {}, layout: null, timer: false, shots: true, axe: true, editing: false };
+  const opts = { states: [], sizes: [], division: 'HS', settings: {}, layout: null, timer: false, shots: true, axe: true, editing: false, bars: 0, soundOn: false };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     const next = () => argv[++i];
@@ -64,6 +73,8 @@ function parseArgs(argv) {
     else if (arg === '--layout') opts.layout = { readouts: next().split(',').map((mode) => ({ mode })) };
     else if (arg === '--timer') opts.timer = true;
     else if (arg === '--editing') opts.editing = true;
+    else if (arg === '--sound-on') opts.soundOn = true;
+    else if (arg === '--bars') opts.bars = Number(next());
     else if (arg === '--no-shots') opts.shots = false;
     else if (arg === '--no-axe') opts.axe = false;
     else throw new Error(`Unknown option ${arg}`);
@@ -105,13 +116,23 @@ try {
   await server.listen();
   const { port } = /** @type {import('net').AddressInfo} */ (server.httpServer.address());
   const base = `http://127.0.0.1:${port}/clock/`;
-  browser = await chromium.launch();
+  browser = await chromium.launch(opts.soundOn ? { args: ['--autoplay-policy=no-user-gesture-required'] } : {});
   // Skip the first-visit prompts so each render shows the state itself.
   const seeded = JSON.stringify({ division: opts.division, themeHint: false, ...opts.settings });
 
   for (const size of opts.sizes) {
     const context = await browser.newContext({ viewport: { width: size.width, height: size.height } });
     await context.addInitScript(([key, value]) => localStorage.setItem(key, value), [SETTINGS_KEY, seeded]);
+    // A phone's browser bars shrink the initial containing block (what html's
+    // height: 100% resolves against) but not 100vh, which stays the full screen.
+    // Everything below the visible height is under the bars.
+    if (opts.bars) {
+      await context.addInitScript((bars) => {
+        const shrink = () => document.documentElement.style.setProperty('height', `${innerHeight - bars}px`);
+        if (document.documentElement) shrink();
+        else new MutationObserver((_, observer) => { if (document.documentElement) { shrink(); observer.disconnect(); } }).observe(document, { childList: true });
+      }, opts.bars);
+    }
     if (opts.layout) {
       await context.addInitScript(([key, value]) => localStorage.setItem(key, value), [LAYOUT_KEY, JSON.stringify(opts.layout)]);
     }
@@ -160,6 +181,27 @@ try {
           })
           .map(([name]) => name);
       });
+      // The phone's agenda, scrolled to its end: its last row must sit wholly
+      // on screen with nothing over it (the window button, the sound prompt).
+      const agenda = await page.evaluate((bars) => {
+        const list = document.querySelector('.clock-agenda');
+        if (!list || !list.getClientRects().length || !list.lastElementChild) return null;
+        list.scrollTop = list.scrollHeight;
+        const row = list.lastElementChild.getBoundingClientRect();
+        const box = list.getBoundingClientRect();
+        const x = row.left + row.width / 2;
+        const covered = [row.top + 2, row.bottom - 2].some((y) => {
+          const hit = document.elementFromPoint(x, y);
+          return !hit || !list.lastElementChild.contains(hit);
+        });
+        const visible = innerHeight - bars;
+        // The window button and the sound prompt under it must stay on screen too.
+        const below = [...document.querySelectorAll('.clock-corner, .clock-sound-prompt')]
+          .filter((n) => n.getClientRects().length)
+          .every((n) => n.getBoundingClientRect().bottom <= visible + 0.5);
+        return { reachable: row.top >= box.top - 0.5 && row.bottom <= Math.min(box.bottom, visible) + 0.5 && !covered && below,
+          listHeight: Math.round(box.height), rowBottom: row.bottom, listBottom: box.bottom, visible };
+      }, opts.bars);
       let violations = [];
       if (opts.axe) {
         await page.addScriptTag({ path: axeSource });
@@ -171,8 +213,8 @@ try {
       }
       const file = `${state.name}-${size.label}.png`;
       if (opts.shots) await page.screenshot({ path: resolve(outDir, file) });
-      const ok = !scroll.x && !scroll.y && !overlaps.length && !errors.length && !violations.length;
-      results.push({ state: state.name, size: size.label, url: base + state.query, ok, scroll, overlaps, errors, violations, shot: opts.shots ? file : null });
+      const ok = !scroll.x && !scroll.y && agenda?.reachable !== false && !overlaps.length && !errors.length && !violations.length;
+      results.push({ state: state.name, size: size.label, url: base + state.query, ok, scroll, agenda, overlaps, errors, violations, shot: opts.shots ? file : null });
       await page.close();
     }
     await context.close();
@@ -185,6 +227,7 @@ writeFileSync(resolve(outDir, 'report.json'), JSON.stringify(results, null, 2));
 const failed = results.filter((r) => !r.ok);
 for (const r of failed) {
   const why = [r.scroll.x && 'scrolls sideways', r.scroll.y && 'scrolls down',
+    r.agenda?.reachable === false && `agenda's last row out of reach (list ${r.agenda.listHeight}px tall, row bottom ${Math.round(r.agenda.rowBottom)}, list bottom ${Math.round(r.agenda.listBottom)}, visible height ${r.agenda.visible})`,
     r.overlaps.length && `ring overlaps ${r.overlaps.join(', ')}`, ...r.errors, ...r.violations].filter(Boolean);
   console.log(`✗ ${r.state} @ ${r.size}: ${why.join('; ')}`);
 }
