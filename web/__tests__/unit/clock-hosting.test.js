@@ -145,6 +145,35 @@ describe('School Clock hosting', () => {
     expect(timer).toMatch(/\.is-editing \.clock-readouts\.has-timer \.clock-smalls\s*\{[^}]*flex-direction:\s*row;[^}]*flex-wrap:\s*wrap;/);
   });
 
+  it('keeps the phone agenda about three rows tall and fits the digits of a phone shorter than 390 x 844 to the height left, so nothing but the agenda scrolls', () => {
+    const css = readFileSync(resolve(clockDir, 'clock.css'), 'utf8');
+    const block = (media) => {
+      const start = css.indexOf(`@media ${media} {`);
+      expect(start, media).toBeGreaterThanOrEqual(0);
+      return css.slice(start, css.slice(start).search(/\n\}\r?\n/) + start);
+    };
+    const phone = block('(max-width: 520px) and (min-height: 521px)');
+    const shortPhone = block('(max-width: 520px) and (min-height: 521px) and (max-height: 760px)');
+    // The agenda never squeezes below three of its rows.
+    expect(phone).toMatch(/\.clock-agenda\s*\{[^}]*min-height:\s*calc\(3 \* var\(--agenda-row\)\);/);
+    expect(phone).toMatch(/\.clock-agenda__row\s*\{[^}]*min-height:\s*var\(--agenda-row\);/);
+    // The big Readout reads a height cap a layout can set, like --edit-cap.
+    expect(css).toMatch(/\.clock-readout--big \.clock-readout__value\s*\{\s*font-size:\s*min\([^;]*var\(--fit-h,\s*var\(--type-digits\)\)/);
+    // A short phone sets it with the agenda, from the visible height less each room...
+    const fit = shortPhone.match(/\.clock-screen:has\(\.clock-bar--day:not\(\[hidden\]\)\)\s*\{[^}]*--fit-h:\s*([^;]+);/);
+    expect(fit).not.toBeNull();
+    const rooms = ['frame', 'banner', 'prompt', 'heading', 'hint', 'next', 'stage'];
+    expect(fit?.[1]).toMatch(/100svh/);
+    for (const room of rooms) expect(fit?.[1]).toContain(`var(--${room}-room)`);
+    // ...each zero until its thing shows.
+    for (const room of rooms.slice(1, -1)) expect(shortPhone).toMatch(new RegExp(`\\.clock-screen\\s*\\{[^}]*--${room}-room:\\s*0px;`));
+    expect(shortPhone).toMatch(/\.clock-screen\.is-simulated\s*\{\s*--banner-room:\s*\d+px;/);
+    expect(shortPhone).toMatch(/\.clock-sound-prompt:not\(\[hidden\]\)\)\s*\{\s*--prompt-room:\s*\d+px;/);
+    // The timer's small Readouts on a phone read the same size edit mode steps down.
+    const timer = readFileSync(resolve(clockDir, 'timer.css'), 'utf8');
+    expect(timer).toMatch(/\.clock-readouts\.has-timer \.clock-readout--small \.clock-readout__value\s*\{\s*font-size:\s*var\(--small-digits\);/);
+  });
+
   it("draws the small Readouts' dividers only between Readouts, so no layout's divider rule reaches the Add slot's dashed outline", () => {
     for (const sheet of ['clock.css', 'timer.css']) {
       const rules = readFileSync(resolve(clockDir, sheet), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');

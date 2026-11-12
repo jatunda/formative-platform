@@ -377,11 +377,12 @@ button.clock-readout__face:focus-visible {
   color: var(--muted);
 }
 
-/* As tall as --type-digits, but capped so the value fits the width, and
-   at --edit-cap in edit mode (each layout sets it there, so edit mode never
-   has to outrank a layout's --type-digits). */
+/* As tall as --type-digits, but capped so the value fits the width, at
+   --edit-cap in edit mode (each layout sets it there, so edit mode never
+   has to outrank a layout's --type-digits), and at --fit-h where a layout
+   fits the digits to the height the rest of the screen leaves them. */
 .clock-readout--big .clock-readout__value {
-  font-size: min(var(--type-digits), var(--edit-cap, var(--type-digits)), calc(var(--fit-w) * 0.94 * var(--digits-fit) / (var(--units) * var(--glyph-em))));
+  font-size: min(var(--type-digits), var(--edit-cap, var(--type-digits)), var(--fit-h, var(--type-digits)), calc(var(--fit-w) * 0.94 * var(--digits-fit) / (var(--units) * var(--glyph-em))));
 }
 
 .clock-readout--small .clock-readout__value {
@@ -1102,6 +1103,12 @@ button.clock-readout__face:focus-visible {
     --edge-x: 16px;
     padding: 16px 16px 12px;
     row-gap: 12px;
+    --agenda-row: 36px;
+    /* The stage's sizes, which a crowded stage steps down (below). */
+    --title-size: 26px;
+    --next-label: block;
+    --smalls-gap: var(--gap-lg);
+    --small-digits: 34px;
   }
 
   /* Controls take the first row, the Day Label the second. */
@@ -1127,7 +1134,7 @@ button.clock-readout__face:focus-visible {
   }
 
   .clock-title {
-    font-size: calc(26px * var(--display-scale));
+    font-size: calc(var(--title-size) * var(--display-scale));
   }
 
   .clock-next {
@@ -1135,7 +1142,7 @@ button.clock-readout__face:focus-visible {
   }
 
   .clock-next__label {
-    display: block;
+    display: var(--next-label);
     margin: 0 0 4px;
   }
 
@@ -1145,6 +1152,7 @@ button.clock-readout__face:focus-visible {
 
   .clock-smalls {
     gap: 16px;
+    margin-top: var(--smalls-gap);
   }
 
   .clock-smalls > .clock-readout + .clock-readout {
@@ -1152,7 +1160,7 @@ button.clock-readout__face:focus-visible {
   }
 
   .clock-readout--small .clock-readout__value {
-    font-size: 34px;
+    font-size: var(--small-digits);
   }
 
   /* No Document Picture-in-Picture on phones, so no Mini player button. */
@@ -1186,14 +1194,20 @@ button.clock-readout__face:focus-visible {
      fit the stage. */
   .clock-screen.is-editing {
     --edit-cap: 16vh;
+    --small-digits: 26px;
+    --smalls-gap: 12px;
+    --next-label: inline;
   }
 
   .clock-screen.is-editing:has(.clock-bar--day:not([hidden])) {
     --edit-cap: 8svh;
   }
 
-  .is-editing .clock-readout--small .clock-readout__value {
-    font-size: 26px;
+  /* A smaller Remove pill, as in the short layout. */
+  .clock-readout__remove {
+    min-height: 32px;
+    padding: 0 var(--s3) 0 var(--s2);
+    font-size: 13px;
   }
 
   /* The window button under the bar on the right; the sound prompt, while
@@ -1234,7 +1248,7 @@ button.clock-readout__face:focus-visible {
   .clock-agenda {
     display: flex;
     flex-direction: column;
-    min-height: 0;
+    min-height: calc(3 * var(--agenda-row));
     margin: 0;
     padding: 0;
     overflow: auto;
@@ -1247,7 +1261,7 @@ button.clock-readout__face:focus-visible {
     flex: none;
     align-items: center;
     gap: 14px;
-    min-height: 36px;
+    min-height: var(--agenda-row);
     padding: 0 8px;
     border-bottom: 1px solid var(--line-soft);
     font-size: 16px;
@@ -1307,6 +1321,114 @@ button.clock-readout__face:focus-visible {
 
   .clock-corner {
     justify-content: flex-end;
+  }
+}
+
+/* narrow and short: a phone shorter than 390 x 844 (375 x 667, 360 x 740).
+   The agenda keeps about three rows (it is the one thing that scrolls), so
+   the Readouts and the rest of the stage step down to make room. */
+@media (max-width: 520px) and (min-height: 521px) and (max-height: 760px) {
+  /* With the agenda, the stage is as tall as its content and the agenda
+     takes the rest. The big Readout's digits fit the height left (over
+     their 0.95 line height): the visible height (svh), less the screen's
+     fixed rows (the padding, the top bar, three agenda rows, the window
+     button and the gaps between) and the room each other thing takes while
+     it shows. Each room is about the height that thing takes here;
+     check:clock's agenda and stage checks catch them going stale. Below
+     32px the digits stop shrinking. */
+  .clock-screen {
+    --frame-room: calc(177px + 3 * var(--agenda-row));
+    --banner-room: 0px;
+    --prompt-room: 0px;
+    --heading-room: 0px;
+    --hint-room: 0px;
+    --next-room: 0px;
+    /* The title, the big Readout's caption and the line's margin. */
+    --stage-room: 51px;
+  }
+
+  .clock-screen:has(.clock-bar--day:not([hidden])) {
+    --fit-h: max(32px, calc((100svh - var(--frame-room) - var(--banner-room) - var(--prompt-room) - var(--heading-room) - var(--hint-room) - var(--next-room) - var(--stage-room)) / 0.95));
+    --title-size: 22px;
+    --next-label: inline;
+    --smalls-gap: 12px;
+    --small-digits: 26px;
+  }
+
+  /* The simulated-time banner (two lines here) and its row gap. */
+  .clock-screen.is-simulated {
+    --banner-room: 54px;
+  }
+
+  /* The sound prompt (three lines) and its gap. */
+  .clock-screen:has(> .clock-bottom > .clock-sound-prompt:not([hidden])) {
+    --prompt-room: 96px;
+  }
+
+  /* The Off-Hours heading over the agenda: up to two lines, and its margin. */
+  .clock-screen:has(.clock-bar__heading) {
+    --heading-room: 40px;
+  }
+
+  .clock-screen:has(.clock-readout > .clock-cycle-hint:not([hidden])) {
+    --hint-room: 36px;
+  }
+
+  /* Up next on one line, in place of the line (edit mode hides it). */
+  .clock-screen:not(.is-editing):has(.clock-stage .clock-next) {
+    --next-room: 44px;
+  }
+
+  /* The row of small Readouts. */
+  .clock-screen:has(.clock-readout--small) {
+    --stage-room: 110px;
+  }
+
+  /* Editing, as in the short layout: the title and the line step away (the
+     agenda names the Segment and what's next), and the Readouts and their
+     Remove buttons close up. Its room: the big Readout's caption, the row
+     of small Readouts and the Add slot, the Remove buttons and the edit note. */
+  .clock-screen.is-editing {
+    --stage-room: 121px;
+    --small-digits: 22px;
+    --smalls-gap: 4px;
+  }
+
+  .clock-screen.is-editing:has(.clock-readout--small) {
+    --stage-room: 158px;
+  }
+
+  .is-editing .clock-next,
+  .is-editing .clock-line {
+    display: none;
+  }
+
+  .is-editing .clock-title {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+
+  .is-editing .clock-readout--big {
+    margin-top: 0;
+  }
+
+  .clock-readout.is-editing {
+    gap: var(--s1);
+  }
+
+  .is-editing .clock-readout__caption {
+    font-size: 11px;
+  }
+
+  .clock-readout__remove {
+    min-height: 26px;
+  }
+
+  .clock-edit-note {
+    margin-top: var(--s1);
   }
 }
 

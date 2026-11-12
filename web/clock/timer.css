@@ -487,8 +487,10 @@
     gap: 16px;
   }
 
+  /* The phone's small Readout size (clock.css), which edit mode and a short
+     phone step down. */
   .clock-readouts.has-timer .clock-readout--small .clock-readout__value {
-    font-size: 34px;
+    font-size: var(--small-digits);
   }
 
   .clock-picker__custom {
