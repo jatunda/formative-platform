@@ -109,6 +109,7 @@
      or colon is 1 unit and a small unit or seconds glyph 0.42. */
   --type-digits: 36vh;  /* about 26% digit height on screens 16:10 and wider */
   --glyph-em: 0.56;     /* average digit advance (em) of the default face */
+  --digits-line: 0.95;  /* the digits' line height (Readouts, the timer ring); layouts that fit the digits to a height divide by it */
   --type-small: clamp(26px, min(8.5vh, 9vw), 100px);   /* small Readouts; a row of two fits a portrait screen */
   --type-segment: clamp(20px, 5.4vh, 64px);  /* Segment name with Period Label */
   --type-line: clamp(16px, 3.8vh, 46px);     /* Up next, Off-Hours lines */

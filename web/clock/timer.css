@@ -211,7 +211,7 @@
   font-weight: var(--digits-weight);
   font-variant-numeric: tabular-nums lining-nums;
   letter-spacing: var(--digits-tracking);
-  line-height: 0.95;
+  line-height: var(--digits-line);
   color: var(--digits);
   white-space: nowrap;
 }

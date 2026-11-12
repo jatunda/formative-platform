@@ -135,7 +135,7 @@ describe('School Clock hosting', () => {
     expect(short).toMatch(/\.clock-screen\s*\{[^}]*--edit-room:\s*0px;/);
     expect(short).toMatch(/\.clock-screen\.is-editing\s*\{[^}]*--edit-room:\s*\d+vh;/);
     // The Remove buttons are as tall as the short layout's other buttons.
-    expect(short).toMatch(/\.clock-readout__remove\s*\{[^}]*min-height:\s*32px;/);
+    expect(short).toMatch(/\.clock-screen\s*\{[^}]*--remove-h:\s*32px;/);
     // Beside layout: the column of small Readouts steps down too.
     expect(css).toMatch(/\.is-editing \.clock-readouts\.has-smalls \.clock-readout--small \.clock-readout__value\s*\{\s*font-size:/);
     // Phone: one cap in edit mode, a smaller one with the agenda, whether the sound prompt shows or not.
@@ -155,7 +155,8 @@ describe('School Clock hosting', () => {
     const phone = block('(max-width: 520px) and (min-height: 521px)');
     const shortPhone = block('(max-width: 520px) and (min-height: 521px) and (max-height: 760px)');
     // The agenda never squeezes below three of its rows.
-    expect(phone).toMatch(/\.clock-agenda\s*\{[^}]*min-height:\s*calc\(3 \* var\(--agenda-row\)\);/);
+    expect(phone).toMatch(/\.clock-agenda\s*\{[^}]*min-height:\s*var\(--agenda-min,\s*0\);/);
+    expect(shortPhone).toMatch(/\.clock-screen\s*\{[^}]*--agenda-min:\s*calc\(3 \* var\(--agenda-row\)\);/);
     expect(phone).toMatch(/\.clock-agenda__row\s*\{[^}]*min-height:\s*var\(--agenda-row\);/);
     // The big Readout reads a height cap a layout can set, like --edit-cap.
     expect(css).toMatch(/\.clock-readout--big \.clock-readout__value\s*\{\s*font-size:\s*min\([^;]*var\(--fit-h,\s*var\(--type-digits\)\)/);
@@ -164,6 +165,13 @@ describe('School Clock hosting', () => {
     expect(fit).not.toBeNull();
     const rooms = ['frame', 'banner', 'prompt', 'heading', 'hint', 'next', 'stage'];
     expect(fit?.[1]).toMatch(/100svh/);
+    // ...over the digits' line height, the one token the digits' own rule reads.
+    expect(fit?.[1]).toMatch(/\/\s*var\(--digits-line\)\)\)$/);
+    expect(css).toMatch(/\.clock-readout__value\s*\{[^}]*line-height:\s*var\(--digits-line\);/);
+    expect(css).not.toMatch(/0\.95/);
+    // The fixed rows are named parts, not one sum of pixels.
+    const frame = shortPhone.match(/--frame-room:\s*([^;]+);/);
+    expect(frame?.[1]).not.toMatch(/\d{3}px/);
     for (const room of rooms) expect(fit?.[1]).toContain(`var(--${room}-room)`);
     // ...each zero until its thing shows.
     for (const room of rooms.slice(1, -1)) expect(shortPhone).toMatch(new RegExp(`\\.clock-screen\\s*\\{[^}]*--${room}-room:\\s*0px;`));
@@ -172,6 +180,33 @@ describe('School Clock hosting', () => {
     // The timer's small Readouts on a phone read the same size edit mode steps down.
     const timer = readFileSync(resolve(clockDir, 'timer.css'), 'utf8');
     expect(timer).toMatch(/\.clock-readouts\.has-timer \.clock-readout--small \.clock-readout__value\s*\{\s*font-size:\s*var\(--small-digits\);/);
+  });
+
+  it('leaves 390 x 844 and taller phones as they were: only a phone shorter than that steps edit mode down further', () => {
+    const rules = readFileSync(resolve(clockDir, 'clock.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+    const start = rules.indexOf('@media (max-width: 520px) and (min-height: 521px) {');
+    const phone = rules.slice(start, rules.slice(start).search(/\n\}\r?\n/) + start);
+    // The phone's edit mode steps the digits down and nothing else.
+    const editing = phone.match(/\.clock-screen\.is-editing\s*\{([^}]*)\}/);
+    expect(editing?.[1].match(/--[a-z-]+(?=:)/g)).toEqual(['--edit-cap', '--small-digits']);
+    expect(phone).not.toMatch(/\.clock-readout__remove\s*\{/);
+    expect(phone).not.toMatch(/--(remove|caption|agenda-min|edit-note)[a-z-]*:/);
+  });
+
+  it('sizes the Remove pill, the captions and the edit note in one rule each, from properties a layout sets', () => {
+    const rules = readFileSync(resolve(clockDir, 'clock.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+    /** The values `property` gets in rules whose whole selector is `selector`. */
+    const declared = (selector, property) => [...rules.matchAll(/(?<=^|[{}])\s*([^{}]+?)\s*\{([^{}]*)\}/g)]
+      .filter((m) => m[1] === selector)
+      .flatMap((m) => [...m[2].matchAll(new RegExp(`(?:^|;)\\s*${property}:\\s*([^;]+);`, 'g'))].map((d) => d[1]));
+    expect(declared('.clock-readout__remove', 'min-height')).toEqual(['var(--remove-h, var(--tap))']);
+    expect(declared('.clock-readout__remove', 'padding')).toEqual(['var(--remove-pad, 0 var(--s4) 0 var(--s3))']);
+    expect(declared('.clock-readout__remove', 'font-size')).toEqual(['var(--remove-font, var(--type-ui-sm))']);
+    expect(declared('.clock-edit-note', 'margin-top')).toEqual(['var(--edit-note-gap, var(--gap-sm))']);
+    expect(rules.match(/[^{}]*\.clock-readout__caption\s*\{[^}]*font-size:/g)).toHaveLength(2);
+    // The short layout and a short phone share one rule for what edit mode hides.
+    expect(rules.match(/\.is-editing \.clock-title\s*\{/g)).toHaveLength(1);
+    expect(rules.match(/\.is-editing \.clock-line[,\s]/g)).toHaveLength(1);
   });
 
   it("draws the small Readouts' dividers only between Readouts, so no layout's divider rule reaches the Add slot's dashed outline", () => {
