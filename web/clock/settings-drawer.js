@@ -1,15 +1,17 @@
-// The Settings drawer: what the clock does (Division, time text, sound,
-// Period Labels, the day's coming rings, About). How it looks, the bar's
-// setting included, is the Look sheet's (look-sheet.js). It's a modal dialog from the right over a scrim, built once (so
+// The Settings drawer: what the clock does (Division, time text and the
+// Bottom bar choice, sound, Period Labels, the day's coming rings, About). How
+// it looks is the Look sheet's (look-sheet.js). It's a modal dialog from the right over a scrim, built once (so
 // typing a Period Label survives the ticks); each render brings its controls
-// in step with the settings, which the top bar can change too.
+// in step with the settings, which the top bar (and a tap on the bar in
+// Readouts edit mode) can change too.
 //
 // The drawer is one scrolling column of sections, each made by
 // `drawerSection()` (controls.js). A new feature adds a section to `sections` below; it
 // never restructures the drawer. The Alarms section is `alarm-editor.js`'s,
 // made by the page and handed in.
 import { DIVISIONS, LABELLED_PERIODS } from './clock-settings.js';
-import { closeButton, drawerSection, feedbackLink, soundChoice, switchControl } from './controls.js';
+import { closeButton, drawerSection, feedbackLink, fieldset, segmented, soundChoice, switchControl } from './controls.js';
+import { BAR_SETTING_NAMES } from './day-bar.js';
 import { el } from './dom.js';
 import { createModal } from './modal.js';
 import { BELL_AUTO_DISMISS_SECONDS } from './sound.js';
@@ -39,22 +41,22 @@ export function createSettingsDrawer({ settings, update, play, testRing, behind,
       divisionInputs.map(({ label }) => label)),
   ]);
 
-  const seconds = switchControl(`${ID}-seconds`, 'Show seconds',
-    'The last minute of a countdown and the timer always show seconds.',
-    (on) => update({ showSeconds: on }));
+  const seconds = switchControl(`${ID}-seconds`, 'Show seconds', '', (on) => update({ showSeconds: on }));
   const use24Hour = switchControl(`${ID}-24-hour`, '24-hour time', '', (on) => update({ use24Hour: on }));
-  const periodEnd = switchControl(`${ID}-period-end`, 'Show when this Segment ends',
-    'The line under the clock says when this Segment ends. In the bar along the bottom, the block you’re in shows its end time too, where there’s room.',
-    (on) => update({ showPeriodEnd: on }));
-  const time = drawerSection('time', 'Time', [seconds.label, use24Hour.label, periodEnd.label]);
+  // When the current Segment (any Segment, not just a Period) ends, under the clock and in the bar.
+  const periodEnd = switchControl(`${ID}-period-end`, 'Show period end time', '', (on) => update({ showPeriodEnd: on }));
+  // The bar's setting (day-bar.js): whole day is the saved dayStrip on.
+  const bar = segmented(`${ID}-bar`, 'Bottom bar', [['day', BAR_SETTING_NAMES.day], ['segment', BAR_SETTING_NAMES.segment]],
+    'day', () => update({ dayStrip: bar.value() === 'day' }));
+  const time = drawerSection('time', 'Time', [seconds.label, use24Hour.label, periodEnd.label, fieldset('Bottom bar', [bar.group])]);
 
   const bells = switchControl(`${ID}-bells`, 'Bells', 'Start and end of every Period and Break',
     (on) => update({ bells: { ...settings().bells, on } }));
   const untilDismissed = switchControl(`${ID}-until-dismissed`, 'Ring Bells until you dismiss them',
-    `Otherwise each Bell plays for about ${BELL_AUTO_DISMISS_SECONDS} seconds, finishes its sound, then stops on its own. Alarms and the timer always ring until dismissed.`,
+    `By default, bells stop after ${BELL_AUTO_DISMISS_SECONDS} seconds. Alarms and timers always ring until dismissed.`,
     (on) => update({ bells: { ...settings().bells, untilDismissed: on } }));
   const assemblyEnds = switchControl(`${ID}-assembly-ends`, 'Bell when an Assembly ends',
-    'Chapel, Convocation and Pep Rally. Never when one starts.',
+    'Chapel, Convocation and Pep Rally. Bells never ring at the start of an assembly.',
     (on) => update({ bells: { ...settings().bells, assemblyEnds: on } }));
   const volumeValue = el('span', { className: 'clock-field__value' });
   const volume = el('input', {
@@ -122,8 +124,8 @@ export function createSettingsDrawer({ settings, update, play, testRing, behind,
     for (const { key, input } of divisionInputs) input.checked = s.division === key;
     seconds.input.checked = s.showSeconds;
     use24Hour.input.checked = s.use24Hour;
-    use24Hour.hint.textContent = s.use24Hour ? 'Clock times show as 13:05.' : 'Clock times show as 1:05.';
     periodEnd.input.checked = s.showPeriodEnd;
+    bar.choose(s.dayStrip ? 'day' : 'segment');
     bells.input.checked = s.bells.on;
     untilDismissed.input.checked = s.bells.untilDismissed === true;
     untilDismissed.input.disabled = !s.bells.on;

@@ -1,9 +1,9 @@
 // The Look sheet: how the clock looks. A compact dialog under the
 // top bar on the right (a bottom sheet on small screens) that keeps the clock
 // visible beside it, so every choice previews live on the real clock. It holds,
-// in order: the theme previews, the flip switch, the bar's whole day / just
-// this Segment setting, the font and colour swaps, and "Use the theme's own
-// font and colours" after a swap. Also here: the "Pick a theme" hint, the
+// in order: the theme previews, the flip switch, the font and colour swaps,
+// and "Use the theme's own font and colours" after a swap. (The Bottom bar
+// choice is the Settings drawer's, in Time.) Also here: the "Pick a theme" hint, the
 // decorations, and `applyLook()`, which puts the look on <html>.
 //
 // Focus is handled by modal.js: it moves in, Tab wraps inside, Escape closes
@@ -11,7 +11,6 @@
 // the clock closes it too. Every name is a look description from themes.js,
 // never who a theme is for.
 import { closeButton, fieldset, switchControl } from './controls.js';
-import { BAR_SETTING_NAMES } from './day-bar.js';
 import { SVG_NS, el } from './dom.js';
 import { icon } from './icons.js';
 import { createModal } from './modal.js';
@@ -99,12 +98,6 @@ export function createLookSheet({ settings, update, behind, onChange }) {
   const flip = switchControl(`${ID}-flip`, 'Light version',
     'Flips this theme. Picking a theme shows its own version again.', (on) => update({ flipped: on }));
 
-  // The bar's setting (day-bar.js): whole day is the saved dayStrip on.
-  const barInputs = /** @type {[string, boolean][]} */ ([[BAR_SETTING_NAMES.day, true], [BAR_SETTING_NAMES.segment, false]]).map(([name, on]) => {
-    const input = el('input', { type: 'radio', name: `${ID}-bar`, onchange: () => update({ dayStrip: on }) });
-    return { on, input, label: el('label', { className: 'clock-segment' }, [input, el('span', { textContent: name })]) };
-  });
-
   const fontInputs = FONTS.map((font) => {
     const input = el('input', { type: 'radio', name: `${ID}-font`, onchange: () => update(pickFont(settings(), font.id)) });
     const name = el('span', { className: 'visually-hidden' });
@@ -151,9 +144,6 @@ export function createLookSheet({ settings, update, behind, onChange }) {
     el('div', { className: 'clock-look__body' }, [
       group('Theme', 'clock-look__themes', [el('div', { className: 'clock-theme-grid' }, themeInputs.map(({ label }) => label))]),
       flip.label,
-      group('Bottom bar', 'clock-look__bar', [
-        el('div', { className: 'clock-segmented' }, barInputs.map(({ label }) => label)),
-      ]),
       group('Font', 'clock-look__fonts', [el('div', { className: 'clock-swatches' }, fontInputs.map(({ label }) => label))]),
       group('Colours', 'clock-look__palettes', [
         el('div', { className: 'clock-swatches' }, paletteInputs.map(({ label }) => label)),
@@ -182,7 +172,6 @@ export function createLookSheet({ settings, update, behind, onChange }) {
     const own = nativeMode(palette);
     flip.input.checked = s.flipped;
     flip.label.querySelector(`#${ID}-flip-name`).textContent = own === 'dark' ? 'Light version' : 'Dark version';
-    for (const { on, input } of barInputs) input.checked = s.dayStrip === on;
     for (const f of fontInputs) {
       f.input.checked = f.id === font;
       f.name.textContent = f.look + (f.id === theme.font ? OWN : '');

@@ -19,11 +19,20 @@ Built behaviour: closed tickets 21 (Look sheet), 34 and 40 (the period end setti
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** closed
 
-- [ ] The Bottom bar choice is in Settings → Time and no longer in Look; it saves the same setting; edit-mode tapping and Settings stay in step
-- [ ] Show seconds and 24-hour time have no explanation
-- [ ] "Show period end time" with no caption; older saves keep their choice
-- [ ] The Ring Bells and Assembly captions read exactly as above
-- [ ] Settings still reads well for screen readers (the moved choice is a labelled radio group)
-- [ ] `npm run lint`, `npm run typecheck`, `npm run test:coverage` in `web/` pass
+- [x] The Bottom bar choice is in Settings → Time and no longer in Look; it saves the same setting; edit-mode tapping and Settings stay in step
+- [x] Show seconds and 24-hour time have no explanation
+- [x] "Show period end time" with no caption; older saves keep their choice
+- [x] The Ring Bells and Assembly captions read exactly as above
+- [x] Settings still reads well for screen readers (the moved choice is a labelled radio group)
+- [x] `npm run lint`, `npm run typecheck`, `npm run test:coverage` in `web/` pass
+
+## Comments
+
+**2026-11-11: built.** The Bottom bar choice is the last thing in Settings → Time: a fieldset with the legend "Bottom bar" round a radio group of the same name (Whole day / Just this Segment, from `BAR_SETTING_NAMES`). It saves the same `dayStrip` key, so older saves load unchanged, and the drawer's render keeps it in step with a tap on the bar in edit mode. The Look sheet now holds only theme (with its flip), font and colours.
+
+- `segmented()` moved from `alarm-editor.js` to `controls.js` so the drawer and the Alarm editor share it.
+- `switchControl()` with an empty hint now has no hint and no `aria-describedby`. Show seconds, 24-hour time and Show period end time use that. The old 24-hour hint ("Clock times show as 1:05.") is gone with it.
+- "Show period end time" keeps the `showPeriodEnd` key. Comments that named it the old way are renamed.
+- The Ring Bells and Assembly captions read word for word as above.
