@@ -70,7 +70,8 @@ export function createDayBarView({ onSwitch }) {
     let name = "Today's Segments";
     if (single) name = fullName(bar.blocks[0]);
     else if (next) name = `Segments on ${date}`;
-    element.className = `clock-bar clock-bar--${bar.setting}${next ? ' clock-bar--next' : ''}`;
+    // Keeps edit mode's outline: a switch rebuilds the bar mid-edit.
+    element.className = `clock-bar clock-bar--${bar.setting}${next ? ' clock-bar--next' : ''}${editing ? ' is-editing' : ''}`;
     element.setAttribute('aria-label', name);
     current = null;
     fill = null;
