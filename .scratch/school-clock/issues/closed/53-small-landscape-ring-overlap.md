@@ -10,7 +10,7 @@ Built behaviour: closed tickets 44 (the short layout and its prompt crowding) an
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** closed
 
 - [x] `npm run check:clock -- --size 480x320 --timer --sound-on --layout countdown,clock,countup` passes
 - [x] `npm run check:clock -- --size 480x320 --timer --sound-on` passes
