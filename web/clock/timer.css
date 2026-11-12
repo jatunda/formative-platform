@@ -382,6 +382,26 @@
     gap: 12px;
   }
 
+  /* Editing: a column of Readouts, each with its Remove button, is taller
+     than the stage, so the others wrap in rows beside a smaller ring. */
+  .is-editing .clock-readouts.has-timer {
+    grid-template-columns: auto minmax(0, 1fr);
+    column-gap: 12px;
+    --ring-d: min(100cqh, 34vw);
+  }
+
+  .is-editing .clock-readouts.has-timer .clock-ring {
+    grid-column: 1;
+  }
+
+  .is-editing .clock-readouts.has-timer .clock-smalls {
+    grid-column: 2;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px 12px;
+  }
+
   .clock-picker {
     padding: var(--s3) var(--s4);
   }
