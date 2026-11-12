@@ -17,13 +17,17 @@ Why: the last session ran 15 merger subagents (about 77k tokens and 2–3 minute
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** closed
 
-- [ ] A clean merge whose tree equals the branch's skips the checks and prints the SHA
-- [ ] A clean merge that adds commits from the integration branch runs the checks and reports them
-- [ ] A conflict stops with the merge in progress and lists the files; nothing is checked
-- [ ] Refuses on a dirty tree or a missing branch
-- [ ] Runs `functions/` tests only when `functions/` changed
-- [ ] Works in Git Bash on Windows (the user's shell) and on Linux
-- [ ] Tested: a test script builds a throwaway repo, covers the cases above (with the check commands stubbed) and runs from `npm test` somewhere CI already runs, or from CI directly
-- [ ] `CLAUDE.md` has a one-line pointer to it
+- [x] A clean merge whose tree equals the branch's skips the checks and prints the SHA
+- [x] A clean merge that adds commits from the integration branch runs the checks and reports them
+- [x] A conflict stops with the merge in progress and lists the files; nothing is checked
+- [x] Refuses on a dirty tree or a missing branch
+- [x] Runs `functions/` tests only when `functions/` changed
+- [x] Works in Git Bash on Windows (the user's shell) and on Linux
+- [x] Tested: a test script builds a throwaway repo, covers the cases above (with the check commands stubbed) and runs from `npm test` somewhere CI already runs, or from CI directly
+- [x] `CLAUDE.md` has a one-line pointer to it
+
+## Comments
+
+Done on `tooling-02`. `scripts/merge-ticket.sh <branch>`; behaviour is in its header. `scripts/merge-ticket.test.sh` (35 cases, throwaway repos, checks stubbed via `MERGE_TICKET_RUN`) runs in its own `scripts` job in `.github/workflows/test.yml`. Two additions beyond the spec: it also runs `npm ci` in `functions/` when that folder changed and has no `node_modules` (a fresh worktree would fail otherwise), and `.gitattributes` keeps `*.sh` at LF so the scripts run in Git Bash with `core.autocrlf=true`. Run for real in a temp clone in Git Bash on Windows: checked merge (lint, typecheck, 3316 web tests, 20 functions tests, about 2 minutes with `npm ci`), skipped merge and conflict all behaved as specified.
