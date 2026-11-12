@@ -117,9 +117,69 @@ describe('the bar during Off-Hours', () => {
     expect(bar).toMatchObject({ day: 'next', date: new Date(2026, 10, 2) });
   });
 
-  it('shows the whole day even on just this Segment, since nothing is current', () => {
-    expect(barAt(tue(16, 0), { dayStrip: false }).setting).toBe('day');
-    expect(barAt(tue(7, 50), { dayStrip: false }).setting).toBe('day');
+});
+
+describe('the bar during Off-Hours on just this Segment: a countdown to the Next School Day', () => {
+  const countdownAt = (now, settings = {}) => barAt(now, { dayStrip: false, ...settings });
+
+  it('after school is one block from the end of school to the next first Segment, filling as time passes', () => {
+    // Tue 10/27 ends 15:10; Wed 10/28 (Even Day) starts with Period 2 at 8:30.
+    const bar = countdownAt(tue(16, 0));
+    expect(bar).toMatchObject({ setting: 'segment', day: 'next', dayLabel: 'Even Day', date: new Date(2026, 9, 28) });
+    expect(bar.blocks).toHaveLength(1);
+    expect(bar.blocks[0]).toMatchObject({
+      name: 'Until Period 2', short: 'Until P2', kind: 'countdown', state: 'now', left: 0, width: 100,
+      start: tue(15, 10), end: new Date(2026, 9, 28, 8, 30), showEnd: false,
+    });
+    expect(bar.end).toEqual(new Date(2026, 9, 28, 8, 30));
+    // 50 of the 1040 minutes from 15:10 to 8:30 are done.
+    expect(bar.done).toBeCloseTo((50 / 1040) * 100);
+    expect(bar.nowAt).toBeCloseTo((50 / 1040) * 100);
+    expect(bar.offHours).toBe(true);
+  });
+
+  it("before school counts from the previous School Day's end, under today's heading", () => {
+    // Mon 10/26 (All Day) ended 15:10; Tue 10/27 starts 8:30: 17h20m. At 7:50, 40 minutes are left.
+    const bar = countdownAt(tue(7, 50));
+    expect(bar).toMatchObject({ setting: 'segment', day: 'today', dayLabel: 'All Day' });
+    expect(bar.blocks[0]).toMatchObject({ name: 'Until Period 1', start: new Date(2026, 9, 26, 15, 10), end: tue(8, 30) });
+    expect(bar.done).toBeCloseTo((1000 / 1040) * 100);
+  });
+
+  it('on a day off counts from the last School Day, across the weekend', () => {
+    // Fri 10/30 ends 15:10 → Mon 11/2 starts 8:30: 66h20m, as clocks fall back on Sun 11/1. Sat noon is 20h50m in.
+    const bar = countdownAt(new Date(2026, 9, 31, 12, 0));
+    expect(bar).toMatchObject({ setting: 'segment', day: 'next', date: new Date(2026, 10, 2) });
+    expect(bar.blocks[0].start).toEqual(new Date(2026, 9, 30, 15, 10));
+    expect(bar.done).toBeCloseTo((1250 / 3980) * 100);
+  });
+
+  it("gives the countdown the first Segment's Period Label", () => {
+    expect(countdownAt(tue(16, 0), { periodLabels: { 'Period 2': 'AP CSA' } }).blocks[0].label).toBe('AP CSA');
+  });
+
+  it('starts from midnight on the first day of the School Year, when no earlier School Day is known', () => {
+    // The year starts Mon 8/17 (No School); Tue 8/18 is the first School Day.
+    const bar = countdownAt(new Date(2026, 7, 17, 12, 0));
+    expect(bar.blocks[0].start).toEqual(new Date(2026, 7, 17));
+    expect(bar.done).toBeCloseTo((12 / 32.5) * 100);
+    expect(countdownAt(new Date(2026, 7, 18, 8, 0)).blocks[0].start).toEqual(new Date(2026, 7, 17));
+  });
+
+  it("starts from midnight on the year's first day too when an earlier School Year is known", () => {
+    const lastYear = { ...SCHOOL_YEARS[0], id: '2025-26', start: '2025-08-18', end: '2026-05-29', calendarExceptions: [] };
+    const years = [lastYear, ...SCHOOL_YEARS];
+    const now = new Date(2026, 7, 17, 12, 0);
+    const moment = describeMoment(now, years, { division: 'HS' });
+    expect(moment.schoolEndedAt).not.toBeNull();
+    const bar = describeBar(now, moment, years, { division: 'HS', dayStrip: false, periodLabels: {}, showPeriodEnd: false });
+    expect(bar.blocks[0].start).toEqual(new Date(2026, 7, 17));
+  });
+
+  it('leaves whole day as it was', () => {
+    expect(barAt(tue(16, 0))).toMatchObject({ setting: 'day', offHours: true });
+    expect(barAt(tue(10, 39)).offHours).toBe(false);
+    expect(countdownAt(tue(10, 39)).offHours).toBe(false);
   });
 });
 
