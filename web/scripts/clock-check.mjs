@@ -18,7 +18,8 @@
 //   npm run check:clock -- --no-shots         checks only, no PNGs
 //
 // For each state × size it saves a screenshot, runs axe, checks the page doesn't
-// scroll, checks the phone's agenda (when it shows) scrolls until its last row is
+// scroll, checks the stage stays inside its row (clear of the top bar and the
+// bottom row), checks the phone's agenda (when it shows) scrolls until its last row is
 // fully on screen and uncovered, with the window button and sound prompt on screen
 // below it (the screenshot is taken scrolled to the end), checks the timer's ring
 // (when one shows) runs into nothing in the top bar or the side Readouts, and
@@ -185,6 +186,21 @@ try {
           })
           .map(([name]) => name);
       });
+      // The stage (the title, the Readouts, the cycle hint, the line) must stay
+      // inside its own row: overflowing it runs into the top bar or hides the
+      // line behind the sound prompt. Reports how far it spills above and below.
+      const stage = await page.evaluate(() => {
+        const box = document.querySelector('.clock-stage')?.getBoundingClientRect();
+        if (!box || !box.height) return null;
+        const parts = [...document.querySelectorAll('.clock-stage *')]
+          .filter((n) => n.getClientRects().length)
+          .map((n) => n.getBoundingClientRect())
+          .filter((b) => b.width && b.height);
+        if (!parts.length) return null;
+        const above = Math.round(box.top - Math.min(...parts.map((b) => b.top)));
+        const below = Math.round(Math.max(...parts.map((b) => b.bottom)) - box.bottom);
+        return { fits: above <= 0 && below <= 0, above, below };
+      });
       // The phone's agenda, scrolled to its end: its last row must sit wholly
       // on screen with nothing over it (the window button, the sound prompt).
       const agenda = await page.evaluate((bars) => {
@@ -217,8 +233,8 @@ try {
       }
       const file = `${state.name}-${size.label}.png`;
       if (opts.shots) await page.screenshot({ path: resolve(outDir, file) });
-      const ok = !scroll.x && !scroll.y && agenda?.reachable !== false && !overlaps.length && !errors.length && !violations.length;
-      results.push({ state: state.name, size: size.label, url: base + state.query, ok, scroll, agenda, overlaps, errors, violations, shot: opts.shots ? file : null });
+      const ok = !scroll.x && !scroll.y && agenda?.reachable !== false && stage?.fits !== false && !overlaps.length && !errors.length && !violations.length;
+      results.push({ state: state.name, size: size.label, url: base + state.query, ok, scroll, stage, agenda, overlaps, errors, violations, shot: opts.shots ? file : null });
       await page.close();
     }
     await context.close();
@@ -232,6 +248,7 @@ const failed = results.filter((r) => !r.ok);
 for (const r of failed) {
   const why = [r.scroll.x && 'scrolls sideways', r.scroll.y && 'scrolls down',
     r.agenda?.reachable === false && `agenda's last row out of reach (list ${r.agenda.listHeight}px tall, row bottom ${Math.round(r.agenda.rowBottom)}, list bottom ${Math.round(r.agenda.listBottom)}, visible height ${r.agenda.visible})`,
+    r.stage?.fits === false && `stage spills out of its row (${r.stage.above}px above, ${r.stage.below}px below)`,
     r.overlaps.length && `ring overlaps ${r.overlaps.join(', ')}`, ...r.errors, ...r.violations].filter(Boolean);
   console.log(`✗ ${r.state} @ ${r.size}: ${why.join('; ')}`);
 }

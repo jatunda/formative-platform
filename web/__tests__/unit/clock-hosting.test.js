@@ -98,6 +98,25 @@ describe('School Clock hosting', () => {
     }
   });
 
+  it("shrinks the short layout's digits by the room the cycle hint and the simulated-time banner take, so the stage stays clear of the top bar and the line clear of the sound prompt", () => {
+    const css = readFileSync(resolve(clockDir, 'clock.css'), 'utf8');
+    const start = css.indexOf('@media (max-height: 520px) {');
+    const short = css.slice(start, css.slice(start).search(/\n\}\r?\n/) + start);
+    // Both the short layout's digit sizes (with and without the sound prompt) give the room back.
+    const sizes = [...short.matchAll(/--type-digits:\s*([^;]+);/g)].map((m) => m[1]);
+    expect(sizes.filter((size) => /var\(--hint-room\)/.test(size) && /var\(--banner-room\)/.test(size))).toHaveLength(2);
+    // The rooms are set only while the hint or the banner is there.
+    expect(short).toMatch(/\.clock-screen:has\(\.clock-readout > \.clock-cycle-hint:not\(\[hidden\]\)\)\s*\{\s*--hint-room:\s*\d+px;/);
+    expect(short).toMatch(/\.clock-screen\.is-simulated\s*\{\s*--banner-room:\s*\d+px;/);
+  });
+
+  it("lets the short layout's line use the full width while the sound prompt holds the window buttons in its row", () => {
+    const css = readFileSync(resolve(clockDir, 'clock.css'), 'utf8');
+    const start = css.indexOf('@media (max-height: 520px) {');
+    const short = css.slice(start, css.slice(start).search(/\n\}\r?\n/) + start);
+    expect(short).toMatch(/\.clock-screen:has\(> \.clock-bottom > \.clock-sound-prompt:not\(\[hidden\]\)\) :is\(\.clock-next, \.clock-line\)\s*\{\s*max-width:\s*none;/);
+  });
+
   it('keeps the page background in fullscreen', () => {
     const css = readFileSync(resolve(clockDir, 'clock.css'), 'utf8');
     // Without a background a fullscreen element shows the black backdrop through it.
