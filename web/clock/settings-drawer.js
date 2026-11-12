@@ -11,7 +11,7 @@
 // made by the page and handed in.
 import { DIVISIONS, LABELLED_PERIODS } from './clock-settings.js';
 import { closeButton, drawerSection, feedbackLink, fieldset, segmented, soundChoice, switchControl } from './controls.js';
-import { BAR_SETTING_NAMES } from './day-bar.js';
+import { BAR_SETTING_NAMES, barSetting, dayStripOf } from './day-bar.js';
 import { el } from './dom.js';
 import { createModal } from './modal.js';
 import { BELL_AUTO_DISMISS_SECONDS } from './sound.js';
@@ -30,24 +30,18 @@ const ID = 'clock-settings';
  *   `alarms` is the Alarms section (`alarm-editor.js`).
  */
 export function createSettingsDrawer({ settings, update, play, testRing, behind, onChange, alarms }) {
-  const divisionInputs = DIVISIONS.map(([key, name]) => {
-    const input = el('input', {
-      type: 'radio', name: `${ID}-division`, value: key, onchange: () => update({ division: key }),
-    });
-    return { key, input, label: el('label', { className: 'clock-segment' }, [input, el('span', { textContent: name })]) };
-  });
-  const division = drawerSection('division', 'Division', [
-    el('div', { className: 'clock-segmented', role: 'radiogroup', 'aria-labelledby': `${ID}-division-title` },
-      divisionInputs.map(({ label }) => label)),
-  ]);
+  // Named by its section's heading (drawerSection()'s `<id>-title`).
+  const divisionChoice = segmented(`${ID}-division`, { labelledBy: `${ID}-division-title` }, DIVISIONS, '',
+    () => update({ division: divisionChoice.value() }));
+  const division = drawerSection('division', 'Division', [divisionChoice.group]);
 
   const seconds = switchControl(`${ID}-seconds`, 'Show seconds', '', (on) => update({ showSeconds: on }));
   const use24Hour = switchControl(`${ID}-24-hour`, '24-hour time', '', (on) => update({ use24Hour: on }));
   // When the current Segment (any Segment, not just a Period) ends, under the clock and in the bar.
   const periodEnd = switchControl(`${ID}-period-end`, 'Show period end time', '', (on) => update({ showPeriodEnd: on }));
-  // The bar's setting (day-bar.js): whole day is the saved dayStrip on.
-  const bar = segmented(`${ID}-bar`, 'Bottom bar', [['day', BAR_SETTING_NAMES.day], ['segment', BAR_SETTING_NAMES.segment]],
-    'day', () => update({ dayStrip: bar.value() === 'day' }));
+  // The bar's setting (day-bar.js), saved as dayStrip.
+  const bar = segmented(`${ID}-bar`, 'Bottom bar', Object.entries(BAR_SETTING_NAMES),
+    barSetting(true), () => update({ dayStrip: dayStripOf(bar.value()) }));
   const time = drawerSection('time', 'Time', [seconds.label, use24Hour.label, periodEnd.label, fieldset('Bottom bar', [bar.group])]);
 
   const bells = switchControl(`${ID}-bells`, 'Bells', 'Start and end of every Period and Break',
@@ -121,11 +115,11 @@ export function createSettingsDrawer({ settings, update, play, testRing, behind,
   /** Bring every control in step with the settings. */
   function render() {
     const s = settings();
-    for (const { key, input } of divisionInputs) input.checked = s.division === key;
+    divisionChoice.choose(s.division);
     seconds.input.checked = s.showSeconds;
     use24Hour.input.checked = s.use24Hour;
     periodEnd.input.checked = s.showPeriodEnd;
-    bar.choose(s.dayStrip ? 'day' : 'segment');
+    bar.choose(barSetting(s.dayStrip));
     bells.input.checked = s.bells.on;
     untilDismissed.input.checked = s.bells.untilDismissed === true;
     untilDismissed.input.disabled = !s.bells.on;
@@ -151,7 +145,7 @@ export function createSettingsDrawer({ settings, update, play, testRing, behind,
      */
     open(from, { atDivision = false } = {}) {
       // The chip that opens it at the Division only shows once one is chosen.
-      modal.open(from, atDivision ? divisionInputs.find(({ input }) => input.checked).input : undefined);
+      modal.open(from, atDivision ? divisionChoice.checked() : undefined);
     },
     /** The day's coming rings as lines of text; with none, the section hides. @param {string[]} lines */
     showRings(lines) {

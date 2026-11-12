@@ -171,6 +171,9 @@ describe('School Clock settings drawer', () => {
       expect(field('High School').checked).toBe(true);
       expect(field('High School').type).toBe('radio');
       expect(field('Middle School').name).toBe(field('High School').name);
+      const group = drawer().querySelector('#clock-settings-division [role="radiogroup"]');
+      expect(accessibleName(group)).toBe('Division');
+      expect(group.getAttribute('aria-labelledby')).toBe('clock-settings-division-title');
 
       field('Middle School').click();
 

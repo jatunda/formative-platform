@@ -49,19 +49,23 @@ export function switchControl(id, name, hint, onChange) {
 }
 
 /**
- * Radios shown as a segmented control. @param {string} name @param {string} groupLabel
- * @param {[string, string][]} options value and words @param {string} chosen @param {() => void} [onChange]
+ * Radios shown as a segmented control. @param {string} name
+ * @param {string | { labelledBy: string }} groupLabel the group's name, or the id of the element that names it
+ * @param {readonly (readonly [string, string])[]} options value and words @param {string} chosen @param {() => void} [onChange]
  */
 export function segmented(name, groupLabel, options, chosen, onChange) {
   const inputs = options.map(([value, words]) => {
     const input = el('input', { type: 'radio', name, value, checked: value === chosen, onchange: onChange });
     return { input, label: el('label', { className: 'clock-segment' }, [input, el('span', { textContent: words })]) };
   });
-  const group = el('div', { className: 'clock-segmented', role: 'radiogroup', 'aria-label': groupLabel },
-    inputs.map(({ label }) => label));
+  const named = typeof groupLabel === 'string' ? { 'aria-label': groupLabel } : { 'aria-labelledby': groupLabel.labelledBy };
+  const group = el('div', { className: 'clock-segmented', role: 'radiogroup', ...named }, inputs.map(({ label }) => label));
+  const checked = () => inputs.find(({ input }) => input.checked)?.input;
   return {
     group,
-    value: () => inputs.find(({ input }) => input.checked)?.input.value,
+    value: () => checked()?.value,
+    /** The radio chosen, if any. */
+    checked,
     /** @param {string} value */
     choose: (value) => { for (const { input } of inputs) input.checked = input.value === value; },
   };
