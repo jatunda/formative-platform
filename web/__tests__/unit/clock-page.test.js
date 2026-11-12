@@ -110,7 +110,7 @@ describe('School Clock page', () => {
     expect(displayText()).toContain('Up next Period 3 10:30 AM');
   });
 
-  it('says when the current Segment ends under the Readouts, with Show when this Period ends on', () => {
+  it('says when the current Segment ends under the Readouts, with Show when this Segment ends on', () => {
     const real = fakeRealClock(new Date(2026, 9, 27, 13, 0, 0));
     app = start({ realNow: real.now, settings: { showPeriodEnd: true } });
 

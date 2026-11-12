@@ -31,7 +31,7 @@ import { periodLabel } from './format.js';
  * - `state`: `next` is the Segment after a Passing Period.
  * - `left` / `width`: percent of the bar.
  * - `showEnd`: it shows its end time beside its start, where that fits
- *   ("Show when this Period ends": the current Segment, on whole day only).
+ *   ("Show when this Segment ends": the current Segment, on whole day only).
  */
 
 /**

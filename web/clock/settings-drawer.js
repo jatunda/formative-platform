@@ -43,8 +43,8 @@ export function createSettingsDrawer({ settings, update, play, testRing, behind,
     'The last minute of a countdown and the timer always show seconds.',
     (on) => update({ showSeconds: on }));
   const use24Hour = switchControl(`${ID}-24-hour`, '24-hour time', '', (on) => update({ use24Hour: on }));
-  const periodEnd = switchControl(`${ID}-period-end`, 'Show when this Period ends',
-    'The line under the clock says when this Period ends. In the bar along the bottom, the block you’re in shows its end time too, where there’s room.',
+  const periodEnd = switchControl(`${ID}-period-end`, 'Show when this Segment ends',
+    'The line under the clock says when this Segment ends. In the bar along the bottom, the block you’re in shows its end time too, where there’s room.',
     (on) => update({ showPeriodEnd: on }));
   const time = drawerSection('time', 'Time', [seconds.label, use24Hour.label, periodEnd.label]);
 

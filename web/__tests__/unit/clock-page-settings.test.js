@@ -201,9 +201,9 @@ describe('School Clock settings drawer', () => {
       expect(stageText()).toContain('08:30');
     });
 
-    it('Show when this Period ends: an off-by-default switch after 24-hour time, saved, shown at once', () => {
+    it('Show when this Segment ends: an off-by-default switch after 24-hour time, saved, shown at once', () => {
       open({ when: at(10, 39) });
-      const name = 'Show when this Period ends';
+      const name = 'Show when this Segment ends';
       expect(field(name).getAttribute('role')).toBe('switch');
       expect(field(name).checked).toBe(false);
       const switches = [...drawer().querySelectorAll('[role="switch"]')].map(accessibleName);
@@ -218,11 +218,14 @@ describe('School Clock settings drawer', () => {
       expect(currentTime()).toBe('10:30–11:15');
     });
 
-    it('Show when this Period ends: the line under the Readouts says when the Segment ends, and the hint says so', () => {
+    it('Show when this Segment ends: the line under the Readouts says when the Segment ends, and the hint says so', () => {
       open({ when: at(10, 39) });
-      const name = 'Show when this Period ends';
+      const name = 'Show when this Segment ends';
       const hint = document.getElementById(field(name).getAttribute('aria-describedby')).textContent;
       expect(hint).toMatch(/under the clock/);
+      // Every Segment, Lunch included: never "this Period".
+      expect(hint).toMatch(/when this Segment ends/);
+      expect(hint).not.toMatch(/Period/);
       expect(hint).toMatch(/bar along the bottom/);
       const line = () => mount().querySelector('.clock-stage .clock-next');
       expect(line()).toBeNull();

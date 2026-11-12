@@ -22,7 +22,7 @@ import { formatClockTime, formatDate, formatSegmentName, formatShortDate, period
  * - `title` and `tag`: "Period 3" and its Period Label "AP CSA" ('' when it has none).
  * - `upNext`: the next Segment and its start, during a Passing Period and before school.
  * - `ends`: when the current Segment ends ("11:15 AM"), with "Show when this
- *   Period ends" on; null otherwise.
+ *   Segment ends" on; null otherwise.
  * - `line`: the Off-Hours line ("Back Mon, Nov 30 · All Day"), or null.
  *   How long until then is a Readout's job (until the Next School Day), not the line's.
  * - `namesNextDay`: the line only names the Next School Day (after school, a
