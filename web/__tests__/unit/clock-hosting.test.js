@@ -9,6 +9,12 @@ const clockDir = resolve(webDir, 'clock');
 const firebase = JSON.parse(readFileSync(resolve(webDir, '../firebase.json'), 'utf8'));
 const rewrites = firebase.hosting.rewrites;
 
+/** The short layout's block (laptop corner, landscape phone) in a stylesheet. */
+function shortLayout(css) {
+  const start = css.indexOf('@media (max-height: 520px) {');
+  return css.slice(start, css.slice(start).search(/\n\}\r?\n/) + start);
+}
+
 describe('School Clock hosting', () => {
   it.each(['/clock', '/clock/'])('serves %s from a static page via a rewrite above the catch-all', (source) => {
     const index = rewrites.findIndex((r) => r.source === source);
@@ -75,8 +81,7 @@ describe('School Clock hosting', () => {
     const css = readFileSync(resolve(clockDir, 'clock.css'), 'utf8');
     // Hidden at the top level; shown again only in the short layout's block.
     expect(css).toMatch(/(^|\n)\.clock-line--in-bar\s*\{\s*display:\s*none;/);
-    const start = css.indexOf('@media (max-height: 520px) {');
-    const short = css.slice(start, css.slice(start).search(/\n\}\r?\n/) + start);
+    const short = shortLayout(css);
     expect(short).toMatch(/\n {2}\.clock-line--in-bar\s*\{\s*display:\s*block;/);
     expect(css.match(/\.clock-line--in-bar/g)).toHaveLength(2);
   });
@@ -100,8 +105,7 @@ describe('School Clock hosting', () => {
 
   it("shrinks the short layout's digits by the room the cycle hint and the simulated-time banner take, so the stage stays clear of the top bar and the line clear of the sound prompt", () => {
     const css = readFileSync(resolve(clockDir, 'clock.css'), 'utf8');
-    const start = css.indexOf('@media (max-height: 520px) {');
-    const short = css.slice(start, css.slice(start).search(/\n\}\r?\n/) + start);
+    const short = shortLayout(css);
     // Both the short layout's digit sizes (with and without the sound prompt) give the room back.
     const sizes = [...short.matchAll(/--type-digits:\s*([^;]+);/g)].map((m) => m[1]);
     expect(sizes.filter((size) => /var\(--hint-room\)/.test(size) && /var\(--banner-room\)/.test(size))).toHaveLength(2);
@@ -112,8 +116,7 @@ describe('School Clock hosting', () => {
 
   it("lets the short layout's line use the full width while the sound prompt holds the window buttons in its row", () => {
     const css = readFileSync(resolve(clockDir, 'clock.css'), 'utf8');
-    const start = css.indexOf('@media (max-height: 520px) {');
-    const short = css.slice(start, css.slice(start).search(/\n\}\r?\n/) + start);
+    const short = shortLayout(css);
     expect(short).toMatch(/\.clock-screen:has\(> \.clock-bottom > \.clock-sound-prompt:not\(\[hidden\]\)\) :is\(\.clock-next, \.clock-line\)\s*\{\s*max-width:\s*none;/);
   });
 

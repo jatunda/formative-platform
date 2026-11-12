@@ -973,6 +973,10 @@ button.clock-readout__face:focus-visible {
     --type-digits: calc(34vh - var(--hint-room) - var(--banner-room));
   }
 
+  /* About the height each takes here, over the digits' 0.95 line height:
+     the hint pill below (12px text, 2px padding, its border and 4px margin)
+     and the banner (12px text, 2px padding, its border and the row gap).
+     check:clock's stage check catches them going stale. */
   .clock-screen:has(.clock-readout > .clock-cycle-hint:not([hidden])) {
     --hint-room: 30px;
   }
