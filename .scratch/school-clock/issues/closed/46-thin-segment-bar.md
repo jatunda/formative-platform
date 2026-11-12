@@ -14,12 +14,16 @@ Built behaviour: closed tickets 20 (Day Strip), 34 (end time on the current bloc
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** closed
 
-- [ ] Just this Segment, during a Segment, a Passing Period and Off-Hours: a thin solid fill bar, about 10 px, with no Segment name and no next-Segment name
-- [ ] The times at each end, the period end time (setting on) and the Off-Hours heading still show
-- [ ] Screen-reader text and the progress bar's name still say what it counts ("Period 3 progress", "Until Period 1, …")
-- [ ] Whole day and the phone agenda are unchanged; the edit-mode tap (ticket 42) still works on the thin bar
-- [ ] `npm run check:clock` at the default sizes, for period, passing, before and after school, looks right
-- [ ] Tests cover the view without the name
-- [ ] `npm run lint`, `npm run typecheck`, `npm run test:coverage` in `web/` pass
+- [x] Just this Segment, during a Segment, a Passing Period and Off-Hours: a thin solid fill bar, about 10 px, with no Segment name and no next-Segment name
+- [x] The times at each end, the period end time (setting on) and the Off-Hours heading still show
+- [x] Screen-reader text and the progress bar's name still say what it counts ("Period 3 progress", "Until Period 1, …")
+- [x] Whole day and the phone agenda are unchanged; the edit-mode tap (ticket 42) still works on the thin bar
+- [x] `npm run check:clock` at the default sizes, for period, passing, before and after school, looks right
+- [x] Tests cover the view without the name
+- [x] `npm run lint`, `npm run typecheck`, `npm run test:coverage` in `web/` pass
+
+## Comments
+
+Built: on Just this Segment the block draws no name text at all (no `.clock-bar__text`), and `clock.css` turns the track into a `max(10px, 1vh)` rounded bar on `--track`, filled in solid `--accent` up to `--done`, with no border, pattern or wash for any kind (Segment, Passing Period, countdown). The times at each end, the Off-Hours heading, the Now marker, the screen-reader text and the progressbar's name are as before. Whole day and the phone agenda are untouched. Checked with `npm run check:clock --settings '{"dayStrip":false}'` for period, passing, before and after at the default sizes (480x320 hides the bar, as before), and `--editing` at 1280x720.

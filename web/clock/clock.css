@@ -680,10 +680,6 @@ button.clock-readout__face:focus-visible {
   list-style: none;
 }
 
-.clock-bar--segment .clock-bar__track {
-  height: max(32px, 5.5vh);
-}
-
 .clock-bar__seg {
   position: absolute;
   top: 0;
@@ -708,17 +704,6 @@ button.clock-readout__face:focus-visible {
   padding: 0 0.6em;
 }
 
-.clock-bar--segment .clock-bar__text {
-  flex-direction: row;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 0.5em;
-}
-
-.clock-bar--segment .clock-bar__label::before {
-  content: "\00B7  ";
-}
-
 /* Breaks are hatched with a dashed edge, Assemblies dotted: pattern, not colour. */
 .clock-bar__seg[data-kind="break"] {
   background: repeating-linear-gradient(-45deg, var(--bg) 0 6px, var(--hatch) 6px 12px);
@@ -732,8 +717,7 @@ button.clock-readout__face:focus-visible {
 }
 
 /* On whole day a Passing Period is the gap between two blocks: no box of
-   its own and no time (the blocks either side show it). On just this
-   Segment it's a bordered block of its own. */
+   its own and no time (the blocks either side show it). */
 .clock-bar--day .clock-bar__seg[data-kind="passing"] {
   border: 0;
   background: transparent;
@@ -741,10 +725,6 @@ button.clock-readout__face:focus-visible {
 
 .clock-bar--day .clock-bar__seg[data-kind="passing"] .clock-bar__time {
   display: none;
-}
-
-.clock-bar--segment .clock-bar__seg[data-kind="passing"] {
-  background: var(--bg);
 }
 
 .clock-bar__name {
@@ -852,6 +832,24 @@ button.clock-readout__face:focus-visible {
     linear-gradient(var(--accent), var(--accent)) left bottom / var(--done, 0%) 5px no-repeat,
     linear-gradient(var(--track), var(--track)) left bottom / 100% 5px no-repeat,
     linear-gradient(to right, var(--accent-soft) var(--done, 0%), transparent var(--done, 0%));
+}
+
+/* Just this Segment is one thin solid bar, whatever the block (a Segment, a
+   Passing Period or the Off-Hours countdown): no box, no pattern and no name
+   (the stage already names it), only the elapsed part in solid accent. */
+.clock-bar--segment .clock-bar__track {
+  height: max(10px, 1vh);
+}
+
+.clock-bar--segment .clock-bar__seg,
+.clock-bar--segment .clock-bar__seg[data-state="now"] {
+  border: 0;
+  border-radius: 999px;
+  background: var(--track);
+}
+
+.clock-bar--segment .clock-bar__fill {
+  background: linear-gradient(var(--accent), var(--accent)) left / var(--done, 0%) 100% no-repeat;
 }
 
 /* The Now marker: a thin notch above the track, so it never crosses text. */
