@@ -218,6 +218,27 @@ describe('School Clock settings drawer', () => {
       expect(currentTime()).toBe('10:30–11:15');
     });
 
+    it('Show when this Period ends: the line under the Readouts says when the Segment ends, and the hint says so', () => {
+      open({ when: at(10, 39) });
+      const name = 'Show when this Period ends';
+      const hint = document.getElementById(field(name).getAttribute('aria-describedby')).textContent;
+      expect(hint).toMatch(/under the clock/);
+      expect(hint).toMatch(/bar along the bottom/);
+      const line = () => mount().querySelector('.clock-stage .clock-next');
+      expect(line()).toBeNull();
+
+      toggle(name);
+
+      expect(line().textContent.replace(/\s+/g, ' ').trim()).toBe('Ends 11:15 AM');
+      expect(line().querySelector('.clock-next__label').textContent).toBe('Ends');
+      expect(line().querySelector('.clock-next__at').textContent).toBe('11:15 AM');
+      toggle('24-hour time');
+      expect(line().textContent.replace(/\s+/g, ' ').trim()).toBe('Ends 11:15');
+
+      toggle(name);
+      expect(line()).toBeNull();
+    });
+
     it('Bells: a switch, kept in step with the top bar Bells button', () => {
       open();
       expect(field('Bells').getAttribute('role')).toBe('switch');

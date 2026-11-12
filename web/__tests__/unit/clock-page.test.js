@@ -110,6 +110,20 @@ describe('School Clock page', () => {
     expect(displayText()).toContain('Up next Period 3 10:30 AM');
   });
 
+  it('says when the current Segment ends under the Readouts, with Show when this Period ends on', () => {
+    const real = fakeRealClock(new Date(2026, 9, 27, 13, 0, 0));
+    app = start({ realNow: real.now, settings: { showPeriodEnd: true } });
+
+    expect(headingText()).toBe('Lunch');
+    expect(displayText()).toContain('Ends 1:30 PM');
+
+    // Into the Passing Period after it, the line is Up next again.
+    real.advance(31 * 60 * 1000);
+    expect(headingText()).toBe('Passing Period');
+    expect(displayText()).toContain('Up next Period 6 1:35 PM');
+    expect(displayText()).not.toContain('Ends');
+  });
+
   it('counts up from the start of a Passing Period when the Readout is tapped', () => {
     const real = fakeRealClock(new Date(2026, 9, 27, 10, 27, 20));
     app = start({ realNow: real.now });
