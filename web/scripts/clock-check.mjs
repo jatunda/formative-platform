@@ -145,7 +145,11 @@ try {
         await page.getByRole('button', { name: 'Timer', exact: true }).click();
         await page.locator('.clock-preset').first().click();
       }
-      if (opts.editing) await page.getByRole('button', { name: 'Readouts', exact: true }).click();
+      if (opts.editing) {
+        // Time-only states (weekend, summer, ...) hide the Readouts button: nothing to edit there.
+        const readouts = page.getByRole('button', { name: 'Readouts', exact: true });
+        if (await readouts.isVisible()) await readouts.click();
+      }
       await page.waitForTimeout(400);
       const scroll = await page.evaluate(() => ({
         x: document.documentElement.scrollWidth > innerWidth,
