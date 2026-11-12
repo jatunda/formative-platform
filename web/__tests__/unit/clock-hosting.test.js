@@ -114,6 +114,18 @@ describe('School Clock hosting', () => {
     expect(short).toMatch(/\.clock-screen\.is-simulated\s*\{\s*--banner-room:\s*\d+px;/);
   });
 
+  it("draws the small Readouts' dividers only between Readouts, so no layout's divider rule reaches the Add slot's dashed outline", () => {
+    for (const sheet of ['clock.css', 'timer.css']) {
+      const rules = readFileSync(resolve(clockDir, sheet), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+      // A rule on any later child of the row (`* + *`) also styles the Add slot that follows the Readouts.
+      expect(rules, sheet).not.toMatch(/\.clock-smalls\s*>\s*\*\s*\+\s*\*/);
+      // And the Add slot needs no rule of its own to put its outline's left side back.
+      expect(rules, sheet).not.toMatch(/\.clock-smalls\s*>\s*\.clock-readout-add/);
+    }
+    const css = readFileSync(resolve(clockDir, 'clock.css'), 'utf8');
+    expect(css).toMatch(/(^|\n)\.clock-smalls > \.clock-readout \+ \.clock-readout\s*\{\s*border-left:\s*1px solid var\(--line-soft\);/);
+  });
+
   it("lets the short layout's line use the full width while the sound prompt holds the window buttons in its row", () => {
     const css = readFileSync(resolve(clockDir, 'clock.css'), 'utf8');
     const short = shortLayout(css);

@@ -392,7 +392,8 @@ button.clock-readout__face:focus-visible {
 }
 
 /* Below (the default): small Readouts in one centred row under the big one,
-   with hairline dividers. The row keeps a wide gap above it, so the big
+   with hairline dividers between Readouts (never on edit mode's Add slot,
+   whose own dashed outline would lose its left side). The row keeps a wide gap above it, so the big
    Readout's caption reads as its own and not as a label for the row. */
 .clock-readouts {
   display: flex;
@@ -407,7 +408,7 @@ button.clock-readout__face:focus-visible {
   margin-top: var(--gap-lg);
 }
 
-.clock-smalls > * + * {
+.clock-smalls > .clock-readout + .clock-readout {
   border-left: 1px solid var(--line-soft);
   padding-left: clamp(16px, 4vw, 80px);
 }
@@ -430,7 +431,7 @@ button.clock-readout__face:focus-visible {
     border-left: 1px solid var(--line-soft);
   }
 
-  .clock-readouts.has-smalls .clock-smalls > * + * {
+  .clock-readouts.has-smalls .clock-smalls > .clock-readout + .clock-readout {
     border-left: 0;
     padding-left: 0;
   }
@@ -509,10 +510,6 @@ button.clock-readout__face:focus-visible {
 .clock-readout-add .clock-icon {
   width: 1.8em;
   height: 1.8em;
-}
-
-.clock-smalls > .clock-readout-add {
-  border-left: 1.5px dashed var(--line);
 }
 
 /* While editing, the big Readout steps down to make room for the buttons;
@@ -1061,7 +1058,7 @@ button.clock-readout__face:focus-visible {
     margin-top: 0;
   }
 
-  .is-editing .clock-smalls > * + * {
+  .is-editing .clock-smalls > .clock-readout + .clock-readout {
     padding-left: 12px;
   }
 
@@ -1129,7 +1126,7 @@ button.clock-readout__face:focus-visible {
     gap: 16px;
   }
 
-  .clock-smalls > * + * {
+  .clock-smalls > .clock-readout + .clock-readout {
     padding-left: 16px;
   }
 

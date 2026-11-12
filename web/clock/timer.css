@@ -60,7 +60,7 @@
   border-left: 0;
 }
 
-.clock-readouts.has-timer .clock-smalls > * + * {
+.clock-readouts.has-timer .clock-smalls > .clock-readout + .clock-readout {
   border-left: 0;
   padding-left: 0;
 }
