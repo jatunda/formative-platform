@@ -54,13 +54,12 @@ try {
     while (next < tasks.length) {
       const { run, size } = tasks[next++];
       const opts = {
-        states: run.states.map((name) => ({ name, query: DEFAULT_STATES[name] })),
-        division: 'HS', settings: {}, layout: run.layout, timer: run.timer, editing: run.editing,
-        soundOn: run.soundOn, bars: 0, axe: true, shots: /** @type {const} */ ('failures'),
+        ...run.config, states: run.states.map((name) => ({ name, query: DEFAULT_STATES[name] })),
+        division: 'HS', settings: {}, bars: 0, axe: true, shots: /** @type {const} */ ('failures'),
       };
       const checked = await check.checkSize(opts, size, { outDir, prefix: `${run.name}-` });
       for (const r of checked) {
-        const render = { run: run.name, layout: run.layout, editing: run.editing, timer: run.timer, soundOn: run.soundOn, ...r };
+        const render = { run: run.name, config: run.config, ...r };
         results.push({ ...render, ...classify(render) });
       }
     }

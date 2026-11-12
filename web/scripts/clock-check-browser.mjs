@@ -16,11 +16,10 @@ export const webDir = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const axeSource = createRequire(import.meta.url).resolve('axe-core/axe.min.js');
 
 /**
- * @typedef {{ states: { name: string, query: string }[], division: string, settings: object,
- *   layout: string | null, timer: boolean, editing: boolean, soundOn: boolean, bars: number,
- *   axe: boolean, shots: boolean | 'failures' }} CheckOptions
- * `layout` is the Readouts' modes, big one first (e.g. 'countdown,clock'), or
- * null for a new tab's own; `shots: 'failures'` saves only failing renders.
+ * @typedef {import('./clock-check-matrix.js').Config & { states: { name: string, query: string }[],
+ *   division: string, settings: object, bars: number, axe: boolean, shots: boolean | 'failures' }} CheckOptions
+ * The Config (e.g. layout 'countdown,clock') plus how to check it;
+ * `shots: 'failures'` saves only failing renders.
  */
 
 /** Starts the server; browsers launch on first use (sound-on needs its own). */

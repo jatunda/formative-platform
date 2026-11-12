@@ -26,11 +26,12 @@ export const SHORT_PHONES = ['375x667', '360x740'];
 const LAYOUTS = [[null, '1r'], ['countdown,clock', '2r'], ['countdown,clock,countup', '3r']];
 
 /**
- * @typedef {{ name: string, layout: string | null, editing: boolean, timer: boolean, soundOn: boolean,
- *   states: string[], sizes: string[] }} Run
- * One clock-check pass: these options, every state at every size.
- * @typedef {{ layout: string | null, editing: boolean, timer: boolean, soundOn: boolean,
- *   state: string, size: string }} Render
+ * @typedef {{ layout: string | null, editing: boolean, timer: boolean, soundOn: boolean }} Config
+ * What a render shows besides its state and size: the Readouts' modes, big one
+ * first (null for a new tab's one), edit mode, the timer, sound already on.
+ * @typedef {{ name: string, config: Config, states: string[], sizes: string[] }} Run
+ * One clock-check pass: this config, every state at every size.
+ * @typedef {{ config: Config, state: string, size: string }} Render
  */
 
 /**
@@ -52,20 +53,20 @@ export function fullMatrix() {
       for (const editing of [false, true]) {
         for (const timer of [false, true]) {
           const name = `${label}${editing ? '-edit' : ''}${timer ? '-timer' : ''}${sound}`;
-          runs.push({ name, layout, editing, timer, soundOn, states, sizes });
+          runs.push({ name, config: { layout, editing, timer, soundOn }, states, sizes });
         }
       }
     }
-    runs.push({ name: `time-only${sound}`, layout: null, editing: false, timer: false, soundOn, states: ['unknown'], sizes });
+    runs.push({ name: `time-only${sound}`, config: { layout: null, editing: false, timer: false, soundOn }, states: ['unknown'], sizes });
   }
   return runs;
 }
 
 /**
- * @typedef {{ layouts?: (string | null)[], editing?: boolean, timer?: boolean, soundOn?: boolean,
- *   states?: string[], sizes?: string[] }} Match
- * Which renders a known failure covers: each named field must match, and a
- * field left out matches any value.
+ * @typedef {Partial<Omit<Config, 'layout'>> & { layouts?: (string | null)[], states?: string[], sizes?: string[] }} Match
+ * Which renders a known failure covers: each named field must match (a
+ * Config's flag, or one of a list of layouts, states or sizes), and a field
+ * left out matches any value.
  * @typedef {{ ticket: number, match: Match }} KnownFailure
  */
 
@@ -94,17 +95,18 @@ export const KNOWN_FAILURES = [
   { ticket: 53, match: { sizes: ['480x320'], editing: false, timer: true, soundOn: true, layouts: [null], states: ['summer'] } },
 ];
 
+/** A Config's on/off fields, which a Match names as is. @type {('editing' | 'timer' | 'soundOn')[]} */
+const FLAGS = ['editing', 'timer', 'soundOn'];
+
 /**
  * Whether `match` covers `render`.
  * @param {Render} render @param {Match} match
  */
-function covers(render, match) {
-  return (match.layouts === undefined || match.layouts.includes(render.layout))
-    && (match.editing === undefined || match.editing === render.editing)
-    && (match.timer === undefined || match.timer === render.timer)
-    && (match.soundOn === undefined || match.soundOn === render.soundOn)
-    && (match.states === undefined || match.states.includes(render.state))
-    && (match.sizes === undefined || match.sizes.includes(render.size));
+function covers({ config, state, size }, match) {
+  return (match.layouts === undefined || match.layouts.includes(config.layout))
+    && FLAGS.every((flag) => match[flag] === undefined || match[flag] === config[flag])
+    && (match.states === undefined || match.states.includes(state))
+    && (match.sizes === undefined || match.sizes.includes(size));
 }
 
 /**

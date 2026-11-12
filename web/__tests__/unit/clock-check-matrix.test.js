@@ -1,23 +1,26 @@
 import { describe, it, expect } from 'vitest';
 import { fullMatrix, describeFailure, classify, KNOWN_FAILURES, parseFullArgs, fullRunFailed } from '../../scripts/clock-check-matrix.js';
 
+/** One string per config, so configs (and renders) compare by value. */
+const keyOf = ({ layout, editing, timer, soundOn }) => `${layout}|${editing}|${timer}|${soundOn}`;
+
 describe('fullMatrix', () => {
   const runs = fullMatrix();
-  const renders = runs.flatMap((run) => run.states.flatMap((state) => run.sizes.map((size) => ({ ...run, state, size }))));
+  const renders = runs.flatMap((run) => run.states.flatMap((state) => run.sizes.map((size) => ({ config: run.config, state, size }))));
 
   it('crosses one, two and three Readouts with edit mode, the timer and the sound prompt', () => {
-    const configs = new Set(runs.map((r) => `${r.layout}|${r.editing}|${r.timer}|${r.soundOn}`));
+    const configs = new Set(runs.map((r) => keyOf(r.config)));
     for (const layout of [null, 'countdown,clock', 'countdown,clock,countup']) {
       for (const editing of [false, true]) {
         for (const timer of [false, true]) {
-          for (const soundOn of [false, true]) expect(configs.has(`${layout}|${editing}|${timer}|${soundOn}`)).toBe(true);
+          for (const soundOn of [false, true]) expect(configs.has(keyOf({ layout, editing, timer, soundOn }))).toBe(true);
         }
       }
     }
   });
 
   it('checks every school state at the default sizes and the two short phones', () => {
-    const period = renders.filter((r) => r.state === 'period' && r.layout === null && !r.editing && !r.timer && !r.soundOn);
+    const period = renders.filter((r) => r.state === 'period' && keyOf(r.config) === keyOf({ layout: null, editing: false, timer: false, soundOn: false }));
     expect(period.map((r) => r.size).sort()).toEqual(
       ['1280x720', '1440x900', '1920x1080', '360x740', '375x667', '390x844', '480x320'],
     );
@@ -26,11 +29,11 @@ describe('fullMatrix', () => {
   it('checks the unknown date (time only) once per sound setting and size, since it shows no layout, edit mode or timer', () => {
     const unknown = renders.filter((r) => r.state === 'unknown');
     expect(unknown).toHaveLength(2 * 7);
-    expect(new Set(unknown.map((r) => r.soundOn))).toEqual(new Set([false, true]));
+    expect(new Set(unknown.map((r) => r.config.soundOn))).toEqual(new Set([false, true]));
   });
 
   it('never checks the same render twice', () => {
-    const keys = renders.map((r) => `${r.layout}|${r.editing}|${r.timer}|${r.soundOn}|${r.state}|${r.size}`);
+    const keys = renders.map((r) => `${keyOf(r.config)}|${r.state}|${r.size}`);
     expect(new Set(keys).size).toBe(keys.length);
     expect(renders).toHaveLength(10 * 24 * 7 + 14);
   });
@@ -68,7 +71,8 @@ describe('describeFailure', () => {
 });
 
 describe('classify', () => {
-  const render = { layout: 'countdown,clock', editing: true, timer: false, soundOn: false, state: 'period', size: '375x667' };
+  const config = { layout: 'countdown,clock', editing: true, timer: false, soundOn: false };
+  const render = { config, state: 'period', size: '375x667' };
   const known = [{ ticket: 52, match: { editing: true, sizes: ['375x667'], states: ['period', 'before'] } }];
 
   it('passes a clean render nobody expects to fail', () => {
@@ -84,17 +88,19 @@ describe('classify', () => {
   });
 
   it('reports any other failure as unexpected', () => {
-    expect(classify({ ...render, editing: false, ok: false }, known)).toEqual({ outcome: 'unexpected' });
+    expect(classify({ ...render, config: { ...config, editing: false }, ok: false }, known)).toEqual({ outcome: 'unexpected' });
     expect(classify({ ...render, state: 'after', ok: false }, known)).toEqual({ outcome: 'unexpected' });
   });
 
   it('matches every field a known failure names, and any value of the ones it leaves out', () => {
     const exact = [{ ticket: 52, match: { layouts: ['countdown,clock,countup'], editing: false, timer: false, soundOn: false, states: ['before'], sizes: ['375x667'] } }];
-    const three = { layout: 'countdown,clock,countup', editing: false, timer: false, soundOn: false, state: 'before', size: '375x667' };
-    expect(classify({ ...three, ok: false }, exact).outcome).toBe('known');
-    expect(classify({ ...three, layout: null, ok: false }, exact).outcome).toBe('unexpected');
-    expect(classify({ ...three, timer: true, ok: false }, exact).outcome).toBe('unexpected');
-    expect(classify({ ...three, soundOn: true, ok: false }, exact).outcome).toBe('unexpected');
+    const three = { layout: 'countdown,clock,countup', editing: false, timer: false, soundOn: false };
+    const at = (change) => ({ config: { ...three, ...change }, state: 'before', size: '375x667', ok: false });
+    expect(classify(at({}), exact).outcome).toBe('known');
+    expect(classify(at({ layout: null }), exact).outcome).toBe('unexpected');
+    expect(classify(at({ editing: true }), exact).outcome).toBe('unexpected');
+    expect(classify(at({ timer: true }), exact).outcome).toBe('unexpected');
+    expect(classify(at({ soundOn: true }), exact).outcome).toBe('unexpected');
   });
 });
 
