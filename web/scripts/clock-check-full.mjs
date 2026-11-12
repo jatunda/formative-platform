@@ -2,23 +2,16 @@
 // Runs the School Clock's browser check (clock-check.mjs, which lists the
 // checks) across the whole layout matrix, where layout bugs have hidden:
 //
-//   npm run check:clock:full               the matrix below, 6 pages at a time
+//   npm run check:clock:full               the whole matrix, 6 pages at a time
 //   npm run check:clock:full -- --jobs 3   fewer at a time (a slower machine)
 //
-// The matrix (fullMatrix() in clock-check-matrix.js, its one home):
-//   Readouts: one (a new tab's own), two (countdown,clock), three (countdown,clock,countup)
-//   × edit mode off and on × the timer in the big spot or not
-//   × the sound prompt showing or sound already on
-//   × every default state × the default sizes plus the short phones 375x667 and 360x740
-// Pruned: the date outside every School Year ("unknown") shows only the time,
-// with no Readouts button, layout or timer, so it runs once per sound setting
-// and size rather than under each layout, edit mode and timer (renders that
-// can't differ). That leaves 10 states × 24 runs × 7 sizes + 14 = 1694 renders.
+// The matrix, and why it's pruned where it is, is fullMatrix() in
+// clock-check-matrix.js.
 //
 // Failures already ticketed (KNOWN_FAILURES in clock-check-matrix.js) report as
 // "known (ticket NN)" and don't fail the run; one that starts passing does (so
 // the list can't go stale: remove its entry). Prints one summary and exits 1
-// on any unexpected or stale result. Screenshots of failing renders (named
+// on any unexpected or stale result, or when it checked no renders. Screenshots of failing renders (named
 // run-state-size.png) and report.json go to .clock-check/ (gitignored).
 //
 // It starts its own Vite server and browsers and always stops them on exit,

@@ -30,9 +30,8 @@
 // It starts its own Vite server on 127.0.0.1 (a free port) and always stops it
 // and the browser on exit, including Ctrl-C, so nothing is left running.
 //
-// For the whole layout matrix (Readouts × edit mode × timer × sound prompt ×
-// sizes, with ticketed failures known), run `npm run check:clock:full`
-// (scripts/clock-check-full.mjs).
+// For the whole layout matrix (fullMatrix() in clock-check-matrix.js), run
+// `npm run check:clock:full` (scripts/clock-check-full.mjs).
 import { startClockCheck, outDir, resetOutDir, report } from './clock-check-browser.mjs';
 import { DEFAULT_STATES, DEFAULT_SIZES, describeFailure } from './clock-check-matrix.js';
 
