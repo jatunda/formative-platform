@@ -6,7 +6,7 @@
 // and how Alarms ring is the clock model's (`ringsInWindow`); this only edits
 // the saved list.
 import { ALARM_PERIODS, BLOCK_DAYS, DEFAULT_ALARM_PERIODS } from './clock-settings.js';
-import { drawerSection, fieldset, soundChoice, switchControl } from './controls.js';
+import { drawerSection, fieldset, segmented, soundChoice, switchControl } from './controls.js';
 import { el } from './dom.js';
 import { formatSegmentName } from './format.js';
 import { icon } from './icons.js';
@@ -24,25 +24,6 @@ const TOAST_MS = 6000;
 const ANCHORS = [['start', 'From the start'], ['end', 'Before the end'], ['halfway', 'Halfway']];
 /** The words after the minutes field, by where it rings ('' has no minutes). @type {Record<string, string>} */
 const MINUTES_WORDS = { start: 'minutes from the start', end: 'minutes before the end', halfway: '' };
-
-/**
- * Radios shown as a segmented control. @param {string} name @param {string} groupLabel
- * @param {[string, string][]} options value and words @param {string} chosen @param {() => void} [onChange]
- */
-function segmented(name, groupLabel, options, chosen, onChange) {
-  const inputs = options.map(([value, words]) => {
-    const input = el('input', { type: 'radio', name, value, checked: value === chosen, onchange: onChange });
-    return { input, label: el('label', { className: 'clock-segment' }, [input, el('span', { textContent: words })]) };
-  });
-  const group = el('div', { className: 'clock-segmented', role: 'radiogroup', 'aria-label': groupLabel },
-    inputs.map(({ label }) => label));
-  return {
-    group,
-    value: () => inputs.find(({ input }) => input.checked)?.input.value,
-    /** @param {string} value */
-    choose: (value) => { for (const { input } of inputs) input.checked = input.value === value; },
-  };
-}
 
 /** A checkbox with its words beside it. @param {string} words @param {boolean} checked */
 function check(words, checked) {

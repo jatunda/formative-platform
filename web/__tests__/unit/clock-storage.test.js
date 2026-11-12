@@ -127,7 +127,7 @@ describe('clock settings store', () => {
     });
   });
 
-  it('loads a save from before "Show when this Segment ends" with it off', () => {
+  it('loads a save from before "Show period end time" with it off', () => {
     expect(storeHolding({ division: 'HS', showSeconds: false, dayStrip: true }).load().showPeriodEnd).toBe(false);
   });
 

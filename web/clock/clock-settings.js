@@ -107,7 +107,7 @@
  *   last minute and the timer always do).
  * - `dayStrip`: the bar along the bottom shows the whole day (true) or just
  *   this Segment (false). See `day-bar.js`.
- * - `showPeriodEnd`: "Show when this Segment ends" (any Segment, not just a
+ * - `showPeriodEnd`: "Show period end time" (any Segment, not just a
  *   Period; the saved key keeps its first name). On whole day, the current
  *   Segment's block shows its end time beside its start ("10:25–11:15"), where
  *   it fits, and the line under the Readouts says it too; off by default.

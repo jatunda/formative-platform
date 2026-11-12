@@ -17,8 +17,9 @@ const words = (node) => node.textContent.replace(/\s+/g, ' ').trim();
 /** Each block's hidden text, as a screen reader hears the bar. */
 const heard = () => [...bar().querySelectorAll('.clock-bar__track > li .visually-hidden')].map(words);
 const progress = () => bar().querySelector('[role="progressbar"]');
-const radio = (name) =>
-  [...mount().querySelectorAll('label')].find((l) => l.textContent.trim() === name).querySelector('input');
+/** A radio of the Bottom bar choice in Settings → Time. */
+const radio = (name) => [...mount().querySelectorAll('#clock-settings-time label')]
+  .find((l) => l.textContent.trim() === name).querySelector('input');
 const choose = (name) => {
   const input = radio(name);
   input.checked = true;
@@ -171,7 +172,7 @@ describe('School Clock bar', () => {
     });
   });
 
-  describe('Show when this Segment ends', () => {
+  describe('Show period end time', () => {
     const times = () => [...bar().querySelectorAll('.clock-bar__time')].map(words);
     const agendaTimes = () => [...bar().querySelectorAll('.clock-agenda__time')].map(words);
 
@@ -284,7 +285,7 @@ describe('School Clock bar', () => {
       return button && isShown(button) ? button : null;
     };
 
-    it('a tap anywhere on the bar switches whole day and just this Segment, saves it, and the Look sheet shows it', () => {
+    it('a tap anywhere on the bar switches whole day and just this Segment, saves it, and Settings shows it', () => {
       open({ when: at(10, 39) });
       edit();
       bar().querySelector('.clock-bar__track li').click();
