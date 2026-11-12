@@ -33,6 +33,12 @@ export const SOUND_NAMES = Object.freeze({
   digitalAlarm: 'Digital alarm clock',
   twinBell: 'Twin-bell alarm clock',
   klaxon: "Ship's klaxon",
+  singingBowl: 'Singing bowl',
+  musicBox: 'Music box',
+  sparkle: 'Sparkle',
+  cuckoo: 'Cuckoo clock',
+  bubblePops: 'Bubble pops',
+  taDa: 'Ta-da',
   beep: 'Beep',
   buzzer: 'Buzzer',
 });
@@ -209,7 +215,9 @@ const MARIMBA_BAR = /** @type {[number, number, number][]} */ ([[1, 0.38, 0.5], 
 // deliberately harsh, for an Alarm nobody can miss, but keep to the same
 // range. None may sound like a fire alarm or an emergency siren (a rising-
 // and-falling wail, or a horn in threes): on a school projector that could
-// start a real panic.
+// start a real panic. The calm and cute voices (Singing bowl, Music box,
+// Sparkle, Cuckoo clock, Bubble pops, Ta-da) are named for how they sound,
+// never for who they're for, as Themes are.
 /** @type {Record<SoundName, Voice>} */
 const VOICES = {
   // A soft pad: an open A-major chord that fades in over a second and out over
@@ -456,6 +464,82 @@ const VOICES = {
       });
     }
     return 2;
+  },
+  // Singing bowl: one struck meditation bowl. A low-mid note and two partials
+  // that sit between harmonics, as on real metal, each two sines under a
+  // hertz apart so they beat slowly ("wah-wah"), dying away over 6 s. Once per
+  // Bell; on repeat, a quiet breath before the next strike.
+  singingBowl(ctx, out, t, track) {
+    for (const [ratio, peak, length] of [[1, 0.22, 6], [2.71, 0.1, 4], [5.2, 0.04, 2.5]]) {
+      for (const detune of [-0.4, 0.4]) tone(ctx, out, track, { freq: 420 * ratio + detune, t, length, peak, attack: 0.02 });
+    }
+    return 7.5;
+  },
+  // Music box: the first line of "Twinkle, Twinkle, Little Star" (the
+  // 18th-century French tune "Ah! vous dirai-je, maman", public domain) on
+  // plucked metal tines: each note a sine, a quieter twin a hair sharp, and a
+  // short partial three times up. Once per Bell, then a gap.
+  musicBox(ctx, out, t, track) {
+    const [C, D, E, F, G, A] = [523.25, 587.33, 659.25, 698.46, 783.99, 880];
+    const BEAT = 0.3;
+    [C, C, G, G, A, A, G, F, F, E, E, D, D, C].forEach((freq, i) => {
+      // The seventh note is held a beat longer, ending the line's first half.
+      const at = t + (i + (i > 6 ? 1 : 0)) * BEAT;
+      const length = i === 13 ? 1.6 : 1;
+      tone(ctx, out, track, { freq, t: at, length, peak: 0.3, attack: 0.005 });
+      tone(ctx, out, track, { freq: freq + 1.2, t: at, length, peak: 0.12, attack: 0.005 });
+      tone(ctx, out, track, { freq: freq * 3, t: at, length: 0.25, peak: 0.05, attack: 0.005 });
+    });
+    return 7.5;
+  },
+  // Sparkle: fairy dust. Ten high, pure bell notes (E6 to E7, a pentatonic
+  // scale) skipping about rather than walking up, each ringing into the next
+  // and a twin a few hertz off so they shimmer, quieter and quieter. Twice per
+  // Bell.
+  sparkle(ctx, out, t, track) {
+    const [e6, g6, a6, c7, d7, e7] = [1318.51, 1567.98, 1760, 2093, 2349.32, 2637.02];
+    [c7, e6, a6, d7, g6, e7, a6, c7, e6, g6].forEach((freq, i) => {
+      const at = t + i * 0.08;
+      const peak = 0.2 * 0.82 ** i;
+      tone(ctx, out, track, { freq, t: at, length: 0.9, peak, attack: 0.004 });
+      tone(ctx, out, track, { freq: freq + 3, t: at, length: 0.9, peak: peak / 2, attack: 0.004 });
+    });
+    return 2.5;
+  },
+  // Cuckoo clock: "cuck-oo", a falling minor third (F#5 to D#5) on a soft,
+  // hollow tone, a triangle wave through a low-pass filter, breathed in
+  // rather than struck. Three calls, then a long quiet gap, so a Bell plays
+  // the three once.
+  cuckoo(ctx, out, t, track) {
+    const filter = { from: 2000, to: 1400, over: 0.4, q: 0.5 };
+    for (const at of [t, t + 0.85, t + 1.7]) {
+      tone(ctx, out, track, { type: 'triangle', freq: 739.99, t: at, length: 0.16, peak: 0.35, attack: 0.03, filter });
+      tone(ctx, out, track, { type: 'triangle', freq: 622.25, t: at + 0.2, length: 0.4, peak: 0.35, attack: 0.03, filter });
+    }
+    return 5.5;
+  },
+  // Bubble pops: five quick, soft bloops, each a sine gliding up fast (as a
+  // bubble does when it pops), each pop higher than the last, in an uneven,
+  // bubbly rhythm. Four times per Bell.
+  bubblePops(ctx, out, t, track) {
+    [[0, 480], [0.13, 600], [0.22, 760], [0.38, 950], [0.47, 1200]].forEach(([offset, freq]) => {
+      tone(ctx, out, track, { freq, bendTo: freq * 1.9, t: t + offset, length: 0.06, peak: 0.3, attack: 0.005 });
+    });
+    return 1.5;
+  },
+  // Ta-da: a cheerful xylophone flourish (G, A, B, quick) up to a bright
+  // C-major chord. Each bar a struck sine and its partial three times up
+  // (a xylophone's tuning), left out where it would go over 3 kHz. Twice per
+  // Bell.
+  taDa(ctx, out, t, track) {
+    /** @param {number} freq @param {number} at @param {number} length */
+    const bar = (freq, at, length) => {
+      tone(ctx, out, track, { freq, t: at, length, peak: 0.25, attack: 0.004 });
+      if (freq * 3 <= 3000) tone(ctx, out, track, { freq: freq * 3, t: at, length: length / 4, peak: 0.06, attack: 0.004 });
+    };
+    [783.99, 880, 987.77].forEach((freq, i) => bar(freq, t + i * 0.07, 0.35));
+    for (const freq of [523.25, 783.99, 1046.5, 1318.51]) bar(freq, t + 0.3, 1.2);
+    return 2.5;
   },
   // Beep-beep.
   beep(ctx, out, t, track) {

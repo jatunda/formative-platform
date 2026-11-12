@@ -88,6 +88,14 @@ describe('clock settings store', () => {
     expect(createSettingsStore(storage).load()).toMatchObject({ bells, alarms, timerSound: 'klaxon' });
   });
 
+  it('round-trips the calm, cute and sparkly voices', () => {
+    const storage = createFakeStorage();
+    const bells = { on: true, sound: 'singingBowl', assemblyEnds: false, untilDismissed: false };
+    const alarms = ['musicBox', 'sparkle', 'cuckoo', 'bubblePops'].map((sound, i) => ({ ...(i % 2 ? periodAlarm : clockAlarm), id: `a${i}`, sound }));
+    createSettingsStore(storage).save({ ...DEFAULT_SETTINGS, bells, alarms, timerSound: 'taDa' });
+    expect(createSettingsStore(storage).load()).toMatchObject({ bells, alarms, timerSound: 'taDa' });
+  });
+
   it('starts with seconds on, the Day Strip on without the current end time, and the dark default theme in its own version, with no swaps', () => {
     expect(DEFAULT_SETTINGS).toMatchObject({
       showSeconds: true, dayStrip: true, showPeriodEnd: false, theme: 'slate', fontSwap: null, paletteSwap: null, flipped: false,
