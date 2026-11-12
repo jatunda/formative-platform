@@ -8,8 +8,8 @@ Why: halves the test time in CI and changes nothing else. From the 2026-11-12 re
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** closed
 
-- [ ] The `test` job runs the suite once, through `npm run test:coverage`
-- [ ] Lint, typecheck, the coverage upload and the `functions` job are unchanged
-- [ ] The workflow is still valid YAML (e.g. parse it); if it's pushed, CI goes green
+- [x] The `test` job runs the suite once, through `npm run test:coverage`
+- [x] Lint, typecheck, the coverage upload and the `functions` job are unchanged
+- [x] The workflow is still valid YAML (e.g. parse it); if it's pushed, CI goes green

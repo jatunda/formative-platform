@@ -38,6 +38,10 @@ npm test
 
 It must exit clean. Request handling lives in `functions/preview-handler.js` as pure functions tested with an injected fake fetch; keep `index.js` a thin Cloud Functions adapter. What deploys is the esbuild bundle of `index.js` (`functions/bundle.js` → `functions/dist/index.js`, built by the `firebase.json` predeploy hook); `test/bundle.test.js` builds it and checks it answers like the source. Never deploy as part of a change.
 
+## Merging a ticket branch
+
+To merge a ticket branch into an integration branch, run `scripts/merge-ticket.sh <branch>` from the integration branch's checkout: it merges, runs the checks above only when the merge brought in something new, and reports in a few lines (behaviour in its header).
+
 ## Agent skills
 
 ### Issue tracker
