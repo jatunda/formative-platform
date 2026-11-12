@@ -27,8 +27,9 @@ export const SOUND_NAMES = Object.freeze({
   levelUp: 'Level up',
   clapPattern: 'Clap pattern',
   // The gentle bell, saved as `schoolBell` until the loud hallway bell took
-  // that name (clock-storage.js loads the old key as this one).
-  softBell: 'Soft bell',
+  // that name (clock-storage.js loads the old key as this one), and shown as
+  // "Soft bell" until ticket 51.
+  softBell: 'School bell (softer)',
   hallwayBell: 'School bell',
   digitalAlarm: 'Digital alarm clock',
   twinBell: 'Twin-bell alarm clock',
@@ -169,11 +170,16 @@ function strike(ctx, out, track, freq, t, partials) {
  * each one sine, or two `detune` Hz either side so they beat.
  * @param {BaseAudioContext} ctx @param {AudioNode} out @param {Track} track
  * @param {{ t: number, rate: number, ring: number, offset?: number, hit: number, rise: number, rest: number,
- *   tail: number, level: number, partials: number[][], detune?: number }} bell
+ *   tail: number, level: number, partials: number[][], detune?: number,
+ *   clatter?: { freq: number, q: number, mix: number } }} bell
  *   `offset`: every strike lands that fraction of a strike late (the second of
- *   two bells struck in turn).
+ *   two bells struck in turn). `clatter` adds noise band-passed around `freq`
+ *   Hz (and capped under 3 kHz), `mix` times `level`, through the same
+ *   clapper, so every strike clangs as well as rings.
  */
-function rattlingBell(ctx, out, track, { t, rate, ring, offset = 0, hit, rise, rest, tail, level, partials, detune = 0 }) {
+function rattlingBell(ctx, out, track, {
+  t, rate, ring, offset = 0, hit, rise, rest, tail, level, partials, detune = 0, clatter,
+}) {
   const clapper = ctx.createGain();
   clapper.connect(out);
   clapper.gain.setValueAtTime(0.0001, t);
@@ -187,6 +193,25 @@ function rattlingBell(ctx, out, track, { t, rate, ring, offset = 0, hit, rise, r
     for (const f of detune ? [freq - detune, freq + detune] : [freq]) {
       tone(ctx, clapper, track, { freq: f, t, length: ring + tail, peak: mix * level, envelope: 'steady' });
     }
+  }
+  if (clatter) {
+    const source = ctx.createBufferSource();
+    const band = ctx.createBiquadFilter();
+    const cap = ctx.createBiquadFilter();
+    const mix = ctx.createGain();
+    source.buffer = noiseBuffer(ctx, 1);
+    source.loop = true;
+    band.type = 'bandpass';
+    band.frequency.value = clatter.freq;
+    band.Q.value = clatter.q;
+    cap.type = 'lowpass';
+    cap.frequency.value = 2800;
+    mix.gain.value = clatter.mix * level;
+    source.connect(band);
+    band.connect(cap);
+    cap.connect(mix);
+    mix.connect(clapper);
+    track(source, t, t + ring + tail);
   }
 }
 
@@ -239,11 +264,11 @@ const MARIMBA_BAR = /** @type {[number, number, number][]} */ ([[1, 0.38, 0.5], 
 // The sound design: every voice sits between about 400 Hz and 3 kHz, where
 // laptop and projector speakers are loud and the ear cuts through room chatter
 // best; none lingers on a steady harsh tone; each has its own rhythm and
-// timbre so different Alarms are told apart; and each leaves a gap before it
-// repeats, so an Alarm ringing for a minute keeps breathing. The loud voices
-// (School bell, Digital alarm clock, Twin-bell alarm clock, Ship's klaxon) are
-// deliberately harsh, for an Alarm nobody can miss, but keep to the same
-// range. None may sound like a fire alarm or an emergency siren (a rising-
+// timbre so different Alarms are told apart; and each but Ship's klaxon
+// leaves a gap before it repeats, so an Alarm ringing for a minute keeps
+// breathing. The loud voices (School bell, Digital alarm clock, Twin-bell
+// alarm clock, Ship's klaxon, which blares on with no break) are deliberately
+// harsh, for an Alarm nobody can miss, but keep to the same range. None may sound like a fire alarm or an emergency siren (a rising-
 // and-falling wail, or a horn in threes): on a school projector that could
 // start a real panic. The calm and cute voices (Singing bowl, Music box,
 // Sparkle, Cuckoo clock, Bubble pops, Ta-da) are named for how they sound,
@@ -292,14 +317,15 @@ const VOICES = {
   },
   // The second half of the Westminster chime on tubular bells, once per Bell:
   // two phrases (G#, E, F#, B, then B, F#, G#, E), each ending on a held note.
-  // A strike every 0.6 s, unhurried like a real tower; one pass takes 6.6 s,
-  // so a Bell plays it once, past its 5 seconds, to the end.
+  // A strike every 0.7 s, unhurried like a real tower; one pass takes 7.4 s,
+  // so a Bell plays it once, past its 5 seconds, to the end. It repeats every
+  // 8.8 s, so an Alarm's last pass (at 52.8 s) still ends inside its minute.
   clockTower(ctx, out, t, track) {
     const [gSharp, fSharp, e, b] = [830.61, 739.99, 659.25, 493.88];
     [[gSharp, e, fSharp, b], [b, fSharp, gSharp, e]].forEach((phrase, p) => {
-      phrase.forEach((freq, i) => strike(ctx, out, track, freq, t + p * 3 + i * 0.6, TUBULAR));
+      phrase.forEach((freq, i) => strike(ctx, out, track, freq, t + p * 3.5 + i * 0.7, TUBULAR));
     });
-    return 7.5;
+    return 8.8;
   },
   // A quick rising arpeggio (C, E, G, C) on a wooden bar, twice per Bell.
   marimba(ctx, out, t, track) {
@@ -384,7 +410,7 @@ const VOICES = {
     }
     return 2.5;
   },
-  // Soft bell. Ring-ring: a bell struck about ten times a second, in two
+  // School bell (softer). Ring-ring: a bell struck about ten times a second, in two
   // short bursts. Gentler than a hallway bell: pure tones, a lower pitch, a
   // shallow flutter rather than a hard rattle, and a gap to breathe.
   softBell(ctx, out, t, track) {
@@ -396,15 +422,18 @@ const VOICES = {
     }
     return 3;
   },
-  // School bell: a real hallway bell. A hard clapper hammers a metal gong 20
-  // times a second, so it rattles, in one long continuous ring of 3 s, then a
-  // short gap before it repeats. The gong's partials are bright and out of
-  // tune with each other, as metal is, each two sines a hair apart so they
-  // beat; the highest stays near 3 kHz and the lowest well above any bass.
+  // School bell: a real electric hallway bell. A hard hammer hits a metal gong
+  // 26 times a second and the gong is choked between hits, so it clatters
+  // harshly rather than dings, in one long continuous ring of 3 s that stops
+  // dead, then a short gap before it repeats. Six partials crowd the middle,
+  // out of tune with each other as metal is, each two sines 10 Hz apart so
+  // they beat roughly; a burst of filtered noise on every hit is the metal's
+  // clang. The highest stays under 3 kHz and the lowest well above any bass.
   hallwayBell(ctx, out, t, track) {
     rattlingBell(ctx, out, track, {
-      t, rate: 20, ring: 3, hit: 0.6, rise: 0.002, rest: 0.2, tail: 0.4, level: 0.2, detune: 2,
-      partials: [[760, 1], [1763, 0.6], [2356, 0.4], [3040, 0.15]],
+      t, rate: 26, ring: 3, hit: 0.7, rise: 0.0015, rest: 0.05, tail: 0.2, level: 0.14, detune: 5,
+      partials: [[700, 1], [1130, 0.75], [1560, 0.6], [1990, 0.5], [2470, 0.35], [2890, 0.2]],
+      clatter: { freq: 2000, q: 1.2, mix: 1.2 },
     });
     return 4;
   },
@@ -429,19 +458,21 @@ const VOICES = {
     return 3;
   },
   // Ship's klaxon: a navy general-alarm horn. Ah-OO-gah: a harsh horn note
-  // that sweeps up quickly from 420 to 640 Hz and holds for about a second,
-  // then a long gap, once every 2 s. A sawtooth and a square a few hertz
-  // apart make it buzz; a low-pass filter keeps the buzz under 3 kHz. One
-  // rise per honk and a gap after, never a rising-and-falling wail, so it
-  // can't be taken for a siren.
+  // that sweeps up quickly from 420 to 640 Hz and holds, 1.25 s a honk, each
+  // honk running straight into the next (its 12 ms fade-out under the next
+  // one's start), so it blares on with no break. A sawtooth and a square a
+  // few hertz apart make it buzz; a low-pass filter keeps the buzz under
+  // 3 kHz. The pitch only ever sweeps up and jumps back down, never a
+  // rising-and-falling wail, so it can't be taken for a siren.
   klaxon(ctx, out, t, track) {
+    const HONK = 1.25;
     for (const [type, detune] of /** @type {[OscillatorType, number][]} */ ([['sawtooth', 0], ['square', 3]])) {
       tone(ctx, out, track, {
-        type, freq: 420 + detune, bendTo: 640 + detune, bendLength: 0.35, t, length: 1.1, peak: 0.22, envelope: 'gate',
-        filter: { from: 2800, to: 1800, over: 1.1, q: 0.8 },
+        type, freq: 420 + detune, bendTo: 640 + detune, bendLength: 0.35, t, length: HONK + 0.012, peak: 0.22,
+        envelope: 'gate', filter: { from: 2800, to: 1800, over: HONK, q: 0.8 },
       });
     }
-    return 2;
+    return HONK;
   },
   // Singing bowl: one struck meditation bowl. A low-mid note and two partials
   // that sit between harmonics, as on real metal, each two sines under a
