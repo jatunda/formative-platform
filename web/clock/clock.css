@@ -101,14 +101,17 @@ body {
 
 /* Three rows: the top bar (Day Label, controls, Division), the stage, and
    the bottom row (the bar, then the icon-only window buttons); four with
-   the "Simulated time" banner. */
+   the "Simulated time" banner. It is as tall as #clockApp, the visible
+   height: on a phone 100vh is the height with the browser bars hidden, so a
+   screen that tall ran its bottom (the agenda's end, the window button)
+   under the bars, where the page, which never scrolls, couldn't reach. */
 .clock-screen {
   position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto minmax(0, 1fr) auto;
   grid-template-areas: "top" "stage" "bottom";
-  height: 100vh;
+  height: 100%;
   padding: var(--edge-y) var(--edge-x);
   row-gap: var(--gap-sm);
   /* The width the Readouts may use: the screen, less the Look sheet while
@@ -1132,6 +1135,12 @@ button.clock-readout__face:focus-visible {
     justify-content: flex-start;
   }
 
+  /* While the sound prompt shows too, the Readout's digits also fit the
+     height, so on a short phone the agenda keeps room for whole rows. */
+  .clock-screen:has(.clock-bar--day:not([hidden])):has(> .clock-bottom > .clock-sound-prompt:not([hidden])) {
+    --type-digits: 12svh;
+  }
+
   /* The window button under the bar on the right; the sound prompt, while
      it shows, across the bottom under them. */
   .clock-bottom {
@@ -1314,7 +1323,7 @@ button.clock-readout__face:focus-visible {
   top: 50%;
   transform: translate(-50%, -50%);
   width: min(520px, calc(100vw - 32px));
-  max-height: calc(100vh - 32px);
+  max-height: calc(100dvh - 32px);
   overflow: auto;
   padding: var(--s5);
   border: 1px solid var(--line-soft);

@@ -81,6 +81,23 @@ describe('School Clock hosting', () => {
     expect(css.match(/\.clock-line--in-bar/g)).toHaveLength(2);
   });
 
+  it("fits the screen to the visible height, so a phone's browser bars never hide the agenda's end", () => {
+    const css = readFileSync(resolve(clockDir, 'clock.css'), 'utf8');
+    // html, body and #clockApp are 100% (the visible height, with the bars);
+    // 100vh is the height without them, so a screen that tall runs under them.
+    expect(css).toMatch(/(^|\n)html,\s*body\s*\{[^}]*height:\s*100%;/);
+    expect(css).toMatch(/(^|\n)#clockApp\s*\{[^}]*height:\s*100%;/);
+    expect(css).toMatch(/(^|\n)\.clock-screen\s*\{[^}]*height:\s*100%;/);
+    // On a phone, while the agenda and the sound prompt both show, the digits
+    // also fit the visible height (svh), not the bars-hidden one (vh).
+    expect(css).toMatch(/\.clock-screen:has\(\.clock-bar--day:not\(\[hidden\]\)\):has\(> \.clock-bottom > \.clock-sound-prompt:not\(\[hidden\]\)\)\s*\{\s*--type-digits:\s*\d+svh;/);
+    // Nor may a panel's height reach for 100vh.
+    for (const sheet of ['clock.css', 'settings-drawer.css', 'timer.css', 'look-sheet.css', 'alarm-editor.css']) {
+      const rules = readFileSync(resolve(clockDir, sheet), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+      expect(rules, sheet).not.toMatch(/\b100vh\b/);
+    }
+  });
+
   it('keeps the page background in fullscreen', () => {
     const css = readFileSync(resolve(clockDir, 'clock.css'), 'utf8');
     // Without a background a fullscreen element shows the black backdrop through it.

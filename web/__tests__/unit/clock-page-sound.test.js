@@ -464,7 +464,7 @@ describe('School Clock sound', () => {
       open();
       openSettings();
       const listed = (name) => [...field(name).options].map((o) => o.textContent);
-      expect(listed('Bell sound')).toEqual(['Beep', 'Buzzer', 'Chime', 'Clap pattern', 'Clock tower', 'Desk bell', 'Harp', 'Level up', 'Marimba', 'School bell', 'Soft bell', 'Songbird', 'Swell', 'Wood block']);
+      expect(listed('Bell sound')).toEqual(['Beep', 'Buzzer', 'Chime', 'Clap pattern', 'Clock tower', 'Desk bell', 'Digital alarm clock', 'Harp', 'Level up', 'Marimba', 'School bell', "Ship's klaxon", 'Soft bell', 'Songbird', 'Swell', 'Twin-bell alarm clock', 'Wood block']);
       expect(listed('Timer sound')).toEqual(listed('Bell sound'));
       // Each option plays the voice it names.
       expect([...field('Bell sound').options].every((o) => SOUND_NAMES[o.value] === o.textContent)).toBe(true);
