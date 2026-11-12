@@ -4,7 +4,10 @@
 // shows instead. It rebuilds only when what's listed changes (a Segment
 // starts or ends, the setting or time format changes), so focus and a screen
 // reader's place survive the ticks; otherwise each tick just moves the fill
-// and the marker. Nothing is a live region: nothing is re-announced.
+// and the marker. Nothing is a live region: nothing is re-announced. In the
+// Readouts' edit mode a tap anywhere on the bar switches it between whole day
+// and just this Segment; a button laid over it (letting taps and scrolls
+// through to the bar) does the same for the keyboard and screen readers.
 import { el } from './dom.js';
 import { formatShortDate } from './format.js';
 
@@ -31,12 +34,24 @@ function timeRange(block, time) {
   return `${meridiem && end.endsWith(meridiem) ? start.slice(0, -meridiem.length) : start}–${end}`;
 }
 
+const SETTING_NAME = { day: 'Whole day', segment: 'Just this Segment' };
+
 /**
- * @returns {{ element: HTMLElement, show: (bar: Bar | null, time: (date: Date) => string) => void }}
- *   `time` writes a clock time (no seconds) under the current settings.
+ * @param {{ onSwitch: () => void }} actions `onSwitch`: the bar was tapped (or its button pressed) in edit mode
+ * @returns {{ element: HTMLElement,
+ *   show: (bar: Bar | null, time: (date: Date) => string, options?: { editing?: boolean }) => void }}
+ *   `time` writes a clock time (no seconds) under the current settings; `editing`: the Readouts' edit mode.
  */
-export function createDayBarView() {
+export function createDayBarView({ onSwitch }) {
   const element = el('section', { className: 'clock-bar', hidden: true });
+  const switchName = el('span', { className: 'visually-hidden' });
+  // A click is a tap, never a scroll, so the phone's agenda still scrolls.
+  // The button's own clicks (Enter, Space) arrive here too.
+  const switchButton = el('button', { type: 'button', className: 'clock-bar__switch', hidden: true }, [switchName]);
+  let editing = false;
+  element.addEventListener('click', () => {
+    if (editing) onSwitch();
+  });
   let built = '';
   /** @type {HTMLElement | null} */
   let current = null;
@@ -101,6 +116,8 @@ export function createDayBarView() {
     marker = bar.nowAt === null ? null : el('span', { className: 'clock-bar__now', 'aria-hidden': 'true' });
 
     const heading = bar.day === 'today' ? `Today · ${bar.dayLabel}` : `Next School Day · ${date} · ${bar.dayLabel}`;
+    // A switch rebuilds the bar, so its button keeps focus through it.
+    const refocus = document.activeElement === switchButton;
     element.replaceChildren(
       // Off-Hours say which day the bar is of; in school the stage already does.
       ...(bar.offHours ? [el('p', { className: 'clock-bar__heading', textContent: heading })] : []),
@@ -110,7 +127,9 @@ export function createDayBarView() {
         el('span', { className: 'clock-bar__end', 'aria-hidden': 'true', textContent: brief(bar.end) }),
       ]),
       ...(single ? [] : [agenda(bar, name, time)]),
+      switchButton,
     );
+    if (refocus) switchButton.focus();
   }
 
   /** The phone's agenda list. @param {Bar} bar @param {string} name @param {(date: Date) => string} time */
@@ -137,9 +156,12 @@ export function createDayBarView() {
     return list;
   }
 
-  /** @param {Bar | null} bar @param {(date: Date) => string} time */
-  function show(bar, time) {
+  /** @param {Bar | null} bar @param {(date: Date) => string} time @param {{ editing?: boolean }} [options] */
+  function show(bar, time, { editing: inEditMode = false } = {}) {
     element.hidden = bar === null;
+    editing = bar !== null && inEditMode;
+    element.classList.toggle('is-editing', editing);
+    switchButton.hidden = !editing;
     if (bar === null) {
       built = '';
       return;
@@ -150,6 +172,8 @@ export function createDayBarView() {
       built = key;
       build(bar, time);
     }
+    const other = bar.setting === 'day' ? 'segment' : 'day';
+    switchName.textContent = `Bottom bar: ${SETTING_NAME[bar.setting]}. Switch to ${SETTING_NAME[other]}`;
     // A current block (and so a fill) exactly when something is current.
     if (current) {
       current.style.setProperty('--done', `${bar.done.toFixed(1)}%`);

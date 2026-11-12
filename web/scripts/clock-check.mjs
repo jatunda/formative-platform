@@ -6,6 +6,7 @@
 //   npm run check:clock -- --size 390x844 --division MS --settings '{"showSeconds":false}'
 //   npm run check:clock -- --layout countdown,clock,countup   Readouts to show, big one first
 //   npm run check:clock -- --timer            with the first preset timer running
+//   npm run check:clock -- --editing          in the Readouts' edit mode
 //   npm run check:clock -- --zoom 1366x768    that screen at every browser zoom, 67% to 200%
 //                                             (the viewport it leaves: 2039x1146 … 683x384; repeatable)
 //   npm run check:clock -- --no-shots         checks only, no PNGs
@@ -48,7 +49,7 @@ const DEFAULT_SIZES = ['1920x1080', '1440x900', '1280x720', '480x320', '390x844'
 const ZOOMS = [0.67, 0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2];
 
 function parseArgs(argv) {
-  const opts = { states: [], sizes: [], division: 'HS', settings: {}, layout: null, timer: false, shots: true, axe: true };
+  const opts = { states: [], sizes: [], division: 'HS', settings: {}, layout: null, timer: false, shots: true, axe: true, editing: false };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     const next = () => argv[++i];
@@ -62,6 +63,7 @@ function parseArgs(argv) {
     else if (arg === '--settings') opts.settings = JSON.parse(next());
     else if (arg === '--layout') opts.layout = { readouts: next().split(',').map((mode) => ({ mode })) };
     else if (arg === '--timer') opts.timer = true;
+    else if (arg === '--editing') opts.editing = true;
     else if (arg === '--no-shots') opts.shots = false;
     else if (arg === '--no-axe') opts.axe = false;
     else throw new Error(`Unknown option ${arg}`);
@@ -122,6 +124,7 @@ try {
         await page.getByRole('button', { name: 'Timer', exact: true }).click();
         await page.locator('.clock-preset').first().click();
       }
+      if (opts.editing) await page.getByRole('button', { name: 'Readouts', exact: true }).click();
       await page.waitForTimeout(400);
       const scroll = await page.evaluate(() => ({
         x: document.documentElement.scrollWidth > innerWidth,

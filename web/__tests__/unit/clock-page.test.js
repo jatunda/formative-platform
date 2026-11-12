@@ -730,7 +730,7 @@ describe('School Clock page', () => {
         expect(readoutsControl().textContent.trim()).toBe('Done');
         expect(addButton()).toBeDefined();
         expect(editNote().hidden).toBe(false);
-        expect(editNote().textContent).toBe('Tap a Readout to change what it shows');
+        expect(editNote().textContent).toBe('Tap a Readout or the bar to change what it shows');
         // One Readout can't be removed.
         expect(removeButtons()).toHaveLength(0);
 
