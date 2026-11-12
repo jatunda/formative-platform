@@ -8,11 +8,12 @@ import { chromium } from 'playwright';
 import { createRequire } from 'module';
 import { fileURLToPath } from 'url';
 import { resolve, dirname } from 'path';
+import { SETTINGS_KEY } from '../clock/clock-storage.js';
+import { LAYOUT_KEY } from '../clock/readout-layout.js';
+import { describeFailure } from './clock-check-matrix.js';
 
 export const webDir = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const axeSource = createRequire(import.meta.url).resolve('axe-core/axe.min.js');
-const SETTINGS_KEY = 'school-clock-settings-v1';
-const LAYOUT_KEY = 'school-clock-layout-v1';
 
 /**
  * @typedef {{ states: { name: string, query: string }[], division: string, settings: object,
@@ -194,6 +195,6 @@ async function checkPage(page, url, opts) {
       return violations.map((v) => `${v.id}: ${v.nodes.length} node(s)`);
     });
   }
-  const ok = !scroll.x && !scroll.y && agenda?.reachable !== false && stage?.fits !== false && !overlaps.length && !errors.length && !violations.length;
-  return { ok, scroll, stage, agenda, overlaps, errors, violations };
+  const checked = { scroll, stage, agenda, overlaps, errors, violations };
+  return { ok: describeFailure(checked).length === 0, ...checked };
 }
