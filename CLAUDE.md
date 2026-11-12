@@ -25,7 +25,7 @@ If coverage fails:
 
 Lowering `coverage.thresholds` to make a failing run pass is not an acceptable fix on its own — raising it is reserved for when coverage has genuinely improved.
 
-To see the School Clock (`/clock`) in a real browser, screenshot it across states and sizes, or check accessibility, run `npm run check:clock` in `web/` (options in `web/scripts/clock-check.mjs`'s header) rather than writing a new harness.
+A School Clock (`/clock`) CSS or layout change is not done until `npm run check:clock:full` in `web/` passes: it sweeps every Readouts/edit mode/timer/sound/size combination, where layout bugs hide (matrix and known failures in `web/scripts/clock-check-full.mjs`'s header). For single screenshots, quick looks or accessibility checks, run `npm run check:clock` (options in `web/scripts/clock-check.mjs`'s header) rather than writing a new harness.
 
 ## Before considering any `functions/` change complete
 

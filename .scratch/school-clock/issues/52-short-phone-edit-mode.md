@@ -22,3 +22,5 @@ Built behaviour: closed tickets 11 (Readouts and edit mode), 43 (the phone agend
 ## Comments
 
 Found while building ticket 45 (see its `## Comments`).
+
+`npm run check:clock:full` (agent-tooling ticket 01) lists this ticket's failures as known in `KNOWN_FAILURES` (`web/scripts/clock-check-matrix.js`), so the fix must remove those entries; the full run fails while any of them passes. Its first run pinned the failing set down: at 375 × 667 in edit mode, two and three Readouts fail in every state with the sound prompt showing, and one Readout fails before school, during passing and in Experience Week; with sound on, two and three Readouts fail in those three states; with the timer, three Readouts fail everywhere and two in Period and Nutrition. Outside edit mode, before school fails with two Readouts as well as three. At 360 × 740 in edit mode with the prompt showing, three Readouts fail everywhere, two in six states, and three with the timer before school and on a day off; one Readout passes.
