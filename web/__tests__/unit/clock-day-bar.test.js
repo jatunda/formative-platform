@@ -183,7 +183,7 @@ describe('the bar during Off-Hours on just this Segment: a countdown to the Next
   });
 });
 
-describe("the current block's end time (Show when this Period ends)", () => {
+describe("the current block's end time (Show when this Segment ends)", () => {
   const ending = (bar) => bar.blocks.filter((b) => b.showEnd).map((b) => b.name);
 
   it('when off, no block shows its end', () => {

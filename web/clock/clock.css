@@ -813,7 +813,7 @@ button.clock-readout__face:focus-visible {
   bottom: 0;
 }
 
-/* "Show when this Period ends": the current block's "–11:15" after its start,
+/* "Show when this Segment ends": the current block's "–11:15" after its start,
    dropped where the block is too narrow for both times (they'd run into the
    next block's start). */
 @container (max-width: 6.2em) {

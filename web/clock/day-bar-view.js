@@ -8,6 +8,7 @@
 // Readouts' edit mode a tap anywhere on the bar switches it between whole day
 // and just this Segment; a button laid over it (letting taps and scrolls
 // through to the bar) does the same for the keyboard and screen readers.
+import { BAR_SETTING_NAMES } from './day-bar.js';
 import { el } from './dom.js';
 import { formatShortDate } from './format.js';
 
@@ -33,8 +34,6 @@ function timeRange(block, time) {
   const meridiem = MERIDIEM.exec(start)?.[0];
   return `${meridiem && end.endsWith(meridiem) ? start.slice(0, -meridiem.length) : start}–${end}`;
 }
-
-const SETTING_NAME = { day: 'Whole day', segment: 'Just this Segment' };
 
 /**
  * @param {{ onSwitch: () => void }} actions `onSwitch`: the bar was tapped (or its button pressed) in edit mode
@@ -173,7 +172,7 @@ export function createDayBarView({ onSwitch }) {
       build(bar, time);
     }
     const other = bar.setting === 'day' ? 'segment' : 'day';
-    switchName.textContent = `Bottom bar: ${SETTING_NAME[bar.setting]}. Switch to ${SETTING_NAME[other]}`;
+    switchName.textContent = `Bottom bar: ${BAR_SETTING_NAMES[bar.setting]}. Switch to ${BAR_SETTING_NAMES[other]}`;
     // A current block (and so a fill) exactly when something is current.
     if (current) {
       current.style.setProperty('--done', `${bar.done.toFixed(1)}%`);

@@ -31,7 +31,7 @@ import { periodLabel } from './format.js';
  * - `state`: `next` is the Segment after a Passing Period.
  * - `left` / `width`: percent of the bar.
  * - `showEnd`: it shows its end time beside its start, where that fits
- *   ("Show when this Period ends": the current Segment, on whole day only).
+ *   ("Show when this Segment ends": the current Segment, on whole day only).
  */
 
 /**
@@ -53,6 +53,9 @@ import { periodLabel } from './format.js';
  * - `end`: the time under the bar's right end.
  * - `offHours`: the bar is of a day still to come (headed with that day).
  */
+
+/** What the bar's two settings are called, wherever the clock names them. */
+export const BAR_SETTING_NAMES = /** @type {const} */ ({ day: 'Whole day', segment: 'Just this Segment' });
 
 /**
  * A Segment's name for a tight block: "Period 3" is "P3", "Nutrition" is

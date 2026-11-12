@@ -22,7 +22,7 @@ import { formatClockTime, formatDate, formatSegmentName, formatShortDate, period
  * - `title` and `tag`: "Period 3" and its Period Label "AP CSA" ('' when it has none).
  * - `upNext`: the next Segment and its start, during a Passing Period and before school.
  * - `ends`: when the current Segment ends ("11:15 AM"), with "Show when this
- *   Period ends" on; null otherwise.
+ *   Segment ends" on; null otherwise.
  * - `line`: the Off-Hours line ("Back Mon, Nov 30 · All Day"), or null.
  *   How long until then is a Readout's job (until the Next School Day), not the line's.
  * - `namesNextDay`: the line only names the Next School Day (after school, a
@@ -71,4 +71,18 @@ export function displayText(now, moment, { use24Hour, periodLabels, showPeriodEn
     default:
       return text({ day: formatDate(now), title: formatDate(now), line: 'No school calendar for this date yet' });
   }
+}
+
+/**
+ * Just the heading at `now`, as one line ("Period 3 · AP CSA", "Passing
+ * Period"), for a view with no room for the rest (the mini player).
+ * @param {Date} now
+ * @param {Moment} moment `describeMoment(now, ...)`
+ * @param {Record<string, string>} periodLabels
+ * @returns {string}
+ */
+export function headingText(now, moment, periodLabels) {
+  // The heading never depends on the time format or the end-time setting.
+  const { title, tag } = displayText(now, moment, { use24Hour: false, periodLabels, showPeriodEnd: false });
+  return [title, tag].filter(Boolean).join(' · ');
 }

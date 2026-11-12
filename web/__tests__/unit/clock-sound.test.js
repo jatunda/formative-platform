@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createSoundPlayer, ringLength, SOUNDS, SOUND_NAMES, BELL_SECONDS, ALARM_MAX_SECONDS } from '../../clock/sound.js';
+import { createSoundPlayer, ringLength, ringSeconds, shownSeconds, silentContext, SOUNDS, SOUND_NAMES, BELL_SECONDS, ALARM_MAX_SECONDS } from '../../clock/sound.js';
 import { createFakeAudioContext, audibleStarts } from '../helpers/fake-audio.js';
 
 const bell = (key, at, sound = 'softBell') => ({ key, at, sound, repeat: false });
@@ -31,6 +31,14 @@ describe('School Clock sound player', () => {
   it('keeps the gentle bell as Soft bell and names the loud hallway bell School bell', () => {
     expect(SOUND_NAMES.softBell).toBe('Soft bell');
     expect(SOUND_NAMES.hallwayBell).toBe('School bell');
+  });
+
+  it('strikes the Soft bell eight times in each burst, whenever it starts', () => {
+    const ctx = createFakeAudioContext({ state: 'running' });
+    createSoundPlayer({ context: ctx }).play('softBell');
+    // One flutter per burst: the gain every partial of that burst passes through.
+    const flutters = distinct(ctx.sources.map((s) => s.connected[0].connected[0]));
+    expect(flutters.map((gain) => gain.gain.events.filter((e) => e.kind === 'linear').length)).toEqual([8, 8]);
   });
 
   describe('School bell (the loud hallway bell)', () => {
@@ -609,6 +617,44 @@ describe('School Clock sound player', () => {
     expect(ringLength('chime', 5)).toBeCloseTo(6);
     // Beep: ten passes, the last at 4.5 s.
     expect(ringLength('beep', 5)).toBeCloseTo(4.9);
+  });
+
+  it('stops a Bell starting new passes after 5 s, and leaves Alarms, the timer and a kept Bell to ring their minute', () => {
+    expect(ringSeconds('bell', { untilDismissed: false })).toBe(5);
+    expect(ringSeconds('bell', {})).toBe(5);
+    expect(ringSeconds('bell', { untilDismissed: true })).toBeUndefined();
+    for (const source of ['clockAlarm', 'periodAlarm', 'timer']) {
+      expect(ringSeconds(source, { untilDismissed: false })).toBeUndefined();
+    }
+  });
+
+  it('shows a Bell that stops on its own until its sound ends, and an Alarm for its minute', () => {
+    // Clock tower plays its one 6.6 s pass to the end, past the Bell's 5 s.
+    expect(shownSeconds('bell', 'clockTower', {})).toBeCloseTo(6.6);
+    expect(shownSeconds('bell', 'clockTower', { untilDismissed: true })).toBeUndefined();
+    expect(shownSeconds('timer', 'chime', {})).toBeUndefined();
+  });
+
+  it('measures a ring on a silent context that takes any node or param call a voice could make', () => {
+    const ctx = silentContext();
+    const out = ctx.createDynamicsCompressor();
+    const reverb = ctx.createConvolver();
+    reverb.buffer = ctx.createBuffer(2, ctx.sampleRate * 2, ctx.sampleRate);
+    reverb.connect(out).connect(ctx.destination);
+    const panner = ctx.createStereoPanner();
+    panner.pan.setTargetAtTime(0.5, 0, 0.1);
+    panner.pan.cancelScheduledValues(0);
+    const osc = ctx.createOscillator();
+    osc.detune.value = 5;
+    osc.frequency.setValueCurveAtTime(new Float32Array([1, 2]), 0, 1);
+    osc.connect(panner);
+    osc.start(0);
+    expect(() => osc.stop(1)).not.toThrow();
+    // A number read from it is no number, so a loop over a buffer's samples never runs...
+    expect(ctx.createBuffer(1, 10, 48000).getChannelData(0).length + 1).toBeNaN();
+    // ...and nothing on it is a promise or an iterable.
+    expect(osc.then).toBeUndefined();
+    expect(osc[Symbol.iterator]).toBeUndefined();
   });
 
   it("repeats a short voice until a Bell's 5 s, then finishes its last pass", () => {

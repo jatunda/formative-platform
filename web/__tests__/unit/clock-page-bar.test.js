@@ -171,7 +171,7 @@ describe('School Clock bar', () => {
     });
   });
 
-  describe('Show when this Period ends', () => {
+  describe('Show when this Segment ends', () => {
     const times = () => [...bar().querySelectorAll('.clock-bar__time')].map(words);
     const agendaTimes = () => [...bar().querySelectorAll('.clock-agenda__time')].map(words);
 

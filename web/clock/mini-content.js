@@ -4,7 +4,7 @@
 // and a foot (how far through the Segment, up next, or the timer's bar and the
 // time left in the Segment under a timer). Pure: the page's moment, settings and big Readout give it.
 // What's ringing is the mini player's own overlay on top of this.
-import { displayText } from './display-text.js';
+import { headingText } from './display-text.js';
 import { formatClockTime, formatSegmentName } from './format.js';
 import { readoutParts, readoutText, untilEndOf } from './readouts.js';
 
@@ -50,9 +50,8 @@ import { readoutParts, readoutText, untilEndOf } from './readouts.js';
  */
 export function miniContent({ now, moment, settings, big, mode, timer }) {
   const options = { use24Hour: settings.use24Hour, seconds: settings.showSeconds };
-  // Only the heading is used; the foot already says when the Segment ends.
-  const words = moment ? displayText(now, moment, { ...settings, showPeriodEnd: false }) : null;
-  const segmentHead = words ? [words.title, words.tag].filter(Boolean).join(' · ') : '';
+  // Only the heading: the foot already says when the Segment ends.
+  const segmentHead = moment ? headingText(now, moment, settings.periodLabels) : '';
   const readout = timer
     // Timers always show seconds, rounded up like the main page's.
     ? readoutParts({ kind: 'duration', ms: timer.remainingMs, caption: 'left', long: false })
