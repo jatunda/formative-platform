@@ -30,16 +30,10 @@ const ID = 'clock-settings';
  *   `alarms` is the Alarms section (`alarm-editor.js`).
  */
 export function createSettingsDrawer({ settings, update, play, testRing, behind, onChange, alarms }) {
-  const divisionInputs = DIVISIONS.map(([key, name]) => {
-    const input = el('input', {
-      type: 'radio', name: `${ID}-division`, value: key, onchange: () => update({ division: key }),
-    });
-    return { key, input, label: el('label', { className: 'clock-segment' }, [input, el('span', { textContent: name })]) };
-  });
-  const division = drawerSection('division', 'Division', [
-    el('div', { className: 'clock-segmented', role: 'radiogroup', 'aria-labelledby': `${ID}-division-title` },
-      divisionInputs.map(({ label }) => label)),
-  ]);
+  // Named by its section's heading (drawerSection()'s `<id>-title`).
+  const divisionChoice = segmented(`${ID}-division`, { labelledBy: `${ID}-division-title` }, DIVISIONS, '',
+    () => update({ division: divisionChoice.value() }));
+  const division = drawerSection('division', 'Division', [divisionChoice.group]);
 
   const seconds = switchControl(`${ID}-seconds`, 'Show seconds', '', (on) => update({ showSeconds: on }));
   const use24Hour = switchControl(`${ID}-24-hour`, '24-hour time', '', (on) => update({ use24Hour: on }));
@@ -121,7 +115,7 @@ export function createSettingsDrawer({ settings, update, play, testRing, behind,
   /** Bring every control in step with the settings. */
   function render() {
     const s = settings();
-    for (const { key, input } of divisionInputs) input.checked = s.division === key;
+    divisionChoice.choose(s.division);
     seconds.input.checked = s.showSeconds;
     use24Hour.input.checked = s.use24Hour;
     periodEnd.input.checked = s.showPeriodEnd;
@@ -151,7 +145,7 @@ export function createSettingsDrawer({ settings, update, play, testRing, behind,
      */
     open(from, { atDivision = false } = {}) {
       // The chip that opens it at the Division only shows once one is chosen.
-      modal.open(from, atDivision ? divisionInputs.find(({ input }) => input.checked).input : undefined);
+      modal.open(from, atDivision ? divisionChoice.checked() : undefined);
     },
     /** The day's coming rings as lines of text; with none, the section hides. @param {string[]} lines */
     showRings(lines) {
