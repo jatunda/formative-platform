@@ -12,10 +12,14 @@ The cause is likely that, while the sound prompt shows, the short layout's promp
 
 Edit mode is a teacher moment, not a projected one, so the digits can step down further there. Found while building ticket 44 (see its `## Comments`). Built behaviour: closed tickets 11 (edit mode), 42 (tapping the bar in edit mode), 43 (phone height), 44.
 
-**Blocked by:** None (can start immediately)
+**Blocked by:** 49 (both change edit-mode styling)
 
-**Status:** needs-triage
+**Status:** ready-for-agent
 
 - [ ] `npm run check:clock -- --editing` passes with one, two and three Readouts at every default size, sound prompt showing and not
 - [ ] Outside edit mode, nothing changes
 - [ ] `npm run lint`, `npm run typecheck`, `npm run test:coverage` in `web/` pass
+
+## Comments
+
+**2026-11-11: triaged.** Eric: yes, with smaller text in edit mode. Make room by stepping the digits (and other Readout text as needed) down further while editing, not by dropping the edit note or controls.
