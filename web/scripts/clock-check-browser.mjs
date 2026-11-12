@@ -209,11 +209,12 @@ async function checkPage(page, url, opts) {
     // too, and clear of the row: an agenda taller than its row (it keeps
     // about three rows) runs under them, painted on top, so elementFromPoint
     // alone doesn't see it.
+    /** Whether two boxes don't overlap (touching edges count as clear). @param {DOMRect} a @param {DOMRect} b */
+    const clear = (a, b) => a.top >= b.bottom - 0.5 || a.bottom <= b.top + 0.5 || a.left >= b.right - 0.5 || a.right <= b.left + 0.5;
     const below = [...document.querySelectorAll('.clock-corner button, .clock-sound-prompt')]
       .filter((n) => n.getClientRects().length)
       .map((n) => n.getBoundingClientRect())
-      .every((b) => b.bottom <= visible + 0.5
-        && (b.top >= row.bottom - 0.5 || b.bottom <= row.top + 0.5 || b.left >= row.right - 0.5 || b.right <= row.left + 0.5));
+      .every((b) => b.bottom <= visible + 0.5 && clear(b, row));
     return { reachable: row.top >= box.top - 0.5 && row.bottom <= Math.min(box.bottom, visible) + 0.5 && !covered && below,
       listHeight: Math.round(box.height), rowBottom: row.bottom, listBottom: box.bottom, visible };
   }, opts.bars);
