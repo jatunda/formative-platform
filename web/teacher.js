@@ -10,12 +10,11 @@ import {
 import { db } from './firebase-config.js';
 import { initializeDatabase } from './database-handle.js';
 import {
-  getDateForDayIndex as sharedGetDateForDayIndex,
+  getDateForDayIndex,
   getTodayDayIndex,
   getClassDateOffset,
   setClassDateOffset
 } from './date-utils.js';
-import { DEFAULT_CLASS_START_DATE } from './constants.js';
 import { showNotification } from './notification-utils.js';
 import {
   createDateOffsetControl
@@ -28,6 +27,7 @@ import {
   createDateCell,
   createEndButtonsContainer,
   makeInsertDayHandler,
+  addInsertDayPlus,
   makeDeleteDayHandler,
   getLessonTitles
 } from "./schedule-day-view.js";
@@ -124,11 +124,6 @@ export async function loadClasses(classSelectEl) {
       editorLink.href = `editor.html?fromClass=${urlClassId}`;
     }
   }
-}
-
-// Use the shared date calculation function
-export async function getDateForDayIndex(dayIndex, classId = currentClassId, classStartDate = DEFAULT_CLASS_START_DATE) {
-  return await sharedGetDateForDayIndex(dayIndex, classId, classStartDate);
 }
 
 export async function applyDateOffset(newOffset, classId = currentClassId) {
@@ -338,8 +333,8 @@ export async function renderScheduleTable(schedule, classId = currentClassId) {
   }
   await getLessonTitles(allLessonHashes);
 
-  // onInsertDay gives each day row an Insert Day "+" on the line above it.
-  // None below the final row: inserting after the last day adds nothing.
+  // onInsertDay gives each day row an Insert Day "+" on the line above it;
+  // one more goes below the last day, on its line with the add-day row.
   const ctx = {
     classId,
     onReload: loadFullSchedule,
@@ -348,15 +343,17 @@ export async function renderScheduleTable(schedule, classId = currentClassId) {
   };
 
   // Render all days
+  const dayRows = [];
   for (let dayIndex = 0; dayIndex <= maxDayIndex; dayIndex++) {
     const lessons = schedule[dayIndex] || [];
     const dateLabel = await getDateForDayIndex(dayIndex, classId);
-    const dayRow = await createDayRow(dayIndex, lessons, todayDayIndex, dateLabel, ctx);
-    scheduleTableBody.appendChild(dayRow);
+    dayRows.push(await createDayRow(dayIndex, lessons, todayDayIndex, dateLabel, ctx));
   }
+  scheduleTableBody.append(...dayRows);
 
   // Final row for adding a new day
   const nextIndex = maxDayIndex + 1;
+  addInsertDayPlus(dayRows[dayRows.length - 1], nextIndex, ctx.onInsertDay, 'below');
   const finalRow = await createFinalRow(nextIndex, ctx);
   scheduleTableBody.appendChild(finalRow);
 }

@@ -93,6 +93,7 @@ vi.mock('../../ui-components.js', () => ({
     btn.onclick = onClick;
     return btn;
   },
+  teacherIcon: (name) => lineIcon(name, 'line-icon'),
 }));
 
 const dayIndicesShown = (containerEl) =>

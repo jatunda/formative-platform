@@ -63,6 +63,22 @@ export const TAP_EXCEPTIONS = [
  * exceptions list of the selectors it matches.
  */
 
+/** A measurement rounded to the nearest half pixel. @param {number} n */
+const round = (n) => Math.round(n * 2) / 2;
+
+/**
+ * One phrase for every item that fails `check` (Full Schedule shows hundreds
+ * of days), naming the first problem, or null when none do.
+ * @template T
+ * @param {T[]} items @param {(item: T) => string | null} check
+ * @param {string} failing - What the failing items are, e.g. "day rows don't line up"
+ * @returns {string | null}
+ */
+function summarize(items, check, failing) {
+  const problems = items.map(check).filter((why) => why !== null);
+  return problems.length ? `${problems.length} of ${items.length} ${failing}, first ${problems[0]}` : null;
+}
+
 /**
  * Why a tap target is too small on a touch screen `viewportWidth` wide, or
  * null when it's big enough. Sizes round to the nearest half pixel first.
@@ -70,7 +86,6 @@ export const TAP_EXCEPTIONS = [
  * @returns {string | null}
  */
 export function tapTargetProblem(target, viewportWidth, exceptions = TAP_EXCEPTIONS) {
-  const round = (/** @type {number} */ n) => Math.round(n * 2) / 2;
   const [width, height] = [round(target.width), round(target.height)];
   const allowed = target.exceptions
     .map((i) => exceptions[i])
@@ -94,7 +109,6 @@ export function tapTargetProblem(target, viewportWidth, exceptions = TAP_EXCEPTI
  * @param {DayRow} row @returns {string | null}
  */
 export function rowMisalignment(row) {
-  const round = (/** @type {number} */ n) => Math.round(n * 2) / 2;
   for (const [edge, verb] of /** @type {const} */ ([['top', 'start'], ['bottom', 'end']])) {
     const at = row.cells.map((c) => round(c[edge]));
     if (new Set(at).size > 1) {
@@ -105,13 +119,12 @@ export function rowMisalignment(row) {
 }
 
 /**
- * One phrase for every day row that doesn't line up (Full Schedule shows
- * hundreds of days), naming the first, or null when they all do.
+ * One phrase for every day row that doesn't line up, naming the first, or
+ * null when they all do.
  * @param {DayRow[]} rows @returns {string | null}
  */
 function misalignedRows(rows) {
-  const problems = rows.map(rowMisalignment).filter((why) => why !== null);
-  return problems.length ? `${problems.length} of ${rows.length} day rows don't line up, first ${problems[0]}` : null;
+  return summarize(rows, rowMisalignment, "day rows don't line up");
 }
 
 /**
@@ -128,7 +141,6 @@ function misalignedRows(rows) {
  * @param {InsertPlus} p @returns {string | null}
  */
 export function insertPlusMisplacement(p) {
-  const round = (/** @type {number} */ n) => Math.round(n * 2) / 2;
   const [x, y] = [round(p.x), round(p.y)];
   if (x < p.gutterLeft || x > p.gutterRight) {
     return `Insert Day "+" ${p.label} is at x ${x}, outside the gutter (${round(p.gutterLeft)} to ${round(p.gutterRight)})`;
@@ -144,8 +156,7 @@ export function insertPlusMisplacement(p) {
  */
 function misplacedPluses(pluses, rows) {
   if (rows.length && !pluses.length) return `no Insert Day "+" beside the ${rows.length} day rows`;
-  const problems = pluses.map(insertPlusMisplacement).filter((why) => why !== null);
-  return problems.length ? `${problems.length} of ${pluses.length} Insert Day "+"s are misplaced, first ${problems[0]}` : null;
+  return summarize(pluses, insertPlusMisplacement, 'Insert Day "+"s are misplaced');
 }
 
 /**
@@ -153,10 +164,12 @@ function misplacedPluses(pluses, rows) {
  * A schedule table with no day over one Lesson: how wide its content is and
  * how wide its pane is.
  * @typedef {{ scrollWidth: number, shortTables: ShortTable[], targets: Target[] | null, rows: DayRow[], pluses: InsertPlus[],
- *   coarse: boolean, touch: boolean, viewportWidth: number, errors: string[], violations: string[] }} Checked
+ *   tablesWithoutEndPlus: string[], coarse: boolean, touch: boolean, viewportWidth: number, errors: string[],
+ *   violations: string[] }} Checked
  * One render as measured: `scrollWidth` is the document's; `targets` is null
  * where tap targets aren't checked (a mouse size); `rows` are the day rows
- * of every schedule table shown, and `pluses` their Insert Day "+"s.
+ * of every schedule table shown, and `pluses` their Insert Day "+"s;
+ * `tablesWithoutEndPlus` names the tables with no "+" below their last day.
  */
 
 /**
@@ -173,6 +186,7 @@ export function describeFailure(r) {
     ...(r.targets ?? []).map((t) => tapTargetProblem(t, r.viewportWidth)),
     misalignedRows(r.rows),
     misplacedPluses(r.pluses, r.rows),
+    ...r.tablesWithoutEndPlus.map((name) => `${name}: no Insert Day "+" below the last day`),
     ...r.errors,
     ...r.violations,
   ].filter((why) => typeof why === 'string');

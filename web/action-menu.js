@@ -6,8 +6,11 @@
 // it with focus back on the ⋮ button. A press anywhere outside it, Tab, or a
 // scroll/resize (it is placed against the button) also closes it.
 //
-// The menu is mounted on document.body with fixed positioning, so a scrolling
-// or clipped container (a day's Lessons cell) can't cut it off.
+// The menu is mounted on the page's <main> (else <body>; see popupHost) with
+// fixed positioning, so a scrolling or clipped container (a day's Lessons
+// cell) can't cut it off.
+
+import { popupHost } from './ui-components.js';
 
 /**
  * @typedef {{ label: string, disabled?: boolean, onSelect: () => any }} MenuItem
@@ -122,7 +125,7 @@ export function createMenuButton(label, getItems) {
       }
     });
 
-    document.body.appendChild(menu);
+    popupHost().appendChild(menu);
     place(menu, anchor);
     anchor.setAttribute('aria-expanded', 'true');
     document.addEventListener('pointerdown', onOutside, true);

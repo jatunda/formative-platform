@@ -149,6 +149,16 @@ describe('lesson-search', () => {
       expect(resultsDiv).toBeTruthy();
     });
 
+    it('is a labelled modal dialog, so it counts as a landmark of its own', async () => {
+      await showLessonSearchPopup({ onSelect: vi.fn() });
+      await vi.waitFor(() => expect(document.querySelector('.lesson-popup')).toBeTruthy());
+
+      const popup = document.querySelector('.lesson-popup');
+      expect(popup.getAttribute('role')).toBe('dialog');
+      expect(popup.getAttribute('aria-modal')).toBe('true');
+      expect(popup.getAttribute('aria-label')).toBe('Search lessons');
+    });
+
     it('should handle no lessons found', async () => {
       expectConsoleErrors();
       mockData.content = {};

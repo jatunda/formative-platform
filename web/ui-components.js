@@ -12,6 +12,25 @@ export function savingSpinner() {
 }
 
 /**
+ * A line icon in the teacher pages' .line-icon style (the clock's wrapper is
+ * clock/icons.js).
+ * @param {Parameters<typeof lineIcon>[0]} name
+ * @returns {SVGSVGElement}
+ */
+export function teacherIcon(name) {
+  return lineIcon(name, 'line-icon');
+}
+
+/**
+ * Where a pop-up that isn't a dialog (a menu, a toast) mounts: inside the
+ * page's <main> when it has one, so it sits in a landmark, else <body>.
+ * @returns {HTMLElement}
+ */
+export function popupHost() {
+  return document.querySelector('main') ?? document.body;
+}
+
+/**
  * A text glyph (e.g. "+") in a box the size of a line icon, so an icon
  * button showing text matches its line-icon neighbours. Text, not an icon or
  * emoji, so it looks the same in every browser and font.

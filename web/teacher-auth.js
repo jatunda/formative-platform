@@ -156,6 +156,9 @@ export class TeacherAuth {
 
       // Create modal box
       const modal = document.createElement('div');
+      modal.setAttribute('role', 'dialog');
+      modal.setAttribute('aria-modal', 'true');
+      modal.setAttribute('aria-labelledby', 'teacherAuthTitle');
       modal.style.cssText = `
         background: #2d3748;
         color: #e2e8f0;
@@ -168,7 +171,7 @@ export class TeacherAuth {
       `;
 
       modal.innerHTML = `
-        <h2 style="margin: 0 0 20px 0; color: #63b3ed; font-size: 1.3em;">Teacher Authentication</h2>
+        <h2 id="teacherAuthTitle" style="margin: 0 0 20px 0; color: #63b3ed; font-size: 1.3em;">Teacher Authentication</h2>
         <p style="margin: 0 0 15px 0; color: #a0aec0;">Enter your teacher password to access this page:</p>
         <input type="password" id="teacherPasswordInput" placeholder="Password" style="
           width: 100%;

@@ -12,6 +12,8 @@ import {
   getShiftAmount,
   withWorkingIndicator,
   savingSpinner,
+  teacherIcon,
+  popupHost,
   textIcon,
 } from '../../ui-components.js';
 import { lineIcon } from '../../line-icons.js';
@@ -102,6 +104,24 @@ describe('ui-components', () => {
       expect(spinner.getAttribute('class')).toBe('line-icon line-icon-spin');
       expect(spinner.innerHTML).toBe(lineIcon('spinner', 'x').innerHTML);
       expect(savingSpinner()).not.toBe(spinner);
+    });
+  });
+
+  describe('teacherIcon', () => {
+    it("is the named line icon in the teacher pages' line-icon style", () => {
+      const icon = teacherIcon('trash');
+      expect(icon.getAttribute('class')).toBe('line-icon');
+      expect(icon.innerHTML).toBe(lineIcon('trash', 'x').innerHTML);
+    });
+  });
+
+  describe('popupHost', () => {
+    it("is the page's <main> when it has one, else <body>", () => {
+      expect(popupHost()).toBe(document.body);
+      const main = document.createElement('main');
+      document.body.appendChild(main);
+      expect(popupHost()).toBe(main);
+      main.remove();
     });
   });
 
