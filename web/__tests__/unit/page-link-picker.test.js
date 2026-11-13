@@ -86,7 +86,7 @@ describe('showPageLinkPicker', () => {
 
     const searchInput = document.querySelector('.lesson-popup-search');
     searchInput.value = 'syl';
-    searchInput.oninput();
+    searchInput.dispatchEvent(new Event('input'));
 
     const buttons = [...document.querySelectorAll('.lesson-popup-result-btn')].map((b) => b.textContent);
     expect(buttons).toEqual(['Syllabus (/p/syllabus)']);
@@ -117,7 +117,7 @@ describe('showPageLinkPicker', () => {
     const searchInput = document.querySelector('.lesson-popup-search');
     pressKey(searchInput, 'ArrowDown');
     searchInput.value = 'a';
-    searchInput.oninput();
+    searchInput.dispatchEvent(new Event('input'));
     pressKey(searchInput, 'ArrowDown');
     pressKey(searchInput, 'Enter');
 

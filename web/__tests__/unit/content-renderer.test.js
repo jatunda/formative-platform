@@ -139,6 +139,15 @@ describe('spoilers', () => {
     expect(processInlineCode('a || b')).toBe('a || b');
   });
 
+  it('leaves "or" pipes in prose alone', () => {
+    expect(processInlineCode('if a || b || c then')).toBe('if a || b || c then');
+  });
+
+  it('still hides text with spaces inside, as long as it doesn\'t start or end with one', () => {
+    expect(processInlineCode('||x y||')).toBe(`${SPOILER_OPEN}x y</span>`);
+    expect(processInlineCode('|| x|| and ||y ||')).toBe('|| x|| and ||y ||');
+  });
+
   it('escapes HTML inside a spoiler', () => {
     expect(processInlineCode('||<b>||')).toBe(`${SPOILER_OPEN}&lt;b&gt;</span>`);
   });
@@ -228,6 +237,42 @@ describe('spoiler reveal on tap and keyboard', () => {
     spoiler.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', bubbles: true }));
     spoiler.parentElement.click();
     expect(spoiler.classList.contains('spoiler-revealed')).toBe(false);
+  });
+
+  it('a tap on a spoiler in an option label only toggles the spoiler, not the option', () => {
+    const label = document.createElement('label');
+    const radio = document.createElement('input');
+    radio.type = 'radio';
+    const text = document.createElement('span');
+    text.innerHTML = processInlineCode('Pick ||me||');
+    label.append(radio, text);
+    document.body.appendChild(label);
+
+    const spoiler = label.querySelector('.spoiler');
+    const event = new MouseEvent('click', { bubbles: true, cancelable: true });
+    spoiler.dispatchEvent(event);
+
+    expect(spoiler.classList.contains('spoiler-revealed')).toBe(true);
+    // jsdom doesn't pass a tap on a tabindex span to the label's radio, but
+    // Chromium does unless the click's default action is cancelled.
+    expect(event.defaultPrevented).toBe(true);
+    expect(radio.checked).toBe(false);
+  });
+
+  it('a tap on a spoiler in a collapsible title only toggles the spoiler, not the section', () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    renderContent({
+      title: 'T',
+      blocks: [{ type: 'question', content: [{ type: 'collapsible', title: 'Hint: ||x||', content: [{ type: 'text', value: 'body' }] }] }]
+    }, container);
+    const details = container.querySelector('details');
+
+    const spoiler = details.querySelector('summary .spoiler');
+    spoiler.click();
+
+    expect(spoiler.classList.contains('spoiler-revealed')).toBe(true);
+    expect(details.open).toBe(false);
   });
 
   it('installing twice still toggles once per tap', () => {

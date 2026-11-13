@@ -1,7 +1,8 @@
 // @ts-check
-// Pure calendar logic for school days (business days: Monday to Friday).
-// No Firebase or DOM: date-utils.js builds Day Index conversions on top of
-// these, and the student pages use them to label dates.
+// Pure calendar logic for business days (Monday to Friday, the days a Date
+// Offset counts) and the date labels built on them. No Firebase or DOM:
+// date-utils.js builds Day Index conversions on top of these, and the
+// student pages use them to label dates.
 
 /**
  * A local-time Date from a YYYY-MM-DD string.
@@ -14,10 +15,21 @@ export function createLocalDate(dateString) {
 }
 
 /**
+ * A Date's local calendar day as YYYY-MM-DD, the inverse of createLocalDate
+ * (e.g. for a <time datetime>).
+ * @param {Date} date
+ * @returns {string}
+ */
+export function localDateString(date) {
+  const pad = (/** @type {number} */ n) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+/**
  * @param {Date} date
  * @returns {boolean} True for Monday to Friday
  */
-function isSchoolDay(date) {
+function isBusinessDay(date) {
   const dayOfWeek = date.getDay(); // 0 = Sunday, 6 = Saturday
   return dayOfWeek >= 1 && dayOfWeek <= 5;
 }
@@ -33,7 +45,7 @@ export function addBusinessDays(startDate, businessDaysToAdd) {
   let daysAdded = 0;
   while (daysAdded < businessDaysToAdd) {
     date.setDate(date.getDate() + 1);
-    if (isSchoolDay(date)) {
+    if (isBusinessDay(date)) {
       daysAdded++;
     }
   }
@@ -52,7 +64,7 @@ export function getBusinessDaysBetween(startDate, endDate) {
   const end = new Date(endDate);
   let businessDays = 0;
   while (current <= end) {
-    if (isSchoolDay(current)) {
+    if (isBusinessDay(current)) {
       businessDays++;
     }
     current.setDate(current.getDate() + 1);
@@ -61,15 +73,15 @@ export function getBusinessDaysBetween(startDate, endDate) {
 }
 
 /**
- * The school day whose Do Nows the landing page lists on a given date: that
+ * The business day whose Do Nows the landing page lists on a given date: that
  * date on a weekday, the Friday before on a weekend (Today's Day Index counts
  * business days only, so a weekend still lands on Friday's Day Index).
  * @param {Date} date
  * @returns {Date}
  */
-export function listedSchoolDay(date) {
+export function listedBusinessDay(date) {
   const day = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  while (!isSchoolDay(day)) {
+  while (!isBusinessDay(day)) {
     day.setDate(day.getDate() - 1);
   }
   return day;
@@ -98,5 +110,5 @@ export function shortDateLabel(date) {
  * @returns {string}
  */
 export function doNowsHeading(today) {
-  return `${monthDayLabel(listedSchoolDay(today))} Do Nows`;
+  return `${monthDayLabel(listedBusinessDay(today))} Do Nows`;
 }

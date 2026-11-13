@@ -11,12 +11,15 @@
 let listCount = 0;
 
 /**
- * Wire the keys up. Call `refresh()` after every redraw of `list`; its
- * results are the `button`s inside it.
- * @param {{ popup: HTMLElement, input: HTMLInputElement, list: HTMLElement }} parts
- * @returns {{ refresh: () => void }}
+ * Wire the keys up and draw the list. `render(filter)` (re)draws `list`
+ * from the search box's text; the results are the `button`s inside it. The
+ * list is drawn now and on every edit of the search box; call `update()` to
+ * redraw it after any other filter in the popup changes.
+ * @param {{ popup: HTMLElement, input: HTMLInputElement, list: HTMLElement,
+ *   render: (filter: string) => void }} parts
+ * @returns {{ update: () => void }}
  */
-export function attachSearchListKeys({ popup, input, list }) {
+export function attachSearchListKeys({ popup, input, list, render }) {
   list.id = `search-list-${++listCount}`;
   list.setAttribute('role', 'listbox');
   input.setAttribute('role', 'combobox');
@@ -42,7 +45,8 @@ export function attachSearchListKeys({ popup, input, list }) {
     item.scrollIntoView?.({ block: 'nearest' });
   }
 
-  function refresh() {
+  function update() {
+    render(input.value);
     items = [...list.querySelectorAll('button')];
     items.forEach((item, i) => {
       item.id = `${list.id}-option-${i}`;
@@ -52,6 +56,7 @@ export function attachSearchListKeys({ popup, input, list }) {
     select(0);
   }
 
+  input.addEventListener('input', update);
   input.addEventListener('keydown', (event) => {
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault();
@@ -70,5 +75,6 @@ export function attachSearchListKeys({ popup, input, list }) {
     }
   });
 
-  return { refresh };
+  update();
+  return { update };
 }

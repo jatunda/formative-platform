@@ -3,13 +3,11 @@
  * Provides functions for creating and managing lesson UI components
  */
 
-import { ref, set } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js";
 import { DEFAULT_LESSON_TITLE } from './constants.js';
 import { withWorkingIndicator } from './ui-components.js';
 import { createMenuButton } from './action-menu.js';
 import { setupDragHandlers } from './drag-drop-utils.js';
-import { moveLessonBetweenDays } from './database-utils.js';
-import { getDb } from './database-handle.js';
+import { moveLessonBetweenDays, updateScheduleForDay } from './database-utils.js';
 
 /**
  * Create a lesson cluster: one row holding the Lesson's title button and a ⋮
@@ -118,7 +116,7 @@ export function createLessonClusterWithDB({
   };
 
   const writeDay = async (newLessons) => {
-    await set(ref(getDb(), `schedule/${classId}/${dayIndex}`), newLessons);
+    await updateScheduleForDay(classId, dayIndex, newLessons);
     onScheduleReload();
   };
 

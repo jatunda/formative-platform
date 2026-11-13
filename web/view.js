@@ -4,7 +4,7 @@ import { db } from './firebase-config.js';
 import { initializeDatabase } from './database-handle.js';
 import { lessonStore } from './lesson-store.js';
 import { getTodayDayIndex } from './date-utils.js';
-import { shortDateLabel } from './school-day.js';
+import { localDateString, shortDateLabel } from './business-days.js';
 import { renderMultipleContent } from './content-renderer.js';
 import { mountQuestionEmbeds } from './question-embed.js';
 import { NO_CONTENT_FOR_TODAY } from './constants.js';
@@ -19,8 +19,7 @@ initializeDatabase(db);
  * @param {Date} [today=new Date()]
  */
 export function renderTodayDate(slot, today = new Date()) {
-  const pad = (n) => String(n).padStart(2, "0");
-  slot.dateTime = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+  slot.dateTime = localDateString(today);
   slot.textContent = shortDateLabel(today);
 }
 

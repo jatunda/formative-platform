@@ -4,6 +4,7 @@
 import { CONTENT_NOT_FOUND } from './constants.js';
 import { PAGE_LINK_PATTERN, parsePageLinkMatch } from './page-links.js';
 import { QUESTION_LINK_PATTERN, parseQuestionLinkMatch } from './question-links.js';
+import { INLINE_CODE_PATTERN, matchAllOutsideInlineCode } from './inline-code.js';
 
 /**
  * A blockquote line: `> text`. A line starting `>>>` is a collapsible marker
@@ -155,9 +156,11 @@ function processMarkdownLinks(text) {
 /**
  * A spoiler: `||hidden text||`. Runs after links and formatting, so they
  * work inside it; inline code is already set aside, so `||x||` inside
- * backticks stays literal.
+ * backticks stays literal. Like Markdown emphasis, the hidden text can't
+ * start or end with whitespace, so `a || b || c` in prose stays as typed
+ * while `||x y||` is still a spoiler.
  */
-const SPOILER_PATTERN = /\|\|(.+?)\|\|/g;
+const SPOILER_PATTERN = /\|\|(?!\s)(.+?)(?<!\s)\|\|/g;
 
 /** Opening tag of a spoiler span; installSpoilerToggle reveals it on tap. */
 const SPOILER_OPEN_TAG = '<span class="spoiler" tabindex="0" role="button" aria-expanded="false">';
@@ -192,8 +195,11 @@ function installSpoilerToggle(doc) {
 		const onLink = target.closest('a') !== null;
 		// A link inside a revealed spoiler works as normal.
 		if (onLink && spoiler.classList.contains('spoiler-revealed')) return;
-		// A tap on a link inside a hidden spoiler reveals it rather than following the link.
-		if (onLink) event.preventDefault();
+		// A tap on a link inside a hidden spoiler reveals it rather than
+		// following the link; one in a Question option's <label> or a
+		// collapsible's <summary> doesn't also pick the option or toggle the
+		// section.
+		if (onLink || spoiler.closest('label, summary')) event.preventDefault();
 		toggleSpoiler(spoiler);
 	});
 
@@ -207,9 +213,6 @@ function installSpoilerToggle(doc) {
 }
 
 if (typeof document !== 'undefined') installSpoilerToggle(document);
-
-/** Backtick-enclosed inline code span. */
-const INLINE_CODE_PATTERN = /`([^`]+)`/g;
 
 /**
  * Stands in for an inline code span while links and formatting run: a
@@ -276,10 +279,7 @@ function expandQuestionLinkLines(rawLines) {
 	const expanded = [];
 	for (const rawLine of rawLines) {
 		// A Question Link typed inside backticks is literal code, not an embed.
-		const codeSpans = [...rawLine.matchAll(INLINE_CODE_PATTERN)]
-			.map((span) => [span.index, span.index + span[0].length]);
-		const matches = [...rawLine.matchAll(QUESTION_LINK_PATTERN)]
-			.filter((match) => !codeSpans.some(([start, end]) => match.index >= start && match.index < end));
+		const matches = matchAllOutsideInlineCode(rawLine, QUESTION_LINK_PATTERN);
 		if (matches.length === 0) {
 			expanded.push(rawLine);
 			continue;

@@ -81,13 +81,7 @@ export function showQuestionLinkPicker({ onSelect }) {
         }
       }
 
-      const keys = attachSearchListKeys({ popup, input: searchInput, list: resultsDiv });
-      searchInput.oninput = () => {
-        renderResults(searchInput.value);
-        keys.refresh();
-      };
-      renderResults('');
-      keys.refresh();
+      attachSearchListKeys({ popup, input: searchInput, list: resultsDiv, render: renderResults });
 
       box.appendChild(closeBtn);
       box.appendChild(searchInput);

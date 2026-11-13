@@ -73,6 +73,20 @@ describe('extractPageLinkSlugs', () => {
     expect(extractPageLinkSlugs(content)).toEqual(['syllabus']);
   });
 
+  it("doesn't count a Page Link typed inside inline code or a code block, which render as literal code", () => {
+    const content = {
+      title: 'T',
+      blocks: [{
+        type: 'question',
+        content: [
+          { type: 'text', value: 'Write `[[syllabus]]` to link.\nSee [[resources]], then `x`.' },
+          { type: 'code', value: '[[grading]]' }
+        ]
+      }]
+    };
+    expect(extractPageLinkSlugs(content)).toEqual(['resources']);
+  });
+
   it('ignores Section Links (no slug)', () => {
     const content = {
       title: 'T',

@@ -3,7 +3,7 @@ import {
   getClassDateOffset as getClassDateOffsetFromDB,
   setClassDateOffset as setClassDateOffsetInDB
 } from "./database-utils.js";
-import { addBusinessDays, createLocalDate, getBusinessDaysBetween, shortDateLabel } from "./school-day.js";
+import { addBusinessDays, createLocalDate, getBusinessDaysBetween, shortDateLabel } from "./business-days.js";
 
 /**
  * Default class start date in YYYY-MM-DD format

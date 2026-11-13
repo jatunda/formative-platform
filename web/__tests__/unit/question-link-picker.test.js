@@ -84,7 +84,7 @@ describe('showQuestionLinkPicker', () => {
 
     const searchInput = document.querySelector('.lesson-popup-search');
     searchInput.value = 'loop';
-    searchInput.oninput();
+    searchInput.dispatchEvent(new Event('input'));
 
     const buttons = [...document.querySelectorAll('.lesson-popup-result-btn')].map((b) => b.textContent);
     expect(buttons).toEqual(['Loops question ([[q:loops]])']);
@@ -120,7 +120,7 @@ describe('showQuestionLinkPicker', () => {
     pressKey(searchInput, 'ArrowDown');
     pressKey(searchInput, 'ArrowDown');
     searchInput.value = 'question';
-    searchInput.oninput();
+    searchInput.dispatchEvent(new Event('input'));
     pressKey(searchInput, 'Enter');
 
     expect(onSelect).toHaveBeenCalledWith({ slug: 'arrays', label: 'Arrays question' });

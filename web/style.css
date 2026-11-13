@@ -206,7 +206,7 @@ button:focus-visible {
   width: auto !important;
   min-width: auto !important;
   max-width: none !important;
-  padding: var(--spacing-sm) var(--spacing-md) !important;
+  padding: var(--delete-day-padding, var(--spacing-sm) var(--spacing-md)) !important;
   font-size: 14px !important;
   height: 100% !important;
   min-height: 60px !important;
@@ -277,7 +277,9 @@ button:focus-visible {
 
 .lesson-main-btn {
   font-weight: bold;
-  min-width: 200px;
+  /* A touch screen trades the 200px floor for the touch minimum. */
+  min-width: var(--touch-min, 200px);
+  min-height: var(--touch-min);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -777,6 +779,14 @@ select:focus {
   white-space: nowrap;
 }
 
+/* The delete-day column (schedule-day-view.js's createActionsCell). Narrow
+   screens tighten it with the other schedule cells. */
+.day-actions-cell {
+  text-align: center;
+  vertical-align: middle;
+  padding: var(--spacing-xs);
+}
+
 /* Insert-day rows are one cell spanning the row; they must not shrink. */
 .schedule-table td.insert-day-cell,
 #scheduleTable td.insert-day-cell {
@@ -856,9 +866,10 @@ select:focus {
   flex-shrink: 0;
 }
 
+/* Hidden with display: none, not visibility, so the 240px box doesn't widen
+   the page (a sideways scroll on a phone) while nobody is looking at it. */
 .info-tooltip-text {
-  visibility: hidden;
-  opacity: 0;
+  display: none;
   position: absolute;
   bottom: 130%;
   left: 0;
@@ -873,22 +884,22 @@ select:focus {
   font-weight: normal;
   line-height: 1.4;
   z-index: 20;
-  transition: opacity var(--transition-fast);
   pointer-events: none;
 }
 
 .info-tooltip:hover .info-tooltip-text,
 .info-tooltip:focus-visible .info-tooltip-text {
-  visibility: visible;
-  opacity: 1;
+  display: block;
 }
 
 /* ========================================
    Teacher nav (Full Schedule / Lesson Planning / Content Editor)
    ======================================== */
+/* Wraps onto a second line on a phone rather than running off the side. */
 .teacher-nav {
   display: flex;
-  gap: var(--spacing-lg);
+  flex-wrap: wrap;
+  gap: var(--spacing-xs) var(--spacing-lg);
   margin-bottom: 1rem;
 }
 
@@ -951,29 +962,30 @@ td > * {
   width: auto;
   padding: 0.3rem 0.5rem;
   line-height: 1;
+  min-width: var(--touch-min-icon, var(--touch-min));
+  min-height: var(--touch-min);
 }
 
-/* Touch screens: keep the icons, and each Lesson's title and ⋮ button, a
-   comfortable finger-sized target (44px, the usual touch minimum). */
+/* Touch screens: the icons, and each Lesson's title and ⋮ button, read
+   --touch-min for a comfortable finger-sized target (44px, the usual touch
+   minimum). Unset elsewhere, so those rules fall back to their own sizes. */
 @media (pointer: coarse) {
-  .schedule-icon-btn,
-  .action-menu-btn,
-  .lesson-cluster .lesson-main-btn {
-    min-width: 44px;
-    min-height: 44px;
+  :root {
+    --touch-min: 44px;
   }
 }
 
 /* Touch phones in portrait: a day with one Lesson must still fit 375px, so
    these keep the full 44px height but give up some width (the ⋮ glyph is
-   thin, and the title needs the room more). */
+   thin, and the title needs the room more). Measured at 375px: 44px widths
+   push the row about 20px wider and shrink the title to 50px. */
 @media (pointer: coarse) and (max-width: 600px) {
-  .lesson-cluster .action-menu-btn {
-    min-width: 32px;
+  :root {
+    --touch-min-icon: 40px;
   }
 
-  .schedule-icon-btn {
-    min-width: 40px;
+  .lesson-cluster {
+    --touch-min-menu: 32px;
   }
 }
 
@@ -1022,6 +1034,8 @@ td > * {
   width: auto;
   padding: 0.3rem 0.4rem;
   line-height: 1;
+  min-width: var(--touch-min-menu, var(--touch-min));
+  min-height: var(--touch-min);
 }
 
 .action-menu {
@@ -2130,13 +2144,16 @@ ol.lesson-list {
     gap: var(--spacing-xxs);
   }
 
+  /* Measured at 375px: with 4px cell padding and the delete button's 8px
+     sides, a one-Lesson day overflowed its pane by 14px (Lesson Planning)
+     to 18px (Full Schedule). */
   .schedule-table td,
   #scheduleTable td {
-    padding: var(--spacing-xs);
+    padding: var(--spacing-xxs);
   }
 
   .delete-day-btn {
-    padding: var(--spacing-xs) var(--spacing-sm) !important;
+    --delete-day-padding: var(--spacing-xs);
   }
 
   .lesson-cluster {
@@ -2160,20 +2177,9 @@ ol.lesson-list {
     max-width: none;
   }
 
-  .lesson-cluster .action-menu-btn {
-    padding: 0.3rem 0.4rem;
-  }
-
   .lesson-collapsible .lesson-collapsible {
     margin-left: var(--spacing-xxs);
     padding-left: 0;
-  }
-
-  /* The icon buttons carry their own touch-target sizing (pointer: coarse,
-     next to .schedule-icon-btn); this query's bigger padding would only
-     widen the row on a narrow screen. */
-  .lessons-end-buttons button {
-    padding: 0.3rem 0.5rem;
   }
 
   /* .schedule-action-btn has a fixed 110px width (see "Button Variants"
@@ -2201,8 +2207,9 @@ ol.lesson-list {
 /* ========================================
    Do Now page header row: the back link on the left, today's date on the
    right. Pulled up into the body padding and with a small gap below, so it
-   takes less height than a plain nav line; the link keeps its padded,
-   full-line-height tap area.
+   takes less height than a plain nav line. The link's tap area reaches
+   past its box (an invisible ::before) to the 44px touch minimum, so the
+   row stays short and the underline stays put.
    ======================================== */
 .do-now-header {
   display: flex;
@@ -2210,6 +2217,16 @@ ol.lesson-list {
   justify-content: space-between;
   gap: var(--spacing-md);
   margin: calc(-1 * var(--spacing-sm)) 0 var(--spacing-xs);
+}
+
+.do-now-header a {
+  position: relative;
+}
+
+.do-now-header a::before {
+  content: "";
+  position: absolute;
+  inset: calc(-1 * var(--spacing-sm)) 0;
 }
 
 .do-now-header time {

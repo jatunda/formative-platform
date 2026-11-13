@@ -183,7 +183,7 @@ describe('lesson-search', () => {
       const searchInput = document.querySelector('.lesson-popup-search');
       pressKey(searchInput, 'ArrowDown');
       searchInput.value = 'algorithms';
-      searchInput.oninput();
+      searchInput.dispatchEvent(new Event('input'));
       pressKey(searchInput, 'ArrowDown');
       pressKey(searchInput, 'Enter');
 

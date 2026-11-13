@@ -7,11 +7,6 @@
  * instead of two. See docs/adr/0002-extract-shared-schedule-editing-module.md.
  */
 
-import {
-  ref,
-  get,
-  set
-} from "https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js";
 import { DEFAULT_LESSON_TITLE, UNTITLED_LESSON } from './constants.js';
 import {
   createIconButton,
@@ -25,10 +20,11 @@ import { showNotification } from './notification-utils.js';
 import { showConfirm } from './confirm-dialog.js';
 import {
   insertDayAt,
-  deleteDayAt
+  deleteDayAt,
+  addLessonToSchedule,
+  moveLessonBetweenDays
 } from './database-utils.js';
 import { lessonStore } from './lesson-store.js';
-import { getDb } from './database-handle.js';
 
 // Lesson titles are keyed by Lesson id, which is global (not per-Class),
 // so a single cache here is correct even when multiple Classes are rendered
@@ -125,9 +121,7 @@ export function createInsertDayRow(dayIndex, onInsert) {
  */
 export function createActionsCell(dayIndex, onDeleteDay) {
   const tdActions = document.createElement("td");
-  tdActions.style.textAlign = "center";
-  tdActions.style.verticalAlign = "middle";
-  tdActions.style.padding = "4px";
+  tdActions.className = "day-actions-cell";
 
   const deleteButton = document.createElement("button");
   deleteButton.textContent = "🗑️";
@@ -146,11 +140,7 @@ export function createActionsCell(dayIndex, onDeleteDay) {
  * @param {{classId: string, onReload: () => void}} ctx
  */
 async function appendLessonToDay(lessonId, dayIndex, ctx) {
-  const dayRef = ref(getDb(), `schedule/${ctx.classId}/${dayIndex}`);
-  const snap = await get(dayRef);
-  const lessons = snap.exists() ? snap.val() : [];
-  lessons.push(lessonId);
-  await set(dayRef, lessons);
+  await addLessonToSchedule(ctx.classId, dayIndex, lessonId);
   ctx.onReload();
 }
 
@@ -210,7 +200,7 @@ export function createDateCell(dateLabels) {
  */
 export function setupLessonDropHandlers(tdLessons, toDayIndex, ctx) {
   setupDropHandlers(tdLessons, async (data) => {
-    const { lessonHash, fromDayIndex, fromLessonIndex, classId: fromClassId } = data;
+    const { fromDayIndex, fromLessonIndex, classId: fromClassId } = data;
 
     // Block drops originating from a different Class's pane.
     if (fromClassId && fromClassId !== ctx.classId) return;
@@ -218,21 +208,8 @@ export function setupLessonDropHandlers(tdLessons, toDayIndex, ctx) {
     // Prevent dropping into the same day
     if (Number(fromDayIndex) === Number(toDayIndex)) return;
 
-    const [fromSnap, toSnap] = await Promise.all([
-      get(ref(getDb(), `schedule/${ctx.classId}/${fromDayIndex}`)),
-      get(ref(getDb(), `schedule/${ctx.classId}/${toDayIndex}`))
-    ]);
-
-    const fromLessons = fromSnap.exists() ? fromSnap.val() : [];
-    const toLessons = toSnap.exists() ? toSnap.val() : [];
-
-    fromLessons.splice(fromLessonIndex, 1);
-    toLessons.push(lessonHash);
-
-    await Promise.all([
-      set(ref(getDb(), `schedule/${ctx.classId}/${fromDayIndex}`), fromLessons),
-      set(ref(getDb(), `schedule/${ctx.classId}/${toDayIndex}`), toLessons)
-    ]);
+    // The same move the ⋮ menu's "Move to previous/next day" makes.
+    await moveLessonBetweenDays(ctx.classId, Number(fromDayIndex), Number(fromLessonIndex), toDayIndex);
     ctx.onReload();
   }, {
     // Reject the hover state (and let the browser show its "not allowed"

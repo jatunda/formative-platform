@@ -53,6 +53,20 @@ describe('extractQuestionLinkSlugs', () => {
     expect(extractQuestionLinkSlugs(content)).toEqual(['loops-1']);
   });
 
+  it("doesn't count a Question Link typed inside inline code or a code block, which render as literal code", () => {
+    const content = {
+      title: 'T',
+      blocks: [{
+        type: 'question',
+        content: [
+          { type: 'text', value: 'Write `[[q:loops-1]]` to embed.\nTry [[q:loops-2]], then `x`.' },
+          { type: 'code', value: '[[q:loops-3]]' }
+        ]
+      }]
+    };
+    expect(extractQuestionLinkSlugs(content)).toEqual(['loops-2']);
+  });
+
   it('finds Question Links nested inside a collapsible', () => {
     const content = {
       title: 'T',
