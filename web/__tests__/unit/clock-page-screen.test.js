@@ -1,15 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { initClockApp } from '../../clock/clock.js';
-import { SETTINGS_KEY } from '../../clock/clock-storage.js';
 import { createFakeStorage } from '../helpers/fake-storage.js';
 import { createFakeSoundPlayer } from '../helpers/fake-sound-player.js';
 import { createFakeFullscreen, createFakePictureInPicture, createFakeWakeLock } from '../helpers/fake-screen.js';
+import { button, clockMount as mount, createRealClock, openClockPage, storageWith } from '../helpers/clock-page.js';
 
 const SEC = 1000;
-const mount = () => document.getElementById('clockApp');
-/** A visible button by its accessible name (its aria-label, else its text). */
-const button = (name, root = mount()) => [...root.querySelectorAll('button')]
-  .find((b) => (b.getAttribute('aria-label') ?? b.textContent.trim()) === name && !b.closest('[hidden]'));
 const bigReadout = () => mount().querySelector('.clock-readout--big .clock-readout__face').textContent.replace(/\s+/g, ' ').trim();
 const ringing = () => mount().querySelector('[role="alertdialog"]');
 /** Let the capability promises (fullscreen, wake lock, PiP) settle. */
@@ -20,25 +15,24 @@ const at = (h, m, s = 0) => new Date(2026, 9, 27, h, m, s);
 
 describe('School Clock fullscreen, mini player and feedback', () => {
   let app;
-  let t;
+  let clock;
   let player;
   let fullscreen;
   let wakeLock;
   let pip;
 
-  const advance = (ms) => { t += ms; vi.advanceTimersByTime(ms); };
+  const advance = (ms) => clock.advance(ms);
 
   /** Open the page on an HS device at `when`, with the given capabilities (all present by default). */
   function open({ when = at(11, 12), settings = { division: 'HS' }, capabilities = {} } = {}) {
-    t = when.getTime();
+    clock = createRealClock(when);
     player = createFakeSoundPlayer({ state: 'running' });
     fullscreen = createFakeFullscreen();
     wakeLock = createFakeWakeLock();
     pip = createFakePictureInPicture();
-    app = initClockApp({
-      realNow: () => t,
-      storage: createFakeStorage({ [SETTINGS_KEY]: JSON.stringify(settings) }),
-      tabStorage: createFakeStorage(),
+    app = openClockPage({
+      clock,
+      storage: storageWith(settings),
       soundPlayer: player,
       prefersReducedMotion: () => false,
       capabilities: { fullscreen, wakeLock, pictureInPicture: pip, ...capabilities },
@@ -511,10 +505,9 @@ describe('School Clock fullscreen, mini player and feedback', () => {
   });
 
   it("detects the browser's own capabilities when none are passed in (jsdom has none)", () => {
-    app = initClockApp({
-      realNow: () => at(11, 12).getTime(),
+    app = openClockPage({
+      clock: createRealClock(at(11, 12)),
       storage: createFakeStorage(),
-      tabStorage: createFakeStorage(),
       soundPlayer: createFakeSoundPlayer(),
     });
     expect(button('Fullscreen')).toBeUndefined();

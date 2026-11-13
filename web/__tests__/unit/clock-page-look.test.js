@@ -1,17 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { initClockApp } from '../../clock/clock.js';
-import { SETTINGS_KEY } from '../../clock/clock-storage.js';
 import { createFakeStorage } from '../helpers/fake-storage.js';
 import { createFakeSoundPlayer } from '../helpers/fake-sound-player.js';
+import { accessibleName, isShown } from '../helpers/clock-dom.js';
 import { createFakePictureInPicture } from '../helpers/fake-screen.js';
+import {
+  button, clockMount as mount, createRealClock, openClockPage, savedSettings as saved, storageWith,
+} from '../helpers/clock-page.js';
 
-const mount = () => document.getElementById('clockApp');
 const html = () => document.documentElement;
-const isShown = (node) => !node.closest('[hidden]');
-const nameOf = (node) => (node.getAttribute('aria-label') ?? node.textContent.replace(/\s+/g, ' ').trim());
-/** A visible button by its accessible name (its aria-label, else its text). */
-const button = (name, root = mount()) => [...root.querySelectorAll('button')]
-  .find((b) => nameOf(b) === name && isShown(b));
 const look = () => ({
   mode: html().getAttribute('data-mode'),
   palette: html().getAttribute('data-palette'),
@@ -50,7 +46,6 @@ const toggleFlip = () => {
 const key = (target, k, init = {}) =>
   target.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true, ...init }));
 const hint = () => [...mount().querySelectorAll('[role="note"]')].find((n) => n.textContent.includes('Pick a theme'));
-const saved = (storage) => JSON.parse(storage.getItem(SETTINGS_KEY));
 
 // Tue 2026-10-27, in Period 3.
 const AT = new Date(2026, 9, 27, 10, 32).getTime();
@@ -63,14 +58,14 @@ describe('School Clock look', () => {
   function open() {
     app?.destroy();
     pip = createFakePictureInPicture();
-    app = initClockApp({
-      realNow: () => AT, storage, tabStorage: createFakeStorage(),
+    app = openClockPage({
+      clock: createRealClock(AT), storage,
       soundPlayer: createFakeSoundPlayer({ state: 'running' }), prefersReducedMotion: () => false,
       capabilities: { fullscreen: null, wakeLock: null, pictureInPicture: pip },
     });
   }
   const withSettings = (settings) => {
-    storage = createFakeStorage({ [SETTINGS_KEY]: JSON.stringify({ division: 'HS', themeHint: false, ...settings }) });
+    storage = storageWith({ division: 'HS', themeHint: false, ...settings });
   };
   const openLook = () => {
     button('Look').click();
@@ -113,7 +108,7 @@ describe('School Clock look', () => {
   describe('the Look sheet', () => {
     it('opens from Look in the top bar, between Readouts and Settings, as a dialog that takes focus', () => {
       open();
-      const names = [...mount().querySelectorAll('.clock-controls .clock-control')].map(nameOf);
+      const names = [...mount().querySelectorAll('.clock-controls .clock-control')].map(accessibleName);
       expect(names.indexOf('Look')).toBe(names.indexOf('Readouts') + 1);
       expect(names.indexOf('Settings')).toBe(names.indexOf('Look') + 1);
       expect(button('Look').getAttribute('aria-haspopup')).toBe('dialog');

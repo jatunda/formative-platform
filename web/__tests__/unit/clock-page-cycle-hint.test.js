@@ -1,13 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { initClockApp } from '../../clock/clock.js';
-import { SETTINGS_KEY } from '../../clock/clock-storage.js';
 import { createFakeStorage } from '../helpers/fake-storage.js';
 import { createFakeSoundPlayer } from '../helpers/fake-sound-player.js';
 import { createFakePictureInPicture } from '../helpers/fake-screen.js';
+import { button, clockMount as mount, createRealClock, openClockPage, storageWith } from '../helpers/clock-page.js';
 
 const SEC = 1000;
 const HINT = 'Click to change what this shows';
-const mount = () => document.getElementById('clockApp');
 /** The tooltip in `root`, if it's showing. */
 const shownHint = (root = mount()) => [...root.querySelectorAll('[role="note"]')]
   .find((n) => n.textContent === HINT && !n.closest('[hidden]'));
@@ -23,29 +21,29 @@ let pip;
 
 describe('School Clock: the first-time "click to change" tooltip', () => {
   let app;
-  let t;
+  let clock;
   let storage;
 
-  const advance = (ms) => { t += ms; vi.advanceTimersByTime(ms); };
+  const advance = (ms) => clock.advance(ms);
 
   function open() {
     app?.destroy();
-    t = AT;
+    clock = createRealClock(AT);
     pip = createFakePictureInPicture();
-    app = initClockApp({
-      realNow: () => t, storage, tabStorage: createFakeStorage(),
+    app = openClockPage({
+      clock, storage,
       soundPlayer: createFakeSoundPlayer({ state: 'running' }), prefersReducedMotion: () => false,
       capabilities: { fullscreen: null, wakeLock: null, pictureInPicture: pip },
     });
   }
   async function openMini() {
-    [...mount().querySelectorAll('button')].find((b) => b.getAttribute('aria-label') === 'Mini player').click();
+    button('Mini player').click();
     await settle();
   }
 
   beforeEach(() => {
     vi.useFakeTimers();
-    storage = createFakeStorage({ [SETTINGS_KEY]: JSON.stringify({ division: 'HS', themeHint: false }) });
+    storage = storageWith({ division: 'HS', themeHint: false });
     document.body.innerHTML = '<div id="clockApp"></div>';
   });
 
@@ -161,7 +159,7 @@ describe('School Clock: the first-time "click to change" tooltip', () => {
       key(pip.window.document, 'Escape');
       expect(shownHint(miniBody())).toBeUndefined();
 
-      storage = createFakeStorage({ [SETTINGS_KEY]: JSON.stringify({ division: 'HS', themeHint: false }) });
+      storage = storageWith({ division: 'HS', themeHint: false });
       open();
       await openMini();
       advance(7 * SEC);
@@ -186,7 +184,7 @@ describe('School Clock: the first-time "click to change" tooltip', () => {
     });
 
     it('waits while the Readout cannot be clicked (just the time)', async () => {
-      storage = createFakeStorage({ [SETTINGS_KEY]: JSON.stringify({ themeHint: false }) });
+      storage = storageWith({ themeHint: false });
       open();
       await openMini();
       expect(shownHint(miniBody())).toBeUndefined();
