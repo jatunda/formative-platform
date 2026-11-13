@@ -222,8 +222,11 @@ export function setupLessonDropHandlers(tdLessons, toDayIndex, ctx) {
  * @param {number|undefined} todayDayIndex - Today's Day Index, for highlighting
  * @param {string} dateLabel - This Day Index's calendar date (see getDateForDayIndex)
  * @param {{classId: string, onReload: () => void, onDeleteDay: (dayIndex: number) => void,
- *   onInsertDay?: (dayIndex: number) => void}} ctx - With onInsertDay, the row gets an
- *   Insert Day "+" on the line above it (see addInsertDayPlus)
+ *   onInsertDay?: (dayIndex: number) => void, lastDayIndex?: number}} ctx - With
+ *   onInsertDay, a day on or before `lastDayIndex` (the last stored Day Index)
+ *   gets an Insert Day "+" on the line above it (see addInsertDayPlus). Past it,
+ *   inserting would only add an empty day, which the database doesn't store, so
+ *   there is no "+" (ticket 13); the add-day row adds days there instead.
  * @returns {Promise<HTMLTableRowElement>}
  */
 export async function createDayRow(dayIndex, lessons, todayDayIndex, dateLabel, ctx) {
@@ -262,7 +265,7 @@ export async function createDayRow(dayIndex, lessons, todayDayIndex, dateLabel, 
 
   tr.appendChild(tdLessons);
   tr.appendChild(createActionsCell(dayIndex, ctx.onDeleteDay));
-  if (ctx.onInsertDay) addInsertDayPlus(tr, dayIndex, ctx.onInsertDay);
+  if (ctx.onInsertDay && dayIndex <= (ctx.lastDayIndex ?? -1)) addInsertDayPlus(tr, dayIndex, ctx.onInsertDay);
 
   return tr;
 }

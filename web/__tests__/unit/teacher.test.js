@@ -256,15 +256,31 @@ describe('teacher', () => {
       expect(createDayRow.mock.calls.map((c) => c[4].onInsertDay)).toEqual([onInsertDay, onInsertDay]);
     });
 
-    it('puts one more "+" below the last day, inserting a day before the add-day row', async () => {
+    it('tells each day row the last stored Day Index, so every day up to it gets a "+"', async () => {
       scheduleFixture();
-      const { addInsertDayPlus, makeInsertDayHandler } = await import('../../schedule-day-view.js');
+      const { createDayRow } = await import('../../schedule-day-view.js');
 
-      await renderScheduleTable({ 0: [], 1: [] }, 'csa');
+      await renderScheduleTable({ 0: ['a'], 2: ['b'] }, 'csa');
 
-      const onInsertDay = makeInsertDayHandler.mock.results.at(-1).value;
-      const lastDay = document.querySelector('.day-row[data-day-index="1"]');
-      expect(addInsertDayPlus).toHaveBeenCalledWith(lastDay, 2, onInsertDay, 'below');
+      expect(createDayRow.mock.calls.map((c) => c[4].lastDayIndex)).toEqual([2, 2, 2]);
+    });
+
+    it('an empty Schedule has no last stored day, so its day 0 gets no "+"', async () => {
+      scheduleFixture();
+      const { createDayRow } = await import('../../schedule-day-view.js');
+
+      await renderScheduleTable({}, 'csa');
+
+      expect(createDayRow.mock.calls.at(-1)[4].lastDayIndex).toBe(-1);
+    });
+
+    it('puts no "+" below the last day: the add-day row adds a day after it (ticket 13)', async () => {
+      scheduleFixture();
+      const { addInsertDayPlus } = await import('../../schedule-day-view.js');
+
+      await renderScheduleTable({ 0: ['a'], 1: ['b'] }, 'csa');
+
+      expect(addInsertDayPlus).not.toHaveBeenCalled();
     });
 
     it("gives each day row that Day Index's date label", async () => {

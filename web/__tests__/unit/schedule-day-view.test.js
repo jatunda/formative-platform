@@ -232,7 +232,7 @@ describe('schedule-day-view', () => {
 
   describe('Insert Day "+"', () => {
     const plusesOf = (row) => [...row.querySelectorAll('button[aria-label="Insert day here"]')];
-    const ctxWith = (onInsertDay) => ({ classId: 'class1', onReload, onDeleteDay: vi.fn(), onInsertDay });
+    const ctxWith = (onInsertDay, lastDayIndex = 9) => ({ classId: 'class1', onReload, onDeleteDay: vi.fn(), onInsertDay, lastDayIndex });
 
     it('a day row has one "+" in its Day Index cell, on the line above it, inserting a day at that Day Index', async () => {
       const onInsertDay = vi.fn();
@@ -254,6 +254,24 @@ describe('schedule-day-view', () => {
 
     it('a day row built without an insert handler has no "+"', async () => {
       const row = await createDayRow(4, [], undefined, 'Mon 11/2', { classId: 'class1', onReload, onDeleteDay: vi.fn() });
+
+      expect(plusesOf(row)).toHaveLength(0);
+    });
+
+    it('a day on or before the last stored day keeps its "+"', async () => {
+      const row = await createDayRow(4, ['a'], undefined, 'Mon 11/2', ctxWith(vi.fn(), 4));
+
+      expect(plusesOf(row)).toHaveLength(1);
+    });
+
+    it('a day past the last stored day has no "+": inserting there would only add an empty day, which is not stored', async () => {
+      const row = await createDayRow(5, [], undefined, 'Mon 11/2', ctxWith(vi.fn(), 4));
+
+      expect(plusesOf(row)).toHaveLength(0);
+    });
+
+    it('with an insert handler but no last stored day (an empty Schedule), a day row has no "+"', async () => {
+      const row = await createDayRow(0, [], undefined, 'Mon 11/2', { classId: 'class1', onReload, onDeleteDay: vi.fn(), onInsertDay: vi.fn() });
 
       expect(plusesOf(row)).toHaveLength(0);
     });

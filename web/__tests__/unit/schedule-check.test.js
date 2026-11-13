@@ -91,7 +91,7 @@ describe('insertPlusMisplacement (ticket 10)', () => {
 const checked = (change = {}) => ({
   scrollWidth: 375, viewportWidth: 375, touch: true, coarse: true,
   shortTables: [{ name: 'P1', lessonsPerDay: 1, contentWidth: 359, paneWidth: 359 }],
-  targets: [target(44, 44)], rows: [dayRow([0, 50], [0, 50])], pluses: [plus(10, 100)], tablesWithoutEndPlus: [], errors: [], violations: [], ...change,
+  targets: [target(44, 44)], rows: [dayRow([0, 50], [0, 50])], pluses: [plus(10, 100)], strayPluses: [], errors: [], violations: [], ...change,
 });
 
 describe('describeFailure', () => {
@@ -126,9 +126,9 @@ describe('describeFailure', () => {
     expect(describeFailure(checked({ pluses: [] }))).toEqual(['no Insert Day "+" beside the 1 day rows']);
   });
 
-  it('reports a schedule table with no Insert Day "+" below its last day (ticket 10)', () => {
-    expect(describeFailure(checked({ tablesWithoutEndPlus: ['P1'] })))
-      .toEqual(['P1: no Insert Day "+" below the last day']);
+  it('reports an Insert Day "+" past the last stored day, where it would only add an empty day (ticket 13)', () => {
+    expect(describeFailure(checked({ strayPluses: ['below P1 day 12'] })))
+      .toEqual(['Insert Day "+" below P1 day 12 is past the last stored day']);
   });
 
   it('reports a browser whose pointer does not match the size', () => {
