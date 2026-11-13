@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createSoundPlayer, ringLength, ringSeconds, shownSeconds, silentContext, SOUNDS, SOUND_NAMES, BELL_SECONDS, ALARM_MAX_SECONDS } from '../../clock/sound.js';
+import { createSoundPlayer, ringLength, silentContext, SOUNDS, SOUND_NAMES, BELL_SECONDS, ALARM_MAX_SECONDS } from '../../clock/sound.js';
 import { createFakeAudioContext, audibleStarts } from '../helpers/fake-audio.js';
 
 const bell = (key, at, sound = 'softBell') => ({ key, at, sound, repeat: false });
@@ -662,22 +662,6 @@ describe('School Clock sound player', () => {
     expect(ringLength('chime', 5)).toBeCloseTo(6);
     // Beep: ten passes, the last at 4.5 s.
     expect(ringLength('beep', 5)).toBeCloseTo(4.9);
-  });
-
-  it('stops a Bell starting new passes after 5 s, and leaves Alarms, the timer and a kept Bell to ring their minute', () => {
-    expect(ringSeconds('bell', { untilDismissed: false })).toBe(5);
-    expect(ringSeconds('bell', {})).toBe(5);
-    expect(ringSeconds('bell', { untilDismissed: true })).toBeUndefined();
-    for (const source of ['clockAlarm', 'periodAlarm', 'timer']) {
-      expect(ringSeconds(source, { untilDismissed: false })).toBeUndefined();
-    }
-  });
-
-  it('shows a Bell that stops on its own until its sound ends, and an Alarm for its minute', () => {
-    // Clock tower plays its one 7.4 s pass to the end, past the Bell's 5 s.
-    expect(shownSeconds('bell', 'clockTower', {})).toBeCloseTo(7.4);
-    expect(shownSeconds('bell', 'clockTower', { untilDismissed: true })).toBeUndefined();
-    expect(shownSeconds('timer', 'chime', {})).toBeUndefined();
   });
 
   it('measures a ring on a silent context that takes any node or param call a voice could make', () => {

@@ -9,7 +9,8 @@
 // onto its audio clock, so they play on time even when this tab's timers are
 // throttled behind other windows. The window is redone when settings change,
 // when the tab is shown again, when sound turns on, and as it rolls forward.
-import { alarmsAfterRinging, describeMoment, ringsInWindow } from './clock-model.js';
+// What rings when, and for how long, is ringing.js's; this page shows it.
+import { alarmsAfterRinging, describeMoment } from './clock-model.js';
 import { createHintStore, createSettingsStore } from './clock-storage.js';
 import { createClockSource } from './clock-source.js';
 import { createCycleHint } from './cycle-hint.js';
@@ -23,7 +24,8 @@ import { createMiniPlayer } from './mini-player.js';
 import { createDivisionPrompt, createErrorToast, createRingCard, createSoundPrompt } from './overlays.js';
 import { addReadout, canAddReadout, createLayoutStore, cycleReadout, newLayout, removeReadout } from './readout-layout.js';
 import { UNTIL_END, readoutParts, readoutValue, untilEndOf } from './readouts.js';
-import { TEST_RING_WORDS, nextRingLines, ringWords } from './ring-words.js';
+import { nextRingLines } from './ring-words.js';
+import { createRinging } from './ringing.js';
 import { createReadoutsView } from './readouts-view.js';
 import { createStageTextView } from './stage-text-view.js';
 import { SCHOOL_YEARS } from './school-years.js';
@@ -31,22 +33,13 @@ import { createWakeLockKeeper, detectCapabilities } from './screen.js';
 import { createAlarmEditor } from './alarm-editor.js';
 import { createSettingsDrawer } from './settings-drawer.js';
 import { applyLook, createLookSheet, decorations } from './look-sheet.js';
-import { ALARM_MAX_SECONDS, createSoundPlayer, ringSeconds, shownSeconds } from './sound.js';
-import { cancelTimer, nameTimer, pauseTimer, resumeTimer, settleTimer, timerRingView, timerStatus } from './timer.js';
+import { createSoundPlayer } from './sound.js';
+import { cancelTimer, createTabTimer, nameTimer, pauseTimer, resumeTimer } from './timer.js';
 import { createTimerPicker } from './timer-picker.js';
 import { createTimerRing } from './timer-ring.js';
 import { keepRingClear } from './ring-fit.js';
 
 const TICK_MS = 1000;
-/** How far ahead (real time) rings are handed to the sound player: past the
- * minute-long timer throttling of a background tab. */
-const LOOKAHEAD_MS = 5 * 60 * 1000;
-/** Rings this recent (real time) stay in the window, so one already playing is
- * kept rather than cancelled when the window is redone. */
-const GRACE_MS = 1000;
-/** Rings older than this (real time) when a tick finally reaches them were
- * missed while the tab slept or was throttled: they don't ring late. */
-const STALE_MS = 5 * 1000;
 
 let destroyActiveApp = null;
 
@@ -63,15 +56,6 @@ function textFor(settings) {
     name: (segment) => formatSegmentName(segment, settings.periodLabels),
     division: settings.division,
   };
-}
-
-/**
- * A name for one ring that stays the same each time the window is redone, so
- * the sound player can tell a ring it already has from a new one.
- * @param {import('./clock-model.js').Ring} ring
- */
-function ringKey(ring) {
-  return `${ring.at.getTime()}|${ring.source}|${'alarm' in ring ? ring.alarm.id : ''}`;
 }
 
 /** Whether the browser asks for less motion (no flashing). */
@@ -121,22 +105,19 @@ export function initClockApp({
 
   const clock = createClockSource({ search, realNow });
   const store = createSettingsStore(storage);
-  let settings = store.load();
-  let lastTick = new Date(clock.now());
   // Simulated time affects only this tab: its timer lives in memory, and the
   // real timer saved by other tabs is neither loaded, cleared nor overwritten.
-  const savedTimer = {
-    timerEndsAt: settings.timerEndsAt, timerPausedMs: settings.timerPausedMs, timerTotalMs: settings.timerTotalMs,
-    timerName: settings.timerName,
-  };
-  if (clock.simulated) settings = { ...settings, ...cancelTimer() };
+  const tabTimer = createTabTimer(store.load(), { simulated: clock.simulated });
+  let settings = tabTimer.settings;
+  let lastTick = new Date(clock.now());
+  const ringing = createRinging({ realNow, speed: clock.speed, schoolYears });
   // Saving can fail (storage full or blocked): the page says so once, and
   // carries on with the change in memory.
   const saveError = createErrorToast("Couldn't save on this device. Changes last until this tab closes.");
   let saveErrorShown = false;
   /** Save the settings (in simulated time, with the real timer as it was saved). */
   function saveSettings() {
-    if (store.save(clock.simulated ? { ...settings, ...savedTimer } : settings) || saveErrorShown) return;
+    if (store.save(tabTimer.toSave(settings)) || saveErrorShown) return;
     saveErrorShown = true;
     saveError.show();
   }
@@ -145,8 +126,9 @@ export function initClockApp({
 
   /** Clear the timer once its end has passed (it has rung by then). @param {Date} now */
   function settleSavedTimer(now) {
-    if (settleTimer(settings, now.getTime()) === settings) return;
-    settings = { ...settings, ...cancelTimer() };
+    const settled = tabTimer.settle(settings, now.getTime());
+    if (settled === settings) return;
+    settings = settled;
     saveSettings();
   }
 
@@ -172,100 +154,46 @@ export function initClockApp({
     render(now);
   }
 
-  // Sound. The coming rings, [now - grace, now + lookahead) in clock time,
-  // mapped onto the audio clock: at &speed=60 a clock minute is a real second.
-  let windowEnd = -Infinity;
+  // Sound: the coming rings, handed to the player while it plays.
   /** @param {Date} now */
   function scheduleSounds(now) {
-    const t = now.getTime();
-    windowEnd = t + LOOKAHEAD_MS * clock.speed;
-    if (soundPlayer.state() !== 'running') return;
-    const rings = settings.division
-      ? ringsInWindow(new Date(t - GRACE_MS * clock.speed), new Date(windowEnd), schoolYears, settings)
-      : [];
-    const audioNow = soundPlayer.currentTime();
-    soundPlayer.schedule(rings.map((ring) => {
-      const seconds = ringSeconds(ring.source, settings.bells);
-      return {
-        key: ringKey(ring),
-        at: audioNow + (ring.at.getTime() - t) / 1000 / clock.speed,
-        sound: ring.sound,
-        repeat: true,
-        ...(seconds === undefined ? {} : { seconds }),
-      };
-    }));
+    const playing = soundPlayer.state() === 'running';
+    const sounds = ringing.soundWindow(now, settings, playing ? soundPlayer.currentTime() : null);
+    if (playing) soundPlayer.schedule(sounds);
   }
 
   // What's ringing on screen: a flash (or a steady highlight) and the ring
-  // card naming the newest ring, until dismissed (60 s at most), for Bells,
-  // Alarms and the timer alike; a Bell stops on its own sooner unless the
-  // teacher keeps Bells ringing. When the newest stops on its own, the card
-  // goes back to one still ringing. The card takes focus and hands it back
-  // when it goes.
-  /** @type {{ words: import('./ring-words.js').RingWords, until: number, timer: boolean }[]} Oldest first; `until` is real time. */
-  let ringing = [];
-  /** What the mini player says is ringing, or null. */
-  let ringingWhat = null;
-  /** The timer has rung and is still ringing: it keeps the big Readout until then. */
-  let timerRinging = false;
-  /** @type {import('./timer.js').RangTimer | null} The timer that rang (its ring shows 0:00 of it until then). */
-  let rangTimer = null;
-  /**
-   * The timer as it shows at `now` (running, paused, or rung and still
-   * ringing), or null when it doesn't. @param {Date} now
-   */
-  function shownTimer(now) {
-    const showing = timerStatus(settings, now.getTime()).status !== 'idle' || timerRinging;
-    return showing ? timerRingView(settings, now.getTime(), rangTimer) : null;
-  }
+  // card naming the newest ring, for Bells, Alarms and the timer alike, until
+  // it stops or is dismissed. When the newest stops on its own, the card goes
+  // back to one still ringing. The card takes focus and hands it back when it
+  // goes.
   const ringCard = createRingCard({ onDismiss: () => dismiss() });
-  /**
-   * @param {import('./ring-words.js').RingWords} words
-   * @param {{ seconds?: number, lateMs?: number, timer?: boolean }} [options] it rings
-   *   `seconds` (an Alarm's minute when missing) from `lateMs` (real time) ago.
-   */
-  function startRinging(words, { seconds = ALARM_MAX_SECONDS, lateMs = 0, timer = false } = {}) {
-    ringing.push({ words, until: realNow() - lateMs + seconds * 1000, timer });
-    if (timer) timerRinging = true;
-    showNewestRing();
-  }
-  function showNewestRing() {
-    const { words } = ringing[ringing.length - 1];
-    ringingWhat = words.title;
-    ringCard.show(words);
-    mount.classList.remove('clock-ringing--flash', 'clock-ringing--steady');
-    mount.classList.add('clock-ringing', prefersReducedMotion() ? 'clock-ringing--steady' : 'clock-ringing--flash');
-    showSoundState();
-    renderMiniRinging();
-  }
-  /** Let go of the rings whose time is up; the card goes back to one still ringing, if any. */
-  function settleRinging() {
-    const t = realNow();
-    if (!ringing.some((ring) => t >= ring.until)) return;
-    const shown = ringing[ringing.length - 1];
-    ringing = ringing.filter((ring) => t < ring.until);
-    if (ringing.length === 0) {
-      stopRinging();
-      return;
-    }
-    timerRinging = ringing.some((ring) => ring.timer);
-    if (ringing[ringing.length - 1] !== shown) showNewestRing();
-  }
-  function stopRinging() {
-    ringing = [];
-    ringingWhat = null;
-    timerRinging = false;
-    ringCard.hide();
+  /** @type {import('./ringing.js').RingingNow | null} The ring the card shows. */
+  let shownRing = null;
+  /** Bring the card, the mount's classes and the mini player in step with what's ringing. */
+  function showRinging() {
+    const ring = ringing.current();
+    if (ring === shownRing) return;
+    shownRing = ring;
     mount.classList.remove('clock-ringing', 'clock-ringing--flash', 'clock-ringing--steady');
+    if (ring) {
+      ringCard.show(ring.words);
+      mount.classList.add('clock-ringing', prefersReducedMotion() ? 'clock-ringing--steady' : 'clock-ringing--flash');
+    } else {
+      ringCard.hide();
+    }
     showSoundState();
     renderMiniRinging();
   }
   /** Stop the current ring, sound and all. */
   function dismiss() {
     soundPlayer.dismiss();
-    stopRinging();
+    ringing.dismiss();
+    showRinging();
     render(new Date(clock.now()));
   }
+  /** The timer as it shows at `now`, or null. @param {Date} now */
+  const shownTimer = (now) => ringing.shownTimer(settings, now);
 
   // First visit: ask the Division once, in a dialog that takes focus.
   const divisionPrompt = createDivisionPrompt({ onChoose: (division) => updateSettings({ division }) });
@@ -319,7 +247,7 @@ export function initClockApp({
   const onKeyDown = (event) => {
     if (event.key !== 'Escape') return;
     // Escape dismisses a ring first.
-    if (ringing.length > 0) {
+    if (ringing.current()) {
       dismiss();
       return;
     }
@@ -368,7 +296,7 @@ export function initClockApp({
   const soundPrompt = createSoundPrompt({ onTurnOn: () => soundPlayer.resume() });
   function showSoundState() {
     // It waits for the first-visit question, and steps aside for a ring.
-    soundPrompt.show(soundPlayer.state(), ringing.length > 0 || settings.division === null);
+    soundPrompt.show(soundPlayer.state(), ringing.current() !== null || settings.division === null);
   }
   soundPlayer.onStateChange(() => {
     showSoundState();
@@ -394,9 +322,9 @@ export function initClockApp({
     update: updateSettings,
     play: (sound) => soundPlayer.preview(sound),
     testRing: () => {
-      const seconds = ringSeconds('bell', settings.bells);
-      soundPlayer.play(settings.bells.sound, { repeat: true, ...(seconds === undefined ? {} : { seconds }) });
-      startRinging(TEST_RING_WORDS, { seconds: shownSeconds('bell', settings.bells.sound, settings.bells) });
+      const { sound, ...options } = ringing.testRing(settings.bells);
+      soundPlayer.play(sound, options);
+      showRinging();
     },
     // A ring shows over the drawer too, so it can be seen, heard and dismissed.
     behind: () => behindAll(drawer.elements, ringCard.elements),
@@ -463,7 +391,7 @@ export function initClockApp({
     mini.show(miniContent({ now, moment, settings, big, mode, timer: shownTimer(now) }));
   }
   function renderMiniRinging() {
-    mini.showRinging(ringingWhat);
+    mini.showRinging(ringing.current()?.words.title ?? null);
   }
 
   // The main screen: the "Simulated time" banner (with ?at=), the top bar,
@@ -507,28 +435,10 @@ export function initClockApp({
    */
   function tick() {
     const now = new Date(clock.now());
-    const staleBefore = now.getTime() - STALE_MS * clock.speed;
-    settleRinging();
-    if (lastTick.getTime() < staleBefore || now.getTime() >= windowEnd - (LOOKAHEAD_MS * clock.speed) / 2) {
-      scheduleSounds(now);
-    }
+    const { rang, soundWindowDue } = ringing.advance(lastTick, now, settings, textFor(settings));
+    if (soundWindowDue) scheduleSounds(now);
+    showRinging();
     if (settings.division) {
-      const rang = ringsInWindow(lastTick, now, schoolYears, settings);
-      const text = textFor(settings);
-      for (const ring of rang) {
-        if (ring.at.getTime() < staleBefore) continue;
-        if (ring.source === 'timer') {
-          rangTimer = { totalMs: ring.totalMs, name: ring.name ?? null };
-        }
-        const seconds = shownSeconds(ring.source, ring.sound, settings.bells);
-        startRinging(ringWords(ring, text), {
-          seconds,
-          // A Bell that stops on its own does so when its sound ends, counted
-          // from when it came due as its sound is, even in a throttled tab.
-          lateMs: seconds === undefined ? 0 : (now.getTime() - ring.at.getTime()) / clock.speed,
-          timer: ring.source === 'timer',
-        });
-      }
       const alarms = alarmsAfterRinging(settings.alarms, rang, { simulated: clock.simulated });
       if (alarms !== settings.alarms) {
         settings = { ...settings, alarms };

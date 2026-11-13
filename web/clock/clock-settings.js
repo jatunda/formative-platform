@@ -17,7 +17,7 @@
  * ring when an Assembly ends (never when one starts); off when missing.
  * `untilDismissed`: a Bell rings until dismissed (up to a minute, like an
  * Alarm) rather than stopping on its own once its sound, which starts no new pass after `BELL_AUTO_DISMISS_SECONDS`, ends
- * (`sound.js`); off when missing.
+ * (`ringing.js`); off when missing.
  * @typedef {{ on: boolean, sound: SoundName, assemblyEnds?: boolean, untilDismissed?: boolean }} BellsSettings
  */
 

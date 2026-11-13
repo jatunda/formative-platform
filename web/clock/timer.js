@@ -303,3 +303,28 @@ export function timerRingView(timer, now, rang = null) {
 }
 
 /** @typedef {ReturnType<typeof timerRingView>} TimerView */
+
+/**
+ * This tab's Timer, from the settings it loaded. In simulated time (`?at=`)
+ * the Timer belongs to this tab alone: the tab starts with none, and the real
+ * Timer saved by other tabs is never loaded, cleared or overwritten (every
+ * save puts it back as it was loaded). In real time the Timer is the saved one.
+ * @template {TimerState} S
+ * @param {S} loaded the settings as loaded @param {{ simulated: boolean }} options
+ * @returns {{ settings: S, toSave: (settings: S) => S, settle: (settings: S, now: number) => S }}
+ *   `settings`: what the tab starts with; `toSave`: the settings to save;
+ *   `settle`: the settings with a Timer whose end has passed cleared (it has
+ *   rung by then), the same object back when nothing changes.
+ */
+export function createTabTimer(loaded, { simulated }) {
+  /** @type {TimerState} */
+  const saved = {
+    timerEndsAt: loaded.timerEndsAt, timerPausedMs: loaded.timerPausedMs, timerTotalMs: loaded.timerTotalMs,
+    timerName: loaded.timerName,
+  };
+  return {
+    settings: simulated ? { ...loaded, ...cancelTimer() } : loaded,
+    toSave: (settings) => (simulated ? { ...settings, ...saved } : settings),
+    settle: (settings, now) => (settleTimer(settings, now) === settings ? settings : { ...settings, ...cancelTimer() }),
+  };
+}
