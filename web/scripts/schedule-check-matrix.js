@@ -138,17 +138,17 @@ export const KNOWN_FAILURES = [
   {
     failure: 'color-contrast: 1 node(s)',
     pages: ['planning'],
-    note: 'The red Logout button (white on #e53e3e, 4.1:1; 4.5:1 is the minimum).',
+    note: 'The red Logout button (white on #e53e3e, 4.1:1; 4.5:1 is the minimum): accepted by Eric.',
   },
   {
     failure: 'color-contrast: 2 node(s)',
     pages: ['full-short', 'full-busy'],
-    note: 'The red Logout button (4.1:1) and the green Go to Today button (white on #28a745, 3.1:1).',
+    note: 'The red Logout button (4.1:1) and the green Go to Today button (white on #28a745, 3.1:1): accepted by Eric.',
   },
-  { failure: 'empty-table-header:', note: 'The day actions column (🗑) has an empty header cell.' },
-  { failure: 'html-has-lang:', note: 'lesson-planning.html and teacher.html have no <html lang>.' },
-  { failure: 'landmark-one-main:', note: 'The pages have no <main> landmark.' },
-  { failure: 'region:', note: 'No <main> or other landmark, so axe counts all content as outside one.' },
+  {
+    failure: 'empty-table-header:',
+    note: 'The day actions column (🗑) has an empty header cell: accepted by Eric (a header word would widen the column for no gain).',
+  },
 ];
 
 /**
