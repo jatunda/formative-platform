@@ -195,9 +195,11 @@
   --track: #ccd5ea; --digits: #0d1b3d; --deco: #c24e00; --deco-2: #3d4c70;
 }
 
-/* Dodgers: Dodger blue and white, with their red as the focus ring (native
-   light; the dark version is white on deep Dodger blue). Team colours only,
-   from the team's own palette (Dodger blue #005a9c, red #ef3e42); no marks. */
+/* Dodgers: Dodger blue and white, with a red focus ring (native light; the
+   dark version is white on deep Dodger blue). Built on the team's blue
+   (#005a9c) and red (#ef3e42): the light version uses that blue as is, the
+   decoration that red, and the focus ring and dark version lighter or
+   deeper shades of them so every pair passes contrast. Colours only, no marks. */
 [data-palette="dodgers"] {
   --bg: #062b52; --surface: #0c3766; --surface-2: #134377;
   --fg: #f4f8fc; --muted: #b3c7e0; --line: #7895bb; --line-soft: #1d4f86;

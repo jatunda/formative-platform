@@ -193,6 +193,64 @@
   --track: #ccd5ea; --digits: #0d1b3d; --deco: #c24e00; --deco-2: #3d4c70;
 }
 
+/* Dodgers: Dodger blue and white, with a red focus ring (native light; the
+   dark version is white on deep Dodger blue). Built on the team's blue
+   (#005a9c) and red (#ef3e42): the light version uses that blue as is, the
+   decoration that red, and the focus ring and dark version lighter or
+   deeper shades of them so every pair passes contrast. Colours only, no marks. */
+[data-palette="dodgers"] {
+  --bg: #062b52; --surface: #0c3766; --surface-2: #134377;
+  --fg: #f4f8fc; --muted: #b3c7e0; --line: #7895bb; --line-soft: #1d4f86;
+  --accent: #8cc4ff; --accent-text: #a3d0ff; --on-accent: #04203d;
+  --focus: #ff8a8d; --ring: #8cc4ff; --on-ring: #04203d;
+  --track: #1d4f86; --digits: #ffffff; --deco: #8cc4ff; --deco-2: #ff8a8d;
+}
+[data-palette="dodgers"][data-mode="light"] {
+  --bg: #f4f7fb; --surface: #ffffff; --surface-2: #e3ebf5;
+  --fg: #0b1f38; --muted: #3d526e; --line: #6b7f99; --line-soft: #cbd8e8;
+  --accent: #005a9c; --accent-text: #005a9c; --on-accent: #ffffff;
+  --focus: #c8102e; --ring: #005a9c; --on-ring: #ffffff;
+  --track: #cbd8e8; --digits: #005a9c; --deco: #005a9c; --deco-2: #ef3e42;
+}
+
+/* Lakers: purple and gold (native dark; the light version is purple on pale
+   gold). From the team's own palette (purple #552583, gold #fdb927). */
+[data-palette="lakers"] {
+  --bg: #241037; --surface: #2f1747; --surface-2: #3a1f56;
+  --fg: #f6f0fb; --muted: #c4b2d6; --line: #8f7aa8; --line-soft: #45285f;
+  --accent: #fdb927; --accent-text: #fdc54d; --on-accent: #2a1a00;
+  --focus: #8fd3ff; --ring: #fdb927; --on-ring: #2a1a00;
+  --track: #45285f; --digits: #fdb927; --deco: #fdb927; --deco-2: #c4b2d6;
+}
+[data-palette="lakers"][data-mode="light"] {
+  --bg: #fdf8ea; --surface: #ffffff; --surface-2: #f6ebcc;
+  --fg: #24103a; --muted: #5a4870; --line: #8a7798; --line-soft: #eadcb5;
+  --accent: #552583; --accent-text: #552583; --on-accent: #ffffff;
+  --focus: #b4400e; --ring: #552583; --on-ring: #ffffff;
+  --track: #eadcb5; --digits: #552583; --deco: #b38600; --deco-2: #5a4870;
+}
+
+/* VCS: Village Christian School's red, with black and white (native dark;
+   the light version is red on white). The red, #b4121a, is the school's own:
+   the cross in its logo and its website's accent colour (villagechristian.org,
+   checked 2026-11-12). The site names no colours in words; black as the
+   second colour is from the school's Wikipedia entry ("red and black"). The
+   dark version lifts the red so it reads on black. */
+[data-palette="vcs"] {
+  --bg: #121111; --surface: #1c1a1a; --surface-2: #262323;
+  --fg: #f6f2f2; --muted: #bfb5b5; --line: #8a7f7f; --line-soft: #332f2f;
+  --accent: #f0444c; --accent-text: #ff6b71; --on-accent: #1a0002;
+  --focus: #8fd3ff; --ring: #f0444c; --on-ring: #1a0002;
+  --track: #332f2f; --digits: #f6f2f2; --deco: #f0444c; --deco-2: #bfb5b5;
+}
+[data-palette="vcs"][data-mode="light"] {
+  --bg: #f7f4f4; --surface: #ffffff; --surface-2: #ece6e6;
+  --fg: #141212; --muted: #4f4646; --line: #7f7474; --line-soft: #ddd4d4;
+  --accent: #b4121a; --accent-text: #b4121a; --on-accent: #ffffff;
+  --focus: #1f5fbf; --ring: #b4121a; --on-ring: #ffffff;
+  --track: #ddd4d4; --digits: #141212; --deco: #b4121a; --deco-2: #4f4646;
+}
+
 /* Blush pink and rose */
 [data-palette="blush"] {
   --bg: #2a1820; --surface: #35202a; --surface-2: #412934;
