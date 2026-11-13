@@ -134,7 +134,7 @@ describe('landing', () => {
     it("names the listed school day's date, Friday's on a weekend", () => {
       const heading = document.createElement('h1');
       renderDoNowsHeading(heading, new Date(2026, 10, 14)); // Saturday
-      expect(heading.textContent).toBe('11/13 Do Nows');
+      expect(heading.textContent).toBe('Do Now - November 13');
     });
 
     it('defaults to the current date', () => {
@@ -143,7 +143,7 @@ describe('landing', () => {
       try {
         const heading = document.createElement('h1');
         renderDoNowsHeading(heading);
-        expect(heading.textContent).toBe('11/11 Do Nows');
+        expect(heading.textContent).toBe('Do Now - November 11');
       } finally {
         vi.useRealTimers();
       }

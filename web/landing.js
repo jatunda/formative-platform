@@ -97,7 +97,7 @@ export function renderClassList(container, classesWithSchedule) {
 
 /**
  * Name the date of the business day whose Do Nows are listed, e.g.
- * "11/11 Do Nows" (Friday's date on a weekend). Every Class shares it: a
+ * "Do Now - November 11" (Friday's date on a weekend). Every Class shares it: a
  * Date Offset shifts which Day Index is shown, not which calendar day.
  * @param {HTMLElement} heading
  * @param {Date} [today=new Date()]

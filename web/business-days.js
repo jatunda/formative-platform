@@ -112,10 +112,19 @@ export function shortDateLabel(date) {
 }
 
 /**
- * The landing page heading on a given date, e.g. "11/11 Do Nows".
+ * @param {Date} date
+ * @returns {string} e.g. "November 2": month spelled out, no weekday or year
+ */
+export function monthNameDayLabel(date) {
+  const month = date.toLocaleDateString('en-US', { month: 'long' });
+  return `${month} ${date.getDate()}`;
+}
+
+/**
+ * The landing page heading on a given date, e.g. "Do Now - November 11".
  * @param {Date} today
  * @returns {string}
  */
 export function doNowsHeading(today) {
-  return `${monthDayLabel(listedBusinessDay(today))} Do Nows`;
+  return `Do Now - ${monthNameDayLabel(listedBusinessDay(today))}`;
 }

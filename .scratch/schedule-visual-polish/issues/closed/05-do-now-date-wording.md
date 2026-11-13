@@ -4,9 +4,9 @@
 
 **Blocked by:** 02 (Short dates). Ordering note: edits the same schedule pages/date files as 02, serialized to avoid merge conflicts.
 
-**Status:** ready-for-agent
+**Status:** closed
 
-- [ ] Landing heading is "Do Now - <Month> <day>", e.g. "Do Now - November 13", with Friday's date on a weekend
-- [ ] Loading text is "Loading Do Now..."
-- [ ] Do Now page shows "<Month> <day>" beside the back link, still on one compact row at desktop and phone widths
-- [ ] Formatting lives in the shared, tested date helper both pages already use
+- [x] Landing heading is "Do Now - <Month> <day>", e.g. "Do Now - November 13", with Friday's date on a weekend
+- [x] Loading text is "Loading Do Now..."
+- [x] Do Now page shows "<Month> <day>" beside the back link, still on one compact row at desktop and phone widths
+- [x] Formatting lives in the shared, tested date helper both pages already use
