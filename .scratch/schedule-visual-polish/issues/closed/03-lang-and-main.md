@@ -4,8 +4,8 @@
 
 **Blocked by:** 02 (Short dates). Ordering note: edits the same schedule pages/date files as 02, serialized to avoid merge conflicts.
 
-**Status:** ready-for-agent
+**Status:** closed
 
-- [ ] axe no longer reports html-has-lang, landmark-one-main or region on either page
-- [ ] The fixed known failures are removed; the accepted ones' notes say "accepted by Eric"
-- [ ] `npm run check:schedule` passes
+- [x] axe no longer reports html-has-lang, landmark-one-main or region on either page
+- [x] The fixed known failures are removed; the accepted ones' notes say "accepted by Eric"
+- [x] `npm run check:schedule` passes
