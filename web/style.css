@@ -525,7 +525,14 @@ select:focus,
   white-space: nowrap;
 }
 
+.today-dayindex-display {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
 .date-offset-control input[type="number"] {
+  width: 60px;
   padding: var(--spacing-xxs) var(--spacing-sm);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
@@ -803,31 +810,9 @@ select:focus,
   flex-wrap: wrap;
 }
 
-.bulk-shift-control {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  flex-wrap: wrap;
-}
-
-.bulk-shift-control button {
-  /* .schedule-action-btn is 110px wide everywhere else, sized for longer
-     button text ("New Lesson", "Insert Day Here") - this control's +/-
-     buttons only ever hold one character, so override to stay compact. */
-  width: auto;
-  min-width: auto;
-  max-width: none;
-  padding: var(--spacing-xxs) var(--spacing-md);
-}
-
-.bulk-shift-control label {
-  font-weight: 500;
-  color: var(--text-primary);
-  font-size: 0.9rem;
-}
-
 /* A small "?" icon with a CSS-only hover/focus tooltip - no JS state, no
-   existing pattern in this app to reuse, so introduced here. */
+   existing pattern in this app to reuse, so introduced here. Built by
+   ui-components.js's createInfoTooltip. */
 .info-tooltip {
   position: relative;
   display: inline-flex;

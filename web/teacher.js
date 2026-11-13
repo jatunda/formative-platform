@@ -351,8 +351,9 @@ export async function renderScheduleTable(schedule, classId = currentClassId) {
 // Initialize date offset control
 export function initializeDateOffsetControl() {
   dateOffsetControl = createDateOffsetControl({
+    label: "Date Offset (days):",
     currentOffset: currentDateOffset,
-    onApply: applyDateOffset,
+    onShift: (delta) => applyDateOffset(currentDateOffset + delta),
     computeTodayDayIndex: () => getTodayDayIndex(currentClassId),
     onGoToToday: () => scrollToToday()
   });

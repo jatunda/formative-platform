@@ -16,7 +16,7 @@ import {
   setClassDateOffset
 } from './date-utils.js';
 import { showNotification } from './notification-utils.js';
-import { createDateOffsetControl, withWorkingIndicator } from './ui-components.js';
+import { createDateOffsetControl } from './ui-components.js';
 import {
   getFullSchedule
 } from './database-utils.js';
@@ -60,64 +60,21 @@ async function main() {
 }
 
 /**
- * Build the compact "shift all classes" toolbar: a magnitude input
- * (default 1) with separate + and − buttons, each applying that magnitude
- * instantly. The description/warning that used to sit below it as always-
- * visible text now lives behind a "?" tooltip icon instead.
+ * Mount the all-classes Bulk Offset Shift: the shared Skip/Delay control,
+ * with no current offset (each Class has its own), applying instantly.
  */
 export function initializeBulkShiftControl() {
   const container = document.getElementById('bulkShiftContainer');
-
-  const controls = document.createElement('div');
-  controls.className = 'bulk-shift-control';
-
-  const label = document.createElement('label');
-  label.textContent = 'Shift all classes:';
-
-  const infoIcon = document.createElement('span');
-  infoIcon.className = 'info-tooltip';
-  infoIcon.textContent = '?';
-  infoIcon.tabIndex = 0;
-  const infoText = document.createElement('span');
-  infoText.className = 'info-tooltip-text';
-  infoText.textContent = "Moves every class's schedule forward or backward by the same number of business days at once (e.g. after a snow day). Applies immediately, no confirmation.";
-  infoIcon.appendChild(infoText);
-
-  const input = document.createElement('input');
-  input.type = 'number';
-  input.id = 'bulkShiftAmount';
-  input.value = '1';
-  input.min = '1';
-  input.style.width = '60px';
-
-  const minusBtn = document.createElement('button');
-  minusBtn.textContent = '−'; // −
-  minusBtn.className = 'schedule-action-btn';
-  minusBtn.title = 'Shift all classes backward';
-  minusBtn.onclick = withWorkingIndicator(minusBtn, () => applyBulkShift(-getShiftMagnitude(input)));
-
-  const plusBtn = document.createElement('button');
-  plusBtn.textContent = '+';
-  plusBtn.className = 'schedule-action-btn';
-  plusBtn.title = 'Shift all classes forward';
-  plusBtn.onclick = withWorkingIndicator(plusBtn, () => applyBulkShift(getShiftMagnitude(input)));
-
-  controls.appendChild(label);
-  controls.appendChild(infoIcon);
-  controls.appendChild(input);
-  controls.appendChild(minusBtn);
-  controls.appendChild(plusBtn);
-  container.appendChild(controls);
-}
-
-export function getShiftMagnitude(input) {
-  const magnitude = Math.abs(parseInt(input.value, 10));
-  return Number.isFinite(magnitude) && magnitude > 0 ? magnitude : 1;
+  container.appendChild(createDateOffsetControl({
+    label: 'All classes:',
+    onShift: applyBulkShift
+  }));
 }
 
 /**
  * Shift every Class's Date Offset by the same signed amount in one action.
  * Applies instantly, no confirmation - clicking the opposite button undoes it.
+ * Positive delta is a Delay, negative a Skip.
  */
 export async function applyBulkShift(delta) {
   try {
@@ -131,8 +88,9 @@ export async function applyBulkShift(delta) {
       await setClassDateOffset(classId, current + delta);
     }));
 
+    const days = `${Math.abs(delta)} day${Math.abs(delta) === 1 ? '' : 's'}`;
     showNotification(
-      `Shifted all classes by ${delta > 0 ? '+' : ''}${delta} day${Math.abs(delta) === 1 ? '' : 's'}.`,
+      delta > 0 ? `Delayed all classes ${days}.` : `Skipped all classes ahead ${days}.`,
       'success'
     );
     await loadAndRenderAllPanes();
@@ -217,10 +175,11 @@ export async function renderClassPane(classId, className, containerEl) {
   header.appendChild(heading);
 
   header.appendChild(createDateOffsetControl({
+    label: 'Offset:',
     currentOffset,
-    onApply: async (newOffset) => {
+    onShift: async (delta) => {
       try {
-        await setClassDateOffset(classId, newOffset);
+        await setClassDateOffset(classId, currentOffset + delta);
         await onReload();
         showNotification(`Date offset for ${className} updated successfully!`, 'success');
       } catch (error) {
@@ -229,11 +188,9 @@ export async function renderClassPane(classId, className, containerEl) {
         throw error;
       }
     },
-    computeTodayDayIndex: () => getTodayDayIndex(classId),
-    // No onGoToToday: the Planning Window is only PLANNING_WINDOW_SIZE days
-    // and already starts at today by definition, so there's nothing beyond
-    // it to scroll to.
-    compact: true
+    // No computeTodayDayIndex or onGoToToday: the Planning Window already
+    // starts at today by definition, so neither would add anything (and the
+    // pane header is too narrow for them).
   }));
 
   const table = document.createElement('table');

@@ -404,15 +404,38 @@ describe('teacher', () => {
   });
 
   describe('initializeDateOffsetControl', () => {
-    it('wires onApply/computeTodayDayIndex/onGoToToday and mounts the control', () => {
+    it('wires onShift/computeTodayDayIndex/onGoToToday and mounts the control', () => {
       scheduleFixture();
       initializeDateOffsetControl();
 
       const config = mockCreateDateOffsetControl.mock.calls[0][0];
-      expect(config.onApply).toBe(applyDateOffset);
+      expect(typeof config.onShift).toBe('function');
       expect(typeof config.computeTodayDayIndex).toBe('function');
       expect(typeof config.onGoToToday).toBe('function');
       expect(document.getElementById('dateOffsetContainer').children).toHaveLength(1);
+    });
+  });
+
+  describe('Skip/Delay on the Full Schedule', () => {
+    it("onShift moves the selected Class's Date Offset by the signed amount", async () => {
+      scheduleFixture();
+      mockData['schedule/csa'] = {};
+      const { getClassDateOffset, setClassDateOffset } = await import('../../date-utils.js');
+      let stored = 5;
+      getClassDateOffset.mockImplementation(async () => stored);
+      setClassDateOffset.mockImplementation(async (_classId, offset) => { stored = offset; });
+      await loadFullSchedule();
+      initializeDateOffsetControl();
+      const config = mockCreateDateOffsetControl.mock.calls.at(-1)[0];
+
+      await config.onShift(-2);
+      expect(setClassDateOffset).toHaveBeenLastCalledWith('csa', 3);
+
+      await config.onShift(4);
+      expect(setClassDateOffset).toHaveBeenLastCalledWith('csa', 7);
+
+      getClassDateOffset.mockImplementation(async () => 5);
+      setClassDateOffset.mockImplementation(async () => {});
     });
   });
 
