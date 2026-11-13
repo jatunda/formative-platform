@@ -12,7 +12,7 @@ import { resolve, dirname } from 'path';
 import { mkdirSync, writeFileSync, rmSync } from 'fs';
 import { SETTINGS_KEY } from '../clock/clock-storage.js';
 import { LAYOUT_KEY } from '../clock/readout-layout.js';
-import { describeFailure } from './clock-check-matrix.js';
+import { describeFailure, ringGapAt } from './clock-check-matrix.js';
 
 const webDir =resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const axeSource = createRequire(import.meta.url).resolve('axe-core/axe.min.js');
@@ -106,7 +106,7 @@ export async function startClockCheck() {
     try {
       for (const state of opts.states) {
         const page = await context.newPage();
-        const result = await checkPage(page, base + state.query, opts);
+        const result = await checkPage(page, base + state.query, opts, ringGapAt(size.label));
         const file = `${prefix}${state.name}-${size.label}.png`;
         const shot = opts.shots === true || (opts.shots === 'failures' && !result.ok);
         if (shot) await page.screenshot({ path: resolve(outDir, file) });
@@ -125,8 +125,9 @@ export async function startClockCheck() {
 /**
  * Opens `url` with the options' timer and edit mode, then checks the render.
  * @param {import('playwright').Page} page @param {string} url @param {CheckOptions} opts
+ * @param {number} [ringGap] the ring's gap at this size, where it isn't ring-fit's (ringGapAt)
  */
-async function checkPage(page, url, opts) {
+async function checkPage(page, url, opts, ringGap) {
   /** @type {string[]} */
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
@@ -148,14 +149,14 @@ async function checkPage(page, url, opts) {
   // The ring against everything ring-fit keeps it clear of (the top bar's
   // Day Label and buttons, the small Readouts' values), with the same circle
   // and gap: ring-geometry.js, imported from the served page, so the check and
-  // the page can't drift apart.
-  const overlaps = await page.evaluate(async (geometryUrl) => {
+  // the page can't drift apart. A size in RING_GAPS asks for its own gap.
+  const overlaps = await page.evaluate(async ([geometryUrl, gap]) => {
     /** @type {typeof import('../clock/ring-geometry.js')} */
     const { ringObstacles, ringTouches } = await import(geometryUrl);
     const ring = document.querySelector('.clock-ring');
     if (!ring || !ring.getClientRects().length) return [];
-    return ringTouches(ring.getBoundingClientRect(), ringObstacles(document));
-  }, RING_GEOMETRY_URL);
+    return ringTouches(ring.getBoundingClientRect(), ringObstacles(document), gap ?? undefined);
+  }, /** @type {[string, number | null]} */ ([RING_GEOMETRY_URL, ringGap ?? null]));
   // The stage (the title, the Readouts, the cycle hint, the line) must stay
   // inside its own row: overflowing it runs into the top bar or hides the
   // line behind the sound prompt. Reports how far it spills above and below.

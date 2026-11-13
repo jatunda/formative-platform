@@ -17,7 +17,7 @@ Built behaviour: closed tickets 53 (the ring and the side Readouts at this size)
 
 **Blocked by:** None (can start immediately)
 
-**Status:** open
+**Status:** closed (won't do)
 
 - [ ] `npm run check:clock -- --size 480x320 --timer` passes
 - [ ] `npm run check:clock -- --size 480x320 --timer --sound-on --layout countdown,clock,countup` passes
@@ -27,3 +27,5 @@ Built behaviour: closed tickets 53 (the ring and the side Readouts at this size)
 ## Comments
 
 Found by the stricter ring check from ticket 56 (2026-11-12): `check:clock:full` gave 60 unexpected renders, all of them 480 × 320 with the timer and not editing (1r, 2r and 3r, sound on and off, all ten states).
+
+**2026-11-12: closed, won't do.** Eric accepts the closeness: "It is acceptable closeness, because the phone is so small." The layout is unchanged. Ticket 60's entry is gone from `KNOWN_FAILURES`; instead `RING_GAPS` in `web/scripts/clock-check-matrix.js` has the ring check ask for a gap of 0 at 480 x 320, so there the ring still must not overlap the top bar's buttons or the side Readouts' values, it just doesn't need the 12px. Every other size keeps ring-fit's `RING_GAP`.
