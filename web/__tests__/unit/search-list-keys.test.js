@@ -9,25 +9,28 @@ function setup(labels = ['A', 'B', 'C']) {
   const list = document.createElement('div');
   /** @type {string[]} */
   const clicks = [];
-  /** @param {string[]} names */
-  function render(names) {
+  /** @param {string} filter */
+  function render(filter) {
     list.innerHTML = '';
-    for (const name of names) {
+    for (const name of labels.filter((label) => label.includes(filter))) {
       const btn = document.createElement('button');
       btn.textContent = name;
       btn.onclick = () => clicks.push(name);
       list.appendChild(btn);
     }
   }
-  render(labels);
   popup.append(input, list);
   document.body.appendChild(popup);
-  const keys = attachSearchListKeys({ popup, input, list });
-  keys.refresh();
+  const keys = attachSearchListKeys({ popup, input, list, render });
   /** @param {string} key @param {EventTarget} [target] */
   const press = (key, target = input) => pressKey(target, key);
+  /** @param {string} text */
+  const type = (text) => {
+    input.value = text;
+    input.dispatchEvent(new Event('input'));
+  };
   const active = () => list.querySelector('[aria-selected="true"]')?.textContent;
-  return { popup, input, list, clicks, render, keys, press, active };
+  return { popup, input, list, clicks, keys, press, type, active };
 }
 
 describe('attachSearchListKeys', () => {
@@ -55,12 +58,19 @@ describe('attachSearchListKeys', () => {
     expect(document.querySelectorAll('[aria-selected="true"]')).toHaveLength(1);
   });
 
-  it('goes back to the first result whenever the list is redrawn', () => {
-    const { press, render, keys, active } = setup();
+  it('redraws the list as the search box changes, back at the first result', () => {
+    const { press, type, list, active } = setup(['A1', 'B1', 'B2']);
     press('ArrowDown');
-    render(['X', 'Y']);
-    keys.refresh();
-    expect(active()).toBe('X');
+    type('B');
+    expect([...list.querySelectorAll('button')].map((b) => b.textContent)).toEqual(['B1', 'B2']);
+    expect(active()).toBe('B1');
+  });
+
+  it('redraws on demand, for other filters in the popup', () => {
+    const { press, keys, active } = setup();
+    press('ArrowDown');
+    keys.update();
+    expect(active()).toBe('A');
   });
 
   it('Enter clicks the highlighted result', () => {
@@ -108,9 +118,8 @@ describe('attachSearchListKeys', () => {
   });
 
   it('clears the announced result when nothing matches', () => {
-    const { input, render, keys } = setup();
-    render([]);
-    keys.refresh();
+    const { input, type } = setup();
+    type('zzz');
     expect(input.hasAttribute('aria-activedescendant')).toBe(false);
   });
 

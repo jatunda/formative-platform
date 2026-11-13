@@ -75,7 +75,7 @@ describe('showQuestionPicker', () => {
 
     const searchInput = document.querySelector('.lesson-popup-search');
     searchInput.value = 'loop';
-    searchInput.oninput();
+    searchInput.dispatchEvent(new Event('input'));
 
     const buttons = [...document.querySelectorAll('.lesson-popup-result-btn')].map((b) => b.textContent);
     expect(buttons).toEqual(['Loops question (loops)']);
