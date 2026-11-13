@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { renderContent, renderMultipleContent, processInlineCode } from '../../content-renderer.js';
+import { renderContent, renderMultipleContent, processInlineCode, installSpoilerToggle } from '../../content-renderer.js';
 import { CONTENT_NOT_FOUND } from '../../constants.js';
 
 describe('processInlineCode', () => {
@@ -107,6 +107,134 @@ describe('processInlineCode', () => {
         '<code>&lt;b onclick=&quot;x&quot;&gt;&amp;&lt;/b&gt;</code>'
       );
     });
+  });
+});
+
+describe('spoilers', () => {
+  const SPOILER_OPEN = '<span class="spoiler" tabindex="0" role="button" aria-expanded="false">';
+
+  it('renders ||text|| as a spoiler span', () => {
+    expect(processInlineCode('The answer is ||42||.')).toBe(`The answer is ${SPOILER_OPEN}42</span>.`);
+  });
+
+  it('renders several spoilers on one line separately', () => {
+    expect(processInlineCode('||a|| and ||b||')).toBe(`${SPOILER_OPEN}a</span> and ${SPOILER_OPEN}b</span>`);
+  });
+
+  it.each([
+    ['bold', '||**x**||', '<strong>x</strong>'],
+    ['italic', '||_x_||', '<em>x</em>'],
+    ['inline code', '||`x`||', '<code>x</code>'],
+    ['a markdown link', '||[a](b)||', '<a href="b" class="lesson-link">a</a>'],
+    ['a Page Link', '||[[slug]]||', '<a href="/p/slug" class="lesson-link">slug</a>'],
+  ])('formats %s inside a spoiler', (_name, input, inner) => {
+    expect(processInlineCode(input)).toBe(`${SPOILER_OPEN}${inner}</span>`);
+  });
+
+  it('keeps ||text|| literal inside inline code', () => {
+    expect(processInlineCode('Type `||secret||` to hide')).toBe('Type <code>||secret||</code> to hide');
+  });
+
+  it('leaves a lone || alone', () => {
+    expect(processInlineCode('a || b')).toBe('a || b');
+  });
+
+  it('escapes HTML inside a spoiler', () => {
+    expect(processInlineCode('||<b>||')).toBe(`${SPOILER_OPEN}&lt;b&gt;</span>`);
+  });
+
+  it('keeps ||text|| literal inside a code block', () => {
+    const container = document.createElement('div');
+    renderContent({
+      title: 'T',
+      blocks: [{ type: 'question', content: [{ type: 'code', value: 'if (a || b || c) {}' }] }]
+    }, container);
+    expect(container.querySelector('.spoiler')).toBeNull();
+    expect(container.querySelector('pre').textContent).toContain('if (a || b || c) {}');
+  });
+
+  it('renders a spoiler in rendered content (student view and editor preview)', () => {
+    const container = document.createElement('div');
+    renderContent({
+      title: 'T',
+      blocks: [{ type: 'question', content: [{ type: 'text', value: 'Answer: ||blue||' }] }]
+    }, container);
+    expect(container.querySelector('p .spoiler').textContent).toBe('blue');
+  });
+});
+
+describe('spoiler reveal on tap and keyboard', () => {
+  /** @returns {HTMLElement} a rendered spoiler attached to the document */
+  function renderSpoiler(value = 'Answer: ||**blue** [here](#top)||') {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    renderContent({ title: 'T', blocks: [{ type: 'question', content: [{ type: 'text', value }] }] }, container);
+    return container.querySelector('.spoiler');
+  }
+
+  beforeEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  it('starts hidden', () => {
+    const spoiler = renderSpoiler();
+    expect(spoiler.classList.contains('spoiler-revealed')).toBe(false);
+    expect(spoiler.getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('reveals on a tap and hides again on a second tap', () => {
+    const spoiler = renderSpoiler();
+    spoiler.click();
+    expect(spoiler.classList.contains('spoiler-revealed')).toBe(true);
+    expect(spoiler.getAttribute('aria-expanded')).toBe('true');
+    spoiler.click();
+    expect(spoiler.classList.contains('spoiler-revealed')).toBe(false);
+    expect(spoiler.getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('toggles when the tap lands on formatted text inside the spoiler', () => {
+    const spoiler = renderSpoiler();
+    spoiler.querySelector('strong').click();
+    expect(spoiler.classList.contains('spoiler-revealed')).toBe(true);
+  });
+
+  it('a tap on a link inside a hidden spoiler reveals it instead of following the link', () => {
+    const spoiler = renderSpoiler();
+    const event = new MouseEvent('click', { bubbles: true, cancelable: true });
+    spoiler.querySelector('a').dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(true);
+    expect(spoiler.classList.contains('spoiler-revealed')).toBe(true);
+  });
+
+  it('a link inside a revealed spoiler works normally', () => {
+    const spoiler = renderSpoiler();
+    spoiler.click();
+    const event = new MouseEvent('click', { bubbles: true, cancelable: true });
+    spoiler.querySelector('a').dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(false);
+    expect(spoiler.classList.contains('spoiler-revealed')).toBe(true);
+  });
+
+  it.each(['Enter', ' '])('toggles on the %j key', (key) => {
+    const spoiler = renderSpoiler();
+    const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
+    spoiler.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(true);
+    expect(spoiler.classList.contains('spoiler-revealed')).toBe(true);
+  });
+
+  it('ignores other keys and clicks outside spoilers', () => {
+    const spoiler = renderSpoiler();
+    spoiler.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', bubbles: true }));
+    spoiler.parentElement.click();
+    expect(spoiler.classList.contains('spoiler-revealed')).toBe(false);
+  });
+
+  it('installing twice still toggles once per tap', () => {
+    installSpoilerToggle(document);
+    const spoiler = renderSpoiler();
+    spoiler.click();
+    expect(spoiler.classList.contains('spoiler-revealed')).toBe(true);
   });
 });
 

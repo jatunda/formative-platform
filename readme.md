@@ -10,6 +10,7 @@ A web app for students to see daily formative assignments.
 - `---`: question separator (three dashes mark question boundaries)
 - `\`\`\``: code block markers (three backticks to start/end code blocks)
 - `\`inline code\``: Wrap inline code in backticks
+- `||hidden text||`: spoiler, blocked out until hovered, tapped (tap again to hide) or focused with the keyboard. Other inline formatting works inside it; literal inside inline code and code blocks
 - `>>> Title`: collapsible section (collapsed by default)
 - `>>>! Title`: collapsible section (expanded by default)
 - `>>>`: collapsible section without title (collapsed)

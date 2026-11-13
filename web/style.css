@@ -372,6 +372,46 @@ a:not(.class-link):not(.schedule-action-btn):hover {
   cursor: not-allowed;
 }
 
+/* Spoiler: ||hidden text||. A solid block until revealed by hover (on
+   devices that can hover), keyboard focus (:focus-visible, so a tap's focus
+   doesn't keep it open), or a tap/click/Enter/Space toggle that adds
+   .spoiler-revealed (installSpoilerToggle in content-renderer.js). */
+.spoiler {
+  background-color: var(--bg-secondary);
+  border-radius: var(--radius-sm);
+  padding: 0 2px;
+  cursor: pointer;
+  transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+
+/* Hidden state. Touch screens skip :hover, which sticks after a tap and
+   would stop a second tap from hiding the spoiler again. */
+@media (hover: none) {
+  .spoiler:not(.spoiler-revealed):not(:focus-visible) {
+    background-color: var(--text-secondary);
+    color: transparent;
+  }
+
+  .spoiler:not(.spoiler-revealed):not(:focus-visible) * {
+    color: transparent;
+    background-color: transparent;
+    border-color: transparent;
+  }
+}
+
+@media (hover: hover) {
+  .spoiler:not(.spoiler-revealed):not(:focus-visible):not(:hover) {
+    background-color: var(--text-secondary);
+    color: transparent;
+  }
+
+  .spoiler:not(.spoiler-revealed):not(:focus-visible):not(:hover) * {
+    color: transparent;
+    background-color: transparent;
+    border-color: transparent;
+  }
+}
+
 /* ========================================
    Forms
    ======================================== */
