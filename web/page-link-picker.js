@@ -4,6 +4,7 @@
 // in the dozens, not the hundreds a Lesson search needs to handle well.
 import { getAllPages, getAllSlugs } from './page-database-utils.js';
 import { UNTITLED_PAGE_LOWERCASE } from './constants.js';
+import { attachSearchListKeys } from './search-list-keys.js';
 
 /**
  * Show a popup listing every linkable Page - one with at least one Slug
@@ -82,8 +83,13 @@ export function showPageLinkPicker({ onSelect }) {
         }
       }
 
-      searchInput.oninput = () => renderResults(searchInput.value);
+      const keys = attachSearchListKeys({ popup, input: searchInput, list: resultsDiv });
+      searchInput.oninput = () => {
+        renderResults(searchInput.value);
+        keys.refresh();
+      };
       renderResults('');
+      keys.refresh();
 
       box.appendChild(closeBtn);
       box.appendChild(searchInput);

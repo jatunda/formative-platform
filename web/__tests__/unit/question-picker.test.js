@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { showQuestionPicker } from '../../question-picker.js';
+import { pressKey } from '../helpers/press-key.js';
 
 const mockGetAllQuestions = vi.fn();
 vi.mock('../../question-database-utils.js', () => ({
@@ -102,6 +103,42 @@ describe('showQuestionPicker', () => {
     document.querySelector('.lesson-popup-result-btn').click();
 
     expect(onSelect).toHaveBeenCalledWith({ questionId: 'q1', label: 'What is 2 + 2?' });
+    expect(document.querySelector('.lesson-popup')).toBeFalsy();
+  });
+
+  it('picks from the keyboard: changing the class filter puts the highlight back on the first match', async () => {
+    mockGetAllQuestions.mockResolvedValue({
+      q1: { stem: [{ type: 'text', value: 'A one' }], classId: 'c1', topic: '' },
+      q2: { stem: [{ type: 'text', value: 'A two' }], classId: 'c1', topic: '' },
+      q3: { stem: [{ type: 'text', value: 'P one' }], classId: 'c2', topic: '' },
+    });
+    const onSelect = vi.fn();
+
+    showQuestionPicker({ onSelect });
+    await flush();
+
+    const searchInput = document.querySelector('.lesson-popup-search');
+    pressKey(searchInput, 'ArrowDown');
+    const select = document.querySelector('select');
+    select.value = 'c1';
+    select.onchange();
+    pressKey(searchInput, 'ArrowDown');
+    pressKey(searchInput, 'Enter');
+
+    expect(onSelect).toHaveBeenCalledWith({ questionId: 'q2', label: 'A two' });
+    expect(document.querySelector('.lesson-popup')).toBeFalsy();
+  });
+
+  it('closes on Escape, even from the class filter', async () => {
+    mockGetAllQuestions.mockResolvedValue({ q1: { stem: [{ type: 'text', value: 'Q' }], classId: 'c1', topic: '' } });
+    const onSelect = vi.fn();
+
+    showQuestionPicker({ onSelect });
+    await flush();
+
+    pressKey(document.querySelector('select'), 'Escape');
+
+    expect(onSelect).not.toHaveBeenCalled();
     expect(document.querySelector('.lesson-popup')).toBeFalsy();
   });
 

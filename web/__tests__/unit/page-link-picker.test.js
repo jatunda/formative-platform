@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { showPageLinkPicker } from '../../page-link-picker.js';
+import { pressKey } from '../helpers/press-key.js';
 
 const mockGetAllPages = vi.fn();
 const mockGetAllSlugs = vi.fn();
@@ -102,6 +103,39 @@ describe('showPageLinkPicker', () => {
     document.querySelector('.lesson-popup-result-btn').click();
 
     expect(onSelect).toHaveBeenCalledWith({ slug: 'syllabus', title: 'Syllabus' });
+    expect(document.querySelector('.lesson-popup')).toBeFalsy();
+  });
+
+  it('picks from the keyboard: the highlight starts on the first match and Enter acts like a click', async () => {
+    mockGetAllPages.mockResolvedValue({ a: { title: 'Apple' }, b: { title: 'Banana' }, z: { title: 'Zebra' } });
+    mockGetAllSlugs.mockResolvedValue({ apple: 'a', banana: 'b', zebra: 'z' });
+    const onSelect = vi.fn();
+
+    showPageLinkPicker({ onSelect });
+    await flush();
+
+    const searchInput = document.querySelector('.lesson-popup-search');
+    pressKey(searchInput, 'ArrowDown');
+    searchInput.value = 'a';
+    searchInput.oninput();
+    pressKey(searchInput, 'ArrowDown');
+    pressKey(searchInput, 'Enter');
+
+    expect(onSelect).toHaveBeenCalledWith({ slug: 'banana', title: 'Banana' });
+    expect(document.querySelector('.lesson-popup')).toBeFalsy();
+  });
+
+  it('closes on Escape without calling onSelect', async () => {
+    mockGetAllPages.mockResolvedValue({ pageA: { title: 'Syllabus' } });
+    mockGetAllSlugs.mockResolvedValue({ syllabus: 'pageA' });
+    const onSelect = vi.fn();
+
+    showPageLinkPicker({ onSelect });
+    await flush();
+
+    pressKey(document.querySelector('.lesson-popup-search'), 'Escape');
+
+    expect(onSelect).not.toHaveBeenCalled();
     expect(document.querySelector('.lesson-popup')).toBeFalsy();
   });
 

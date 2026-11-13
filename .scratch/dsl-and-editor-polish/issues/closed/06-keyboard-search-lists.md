@@ -4,11 +4,11 @@
 
 **Blocked by:** 05 (Remove AI generation); schedule-planning-polish 08 (Move the other confirm() callers), which also touches the editors. Ordering note: edges in this folder also serialize tickets that edit the same renderer and stylesheet, to prevent merge conflicts.
 
-**Status:** ready-for-agent
+**Status:** closed
 
-- [ ] First result selected on open and after every change to the search text
-- [ ] First ↓ moves to the second result; ↓ at the last and ↑ at the first do nothing
-- [ ] Enter selects the highlighted item with the same effect as clicking it
-- [ ] Esc closes the popup
-- [ ] Selection is visible (styled) and announced to screen readers (aria-activedescendant or equivalent)
-- [ ] Works in all four lists through one shared helper
+- [x] First result selected on open and after every change to the search text
+- [x] First ↓ moves to the second result; ↓ at the last and ↑ at the first do nothing
+- [x] Enter selects the highlighted item with the same effect as clicking it
+- [x] Esc closes the popup
+- [x] Selection is visible (styled) and announced to screen readers (aria-activedescendant or equivalent)
+- [x] Works in all four lists through one shared helper

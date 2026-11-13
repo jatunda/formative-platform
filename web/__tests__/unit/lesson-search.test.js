@@ -6,6 +6,7 @@ import {
   clearTitleCache,
 } from '../../lesson-search.js';
 import { initializeDatabase } from '../../database-handle.js';
+import { pressKey } from '../helpers/press-key.js';
 
 // Mock Firebase
 let mockData = {};
@@ -172,6 +173,33 @@ describe('lesson-search', () => {
         expect(onSelect).toHaveBeenCalled();
         expect(typeof onSelect.mock.calls[0][0]).toBe('string');
       }
+    });
+
+    it('picks from the keyboard: the highlight starts on the first match and Enter acts like a click', async () => {
+      const onSelect = vi.fn();
+      await showLessonSearchPopup({ onSelect });
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      const searchInput = document.querySelector('.lesson-popup-search');
+      pressKey(searchInput, 'ArrowDown');
+      searchInput.value = 'algorithms';
+      searchInput.oninput();
+      pressKey(searchInput, 'ArrowDown');
+      pressKey(searchInput, 'Enter');
+
+      expect(onSelect).toHaveBeenCalledWith('hash3');
+      expect(document.querySelector('.lesson-popup')).toBeFalsy();
+    });
+
+    it('closes on Escape without calling onSelect', async () => {
+      const onSelect = vi.fn();
+      await showLessonSearchPopup({ onSelect });
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      pressKey(document.querySelector('.lesson-popup-search'), 'Escape');
+
+      expect(onSelect).not.toHaveBeenCalled();
+      expect(document.querySelector('.lesson-popup')).toBeFalsy();
     });
 
     it('should close popup when close button is clicked', async () => {

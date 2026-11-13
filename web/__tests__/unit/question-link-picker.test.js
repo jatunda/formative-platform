@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { showQuestionLinkPicker } from '../../question-link-picker.js';
+import { pressKey } from '../helpers/press-key.js';
 
 const mockGetAllQuestions = vi.fn();
 const mockGetAllQuestionSlugs = vi.fn();
@@ -100,6 +101,43 @@ describe('showQuestionLinkPicker', () => {
     document.querySelector('.lesson-popup-result-btn').click();
 
     expect(onSelect).toHaveBeenCalledWith({ slug: 'loops', label: 'Loops question' });
+    expect(document.querySelector('.lesson-popup')).toBeFalsy();
+  });
+
+  it('picks from the keyboard: the highlight starts on the first match and Enter acts like a click', async () => {
+    mockGetAllQuestions.mockResolvedValue({
+      qA: { stem: [{ type: 'text', value: 'Arrays question' }] },
+      qB: { stem: [{ type: 'text', value: 'Loops question' }] },
+      qC: { stem: [{ type: 'text', value: 'Strings' }] },
+    });
+    mockGetAllQuestionSlugs.mockResolvedValue({ arrays: 'qA', loops: 'qB', strings: 'qC' });
+    const onSelect = vi.fn();
+
+    showQuestionLinkPicker({ onSelect });
+    await flush();
+
+    const searchInput = document.querySelector('.lesson-popup-search');
+    pressKey(searchInput, 'ArrowDown');
+    pressKey(searchInput, 'ArrowDown');
+    searchInput.value = 'question';
+    searchInput.oninput();
+    pressKey(searchInput, 'Enter');
+
+    expect(onSelect).toHaveBeenCalledWith({ slug: 'arrays', label: 'Arrays question' });
+    expect(document.querySelector('.lesson-popup')).toBeFalsy();
+  });
+
+  it('closes on Escape without calling onSelect', async () => {
+    mockGetAllQuestions.mockResolvedValue({ qA: { stem: [{ type: 'text', value: 'Loops question' }] } });
+    mockGetAllQuestionSlugs.mockResolvedValue({ loops: 'qA' });
+    const onSelect = vi.fn();
+
+    showQuestionLinkPicker({ onSelect });
+    await flush();
+
+    pressKey(document.querySelector('.lesson-popup-search'), 'Escape');
+
+    expect(onSelect).not.toHaveBeenCalled();
     expect(document.querySelector('.lesson-popup')).toBeFalsy();
   });
 

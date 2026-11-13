@@ -5,6 +5,7 @@
 // page-link-picker.js excluding a Page with no Slug).
 import { getAllQuestions, getAllQuestionSlugs } from './question-database-utils.js';
 import { deriveQuestionLabel } from './question-label.js';
+import { attachSearchListKeys } from './search-list-keys.js';
 
 /**
  * Show a popup listing every linkable Question. Selecting one calls
@@ -80,8 +81,13 @@ export function showQuestionLinkPicker({ onSelect }) {
         }
       }
 
-      searchInput.oninput = () => renderResults(searchInput.value);
+      const keys = attachSearchListKeys({ popup, input: searchInput, list: resultsDiv });
+      searchInput.oninput = () => {
+        renderResults(searchInput.value);
+        keys.refresh();
+      };
       renderResults('');
+      keys.refresh();
 
       box.appendChild(closeBtn);
       box.appendChild(searchInput);

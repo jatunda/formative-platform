@@ -7,6 +7,7 @@
 // - Results sorted by relevance score
 import { UNTITLED_LESSON } from './constants.js';
 import { lessonStore } from './lesson-store.js';
+import { attachSearchListKeys } from './search-list-keys.js';
 
 // Cache for page titles to avoid redundant queries
 const pageTitles = {}; // id → title
@@ -194,8 +195,13 @@ export function showLessonSearchPopup({ onSelect }) {
         }
       }
 
-      searchInput.oninput = () => renderResults(searchInput.value);
+      const keys = attachSearchListKeys({ popup, input: searchInput, list: resultsDiv });
+      searchInput.oninput = () => {
+        renderResults(searchInput.value);
+        keys.refresh();
+      };
       renderResults("");
+      keys.refresh();
 
       box.appendChild(closeBtn);
       box.appendChild(searchInput);
