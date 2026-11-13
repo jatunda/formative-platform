@@ -196,12 +196,6 @@ export function describeFailure(r) {
  */
 export const KNOWN_FAILURES = [
   {
-    failure: 'tap target "Delete day ',
-    touch: true,
-    maxWidth: 600,
-    note: 'The Delete Day (trash icon) button is about 29px wide on a phone; a wider one would squeeze the Lessons column (ticket 02).',
-  },
-  {
     failure: 'color-contrast: 1 node(s)',
     pages: ['planning'],
     note: 'The red Logout button (white on #e53e3e, 4.1:1; 4.5:1 is the minimum): accepted by Eric.',
