@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { RING_GAP, keepRingClear, ringRoom, ringShift } from '../../clock/ring-fit.js';
+import { keepRingClear, ringRoom, ringShift } from '../../clock/ring-fit.js';
+import { RING_GAP } from '../../clock/ring-geometry.js';
 
 const box = (left, top, right, bottom) => ({ left, top, right, bottom });
 // A 1000 × 600 region: the ring's centre is at x=500, and y=300 in the middle.

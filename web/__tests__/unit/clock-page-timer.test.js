@@ -154,6 +154,15 @@ describe('School Clock classroom timer', () => {
       expect(ring().textContent).not.toContain('of 5:00');
     });
 
+    it('sizes its digits by their glyph counts, as a Readout does', () => {
+      open();
+      pick('5 min');
+      advance(48 * SEC);
+      expect(digits().textContent).toBe('4:12');
+      expect(digits().style.getPropertyValue('--d')).toBe('3');
+      expect(digits().style.getPropertyValue('--c')).toBe('1');
+    });
+
     it('shows the share of time left, a little less every tick', () => {
       open();
       pick('5 min');
