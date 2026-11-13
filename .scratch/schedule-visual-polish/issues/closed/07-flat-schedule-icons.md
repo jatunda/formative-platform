@@ -4,8 +4,8 @@
 
 **Blocked by:** 01 (Shared line-icon module), 06 (Full Schedule link). Ordering note: tickets 06–11 change the same schedule rows and stylesheet, so they run in order to avoid merge conflicts.
 
-**Status:** ready-for-agent
+**Status:** closed
 
-- [ ] Link Lesson, Delete Day and the saving indicator use flat icons on both schedule pages
-- [ ] The spinner spins while a change saves and the button keeps its size
-- [ ] Aria-labels and tooltips unchanged
+- [x] Link Lesson, Delete Day and the saving indicator use flat icons on both schedule pages
+- [x] The spinner spins while a change saves and the button keeps its size
+- [x] Aria-labels and tooltips unchanged

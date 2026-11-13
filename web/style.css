@@ -220,6 +220,14 @@ button:focus-visible {
   cursor: pointer;
 }
 
+/* The trash icon (and its saving spinner) at the width the 🗑️ emoji had,
+   so the button keeps the size the layout and its 44px desktop target
+   were measured with. */
+.delete-day-btn .line-icon {
+  width: 1.375em;
+  height: 1.375em;
+}
+
 .delete-day-btn:hover {
   background-color: var(--error-red-hover);
   border-color: var(--error-red-hover);
@@ -1503,6 +1511,13 @@ ol.lesson-list {
   stroke-width: 2;
   stroke-linecap: round;
   stroke-linejoin: round;
+  vertical-align: -0.125em;
+}
+
+/* The saving spinner (savingSpinner in ui-components.js) a schedule button
+   shows in place of its icon while a change saves. */
+.line-icon-spin {
+  animation: spin 1s linear infinite;
 }
 
 #contentId {
