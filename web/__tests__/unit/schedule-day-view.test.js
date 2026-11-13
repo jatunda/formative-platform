@@ -195,25 +195,47 @@ describe('schedule-day-view', () => {
   });
 
   describe('makeDeleteDayHandler', () => {
+    const answer = async (text) => {
+      const dialog = document.querySelector('[role="alertdialog"]');
+      [...dialog.querySelectorAll('button')].find((b) => b.textContent === text).click();
+    };
+
     beforeEach(() => {
+      document.body.innerHTML = '';
       global.confirm = vi.fn(() => true);
+    });
+
+    it('asks in the in-app dialog, not the browser confirm()', async () => {
+      const handler = makeDeleteDayHandler('class1', onReload);
+
+      const done = handler(3);
+      const dialog = document.querySelector('[role="alertdialog"]');
+      expect(dialog.textContent).toContain('day 3');
+      expect(dialog.textContent).toContain('shift all future days back by one');
+      expect(global.confirm).not.toHaveBeenCalled();
+
+      await answer('Cancel');
+      await done;
     });
 
     it('deletes the day and reloads when confirmed', async () => {
       mockDeleteDayAt.mockResolvedValue(undefined);
       const handler = makeDeleteDayHandler('class1', onReload);
 
-      await handler(3);
+      const done = handler(3);
+      await answer('Delete Day');
+      await done;
 
       expect(mockDeleteDayAt).toHaveBeenCalledWith('class1', 3);
       expect(onReload).toHaveBeenCalled();
     });
 
-    it('does nothing when the confirmation is declined', async () => {
-      global.confirm = vi.fn(() => false);
+    it('does nothing when cancelled', async () => {
       const handler = makeDeleteDayHandler('class1', onReload);
 
-      await handler(3);
+      const done = handler(3);
+      await answer('Cancel');
+      await done;
 
       expect(mockDeleteDayAt).not.toHaveBeenCalled();
       expect(onReload).not.toHaveBeenCalled();
@@ -224,7 +246,9 @@ describe('schedule-day-view', () => {
       mockDeleteDayAt.mockRejectedValue(new Error('boom'));
       const handler = makeDeleteDayHandler('class1', onReload);
 
-      await handler(3);
+      const done = handler(3);
+      await answer('Delete Day');
+      await done;
 
       expect(mockShowNotification).toHaveBeenCalledWith(expect.stringContaining('Failed'), 'error');
       expect(onReload).not.toHaveBeenCalled();
