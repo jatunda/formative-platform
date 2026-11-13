@@ -9,7 +9,7 @@
 // there is no bar. Pure: a moment from the clock model and the settings give
 // what to draw (positions in percent of the bar's width).
 import { isoDate, localMidnight, segmentsOn } from './clock-model.js';
-import { periodLabel } from './format.js';
+import { formatSegmentName, periodLabel } from './format.js';
 
 /** @typedef {import('./clock-model.js').Moment} Moment */
 /** @typedef {import('./clock-model.js').TimedSegment} TimedSegment */
@@ -17,7 +17,7 @@ import { periodLabel } from './format.js';
 /**
  * One block of the bar.
  * @typedef {{
- *   name: string, short: string, label: string,
+ *   name: string, short: string, label: string, fullName: string,
  *   kind: import('./school-years.js').SegmentKind | 'passing' | 'countdown',
  *   start: Date, end: Date,
  *   state: 'past' | 'now' | 'next' | 'later',
@@ -26,6 +26,7 @@ import { periodLabel } from './format.js';
  * }} BarBlock
  * - `short`: the name for a tight block ("P3", "Nutr."); never shorter.
  * - `label`: the Period's Period Label ('' for none, and for every Break and Assembly).
+ * - `fullName`: the name with its Period Label, "Period 3 · AP CSA".
  * - `countdown`: the Off-Hours block on just this Segment, "Until Period 1",
  *   from the last School Day's end to the Next School Day's first Segment.
  * - `state`: `next` is the Segment after a Passing Period.
@@ -114,6 +115,7 @@ export function describeBar(now, moment, schoolYears, { division, dayStrip, peri
     name: s.name,
     short: shortName(s.name),
     label: periodLabel(s, periodLabels),
+    fullName: formatSegmentName(s, periodLabels),
     kind: s.kind,
     start: s.start,
     end: s.end,
@@ -127,6 +129,7 @@ export function describeBar(now, moment, schoolYears, { division, dayStrip, peri
     ...block(first, 'now', false),
     name: `Until ${first.name}`,
     short: `Until ${shortName(first.name)}`,
+    fullName: `Until ${formatSegmentName(first, periodLabels)}`,
     kind: /** @type {const} */ ('countdown'),
     start: countdownStart(moment.schoolEndedAt, first.start, schoolYears),
     end: first.start,

@@ -17,15 +17,13 @@ import { createCycleHint } from './cycle-hint.js';
 import { createDayBarView } from './day-bar-view.js';
 import { describeBar } from './day-bar.js';
 import { el } from './dom.js';
-import { formatClockTime, formatSegmentName, formatShortDate } from './format.js';
 import { icon } from './icons.js';
-import { miniContent } from './mini-content.js';
 import { createMiniPlayer } from './mini-player.js';
 import { createDivisionPrompt, createErrorToast, createRingCard, createSoundPrompt } from './overlays.js';
 import { addReadout, canAddReadout, createLayoutStore, cycleReadout, newLayout, removeReadout } from './readout-layout.js';
-import { UNTIL_END, readoutParts, readoutValue, untilEndOf } from './readouts.js';
 import { nextRingLines } from './ring-words.js';
 import { createRinging } from './ringing.js';
+import { screenWords } from './screen-words.js';
 import { createReadoutsView } from './readouts-view.js';
 import { createStageTextView } from './stage-text-view.js';
 import { SCHOOL_YEARS } from './school-years.js';
@@ -42,21 +40,6 @@ import { keepRingClear } from './ring-fit.js';
 const TICK_MS = 1000;
 
 let destroyActiveApp = null;
-
-/**
- * How the page writes clock times, Segment names and the Division under the current settings.
- * @param {import('./clock-settings.js').ClockSettings} settings
- */
-function textFor(settings) {
-  return {
-    time: (date, { seconds = false } = {}) => formatClockTime(date, { seconds, use24Hour: settings.use24Hour }),
-    /** The current time, with seconds when they're on. @param {Date} date */
-    now: (date) => formatClockTime(date, { seconds: settings.showSeconds, use24Hour: settings.use24Hour }),
-    readout: { use24Hour: settings.use24Hour, seconds: settings.showSeconds },
-    name: (segment) => formatSegmentName(segment, settings.periodLabels),
-    division: settings.division,
-  };
-}
 
 /** Whether the browser asks for less motion (no flashing). */
 function browserPrefersReducedMotion() {
@@ -383,13 +366,6 @@ export function initClockApp({
   mini.button.classList.add('clock-control', 'clock-control--icon', 'clock-control--mini');
   globalThis.addEventListener('pagehide', mini.close);
 
-  /**
-   * @param {Date} now @param {import('./clock-model.js').Moment | null} moment
-   * @param {import('./mini-content.js').BigReadout} bigReadout the big Readout (the layout's first) and its mode
-   */
-  function renderMini(now, moment, { big, mode }) {
-    mini.show(miniContent({ now, moment, settings, big, mode, timer: shownTimer(now) }));
-  }
   function renderMiniRinging() {
     mini.showRinging(ringing.current()?.words.title ?? null);
   }
@@ -435,7 +411,7 @@ export function initClockApp({
    */
   function tick() {
     const now = new Date(clock.now());
-    const { rang, soundWindowDue } = ringing.advance(lastTick, now, settings, textFor(settings));
+    const { rang, soundWindowDue } = ringing.advance(lastTick, now, settings);
     if (soundWindowDue) scheduleSounds(now);
     showRinging();
     if (settings.division) {
@@ -452,8 +428,21 @@ export function initClockApp({
 
   function render(now) {
     const chosen = settings.division !== null;
-    const text = textFor(settings);
     const moment = chosen ? describeMoment(now, schoolYears, { division: settings.division }) : null;
+    // The Readouts show just the time before a Division is chosen or on a
+    // date the clock knows nothing about; otherwise the tab's layout.
+    const timeOnly = !moment || moment.state === 'unknown';
+    if (!timeOnly) {
+      lastMoment = moment;
+      if (!layout) {
+        layout = newLayout(moment);
+        layoutStore.keepInTab(layout);
+      }
+    }
+    const timer = shownTimer(now);
+    const words = screenWords({
+      now, moment, settings, timer, readouts: timeOnly ? null : layout.readouts.map(({ mode }) => mode),
+    });
     // Until a Division is chosen, the prompt is the only thing in reach.
     mainScreen.toggleAttribute('inert', !chosen);
     divisionPrompt.show(!chosen);
@@ -469,77 +458,46 @@ export function initClockApp({
       String(settings.division),
       el('span', { className: 'visually-hidden', textContent: ', switch Division' }),
     );
-    banner.replaceChildren(icon('clock'), el('span', {
-      textContent: `Simulated time · ${formatShortDate(now)}, ${text.now(now)} · this tab only`,
-    }));
-    const bar = barFor(now, moment);
+    banner.replaceChildren(icon('clock'), el('span', { textContent: words.banner }));
+    // The bar: hidden before a Division, while the timer has the big spot (the
+    // ring needs the height), and wherever describeBar has none.
+    const bar = moment && !timer ? describeBar(now, moment, schoolYears, settings) : null;
     // A bar of the Next School Day's Segments is headed with its date and Day Label.
-    stageText.show(now, moment, settings, bar?.day === 'next');
-    renderMini(now, moment, renderReadouts(now, moment, text));
-    dayBar.show(bar, (date) => text.time(date), { editing });
+    stageText.show(words.stage, bar?.day === 'next');
+    renderReadouts(timeOnly, timer, words.readouts);
+    mini.show(words.mini);
+    dayBar.show(bar, settings, { editing });
     // The edit note names the bar too while there's one to tap.
     editNote.textContent = `Tap a Readout${bar ? ' or the bar' : ''} to change what it shows`;
-    drawer.showRings(chosen ? nextRingLines(now, schoolYears, settings, text) : []);
+    drawer.showRings(chosen ? nextRingLines(now, schoolYears, settings) : []);
   }
 
   /**
-   * The bar: hidden before a Division, while the timer has the big spot (the
-   * ring needs the height), and wherever describeBar has none.
-   * @param {Date} now @param {import('./clock-model.js').Moment | null} moment
+   * Show the Readouts: the tab's layout (with the timer in the big spot while
+   * it shows), or just the time.
+   * @param {boolean} timeOnly @param {import('./timer.js').TimerView | null} timer
+   * @param {ReturnType<typeof screenWords>['readouts']} parts the Readouts' words
    */
-  function barFor(now, moment) {
-    return moment && !shownTimer(now)
-      ? describeBar(now, moment, schoolYears, {
-        division: settings.division, dayStrip: settings.dayStrip, periodLabels: settings.periodLabels,
-        showPeriodEnd: settings.showPeriodEnd,
-      })
-      : null;
-  }
-
-  /**
-   * Show the Readouts for `moment`: the tab's layout (with the timer in the
-   * big spot while it shows), or just the time before a Division is chosen
-   * or on a date the clock knows nothing about.
-   * @param {Date} now @param {import('./clock-model.js').Moment | null} moment @param {ReturnType<typeof textFor>} text
-   * @returns {import('./mini-content.js').BigReadout} the big Readout (the layout's first, under a timer too)
-   */
-  function renderReadouts(now, moment, text) {
-    const options = text.readout;
-    const timeOnly = !moment || moment.state === 'unknown';
+  function renderReadouts(timeOnly, timer, parts) {
     readoutsControl.hidden = timeOnly;
     if (timeOnly) {
       editing = false;
       mainScreen.classList.remove('has-timer');
-      const parts = readoutParts({ kind: 'time', at: now }, options);
-      readoutsView.show({ count: 1, cyclable: false, timer: false, editing: false, canAdd: false }, [parts]);
+      readoutsView.show({ count: 1, cyclable: false, timer: false, editing: false, canAdd: false }, parts);
       pageHint.update(false);
       showEditing();
-      return { big: parts, mode: null };
+      return;
     }
-    lastMoment = moment;
-    if (!layout) {
-      layout = newLayout(moment);
-      layoutStore.keepInTab(layout);
-    }
-    const timer = shownTimer(now);
     const withTimer = timer !== null;
     mainScreen.classList.toggle('has-timer', withTimer);
     if (timer) timerRing.show(timer);
-    const values = layout.readouts.map(({ mode }) => readoutValue(mode, moment, now, settings.periodLabels));
-    const parts = values.map((value) => readoutParts(value, options));
-    // Beside the ring, the old main Readout's time left names its Segment
-    // (the heading steps aside for the ring).
-    if (withTimer && moment.state === 'segment' && parts[0].caption === UNTIL_END) {
-      parts[0] = { ...parts[0], caption: untilEndOf(text.name(moment.current)) };
-    }
     readoutsView.show(
-      { count: values.length, cyclable: true, timer: withTimer, editing, canAdd: canAddReadout(layout) },
+      { count: parts.length, cyclable: true, timer: withTimer, editing, canAdd: canAddReadout(layout) },
       parts,
     );
     // Not in edit mode, which has its own note.
     pageHint.update(!editing);
     showEditing();
-    return { big: parts[0], mode: layout.readouts[0].mode };
   }
 
   /** The Readouts control's pressed state, and the screen's edit-mode look. */

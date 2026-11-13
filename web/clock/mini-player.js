@@ -3,7 +3,7 @@
 // head line (the Segment, "5:00 timer", or what's ringing), the big Readout
 // (its mode cycles on a click anywhere, as the first-time tooltip says), and a
 // foot (the Segment's or timer's bar and words, up next, or Dismiss while something
-// rings). The page works out what to show (mini-content.js); this draws it
+// rings). The page works out what to show (screen-words.js); this draws it
 // while the window is open. The window loads the page's tokens, themes and
 // components and mirrors the look attributes on the page's <html>, so it
 // follows the teacher's theme as it changes.
@@ -16,7 +16,7 @@ const MINI_PLAYER_SIZE = { width: 320, height: 180 };
 /** The page's tokens, themes and components, then the mini player's own layout. */
 const STYLESHEETS = ['/clock/tokens.css', '/clock/themes.css', '/clock/clock.css', '/clock/mini-player.css'];
 
-/** @typedef {import('./mini-content.js').MiniContent} MiniContent */
+/** @typedef {import('./screen-words.js').MiniContent} MiniContent */
 
 /**
  * @param {{ pictureInPicture: import('./screen.js').PictureInPicture | null,

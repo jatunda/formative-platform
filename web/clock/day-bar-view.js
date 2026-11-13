@@ -10,7 +10,7 @@
 // through to the bar) does the same for the keyboard and screen readers.
 import { BAR_SETTING_NAMES, barSetting, dayStripOf } from './day-bar.js';
 import { el } from './dom.js';
-import { formatShortDate } from './format.js';
+import { formatClockTime, formatShortDate } from './format.js';
 
 /** @typedef {import('./day-bar.js').Bar} Bar */
 /** @typedef {import('./day-bar.js').BarBlock} BarBlock */
@@ -19,9 +19,6 @@ const KIND_WORD = { break: 'Break', assembly: 'Assembly' };
 
 /** A 12-hour time's " AM" / " PM". */
 const MERIDIEM = / [AP]M$/;
-
-/** "Period 3 · AP CSA". @param {BarBlock} block */
-const fullName = (block) => (block.label ? `${block.name} · ${block.label}` : block.name);
 
 /**
  * "10:25–11:15 AM": a block's start and end, saying AM or PM once when both
@@ -38,8 +35,9 @@ function timeRange(block, time) {
 /**
  * @param {{ onSwitch: () => void }} actions `onSwitch`: the bar was tapped (or its button pressed) in edit mode
  * @returns {{ element: HTMLElement,
- *   show: (bar: Bar | null, time: (date: Date) => string, options?: { editing?: boolean }) => void }}
- *   `time` writes a clock time (no seconds) under the current settings; `editing`: the Readouts' edit mode.
+ *   show: (bar: Bar | null, settings: Pick<import('./format.js').WordSettings, 'use24Hour'>,
+ *     options?: { editing?: boolean }) => void }}
+ *   `settings` say how clock times are written; `editing`: the Readouts' edit mode.
  */
 export function createDayBarView({ onSwitch }) {
   const element = el('section', { className: 'clock-bar', hidden: true });
@@ -68,7 +66,7 @@ export function createDayBarView({ onSwitch }) {
     const next = bar.day === 'next';
     const date = formatShortDate(bar.date);
     let name = "Today's Segments";
-    if (single) name = fullName(bar.blocks[0]);
+    if (single) name = bar.blocks[0].fullName;
     else if (next) name = `Segments on ${date}`;
     // Keeps edit mode's outline: a switch rebuilds the bar mid-edit.
     element.className = `clock-bar clock-bar--${bar.setting}${next ? ' clock-bar--next' : ''}${editing ? ' is-editing' : ''}`;
@@ -96,8 +94,8 @@ export function createDayBarView({ onSwitch }) {
           className: 'visually-hidden',
           // The Off-Hours countdown says what it counts down to: "Until Period 1, Mon, Nov 16 at 8:30 AM".
           textContent: block.kind === 'countdown'
-            ? `${fullName(block)}, ${bar.day === 'today' ? 'today' : date} at ${time(block.end)}`
-            : `${fullName(block)}, ${time(block.start)} to ${time(block.end)}${nowWord}`,
+            ? `${block.fullName}, ${bar.day === 'today' ? 'today' : date} at ${time(block.end)}`
+            : `${block.fullName}, ${time(block.start)} to ${time(block.end)}${nowWord}`,
         }),
       ]);
       item.dataset.kind = block.kind;
@@ -140,7 +138,7 @@ export function createDayBarView({ onSwitch }) {
       const row = el('li', { className: 'clock-agenda__row' }, [
         el('span', { className: 'clock-agenda__time', textContent: block.showEnd ? timeRange(block, time) : time(block.start) }), ' ',
         el('span', { className: 'clock-agenda__name' }, [
-          fullName(block),
+          block.fullName,
           // Breaks and Assemblies say so in words, not just by colour.
           ...(KIND_WORD[block.kind] ? [el('span', { className: 'clock-agenda__kind', textContent: ` · ${KIND_WORD[block.kind]}` })] : []),
         ]),
@@ -157,8 +155,13 @@ export function createDayBarView({ onSwitch }) {
     return list;
   }
 
-  /** @param {Bar | null} bar @param {(date: Date) => string} time @param {{ editing?: boolean }} [options] */
-  function show(bar, time, { editing: inEditMode = false } = {}) {
+  /**
+   * @param {Bar | null} bar @param {Pick<import('./format.js').WordSettings, 'use24Hour'>} settings
+   * @param {{ editing?: boolean }} [options]
+   */
+  function show(bar, { use24Hour }, { editing: inEditMode = false } = {}) {
+    /** A clock time, no seconds. @param {Date} date */
+    const time = (date) => formatClockTime(date, { use24Hour });
     element.hidden = bar === null;
     editing = bar !== null && inEditMode;
     element.classList.toggle('is-editing', editing);
