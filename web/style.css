@@ -467,9 +467,7 @@ textarea:focus-visible {
   background-color: var(--bg-secondary);
 }
 
-select,
-#aiClassSelect,
-#learningObjectives {
+select {
   width: 100%;
   padding: var(--spacing-md);
   background-color: var(--bg-secondary);
@@ -482,63 +480,19 @@ select,
 }
 
 select:focus,
-select:hover,
-#aiClassSelect:focus,
-#learningObjectives:focus {
+select:hover {
   outline: none;
   border-color: var(--accent-blue);
 }
 
-select:focus-visible,
-#aiClassSelect:focus-visible,
-#learningObjectives:focus-visible {
+select:focus-visible {
   outline: 2px solid var(--accent-blue);
   outline-offset: 2px;
 }
 
-select:focus,
-#aiClassSelect:focus,
-#learningObjectives:focus {
+select:focus {
   background-color: var(--bg-primary);
   box-shadow: var(--shadow-focus);
-}
-
-#learningObjectives {
-  resize: vertical;
-  min-height: 100px;
-  font-family: inherit;
-}
-
-.radio-group {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-md);
-}
-
-.radio-label {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--spacing-sm);
-  cursor: pointer;
-  padding: var(--spacing-md);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-lg);
-  transition: all var(--transition-fast);
-}
-
-.radio-label:hover {
-  border-color: var(--accent-blue);
-  background-color: var(--accent-blue-hover);
-}
-
-.radio-label input[type="radio"] {
-  margin: 0;
-  accent-color: var(--accent-blue);
-}
-
-.radio-label span {
-  font-weight: 600;
-  color: var(--accent-blue);
 }
 
 .date-offset-control {
