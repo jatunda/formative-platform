@@ -382,8 +382,9 @@ a:not(.class-link):not(.schedule-action-btn):hover {
 }
 
 /* Spoiler: ||hidden text||. A solid block until revealed by hover (on
-   devices that can hover), keyboard focus (:focus-visible, so a tap's focus
-   doesn't keep it open), or a tap/click/Enter/Space toggle that adds
+   devices that can hover), keyboard focus on it or on a link inside it
+   (:focus-visible, so a tap's focus doesn't keep it open), or a
+   tap/click/Enter/Space toggle that adds
    .spoiler-revealed (installSpoilerToggle in content-renderer.js). */
 .spoiler {
   background-color: var(--bg-secondary);
@@ -396,12 +397,12 @@ a:not(.class-link):not(.schedule-action-btn):hover {
 /* Hidden state. Touch screens skip :hover, which sticks after a tap and
    would stop a second tap from hiding the spoiler again. */
 @media (hover: none) {
-  .spoiler:not(.spoiler-revealed):not(:focus-visible) {
+  .spoiler:not(.spoiler-revealed):not(:focus-visible):not(:has(:focus-visible)) {
     background-color: var(--text-secondary);
     color: transparent;
   }
 
-  .spoiler:not(.spoiler-revealed):not(:focus-visible) * {
+  .spoiler:not(.spoiler-revealed):not(:focus-visible):not(:has(:focus-visible)) * {
     color: transparent;
     background-color: transparent;
     border-color: transparent;
@@ -409,12 +410,12 @@ a:not(.class-link):not(.schedule-action-btn):hover {
 }
 
 @media (hover: hover) {
-  .spoiler:not(.spoiler-revealed):not(:focus-visible):not(:hover) {
+  .spoiler:not(.spoiler-revealed):not(:focus-visible):not(:has(:focus-visible)):not(:hover) {
     background-color: var(--text-secondary);
     color: transparent;
   }
 
-  .spoiler:not(.spoiler-revealed):not(:focus-visible):not(:hover) * {
+  .spoiler:not(.spoiler-revealed):not(:focus-visible):not(:has(:focus-visible)):not(:hover) * {
     color: transparent;
     background-color: transparent;
     border-color: transparent;

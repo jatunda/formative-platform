@@ -6,9 +6,13 @@
 
 **Blocked by:** 09 (A blank line splits two quotes), which also edits `web/content-renderer.js`.
 
-**Status:** ready-for-agent
+**Status:** closed
 
-- [ ] Mouse: one click on a link inside a spoiler follows the link
-- [ ] Touch: the first tap reveals, the second tap follows the link
-- [ ] Keyboard: a link inside a revealed spoiler is reachable with Tab and opens with Enter
-- [ ] Spoilers inside question options and `>>>` titles still only toggle the spoiler (code-review fix)
+- [x] Mouse: one click on a link inside a spoiler follows the link
+- [x] Touch: the first tap reveals, the second tap follows the link
+- [x] Keyboard: a link inside a revealed spoiler is reachable with Tab and opens with Enter
+- [x] Spoilers inside question options and `>>>` titles still only toggle the spoiler (code-review fix)
+
+## Comments
+
+Done. A click on a link inside a hidden spoiler follows it when the device can hover (`(hover: hover)`), unless the click came from a touch tap (`pointerType === 'touch'`), so a tap on a touch-screen laptop still reveals first. Also, Tabbing straight onto a link inside a hidden spoiler now shows the spoiler (`:has(:focus-visible)` in style.css), so keyboard users can see the link they're on. Checked in headless Chromium with mouse, touch (phone and touch-screen laptop) and keyboard.
