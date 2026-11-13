@@ -1,4 +1,18 @@
 /**
+ * A blockquote line: `> text`. A line starting `>>>` is a collapsible marker
+ * (parseDSL takes those before they reach a text item), so it never starts a
+ * quote, and one inside a quote (`> >>> x`) stays literal text.
+ */
+export const QUOTE_LINE_PATTERN = /^\s*>(?!>>) ?(.*)$/;
+
+/**
+ * Content item type for a blank line between two quote lines: it splits them
+ * into two quotes. Blank lines anywhere else are dropped on parse, and
+ * content saved before quote breaks existed has none.
+ */
+export const QUOTE_BREAK = "quoteBreak";
+
+/**
  * Parse DSL (Domain-Specific Language) text into structured content format
  * 
  * DSL Format:
@@ -34,10 +48,16 @@ export function parseDSL(dslText) {
   let inQuestion = false;
   let hasEncounteredSeparator = false;
   let collapsibleStack = []; // Track open collapsible sections: [{ section: object, depth: number }]
+  let afterBlankLine = false; // A blank line came since the last non-blank one
   
   for (let raw of lines) {
     const line = raw.trim();
-    if (line === "" && !inCode) continue; // Allow empty lines in code blocks
+    if (line === "" && !inCode) { // Allow empty lines in code blocks
+      afterBlankLine = true;
+      continue;
+    }
+    const followsBlankLine = afterBlankLine;
+    afterBlankLine = false;
     
     // Inside a code block every line but the closing fence is literal code,
     // so this is checked before the title, separator and collapsible markers
@@ -236,11 +256,16 @@ export function parseDSL(dslText) {
       // Use raw line to preserve leading whitespace for indentation (needed for nested lists)
       if (inQuestion && currentBlock) {
         // If we're inside a collapsible section, add to the top of the stack
-        if (collapsibleStack.length > 0) {
-          collapsibleStack[collapsibleStack.length - 1].section.content.push({ type: "text", value: raw });
-        } else {
-          currentBlock.content.push({ type: "text", value: raw });
+        const target = collapsibleStack.length > 0
+          ? collapsibleStack[collapsibleStack.length - 1].section.content
+          : currentBlock.content;
+        // A blank line between two quote lines splits them into two quotes.
+        const previous = target[target.length - 1];
+        if (followsBlankLine && QUOTE_LINE_PATTERN.test(raw)
+          && previous && previous.type === "text" && QUOTE_LINE_PATTERN.test(previous.value)) {
+          target.push({ type: QUOTE_BREAK });
         }
+        target.push({ type: "text", value: raw });
       }
     }
     
@@ -282,6 +307,8 @@ function serializeContentItems(contentItems, lines) {
   for (const item of contentItems) {
     if (item.type === "text") {
       lines.push(item.value);
+    } else if (item.type === QUOTE_BREAK) {
+      lines.push("");
     } else if (item.type === "code") {
       // Include language specification if present
       if (item.language) {

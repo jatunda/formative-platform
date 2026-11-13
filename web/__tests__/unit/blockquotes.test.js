@@ -149,3 +149,49 @@ describe('headings inside quotes', () => {
     expect(container.querySelector('a[href="#inside"]')).not.toBeNull();
   });
 });
+
+describe('a blank line between quotes', () => {
+  it('splits two > quotes into two blockquotes', () => {
+    const quotes = render('> a\n\n> b').querySelectorAll(':scope > blockquote');
+    expect([...quotes].map((q) => q.textContent)).toEqual(['a', 'b']);
+  });
+
+  it('splits two callouts, and a quote from a callout', () => {
+    const container = render('> [!tip] One\n> Body one\n\n> [!tip] Two\n\n> Plain\n\n> [!danger]');
+    expect([...container.querySelectorAll(':scope > .lesson-callout, :scope > blockquote')].map((el) => el.className))
+      .toEqual(['lesson-callout lesson-callout-tip', 'lesson-callout lesson-callout-tip', 'lesson-blockquote', 'lesson-callout lesson-callout-danger']);
+  });
+
+  it('ends a callout at the blank line, so the next > line is a plain quote', () => {
+    const container = render('> [!note] Title\n> first\n\n> second');
+    expect(container.querySelector('.lesson-callout-content').textContent).toBe('first');
+    expect(container.querySelector(':scope > blockquote').textContent).toBe('second');
+  });
+
+  it('splits quotes inside a collapsible', () => {
+    expect(render('>>> Section\n> a\n\n> b\n<<<').querySelectorAll('details blockquote')).toHaveLength(2);
+  });
+
+  it('keeps several blank lines between quotes as one split', () => {
+    expect(render('> a\n\n\n> b').querySelectorAll('blockquote')).toHaveLength(2);
+  });
+
+  it('stores nothing extra for a blank line next to non-quote text', () => {
+    const content = parseDSL('Intro\n\n> a\n\nAfter\n\n> b').blocks[0].content;
+    expect(content.map((item) => item.value)).toEqual(['Intro', '> a', 'After', '> b']);
+  });
+
+  it('draws saved content from before quote breaks unchanged: one quote', () => {
+    const container = document.createElement('div');
+    renderContent({ title: 'Old', blocks: [{ type: 'question', content: [{ type: 'text', value: '> a' }, { type: 'text', value: '> b' }] }] }, container);
+    expect([...container.querySelectorAll('blockquote')].map((q) => q.textContent)).toEqual(['ab']);
+  });
+
+  it('keeps the split through parse then generate', () => {
+    const dsl = '# Lesson\n\n> a\n\n> [!tip] b\n>>> More\n> c\n\n> d\n<<<';
+    const generated = generateDSLFromContent(parseDSL(dsl));
+    expect(generated).toContain('> a\n\n> [!tip] b');
+    expect(generated).toContain('> c\n\n> d');
+    expect(parseDSL(generated)).toEqual(parseDSL(dsl));
+  });
+});
