@@ -5,13 +5,7 @@ import { CONTENT_NOT_FOUND } from './constants.js';
 import { PAGE_LINK_PATTERN, parsePageLinkMatch } from './page-links.js';
 import { QUESTION_LINK_PATTERN, parseQuestionLinkMatch } from './question-links.js';
 import { INLINE_CODE_PATTERN, matchAllOutsideInlineCode } from './inline-code.js';
-
-/**
- * A blockquote line: `> text`. A line starting `>>>` is a collapsible marker
- * (parseDSL takes those before they reach a text item), so it never starts a
- * quote, and one inside a quote (`> >>> x`) stays literal text.
- */
-const QUOTE_LINE_PATTERN = /^\s*>(?!>>) ?(.*)$/;
+import { QUOTE_LINE_PATTERN } from './dsl.js';
 
 /** Every leading quote marker on a line, nested ones (`>> `) included. */
 const QUOTE_PREFIX_PATTERN = /^(\s*>(?!>>) ?)+/;
@@ -314,7 +308,8 @@ const CALLOUT_ICONS = new Map([
 /**
  * Split text items into runs of plain lines and runs of quote lines, so
  * consecutive `>` lines become one quote item even though parseDSL stores
- * each line as its own text item. Code and collapsible items pass through.
+ * each line as its own text item. Code, collapsible and quote break items
+ * pass through, so a quote line after a quote break starts a new quote.
  * @param {Array<Object>} contentItems
  * @returns {Array<Object>} items, where `{type: "quote", lines}` holds a quote's lines with the `>` removed
  * @private

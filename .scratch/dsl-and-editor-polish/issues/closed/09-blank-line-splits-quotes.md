@@ -6,11 +6,11 @@ The fix keeps a quote boundary through the parse. Only a blank line *between two
 
 **Blocked by:** None (can start immediately). Ordering note: 10 also edits `web/content-renderer.js`, so it waits for this one.
 
-**Status:** ready-for-agent
+**Status:** closed
 
-- [ ] `> a` / blank line / `> b` renders as two quotes in the editor preview and the student view
-- [ ] Same for two callouts (`> [!tip]` …) and for a quote followed by a callout
-- [ ] Consecutive `>` lines with no blank line between them are still one quote
-- [ ] Existing saved content renders unchanged
-- [ ] Round trip (`parseDSL` → `generateDSLFromContent`) keeps the split
-- [ ] Readme line about "separate two quotes with a non-quote line" updated
+- [x] `> a` / blank line / `> b` renders as two quotes in the editor preview and the student view
+- [x] Same for two callouts (`> [!tip]` …) and for a quote followed by a callout
+- [x] Consecutive `>` lines with no blank line between them are still one quote
+- [x] Existing saved content renders unchanged
+- [x] Round trip (`parseDSL` → `generateDSLFromContent`) keeps the split
+- [x] Readme line about "separate two quotes with a non-quote line" updated

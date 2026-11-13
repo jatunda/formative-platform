@@ -11,7 +11,7 @@ A web app for students to see daily formative assignments.
 - `\`\`\``: code block markers (three backticks to start/end code blocks)
 - `\`inline code\``: Wrap inline code in backticks
 - `||hidden text||`: spoiler, blocked out until hovered, tapped (tap again to hide) or focused with the keyboard. Other inline formatting works inside it; the hidden text can't start or end with a space (so `a || b || c` stays as typed); literal inside inline code and code blocks
-- `> text`: blockquote. Consecutive `>` lines form one quote (`>>` nests one inside it). Inline formatting, lists and headings work inside; code fences and `>>>`/`<<<` stay literal text there. A blank line does not split a quote (blank lines are dropped on parse), so separate two quotes with a non-quote line
+- `> text`: blockquote. Consecutive `>` lines form one quote (`>>` nests one inside it). Inline formatting, lists and headings work inside; code fences and `>>>`/`<<<` stay literal text there. A blank line between two `>` lines splits them into two quotes (or callouts), as in Obsidian; blank lines elsewhere are still dropped on parse
 - `> [!type] Optional title`: as a quote's first line, makes it a callout box instead, with an icon and colour per type: `note`, `tip`, `warning`, `danger`, `question`, `example` (any other type draws as a note; the type is case-insensitive). The title defaults to the type name. Every `> [!type]` line starts a new callout. Callouts don't fold; use a collapsible for that
 - `>>> Title`: collapsible section (collapsed by default)
 - `>>>! Title`: collapsible section (expanded by default)

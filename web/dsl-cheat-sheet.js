@@ -12,7 +12,7 @@ const CHEAT_SHEET_ENTRIES = [
   { syntax: '## Heading', description: 'A heading, level 1 through 6 (#  through ######).' },
   { syntax: '- item\n* item', description: 'A bulleted list item. Indent with 4 spaces to nest.' },
   { syntax: '1. item', description: 'A numbered list item. Indent with 4 spaces to nest.' },
-  { syntax: '> quoted text', description: 'A blockquote. Lines in a row that start with > make one quote. Formatting and lists work inside; code blocks and collapsibles do not.' },
+  { syntax: '> quoted text', description: 'A blockquote. Lines in a row that start with > make one quote; a blank line starts a new one. Formatting and lists work inside; code blocks and collapsibles do not.' },
   { syntax: '> [!tip] Optional title\n> Callout text', description: 'A callout box. Types: note, tip, warning, danger, question, example (any other type looks like a note). The title defaults to the type name.' },
   { syntax: '>>> Title\n...\n<<<', description: 'A collapsible section, closed by default. Use >>>! to start it already open.' },
   { syntax: '[text](url)', description: 'A link to any URL.' },
