@@ -4,11 +4,11 @@
 
 **Blocked by:** 01 (Code blocks keep literal lines), 03 (Spoilers). Ordering note: edges in this folder also serialize tickets that edit the same renderer and stylesheet, to prevent merge conflicts.
 
-**Status:** ready-for-agent
+**Status:** closed
 
-- [ ] Blockquotes and each callout type render in the editor preview and the student view
-- [ ] `>>>`, `>>>!` and `<<<` still behave as collapsibles
-- [ ] `>` lines inside code blocks stay literal
-- [ ] Round-trip (parse then generate DSL) preserves blockquotes and callouts
-- [ ] Readable in the projected/student view
-- [ ] Added to the DSL cheat sheet and readme
+- [x] Blockquotes and each callout type render in the editor preview and the student view
+- [x] `>>>`, `>>>!` and `<<<` still behave as collapsibles
+- [x] `>` lines inside code blocks stay literal
+- [x] Round-trip (parse then generate DSL) preserves blockquotes and callouts
+- [x] Readable in the projected/student view
+- [x] Added to the DSL cheat sheet and readme

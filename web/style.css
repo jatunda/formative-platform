@@ -1458,6 +1458,54 @@ ol.lesson-list {
   padding-left: var(--spacing-xs);
 }
 
+/* Blockquotes and callouts (`> text`, `> [!type] Title`) */
+.lesson-blockquote {
+  margin: var(--spacing-sm) 0;
+  padding: var(--spacing-xs) var(--spacing-lg);
+  border-left: 4px solid var(--border-color);
+  color: var(--text-primary);
+  background-color: var(--bg-secondary);
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+}
+
+.lesson-callout {
+  --callout-color: var(--accent-blue);
+  margin: var(--spacing-sm) 0;
+  padding: var(--spacing-sm) var(--spacing-lg);
+  border-left: 4px solid var(--callout-color);
+  border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
+  background-color: color-mix(in srgb, var(--callout-color) 12%, var(--bg-primary));
+  color: var(--text-primary);
+}
+
+.lesson-callout-tip { --callout-color: var(--accent-mint); }
+.lesson-callout-warning { --callout-color: var(--warning-yellow); }
+.lesson-callout-danger { --callout-color: var(--accent-pink); }
+.lesson-callout-question { --callout-color: var(--accent-orange); }
+.lesson-callout-example { --callout-color: #b794f4; }
+
+.lesson-callout-title {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  font-weight: bold;
+  color: var(--callout-color);
+}
+
+.lesson-callout-content:empty {
+  display: none;
+}
+
+.lesson-blockquote > :first-child,
+.lesson-callout-content > :first-child {
+  margin-top: var(--spacing-xs);
+}
+
+.lesson-blockquote > :last-child,
+.lesson-callout-content > :last-child {
+  margin-bottom: var(--spacing-xs);
+}
+
 /* ========================================
    Utility Components
    ======================================== */

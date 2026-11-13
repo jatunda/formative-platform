@@ -6,6 +6,16 @@ import { PAGE_LINK_PATTERN, parsePageLinkMatch } from './page-links.js';
 import { QUESTION_LINK_PATTERN, parseQuestionLinkMatch } from './question-links.js';
 
 /**
+ * A blockquote line: `> text`. A line starting `>>>` is a collapsible marker
+ * (parseDSL takes those before they reach a text item), so it never starts a
+ * quote, and one inside a quote (`> >>> x`) stays literal text.
+ */
+const QUOTE_LINE_PATTERN = /^\s*>(?!>>) ?(.*)$/;
+
+/** Every leading quote marker on a line, nested ones (`>> `) included. */
+const QUOTE_PREFIX_PATTERN = /^(\s*>(?!>>) ?)+/;
+
+/**
  * Turn heading text into a URL-safe id fragment for Section Link targets.
  * @private
  */
@@ -45,7 +55,8 @@ function collectHeadingIds(data) {
 		for (const item of items || []) {
 			if (item.type === "text") {
 				for (const line of item.value.split('\n')) {
-					const headingMatch = line.match(/^(#{1,6})\s+(.+)$/);
+					// Headings inside quotes render too, so look past the `>`s.
+					const headingMatch = line.replace(QUOTE_PREFIX_PATTERN, '').match(/^(#{1,6})\s+(.+)$/);
 					if (!headingMatch) continue;
 					const headingText = headingMatch[2].trim();
 					const normalized = normalizeHeadingText(headingText);
@@ -204,7 +215,7 @@ const INLINE_CODE_PATTERN = /`([^`]+)`/g;
  * Stands in for an inline code span while links and formatting run: a
  * Private Use Area character, which no link or formatting pattern matches.
  */
-const CODE_SPAN_PLACEHOLDER = /(\d+)/g;
+const CODE_SPAN_PLACEHOLDER = /î€€(\d+)î€€/g;
 
 /**
  * Process inline formatting, escaping HTML to prevent XSS.
@@ -226,7 +237,7 @@ function processInlineCode(text, headingIds = new Map()) {
 	const codeSpans = [];
 	const withoutCode = escaped.replace(INLINE_CODE_PATTERN, (_match, code) => {
 		codeSpans.push(code);
-		return `${codeSpans.length - 1}`;
+		return `î€€${codeSpans.length - 1}î€€`;
 	});
 
 	const withPageLinks = processPageAndSectionLinks(withoutCode, headingIds);
@@ -287,12 +298,112 @@ function expandQuestionLinkLines(rawLines) {
 	return expanded;
 }
 
+/** A quote's first line `[!type] Optional title` makes it a callout. */
+const CALLOUT_HEADER_PATTERN = /^\[!([A-Za-z]+)\](.*)$/;
+
+/** Callout types and their icons; any other type draws as a note. */
+const CALLOUT_ICONS = new Map([
+	["note", "📝"],
+	["tip", "💡"],
+	["warning", "⚠️"],
+	["danger", "⛔"],
+	["question", "❓"],
+	["example", "📋"],
+]);
+
+/**
+ * Split text items into runs of plain lines and runs of quote lines, so
+ * consecutive `>` lines become one quote item even though parseDSL stores
+ * each line as its own text item. Code and collapsible items pass through.
+ * @param {Array<Object>} contentItems
+ * @returns {Array<Object>} items, where `{type: "quote", lines}` holds a quote's lines with the `>` removed
+ * @private
+ */
+function groupQuoteLines(contentItems) {
+	const grouped = [];
+	for (const item of contentItems) {
+		if (item.type !== "text") {
+			grouped.push(item);
+			continue;
+		}
+		for (const line of item.value.split('\n')) {
+			const last = grouped[grouped.length - 1];
+			const quoteMatch = line.match(QUOTE_LINE_PATTERN);
+			if (quoteMatch) {
+				// A `[!type]` line always starts a new callout.
+				if (last && last.type === "quote" && !CALLOUT_HEADER_PATTERN.test(quoteMatch[1])) {
+					last.lines.push(quoteMatch[1]);
+				} else {
+					grouped.push({ type: "quote", lines: [quoteMatch[1]] });
+				}
+			} else if (last && last.type === "text") {
+				last.value += `\n${line}`;
+			} else {
+				grouped.push({ type: "text", value: line });
+			}
+		}
+	}
+	return grouped;
+}
+
+/**
+ * Render one quote run: inline formatting and lists work inside it, through
+ * the same text rendering as everywhere else.
+ * @param {string[]} lines - The quote's lines, `>` removed
+ * @param {HTMLElement} containerEl
+ * @param {Map<string, string>} headingIds
+ * @param {string[]} headingIdQueue
+ * @private
+ */
+function renderQuote(lines, containerEl, headingIds, headingIdQueue) {
+	const calloutMatch = lines[0].match(CALLOUT_HEADER_PATTERN);
+	if (!calloutMatch) {
+		const blockquote = document.createElement("blockquote");
+		blockquote.className = "lesson-blockquote";
+		renderContentItems([{ type: "text", value: lines.join('\n') }], blockquote, headingIds, headingIdQueue);
+		containerEl.appendChild(blockquote);
+		return;
+	}
+
+	const typedName = calloutMatch[1].toLowerCase();
+	const type = CALLOUT_ICONS.has(typedName) ? typedName : "note";
+	const title = calloutMatch[2].trim() || typedName.charAt(0).toUpperCase() + typedName.slice(1);
+
+	const callout = document.createElement("div");
+	callout.className = `lesson-callout lesson-callout-${type}`;
+	callout.setAttribute("role", "note");
+
+	const titleEl = document.createElement("div");
+	titleEl.className = "lesson-callout-title";
+	const icon = document.createElement("span");
+	icon.className = "lesson-callout-icon";
+	icon.setAttribute("aria-hidden", "true");
+	icon.textContent = CALLOUT_ICONS.get(type);
+	const titleText = document.createElement("span");
+	titleText.className = "lesson-callout-title-text";
+	titleText.innerHTML = processInlineCode(title, headingIds);
+	titleEl.append(icon, titleText);
+
+	const content = document.createElement("div");
+	content.className = "lesson-callout-content";
+	renderContentItems([{ type: "text", value: lines.slice(1).join('\n') }], content, headingIds, headingIdQueue);
+
+	callout.append(titleEl, content);
+	containerEl.appendChild(callout);
+}
+
 function renderContentItems(contentItems, containerEl, headingIds = new Map(), headingIdQueue = []) {
 	// Stack to track list hierarchy (separate from parent list stack)
 	const listStack = [];
 	let indentUnit = null;
-	
-	contentItems.forEach(item => {
+
+	groupQuoteLines(contentItems).forEach(item => {
+		if (item.type === "quote") {
+			listStack.length = 0;
+			indentUnit = null;
+			renderQuote(item.lines, containerEl, headingIds, headingIdQueue);
+			return;
+		}
 		if (item.type === "text") {
 			// Split text into lines to process each separately, expanding out
 			// any [[q:slug]] Question Links into their own placeholder markers
