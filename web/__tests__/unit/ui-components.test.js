@@ -149,12 +149,15 @@ describe('ui-components', () => {
   });
 
   describe('createInsertDayButton', () => {
-    it('should create button with correct text', () => {
-      const insertFn = vi.fn();
-      const button = createInsertDayButton(5, insertFn);
-      
-      expect(button.textContent).toBe('+ Insert Day Here');
-      expect(button.className).toBe('schedule-action-btn insert-day-btn');
+    it('is a small text "+" whose tooltip and accessible name are "Insert day here"', () => {
+      const button = createInsertDayButton(5, vi.fn());
+
+      expect(button.className).toBe('insert-day-btn');
+      expect(button.title).toBe('Insert day here');
+      expect(button.getAttribute('aria-label')).toBe('Insert day here');
+      const plus = button.firstElementChild;
+      expect(plus.className).toBe('text-icon');
+      expect(button.textContent).toBe('+');
     });
 
     it('should call insertFunction with dayIndex when clicked', () => {

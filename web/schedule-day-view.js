@@ -101,19 +101,18 @@ export function makeInsertDayHandler(classId, maxDayIndex, onReload) {
 }
 
 /**
- * Create a row with an "Insert Day Here" button.
- * @param {number} dayIndex - The day index to insert before
- * @param {(dayIndex: number) => void} onInsert - Callback function when insert is clicked
- * @returns {HTMLTableRowElement}
+ * Add an Insert Day "+" to a day row: it sits in the left gutter beside the
+ * row's Day Index cell, centred on the line above (or below) the day, and
+ * inserts a day at `insertAt`.
+ * @param {HTMLTableRowElement} dayRow - A row from createDayRow
+ * @param {number} insertAt - The Day Index the new day takes
+ * @param {(dayIndex: number) => void} onInsert
+ * @param {"above" | "below"} [edge="above"] - Which of the row's lines it sits on
  */
-export function createInsertDayRow(dayIndex, onInsert) {
-  const insertRow = document.createElement("tr");
-  const insertTd = document.createElement("td");
-  insertTd.colSpan = 4;
-  insertTd.className = "insert-day-cell";
-  insertTd.appendChild(createInsertDayButton(dayIndex, onInsert));
-  insertRow.appendChild(insertTd);
-  return insertRow;
+export function addInsertDayPlus(dayRow, insertAt, onInsert, edge = "above") {
+  const btn = createInsertDayButton(insertAt, onInsert);
+  btn.classList.add(`insert-day-${edge}`);
+  /** @type {HTMLTableCellElement} */ (dayRow.querySelector(".day-index-cell")).appendChild(btn);
 }
 
 /**
@@ -222,7 +221,9 @@ export function setupLessonDropHandlers(tdLessons, toDayIndex, ctx) {
  * @param {string[]} lessons - Lesson hashes for this day
  * @param {number|undefined} todayDayIndex - Today's Day Index, for highlighting
  * @param {string} dateLabel - This Day Index's calendar date (see getDateForDayIndex)
- * @param {{classId: string, onReload: () => void, onDeleteDay: (dayIndex: number) => void}} ctx
+ * @param {{classId: string, onReload: () => void, onDeleteDay: (dayIndex: number) => void,
+ *   onInsertDay?: (dayIndex: number) => void}} ctx - With onInsertDay, the row gets an
+ *   Insert Day "+" on the line above it (see addInsertDayPlus)
  * @returns {Promise<HTMLTableRowElement>}
  */
 export async function createDayRow(dayIndex, lessons, todayDayIndex, dateLabel, ctx) {
@@ -261,6 +262,7 @@ export async function createDayRow(dayIndex, lessons, todayDayIndex, dateLabel, 
 
   tr.appendChild(tdLessons);
   tr.appendChild(createActionsCell(dayIndex, ctx.onDeleteDay));
+  if (ctx.onInsertDay) addInsertDayPlus(tr, dayIndex, ctx.onInsertDay);
 
   return tr;
 }

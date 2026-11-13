@@ -76,12 +76,6 @@ vi.mock('../../schedule-day-view.js', () => ({
     tr.dataset.dayIndex = dayIndex;
     return tr;
   }),
-  createInsertDayRow: vi.fn((dayIndex) => {
-    const tr = document.createElement('tr');
-    tr.className = 'insert-day-row';
-    tr.dataset.beforeDayIndex = dayIndex;
-    return tr;
-  }),
   createEndButtonsContainer: vi.fn(() => document.createElement('div')),
   createDateCell: vi.fn((dateLabel) => {
     const td = document.createElement('td');
@@ -256,10 +250,17 @@ describe('teacher', () => {
       const tbody = document.querySelector('#scheduleTable tbody');
       const dayRows = [...tbody.querySelectorAll('.day-row')].map((r) => r.dataset.dayIndex);
       expect(dayRows).toEqual(['0', '1', '2']);
-      // One insert-day row before each day (the trailing "add a day" row is
-      // a distinct row built by createFinalRow, not another insert-day row)
-      expect(tbody.querySelectorAll('.insert-day-row')).toHaveLength(3);
-      expect(tbody.children).toHaveLength(7); // 3 insert + 3 day + 1 final
+      expect(tbody.children).toHaveLength(4); // 3 days + 1 final, no Insert Day rows
+    });
+
+    it('gives each day row the Insert Day handler, so each gets a "+" on the line above it', async () => {
+      scheduleFixture();
+      const { createDayRow, makeInsertDayHandler } = await import('../../schedule-day-view.js');
+
+      await renderScheduleTable({ 0: [], 1: [] }, 'csa');
+
+      const onInsertDay = makeInsertDayHandler.mock.results.at(-1).value;
+      expect(createDayRow.mock.calls.map((c) => c[4].onInsertDay)).toEqual([onInsertDay, onInsertDay]);
     });
 
     it("gives each day row that Day Index's date label", async () => {

@@ -171,15 +171,6 @@ button:focus-visible {
   box-sizing: border-box;
 }
 
-.insert-day-btn {
-  font-size: 0.9em;
-  width: auto !important;
-  min-width: auto !important;
-  max-width: none !important;
-  white-space: nowrap;
-  padding: var(--spacing-xxs) var(--spacing-sm) !important;
-}
-
 .delete-btn {
   background-color: var(--error-red);
   color: white;
@@ -813,10 +804,72 @@ select:focus {
   padding-bottom: var(--spacing-xxs);
 }
 
-/* Insert-day rows are one cell spanning the row; they must not shrink. */
-.schedule-table td.insert-day-cell,
-#scheduleTable td.insert-day-cell {
-  width: auto;
+
+/* Insert Day "+" (ticket 10; schedule-day-view.js's addInsertDayPlus). The
+   table leaves a gutter on its left, inside its pane (which scrolls sideways
+   and so clips anything outside it). Each "+" lives in a day's Day Index
+   cell, pulled out into that gutter and centred on the line above (or
+   below) the day. On touch screens its button is a 44px tap area that
+   overlaps the rows beside it and reaches right over the Day Index cell;
+   the "+" itself stays small, centred in the gutter. */
+.schedule-table,
+#scheduleTable {
+  --insert-gutter: 1.25rem;
+  --insert-tap: max(var(--insert-gutter), var(--touch-min, 0px));
+  width: calc(100% - var(--insert-gutter));
+  margin-left: var(--insert-gutter);
+  /* Room for the last day's "+" below the table, so the pane doesn't scroll. */
+  margin-bottom: calc(var(--insert-tap) / 2);
+}
+
+/* Portrait phones: a gutter just wide enough for the "+", so a day with one
+   Lesson still fits 375px (ticket 02). */
+@media (max-width: 600px) {
+  .schedule-table,
+  #scheduleTable {
+    --insert-gutter: 0.625rem;
+  }
+}
+
+.schedule-table .day-index-cell,
+#scheduleTable .day-index-cell {
+  position: relative;
+}
+
+.insert-day-btn {
+  position: absolute;
+  top: 0;
+  left: calc(-1 * var(--insert-gutter));
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  width: var(--insert-tap);
+  height: var(--insert-tap);
+  padding: 0;
+  margin: 0;
+  border: none;
+  border-radius: 0;
+  background: none;
+  transform: translateY(-50%);
+}
+
+.insert-day-btn.insert-day-below {
+  top: 100%;
+}
+
+.insert-day-btn:hover {
+  background: none;
+}
+
+.insert-day-btn .text-icon {
+  width: var(--insert-gutter);
+  height: var(--insert-gutter);
+  line-height: var(--insert-gutter);
+  border-radius: 50%;
+}
+
+.insert-day-btn:hover .text-icon {
+  background-color: var(--border-color);
 }
 
 /* ========================================
@@ -1022,11 +1075,6 @@ td > * {
   .lesson-cluster {
     --touch-min-menu: 32px;
   }
-}
-
-.insert-day-cell {
-  text-align: center;
-  padding: var(--spacing-xxs);
 }
 
 .schedule-list-item {
@@ -2196,9 +2244,10 @@ ol.lesson-list {
   /* Portrait phones: tighter cells and a narrower Lesson cluster, so a day
      with one Lesson fits the screen without sideways scrolling. Each cluster
      keeps a fixed width, so a day with many Lessons still scrolls inside its
-     pane instead of squeezing them. */
+     pane instead of squeezing them. The page's sides are 4px so the
+     schedule table's Insert Day gutter (ticket 10) still leaves it room. */
   body[data-teacher-page] {
-    padding: var(--spacing-sm);
+    padding: var(--spacing-sm) var(--spacing-xs);
   }
 
   .lessons-cell {

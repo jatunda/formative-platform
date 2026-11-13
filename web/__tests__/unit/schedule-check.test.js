@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
-  PAGES, SIZES, TAP_EXCEPTIONS, KNOWN_FAILURES, tapTargetProblem, rowMisalignment, describeFailure, classify, parseArgs,
+  PAGES, SIZES, TAP_EXCEPTIONS, KNOWN_FAILURES, tapTargetProblem, rowMisalignment, insertPlusMisplacement, describeFailure, classify, parseArgs,
 } from '../../scripts/schedule-check-matrix.js';
 import { buildFixtureDb, todayIndex, TODAY, DATE_OFFSET, SCHEDULES, LONG_TITLE } from '../../scripts/schedule-check-fixtures.js';
 import { getBusinessDaysBetween, createLocalDate, DEFAULT_CLASS_START_DATE } from '../../business-days.js';
@@ -67,11 +67,31 @@ describe('rowMisalignment', () => {
   });
 });
 
+/** An Insert Day "+" whose glyph centre is at (x, y), in a gutter from 0 to 20, on the line at y = 100. */
+const plus = (x, y) => ({ label: 'P1 above day 12', x, y, gutterLeft: 0, gutterRight: 20, line: 100 });
+
+describe('insertPlusMisplacement (ticket 10)', () => {
+  it('passes a "+" centred in the gutter and on its line, to the half pixel', () => {
+    expect(insertPlusMisplacement(plus(10, 100))).toBeNull();
+    expect(insertPlusMisplacement(plus(10, 100.2))).toBeNull();
+  });
+
+  it('fails a "+" outside the gutter, beside it or over the table', () => {
+    expect(insertPlusMisplacement(plus(-3, 100))).toBe('Insert Day "+" P1 above day 12 is at x -3, outside the gutter (0 to 20)');
+    expect(insertPlusMisplacement(plus(30, 100))).toMatch(/at x 30, outside the gutter/);
+  });
+
+  it('fails a "+" more than a pixel off the line between days', () => {
+    expect(insertPlusMisplacement(plus(10, 104))).toBe('Insert Day "+" P1 above day 12 is 4px off its line');
+    expect(insertPlusMisplacement(plus(10, 101))).toBeNull();
+  });
+});
+
 /** A clean render, with `change` applied. */
 const checked = (change = {}) => ({
   scrollWidth: 375, viewportWidth: 375, touch: true, coarse: true,
   shortTables: [{ name: 'P1', lessonsPerDay: 1, contentWidth: 359, paneWidth: 359 }],
-  targets: [target(44, 44)], rows: [dayRow([0, 50], [0, 50])], errors: [], violations: [], ...change,
+  targets: [target(44, 44)], rows: [dayRow([0, 50], [0, 50])], pluses: [plus(10, 100)], errors: [], violations: [], ...change,
 });
 
 describe('describeFailure', () => {
@@ -93,6 +113,17 @@ describe('describeFailure', () => {
     expect(describeFailure(checked({ rows }))).toEqual([
       "2 of 3 day rows don't line up, first P1 day 12 (1 Lesson): cells end at different heights (Day Index 50, Date 40)",
     ]);
+  });
+
+  it('reports misplaced Insert Day "+"s, naming the first (ticket 10)', () => {
+    const pluses = [plus(10, 100), plus(30, 100), plus(10, 90)];
+    expect(describeFailure(checked({ pluses }))).toEqual([
+      '2 of 3 Insert Day "+"s are misplaced, first Insert Day "+" P1 above day 12 is at x 30, outside the gutter (0 to 20)',
+    ]);
+  });
+
+  it('reports day rows with no Insert Day "+" at all', () => {
+    expect(describeFailure(checked({ pluses: [] }))).toEqual(['no Insert Day "+" beside the 1 day rows']);
   });
 
   it('reports a browser whose pointer does not match the size', () => {

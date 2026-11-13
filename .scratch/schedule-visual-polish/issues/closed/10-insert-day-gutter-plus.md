@@ -4,9 +4,9 @@
 
 **Blocked by:** 03 (lang and main), 09 (Compact rows). Ordering note: tickets 06–11 change the same schedule rows and stylesheet, so they run in order to avoid merge conflicts.
 
-**Status:** ready-for-agent
+**Status:** closed
 
-- [ ] No Insert Day rows remain on Lesson Planning or Full Schedule
-- [ ] A "+" sits in the left gutter at each break between days and at both ends, and inserts a day in the right place
-- [ ] Tooltip and accessible name "Insert day here"; reachable by keyboard
-- [ ] 44px tap area on touch screens; `npm run check:schedule` passes with the Insert Day known failure removed
+- [x] No Insert Day rows remain on Lesson Planning or Full Schedule
+- [x] A "+" sits in the left gutter at each break between days and at both ends, and inserts a day in the right place
+- [x] Tooltip and accessible name "Insert day here"; reachable by keyboard
+- [x] 44px tap area on touch screens; `npm run check:schedule` passes with the Insert Day known failure removed

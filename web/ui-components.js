@@ -125,16 +125,19 @@ export function createArrowButton(direction, isDisabled, onClick) {
 }
 
 /**
- * Create an "Insert Day Here" button
+ * Create an Insert Day button: a small text "+" (the schedule pages place it
+ * in the gutter beside the line between two days).
  * @param {number} dayIndex - The day index where the new day should be inserted
  * @param {(dayIndex: number) => void} insertFunction - Function to insert the day
  * @returns {HTMLButtonElement} The created button element
  */
 export function createInsertDayButton(dayIndex, insertFunction) {
   const btn = document.createElement("button");
-  btn.textContent = "+ Insert Day Here";
-  btn.className = "schedule-action-btn insert-day-btn";
-  btn.onclick = withWorkingIndicator(btn, () => insertFunction(dayIndex));
+  btn.append(textIcon("+"));
+  btn.title = "Insert day here";
+  btn.setAttribute("aria-label", "Insert day here");
+  btn.className = "insert-day-btn";
+  btn.onclick = withWorkingIndicator(btn, () => insertFunction(dayIndex), { workingLabel: savingSpinner });
   return btn;
 }
 

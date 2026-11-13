@@ -8,6 +8,8 @@ import {
   createEndButtonsContainer,
   createDateCell,
   createActionsCell,
+  createDayRow,
+  addInsertDayPlus,
 } from '../../schedule-day-view.js';
 import { lineIcon } from '../../line-icons.js';
 import { initializeDatabase } from '../../database-handle.js';
@@ -225,6 +227,47 @@ describe('schedule-day-view', () => {
       } finally {
         vi.useRealTimers();
       }
+    });
+  });
+
+  describe('Insert Day "+"', () => {
+    const plusesOf = (row) => [...row.querySelectorAll('button[aria-label="Insert day here"]')];
+    const ctxWith = (onInsertDay) => ({ classId: 'class1', onReload, onDeleteDay: vi.fn(), onInsertDay });
+
+    it('a day row has one "+" in its Day Index cell, on the line above it, inserting a day at that Day Index', async () => {
+      const onInsertDay = vi.fn();
+      const row = await createDayRow(4, [], undefined, 'Mon 11/2', ctxWith(onInsertDay));
+
+      const [plus] = plusesOf(row);
+      expect(plusesOf(row)).toHaveLength(1);
+      expect(plus.parentElement.className).toBe('day-index-cell');
+      expect(plus.classList.contains('insert-day-above')).toBe(true);
+      await plus.onclick();
+      expect(onInsertDay).toHaveBeenCalledWith(4);
+    });
+
+    it('the Day Index cell still reads as just the number before the "+"', async () => {
+      const row = await createDayRow(4, [], undefined, 'Mon 11/2', ctxWith(vi.fn()));
+
+      expect(row.querySelector('.day-index-cell').firstChild.textContent).toBe('4');
+    });
+
+    it('a day row built without an insert handler has no "+"', async () => {
+      const row = await createDayRow(4, [], undefined, 'Mon 11/2', { classId: 'class1', onReload, onDeleteDay: vi.fn() });
+
+      expect(plusesOf(row)).toHaveLength(0);
+    });
+
+    it('addInsertDayPlus can put a second "+" on the line below a day', async () => {
+      const onInsertDay = vi.fn();
+      const row = await createDayRow(4, [], undefined, 'Mon 11/2', ctxWith(onInsertDay));
+
+      addInsertDayPlus(row, 5, onInsertDay, 'below');
+
+      const below = plusesOf(row)[1];
+      expect(below.classList.contains('insert-day-below')).toBe(true);
+      await below.onclick();
+      expect(onInsertDay).toHaveBeenCalledWith(5);
     });
   });
 

@@ -58,11 +58,8 @@ vi.mock('../../schedule-day-view.js', () => ({
     tr.dataset.dayIndex = dayIndex;
     return tr;
   }),
-  createInsertDayRow: vi.fn((dayIndex) => {
-    const tr = document.createElement('tr');
-    tr.className = 'insert-day-row';
-    tr.dataset.beforeDayIndex = dayIndex;
-    return tr;
+  addInsertDayPlus: vi.fn((dayRow, insertAt, onInsert, edge) => {
+    dayRow.dataset.plusBelow = `${insertAt}:${edge}`;
   }),
   makeInsertDayHandler: vi.fn(() => vi.fn()),
   makeDeleteDayHandler: vi.fn(() => vi.fn()),
@@ -446,17 +443,20 @@ describe('lesson-planning', () => {
       });
     });
 
-    it('brackets the window with an insert-day row before and after', async () => {
+    it('has no Insert Day rows: each day gets a "+" on the line above it, and the last day one below it too', async () => {
       mockGetFullSchedule.mockResolvedValue({});
+      const { createDayRow, makeInsertDayHandler, addInsertDayPlus } = await import('../../schedule-day-view.js');
       const containerEl = document.createElement('div');
 
       await renderClassPane('csa', 'CS A', containerEl);
 
+      const onInsertDay = makeInsertDayHandler.mock.results.at(-1).value;
       const rows = [...containerEl.querySelectorAll('tbody > tr')];
-      expect(rows[0].className).toBe('insert-day-row');
-      expect(rows[0].dataset.beforeDayIndex).toBe('10');
-      expect(rows.at(-1).className).toBe('insert-day-row');
-      expect(rows.at(-1).dataset.beforeDayIndex).toBe('13');
+      expect(rows.map((r) => r.className)).toEqual(['day-row', 'day-row', 'day-row']);
+      expect(createDayRow.mock.calls.map((c) => c[4].onInsertDay)).toEqual([onInsertDay, onInsertDay, onInsertDay]);
+      expect(addInsertDayPlus).toHaveBeenCalledTimes(1);
+      expect(rows.at(-1).dataset.plusBelow).toBe('13:below');
+      expect(addInsertDayPlus.mock.calls[0][2]).toBe(onInsertDay);
     });
 
     it('only preloads lesson titles for hashes inside the Planning Window', async () => {
