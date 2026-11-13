@@ -141,6 +141,62 @@ function processMarkdownLinks(text) {
     return text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="lesson-link">$1</a>');
 }
 
+/**
+ * A spoiler: `||hidden text||`. Runs after links and formatting, so they
+ * work inside it; inline code is already set aside, so `||x||` inside
+ * backticks stays literal.
+ */
+const SPOILER_PATTERN = /\|\|(.+?)\|\|/g;
+
+/** Opening tag of a spoiler span; installSpoilerToggle reveals it on tap. */
+const SPOILER_OPEN_TAG = '<span class="spoiler" tabindex="0" role="button" aria-expanded="false">';
+
+/** Documents that already have the spoiler toggle listeners. */
+const spoilerToggleDocuments = new WeakSet();
+
+/**
+ * Flip a spoiler between hidden and revealed.
+ * @param {Element} spoiler
+ */
+function toggleSpoiler(spoiler) {
+	const revealed = spoiler.classList.toggle('spoiler-revealed');
+	spoiler.setAttribute('aria-expanded', String(revealed));
+}
+
+/**
+ * Let a tap, click, Enter or Space toggle any spoiler in the document. One
+ * delegated listener covers every renderer and every re-render (the editor
+ * preview re-renders on each keystroke). Hover and keyboard focus reveal
+ * through CSS alone (style.css). Safe to call more than once per document.
+ * @param {Document} doc
+ */
+function installSpoilerToggle(doc) {
+	if (spoilerToggleDocuments.has(doc)) return;
+	spoilerToggleDocuments.add(doc);
+
+	doc.addEventListener('click', (event) => {
+		const target = /** @type {Element} */ (event.target);
+		const spoiler = target.closest('.spoiler');
+		if (!spoiler) return;
+		const onLink = target.closest('a') !== null;
+		// A link inside a revealed spoiler works as normal.
+		if (onLink && spoiler.classList.contains('spoiler-revealed')) return;
+		// A tap on a link inside a hidden spoiler reveals it rather than following the link.
+		if (onLink) event.preventDefault();
+		toggleSpoiler(spoiler);
+	});
+
+	doc.addEventListener('keydown', (event) => {
+		const target = /** @type {Element} */ (event.target);
+		if (event.key !== 'Enter' && event.key !== ' ') return;
+		if (!target.classList.contains('spoiler')) return;
+		event.preventDefault();
+		toggleSpoiler(target);
+	});
+}
+
+if (typeof document !== 'undefined') installSpoilerToggle(document);
+
 /** Backtick-enclosed inline code span. */
 const INLINE_CODE_PATTERN = /`([^`]+)`/g;
 
@@ -176,8 +232,9 @@ function processInlineCode(text, headingIds = new Map()) {
 	const withPageLinks = processPageAndSectionLinks(withoutCode, headingIds);
 	const withLinks = processMarkdownLinks(withPageLinks);
 	const withFormatting = processTextFormatting(withLinks);
+	const withSpoilers = withFormatting.replace(SPOILER_PATTERN, `${SPOILER_OPEN_TAG}$1</span>`);
 
-	return withFormatting.replace(CODE_SPAN_PLACEHOLDER, (_match, index) => `<code>${codeSpans[Number(index)]}</code>`);
+	return withSpoilers.replace(CODE_SPAN_PLACEHOLDER, (_match, index) => `<code>${codeSpans[Number(index)]}</code>`);
 }
 
 /**
@@ -535,5 +592,6 @@ export {
 	renderContent,
 	renderMultipleContent,
 	processInlineCode,
-	renderContentItems
+	renderContentItems,
+	installSpoilerToggle
 };

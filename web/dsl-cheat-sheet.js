@@ -7,6 +7,7 @@ const CHEAT_SHEET_ENTRIES = [
   { syntax: '---', description: 'Separates questions/sections, on its own line.' },
   { syntax: '**bold**, *italic*, ***both***', description: 'Text formatting. Also __bold__ and _italic_.' },
   { syntax: '`code`', description: 'Inline code.' },
+  { syntax: '||hidden text||', description: 'A spoiler - blocked out until hovered, tapped or reached with Tab. Other formatting works inside it.' },
   { syntax: '```\ncode block\n```', description: 'A code block. Add a language right after the opening ``` for syntax highlighting, e.g. ```javascript.' },
   { syntax: '## Heading', description: 'A heading, level 1 through 6 (#  through ######).' },
   { syntax: '- item\n* item', description: 'A bulleted list item. Indent with 4 spaces to nest.' },
