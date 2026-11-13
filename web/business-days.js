@@ -15,6 +15,17 @@ export function createLocalDate(dateString) {
 }
 
 /**
+ * A Date's local calendar day as YYYY-MM-DD, the inverse of createLocalDate
+ * (e.g. for a <time datetime>).
+ * @param {Date} date
+ * @returns {string}
+ */
+export function localDateString(date) {
+  const pad = (/** @type {number} */ n) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+/**
  * @param {Date} date
  * @returns {boolean} True for Monday to Friday
  */

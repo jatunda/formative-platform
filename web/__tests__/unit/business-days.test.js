@@ -1,7 +1,19 @@
 import { describe, it, expect } from 'vitest';
 import {
-  addBusinessDays, doNowsHeading, getBusinessDaysBetween, listedBusinessDay, shortDateLabel,
+  addBusinessDays, createLocalDate, doNowsHeading, getBusinessDaysBetween, listedBusinessDay,
+  localDateString, shortDateLabel,
 } from '../../business-days.js';
+
+describe('localDateString', () => {
+  it("writes a date's local calendar day as YYYY-MM-DD, zero-padded", () => {
+    expect(localDateString(new Date(2026, 0, 5, 23, 59))).toBe('2026-01-05');
+    expect(localDateString(new Date(2026, 10, 12, 0, 0))).toBe('2026-11-12');
+  });
+
+  it('reads back through createLocalDate', () => {
+    expect(createLocalDate(localDateString(new Date(2026, 1, 28)))).toEqual(new Date(2026, 1, 28));
+  });
+});
 
 // November 2026: Mon 9, Tue 10, Wed 11, Thu 12, Fri 13, Sat 14, Sun 15, Mon 16.
 const nov = (day) => new Date(2026, 10, day, 10, 30);
