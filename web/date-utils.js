@@ -3,13 +3,9 @@ import {
   getClassDateOffset as getClassDateOffsetFromDB,
   setClassDateOffset as setClassDateOffsetInDB
 } from "./database-utils.js";
-import { addBusinessDays, createLocalDate, getBusinessDaysBetween, shortDateLabel } from "./business-days.js";
+import { addBusinessDays, createLocalDate, getBusinessDaysBetween, shortDateLabel, DEFAULT_CLASS_START_DATE } from "./business-days.js";
 
-/**
- * Default class start date in YYYY-MM-DD format
- * @type {string}
- */
-export const DEFAULT_CLASS_START_DATE = "2024-08-19";
+export { DEFAULT_CLASS_START_DATE };
 
 // Cache for date offsets to avoid redundant queries
 const dateOffsetCache = new Map();

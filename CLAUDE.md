@@ -27,6 +27,8 @@ Lowering `coverage.thresholds` to make a failing run pass is not an acceptable f
 
 A School Clock (`/clock`) CSS or layout change is not done until `npm run check:clock:full` in `web/` passes: it sweeps the layout matrix, where layout bugs hide (`fullMatrix()` and the ticketed `KNOWN_FAILURES` in `web/scripts/clock-check-matrix.js`). For single screenshots, quick looks or accessibility checks, run `npm run check:clock` (options in `web/scripts/clock-check.mjs`'s header) rather than writing a new harness.
 
+A Lesson Planning or Full Schedule CSS or layout change is not done until `npm run check:schedule` in `web/` passes (options, checks and fixture data in `web/scripts/schedule-check.mjs`'s header; known failures and tap-target exceptions in `schedule-check-matrix.js`); use it, not a throwaway Playwright mock-up, to check those pages' layout.
+
 ## Before considering any `functions/` change complete
 
 Run the link-preview function's tests (Node's built-in test runner, no emulator or network; run `npm ci` first in a fresh checkout):
@@ -40,7 +42,7 @@ It must exit clean. Request handling lives in `functions/preview-handler.js` as 
 
 ## Merging a ticket branch
 
-To merge a ticket branch into an integration branch, run `scripts/merge-ticket.sh <branch>` from the integration branch's checkout: it merges, runs the checks above only when the merge brought in something new, and reports in a few lines (behaviour in its header).
+To merge a ticket branch into an integration branch, run `scripts/merge-ticket.sh <branch>` from the integration branch's checkout: it merges, runs the checks above only when the merge brought in something new, and reports in a few lines (behaviour in its header). Then run `scripts/remove-worktree.sh <branch>` to remove the merged branch's worktree and the branch, stopping any dev server left running there.
 
 ## Agent skills
 
