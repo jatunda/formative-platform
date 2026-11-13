@@ -164,8 +164,7 @@ button:focus-visible {
 }
 
 /* Button Variants */
-.schedule-action-btn,
-.new-lesson-btn {
+.schedule-action-btn {
   width: 110px;
   min-width: 110px;
   max-width: 110px;
@@ -762,9 +761,34 @@ select:focus,
 #scheduleTable,
 .schedule-table {
   width: 100%;
-  min-width: 600px;
   background-color: var(--bg-dark);
   color: var(--text-primary);
+}
+
+/* Day Index, Date and the delete-day column hug their content (width: 1%
+   is the table-layout idiom for "as narrow as the content allows"), so the
+   Lessons column gets all the spare width instead of empty space opening
+   up to the right of e.g. "8". */
+.schedule-table .day-index-cell,
+.schedule-table .date-cell,
+#scheduleTable .day-index-cell,
+#scheduleTable .date-cell,
+.schedule-table td:last-child,
+#scheduleTable td:last-child {
+  width: 1%;
+  white-space: nowrap;
+}
+
+/* Insert-day rows are one cell spanning the row; they must not shrink. */
+.schedule-table td.insert-day-cell,
+#scheduleTable td.insert-day-cell {
+  width: auto;
+}
+
+/* The Date cell holds both labels; narrow screens swap to the short one
+   (see the max-width: 600px block under Responsive). */
+.date-short {
+  display: none;
 }
 
 /* ========================================
@@ -915,10 +939,26 @@ td > * {
 
 .lessons-end-buttons {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   gap: var(--spacing-xxs);
-  align-items: stretch;
+  align-items: center;
   flex-shrink: 0;
+}
+
+/* New Lesson / Link Lesson: compact icon buttons, not the full-width
+   default every <button> gets. */
+.schedule-icon-btn {
+  width: auto;
+  padding: 0.3rem 0.5rem;
+  line-height: 1;
+}
+
+/* Touch screens: keep the icons a comfortable finger-sized target. */
+@media (pointer: coarse) {
+  .schedule-icon-btn {
+    min-width: 40px;
+    min-height: 40px;
+  }
 }
 
 .insert-day-cell {
@@ -1967,22 +2007,81 @@ ol.lesson-list {
     padding: 0.8rem;
   }
 
+  .date-full {
+    display: none;
+  }
+
+  .date-short {
+    display: inline;
+  }
+
+  /* Portrait phones: tighter cells and a narrower Lesson cluster, so a day
+     with one Lesson fits the screen without sideways scrolling. Each cluster
+     keeps a fixed width, so a day with many Lessons still scrolls inside its
+     pane instead of squeezing them. */
+  body[data-teacher-page] {
+    padding: var(--spacing-sm);
+  }
+
+  .lessons-cell {
+    gap: var(--spacing-xxs);
+  }
+
+  .schedule-table td,
+  #scheduleTable td {
+    padding: var(--spacing-xs);
+  }
+
+  .delete-day-btn {
+    padding: var(--spacing-xs) var(--spacing-sm) !important;
+  }
+
+  .lesson-cluster {
+    min-width: 0;
+    width: 5.75rem;
+    margin-right: 0;
+    padding: var(--spacing-xxs);
+    box-sizing: border-box;
+  }
+
+  /* Rows fill the cluster's fixed width (rather than centering at their
+     content width), so a long title truncates instead of spilling out. */
+  .lesson-cluster-top,
+  .lesson-cluster-bottom {
+    align-self: stretch;
+    min-width: 0;
+  }
+
+  .lesson-cluster .lesson-main-btn {
+    min-width: 0;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .lesson-cluster-bottom .schedule-action-btn {
+    flex: 1 1 0;
+    width: auto;
+    min-width: 0;
+    max-width: none;
+    padding: 0.3rem 0;
+  }
+
   .lesson-collapsible .lesson-collapsible {
     margin-left: var(--spacing-xxs);
     padding-left: 0;
   }
 
-  /* .schedule-action-btn/.new-lesson-btn have a fixed 110px width (see
-     "Button Variants" above); the bigger touch-target padding this media
-     query gives every button eats into that fixed box, so "Link Lesson"/
-     "New Lesson" no longer fit on one line, and grow taller besides.
-     Restore the original padding just for these two, which is already
-     known to fit that text at 110px width above this breakpoint. */
+  /* The icon buttons carry their own touch-target sizing (pointer: coarse,
+     next to .schedule-icon-btn); this query's bigger padding would only
+     widen the row on a narrow screen. */
   .lessons-end-buttons button {
-    padding: 0.3rem;
+    padding: 0.3rem 0.5rem;
   }
 
-  /* Same fixed-width collision as above, for the lesson title button. */
+  /* .schedule-action-btn has a fixed 110px width (see "Button Variants"
+     above); the bigger touch-target padding this media query gives every
+     button eats into that fixed box, so the lesson title no longer fits on
+     one line. Restore the original padding for it. */
   .lesson-main-btn {
     padding: 0.3rem;
   }

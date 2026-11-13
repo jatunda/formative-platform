@@ -153,17 +153,25 @@ export async function getTodayDayIndex(classId, classStartDate = DEFAULT_CLASS_S
  * @returns {Promise<string>} The formatted date string with weekday (e.g., "1/15/2025 (Wednesday)")
  */
 export async function getDateForDayIndex(dayIndex, classId, classStartDate = DEFAULT_CLASS_START_DATE) {
-  const dateOffset = await getClassDateOffset(classId);
-  
-  const start = createLocalDate(classStartDate);
-  // Apply both day index and date offset using business days
-  const totalBusinessDays = Number(dayIndex) + Number(dateOffset);
-  const date = addBusinessDays(start, totalBusinessDays);
-  
-  const weekday = date.toLocaleDateString(undefined, {
-    weekday: "long"
-  });
-  return `${date.toLocaleDateString()} (${weekday})`;
+  return (await getDayDateLabels(dayIndex, classId, classStartDate)).full;
+}
+
+/**
+ * Both date labels a Schedule row shows for a day index: `full` for wide
+ * screens (e.g. "11/2/2026 (Monday)") and `short` for narrow ones ("Mon 11/2").
+ * @param {number} dayIndex - The day index
+ * @param {string} classId - The class ID
+ * @param {string} [classStartDate=DEFAULT_CLASS_START_DATE] - The class start date in YYYY-MM-DD format
+ * @returns {Promise<{full: string, short: string}>}
+ */
+export async function getDayDateLabels(dayIndex, classId, classStartDate = DEFAULT_CLASS_START_DATE) {
+  const date = await getDateObjectForDayIndex(dayIndex, classId, classStartDate);
+  const longWeekday = date.toLocaleDateString(undefined, { weekday: "long" });
+  const shortWeekday = date.toLocaleDateString(undefined, { weekday: "short" });
+  return {
+    full: `${date.toLocaleDateString()} (${longWeekday})`,
+    short: `${shortWeekday} ${date.getMonth() + 1}/${date.getDate()}`
+  };
 }
 
 /**
