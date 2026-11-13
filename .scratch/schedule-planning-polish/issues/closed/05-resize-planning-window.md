@@ -4,10 +4,10 @@
 
 **Blocked by:** 04 (Skip / Delay Date Offset control). Ordering note: the tickets in this folder are deliberately serial because they edit the same schedule-rendering code and stylesheet rules; the edge prevents merge conflicts, not a logical dependency.
 
-**Status:** ready-for-agent
+**Status:** closed
 
-- [ ] "+3 days" adds three more Day Indices to that Class only
-- [ ] "−3 days" removes three, and is disabled at 3
-- [ ] Other Classes are unaffected
-- [ ] Reload resets every Class to 3
-- [ ] Size survives that pane's own re-renders (e.g. after moving a Lesson or changing its Date Offset)
+- [x] "+3 days" adds three more Day Indices to that Class only
+- [x] "−3 days" removes three, and is disabled at 3
+- [x] Other Classes are unaffected
+- [x] Reload resets every Class to 3
+- [x] Size survives that pane's own re-renders (e.g. after moving a Lesson or changing its Date Offset)

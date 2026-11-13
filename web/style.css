@@ -810,6 +810,18 @@ select:focus,
   flex-wrap: wrap;
 }
 
+/* "−3 days" / "+3 days" under each pane's table (lesson-planning.js). */
+.planning-window-resize {
+  display: flex;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-sm);
+}
+
+.planning-window-resize button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* A small "?" icon with a CSS-only hover/focus tooltip - no JS state, no
    existing pattern in this app to reuse, so introduced here. Built by
    ui-components.js's createInfoTooltip. */

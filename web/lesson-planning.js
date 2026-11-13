@@ -16,7 +16,7 @@ import {
   setClassDateOffset
 } from './date-utils.js';
 import { showNotification } from './notification-utils.js';
-import { createDateOffsetControl } from './ui-components.js';
+import { createDateOffsetControl, createStyledButton } from './ui-components.js';
 import {
   getFullSchedule
 } from './database-utils.js';
@@ -31,8 +31,11 @@ import {
 import { renderTeacherNav } from './teacher-nav.js';
 
 // Number of upcoming Day Indices shown per Class in each pane's Planning
-// Window (today, +1, +2, ...). Change this single constant to widen it later.
+// Window (today, +1, +2, ...) when the pane is first rendered. Each pane's
+// "+3 days" / "−3 days" buttons resize it by this step, never below it.
+// The size is not remembered: a page reload puts every Class back to this.
 const PLANNING_WINDOW_SIZE = 3;
+const PLANNING_WINDOW_STEP = 3;
 
 initializeDatabase(db);
 
@@ -142,8 +145,10 @@ export async function loadAndRenderAllPanes() {
  * functionality (drag-and-drop, lesson actions, Insert/Delete Day). Changing
  * the Class's Date Offset shifts which Day Indices the window shows, so a
  * reload re-renders the whole pane, not just the table.
+ * `windowSize` is how many Day Indices the window shows; the pane's own
+ * re-renders (and its resize buttons) pass it along so it survives them.
  */
-export async function renderClassPane(classId, className, containerEl) {
+export async function renderClassPane(classId, className, containerEl, windowSize = PLANNING_WINDOW_SIZE) {
   const schedule = await getFullSchedule(classId);
   const dayIndexes = Object.keys(schedule).map(Number);
   const maxDayIndex = dayIndexes.length > 0 ? Math.max(...dayIndexes) : 0;
@@ -151,7 +156,7 @@ export async function renderClassPane(classId, className, containerEl) {
   const todayDayIndex = await getTodayDayIndex(classId);
 
   const windowIndexes = Array.from(
-    { length: PLANNING_WINDOW_SIZE },
+    { length: windowSize },
     (_, i) => todayDayIndex + i
   );
 
@@ -159,7 +164,8 @@ export async function renderClassPane(classId, className, containerEl) {
   const lessonHashesInWindow = windowIndexes.flatMap(idx => schedule[idx] || []);
   await getLessonTitles(lessonHashesInWindow);
 
-  const onReload = () => renderClassPane(classId, className, containerEl);
+  const renderAtSize = (size) => renderClassPane(classId, className, containerEl, size);
+  const onReload = () => renderAtSize(windowSize);
   const ctx = {
     classId,
     onReload,
@@ -222,7 +228,15 @@ export async function renderClassPane(classId, className, containerEl) {
   tableWrapper.className = 'schedule-pane';
   tableWrapper.appendChild(table);
 
+  const resizeControls = document.createElement('div');
+  resizeControls.className = 'planning-window-resize';
+  const shrinkBtn = createStyledButton('−3 days', () => renderAtSize(windowSize - PLANNING_WINDOW_STEP));
+  shrinkBtn.disabled = windowSize <= PLANNING_WINDOW_SIZE;
+  resizeControls.appendChild(shrinkBtn);
+  resizeControls.appendChild(createStyledButton('+3 days', () => renderAtSize(windowSize + PLANNING_WINDOW_STEP)));
+
   containerEl.innerHTML = '';
   containerEl.appendChild(header);
   containerEl.appendChild(tableWrapper);
+  containerEl.appendChild(resizeControls);
 }

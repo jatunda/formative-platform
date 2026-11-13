@@ -81,7 +81,18 @@ const mockCreateDateOffsetControl = vi.fn((config) => {
 vi.mock('../../ui-components.js', () => ({
   createDateOffsetControl: (config) => mockCreateDateOffsetControl(config),
   withWorkingIndicator: (btn, onClick) => onClick,
+  createStyledButton: (text, onClick) => {
+    const btn = document.createElement('button');
+    btn.textContent = text;
+    btn.onclick = onClick;
+    return btn;
+  },
 }));
+
+const dayIndicesShown = (containerEl) =>
+  [...containerEl.querySelectorAll('.day-row')].map((r) => r.dataset.dayIndex);
+const resizeButton = (containerEl, text) =>
+  [...containerEl.querySelectorAll('.planning-window-resize button')].find((b) => b.textContent === text);
 
 describe('lesson-planning', () => {
   beforeEach(() => {
@@ -205,6 +216,91 @@ describe('lesson-planning', () => {
 
       const dayRows = [...containerEl.querySelectorAll('.day-row')].map((r) => r.dataset.dayIndex);
       expect(dayRows).toEqual(['10', '11', '12']);
+    });
+
+    describe('resizing the Planning Window', () => {
+      it('"+3 days" adds three more Day Indices', async () => {
+        mockGetFullSchedule.mockResolvedValue({});
+        const containerEl = document.createElement('div');
+        await renderClassPane('csa', 'CS A', containerEl);
+
+        await resizeButton(containerEl, '+3 days').onclick();
+
+        expect(dayIndicesShown(containerEl)).toEqual(['10', '11', '12', '13', '14', '15']);
+        await resizeButton(containerEl, '+3 days').onclick();
+        expect(dayIndicesShown(containerEl)).toHaveLength(9);
+      });
+
+      it('"−3 days" removes three, and is disabled at 3', async () => {
+        mockGetFullSchedule.mockResolvedValue({});
+        const containerEl = document.createElement('div');
+        await renderClassPane('csa', 'CS A', containerEl);
+        expect(resizeButton(containerEl, '−3 days').disabled).toBe(true);
+
+        await resizeButton(containerEl, '+3 days').onclick();
+        expect(resizeButton(containerEl, '−3 days').disabled).toBe(false);
+        await resizeButton(containerEl, '−3 days').onclick();
+
+        expect(dayIndicesShown(containerEl)).toEqual(['10', '11', '12']);
+        expect(resizeButton(containerEl, '−3 days').disabled).toBe(true);
+      });
+
+      it('places the buttons under the table', async () => {
+        mockGetFullSchedule.mockResolvedValue({});
+        const containerEl = document.createElement('div');
+        await renderClassPane('csa', 'CS A', containerEl);
+
+        expect(containerEl.lastElementChild.classList.contains('planning-window-resize')).toBe(true);
+      });
+
+      it('leaves other Classes unaffected', async () => {
+        mockGetFullSchedule.mockResolvedValue({});
+        const csaEl = document.createElement('div');
+        const cspEl = document.createElement('div');
+        await renderClassPane('csa', 'CS A', csaEl);
+        await renderClassPane('csp', 'CS P', cspEl);
+
+        await resizeButton(csaEl, '+3 days').onclick();
+
+        expect(dayIndicesShown(cspEl)).toEqual(['10', '11', '12']);
+      });
+
+      it("keeps its size across the pane's own re-renders (e.g. a Date Offset change)", async () => {
+        mockGetFullSchedule.mockResolvedValue({});
+        const containerEl = document.createElement('div');
+        await renderClassPane('csa', 'CS A', containerEl);
+        await resizeButton(containerEl, '+3 days').onclick();
+
+        const config = mockCreateDateOffsetControl.mock.calls.at(-1)[0];
+        await config.onShift(1);
+
+        expect(dayIndicesShown(containerEl)).toHaveLength(6);
+      });
+
+      it('keeps its size when a day-row action reloads the pane', async () => {
+        mockGetFullSchedule.mockResolvedValue({});
+        const { createDayRow } = await import('../../schedule-day-view.js');
+        const containerEl = document.createElement('div');
+        await renderClassPane('csa', 'CS A', containerEl);
+        await resizeButton(containerEl, '+3 days').onclick();
+
+        const ctx = createDayRow.mock.calls.at(-1)[4];
+        await ctx.onReload();
+
+        expect(dayIndicesShown(containerEl)).toHaveLength(6);
+      });
+
+      it('starts every freshly rendered pane (e.g. after a page reload) at 3', async () => {
+        mockGetFullSchedule.mockResolvedValue({});
+        const containerEl = document.createElement('div');
+        await renderClassPane('csa', 'CS A', containerEl);
+        await resizeButton(containerEl, '+3 days').onclick();
+
+        const freshEl = document.createElement('div');
+        await renderClassPane('csa', 'CS A', freshEl);
+
+        expect(dayIndicesShown(freshEl)).toEqual(['10', '11', '12']);
+      });
     });
 
     it('brackets the window with an insert-day row before and after', async () => {
