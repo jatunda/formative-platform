@@ -121,9 +121,7 @@ export function createInsertDayRow(dayIndex, onInsert) {
  */
 export function createActionsCell(dayIndex, onDeleteDay) {
   const tdActions = document.createElement("td");
-  tdActions.style.textAlign = "center";
-  tdActions.style.verticalAlign = "middle";
-  tdActions.style.padding = "4px";
+  tdActions.className = "day-actions-cell";
 
   const deleteButton = document.createElement("button");
   deleteButton.textContent = "🗑️";

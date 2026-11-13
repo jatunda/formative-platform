@@ -779,6 +779,14 @@ select:focus {
   white-space: nowrap;
 }
 
+/* The delete-day column (schedule-day-view.js's createActionsCell). Narrow
+   screens tighten it with the other schedule cells. */
+.day-actions-cell {
+  text-align: center;
+  vertical-align: middle;
+  padding: var(--spacing-xs);
+}
+
 /* Insert-day rows are one cell spanning the row; they must not shrink. */
 .schedule-table td.insert-day-cell,
 #scheduleTable td.insert-day-cell {
@@ -858,9 +866,10 @@ select:focus {
   flex-shrink: 0;
 }
 
+/* Hidden with display: none, not visibility, so the 240px box doesn't widen
+   the page (a sideways scroll on a phone) while nobody is looking at it. */
 .info-tooltip-text {
-  visibility: hidden;
-  opacity: 0;
+  display: none;
   position: absolute;
   bottom: 130%;
   left: 0;
@@ -875,22 +884,22 @@ select:focus {
   font-weight: normal;
   line-height: 1.4;
   z-index: 20;
-  transition: opacity var(--transition-fast);
   pointer-events: none;
 }
 
 .info-tooltip:hover .info-tooltip-text,
 .info-tooltip:focus-visible .info-tooltip-text {
-  visibility: visible;
-  opacity: 1;
+  display: block;
 }
 
 /* ========================================
    Teacher nav (Full Schedule / Lesson Planning / Content Editor)
    ======================================== */
+/* Wraps onto a second line on a phone rather than running off the side. */
 .teacher-nav {
   display: flex;
-  gap: var(--spacing-lg);
+  flex-wrap: wrap;
+  gap: var(--spacing-xs) var(--spacing-lg);
   margin-bottom: 1rem;
 }
 
@@ -2135,13 +2144,16 @@ ol.lesson-list {
     gap: var(--spacing-xxs);
   }
 
+  /* Measured at 375px: with 4px cell padding and the delete button's 8px
+     sides, a one-Lesson day overflowed its pane by 14px (Lesson Planning)
+     to 18px (Full Schedule). */
   .schedule-table td,
   #scheduleTable td {
-    padding: var(--spacing-xs);
+    padding: var(--spacing-xxs);
   }
 
   .delete-day-btn {
-    --delete-day-padding: var(--spacing-xs) var(--spacing-sm);
+    --delete-day-padding: var(--spacing-xs);
   }
 
   .lesson-cluster {
