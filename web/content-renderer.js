@@ -4,6 +4,7 @@
 import { CONTENT_NOT_FOUND } from './constants.js';
 import { PAGE_LINK_PATTERN, parsePageLinkMatch } from './page-links.js';
 import { QUESTION_LINK_PATTERN, parseQuestionLinkMatch } from './question-links.js';
+import { INLINE_CODE_PATTERN, matchAllOutsideInlineCode } from './inline-code.js';
 
 /**
  * A blockquote line: `> text`. A line starting `>>>` is a collapsible marker
@@ -213,9 +214,6 @@ function installSpoilerToggle(doc) {
 
 if (typeof document !== 'undefined') installSpoilerToggle(document);
 
-/** Backtick-enclosed inline code span. */
-const INLINE_CODE_PATTERN = /`([^`]+)`/g;
-
 /**
  * Stands in for an inline code span while links and formatting run: a
  * Private Use Area character, which no link or formatting pattern matches.
@@ -281,10 +279,7 @@ function expandQuestionLinkLines(rawLines) {
 	const expanded = [];
 	for (const rawLine of rawLines) {
 		// A Question Link typed inside backticks is literal code, not an embed.
-		const codeSpans = [...rawLine.matchAll(INLINE_CODE_PATTERN)]
-			.map((span) => [span.index, span.index + span[0].length]);
-		const matches = [...rawLine.matchAll(QUESTION_LINK_PATTERN)]
-			.filter((match) => !codeSpans.some(([start, end]) => match.index >= start && match.index < end));
+		const matches = matchAllOutsideInlineCode(rawLine, QUESTION_LINK_PATTERN);
 		if (matches.length === 0) {
 			expanded.push(rawLine);
 			continue;

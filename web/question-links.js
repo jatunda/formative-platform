@@ -1,3 +1,5 @@
+import { matchAllOutsideInlineCode } from "./inline-code.js";
+
 // Shared pattern for Question Links: [[q:slug]], [[q:slug|text]]. A Question
 // Link is the Question equivalent of a Page Link, but lives in its own
 // namespace/syntax (docs/adr/0011) since Questions keep a separate
@@ -45,7 +47,9 @@ export function extractQuestionLinkSlugs(parsedContent) {
   const slugs = new Set();
   for (const block of (parsedContent && parsedContent.blocks) || []) {
     walkTextValues(block.content, (text) => {
-      for (const match of text.matchAll(QUESTION_LINK_PATTERN)) {
+      // Skips links written as inline code, which render as literal code.
+      const matches = text.split("\n").flatMap((line) => matchAllOutsideInlineCode(line, QUESTION_LINK_PATTERN));
+      for (const match of matches) {
         const { slug } = parseQuestionLinkMatch(match[1], match[2]);
         if (slug) slugs.add(slug);
       }

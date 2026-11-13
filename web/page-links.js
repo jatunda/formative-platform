@@ -1,3 +1,5 @@
+import { matchAllOutsideInlineCode } from "./inline-code.js";
+
 // Shared pattern for Obsidian-style [[...]] links: [[slug]], [[slug|text]],
 // [[#Header]], [[#Header|text]]. Used both to render them (content-renderer.js)
 // and to index/rewrite them for Backlinks (page-database-utils.js), so the
@@ -43,7 +45,9 @@ export function extractPageLinkSlugs(parsedContent) {
   const slugs = new Set();
   for (const block of (parsedContent && parsedContent.blocks) || []) {
     walkTextValues(block.content, (text) => {
-      for (const match of text.matchAll(PAGE_LINK_PATTERN)) {
+      // Skips links written as inline code, which render as literal code.
+      const matches = text.split("\n").flatMap((line) => matchAllOutsideInlineCode(line, PAGE_LINK_PATTERN));
+      for (const match of matches) {
         const { slug } = parsePageLinkMatch(match[1], match[2], match[3]);
         // [[q:slug]] is Question Link syntax (question-links.js), not a Page
         // Link - PAGE_LINK_PATTERN's slug group has no way to exclude it
