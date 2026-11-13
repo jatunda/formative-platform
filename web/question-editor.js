@@ -10,6 +10,7 @@ import { validateQuestionDSL, getQuestionErrorExplanation } from './question-dsl
 import { renderContentItems } from './content-renderer.js';
 import { renderTeacherNav } from './teacher-nav.js';
 import { showNotification } from './notification-utils.js';
+import { showConfirm } from './confirm-dialog.js';
 import { withWorkingIndicator } from './ui-components.js';
 import { createQuestionDslCheatSheetPanel } from './question-dsl-cheat-sheet.js';
 import {
@@ -158,7 +159,7 @@ async function refreshSlugList(questionId, slugListEl) {
     removeBtn.className = 'schedule-action-btn delete-btn';
     removeBtn.onclick = withWorkingIndicator(removeBtn, async () => {
       const backlinks = await getQuestionBacklinks(questionId);
-      const confirmed = confirm(`Remove "[[q:${slug}]]"?${describeBacklinks(backlinks)}`);
+      const confirmed = await showConfirm({ message: `Remove "[[q:${slug}]]"?${describeBacklinks(backlinks)}`, confirmLabel: 'Remove' });
       if (!confirmed) return;
       await removeQuestionSlug(slug);
       await refreshSlugList(questionId, slugListEl);
@@ -276,11 +277,12 @@ export async function main() {
 
   deleteBtn.onclick = async () => {
     const backlinks = await getQuestionBacklinks(questionId);
-    const confirmed = confirm(
-      'Are you sure you want to delete this question?\n\n' +
+    const confirmed = await showConfirm({
+      confirmLabel: 'Delete',
+      message: 'Are you sure you want to delete this question?\n\n' +
       'This also removes every Question Link pointing to it. This action cannot be undone.' +
       describeBacklinks(backlinks)
-    );
+    });
     if (!confirmed) return;
     await deleteQuestionAndSlugs(questionId);
     markClean();

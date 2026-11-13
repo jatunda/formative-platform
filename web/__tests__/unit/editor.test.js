@@ -86,8 +86,17 @@ vi.mock('../../question-link-picker.js', () => ({
   showQuestionLinkPicker: (...args) => mockShowQuestionLinkPicker(...args),
 }));
 
+const mockShowConfirm = vi.fn(async () => true);
+vi.mock('../../confirm-dialog.js', () => ({
+  showConfirm: (...args) => mockShowConfirm(...args),
+}));
+
 global.alert = vi.fn();
 global.confirm = vi.fn(() => true);
+
+/** Expect the in-app confirm dialog to have asked with a message containing `text`. */
+const expectAskedWith = (text) =>
+  expect(mockShowConfirm).toHaveBeenCalledWith(expect.objectContaining({ message: expect.stringContaining(text) }));
 
 describe('editor', () => {
   beforeEach(() => {
@@ -96,7 +105,7 @@ describe('editor', () => {
     vi.clearAllMocks();
     mockParseDSL.mockReturnValue({ title: 'Parsed Title', blocks: [{ type: 'question', content: [] }] });
     mockValidateDSL.mockReturnValue(null);
-    global.confirm.mockReturnValue(true);
+    mockShowConfirm.mockResolvedValue(true);
   });
 
   describe('getQueryParams', () => {
@@ -419,7 +428,7 @@ describe('editor', () => {
 
       const result = await deleteLesson('abc123', '# To Delete');
 
-      expect(confirm).toHaveBeenCalledWith(expect.stringContaining('  - Period 1: Day Index 2'));
+      expectAskedWith('  - Period 1: Day Index 2');
       expect(result).toBe(true);
       expect(await lessons.get('abc123')).toBeNull();
       expect(await lessons.findScheduleUses('abc123')).toEqual([]);
@@ -430,11 +439,11 @@ describe('editor', () => {
     it('includes the parsed title in the confirmation prompt', async () => {
       mockParseDSL.mockReturnValue({ title: 'A Specific Title', blocks: [{}] });
       await deleteLesson('abc123', '# A Specific Title');
-      expect(confirm).toHaveBeenCalledWith(expect.stringContaining('"A Specific Title"'));
+      expectAskedWith('"A Specific Title"');
     });
 
     it('does not delete when the teacher cancels the confirmation', async () => {
-      global.confirm.mockReturnValue(false);
+      mockShowConfirm.mockResolvedValue(false);
 
       const result = await deleteLesson('abc123', '# To Delete');
 
@@ -454,7 +463,7 @@ describe('editor', () => {
 
       await deleteLesson('abc123', 'garbage');
 
-      expect(confirm).toHaveBeenCalledWith(expect.stringContaining('"To Delete"'));
+      expectAskedWith('"To Delete"');
     });
 
     it('falls back to a generic title when neither the DSL nor the database has one', async () => {
@@ -463,7 +472,7 @@ describe('editor', () => {
 
       await deleteLesson('abc123', 'garbage');
 
-      expect(confirm).toHaveBeenCalledWith(expect.stringContaining('"(Untitled)"'));
+      expectAskedWith('"(Untitled)"');
     });
 
     it('keeps the generic title when the DSL parses without one', async () => {
@@ -471,7 +480,7 @@ describe('editor', () => {
 
       await deleteLesson('abc123', 'no title');
 
-      expect(confirm).toHaveBeenCalledWith(expect.stringContaining('"(Untitled)"'));
+      expectAskedWith('"(Untitled)"');
     });
 
     it('keeps the generic title when the database title read fails too', async () => {
@@ -487,7 +496,7 @@ describe('editor', () => {
 
       await deleteLesson('abc123', 'garbage');
 
-      expect(confirm).toHaveBeenCalledWith(expect.stringContaining('"(Untitled)"'));
+      expectAskedWith('"(Untitled)"');
     });
 
     it('does not delete, and notifies, when the Schedules cannot be checked', async () => {
@@ -505,7 +514,7 @@ describe('editor', () => {
       const result = await deleteLesson('abc123', '# To Delete');
 
       expect(result).toBe(false);
-      expect(confirm).not.toHaveBeenCalled();
+      expect(mockShowConfirm).not.toHaveBeenCalled();
       expect(await lessons.get('abc123')).toEqual({ title: 'To Delete' });
       expect(showNotification).toHaveBeenCalledWith(expect.stringContaining('Failed'), 'error');
     });
@@ -641,18 +650,32 @@ describe('editor', () => {
   });
 
   describe('confirmDiscardUnsavedChanges', () => {
-    it('returns true immediately when there are no unsaved changes, without prompting', () => {
-      expect(confirmDiscardUnsavedChanges(false)).toBe(true);
+    it('resolves true when there are no unsaved changes, without prompting', async () => {
+      expect(await confirmDiscardUnsavedChanges(false)).toBe(true);
+      expect(mockShowConfirm).not.toHaveBeenCalled();
+    });
+
+    it('asks in the in-app dialog and resolves with the answer when dirty', async () => {
+      mockShowConfirm.mockResolvedValue(true);
+      expect(await confirmDiscardUnsavedChanges(true)).toBe(true);
+      expectAskedWith('You have unsaved changes. Discard them and continue?');
+
+      mockShowConfirm.mockResolvedValue(false);
+      expect(await confirmDiscardUnsavedChanges(true)).toBe(false);
       expect(confirm).not.toHaveBeenCalled();
     });
 
-    it('prompts and returns the confirm result when dirty', () => {
-      global.confirm.mockReturnValue(true);
-      expect(confirmDiscardUnsavedChanges(true)).toBe(true);
-      expect(confirm).toHaveBeenCalledWith(expect.stringContaining('unsaved changes'));
+    it('stays unanswered until the teacher answers', async () => {
+      let answer = (/** @type {boolean} */ _ok) => {};
+      mockShowConfirm.mockReturnValue(new Promise((resolve) => { answer = resolve; }));
+      let settled = false;
+      const pending = confirmDiscardUnsavedChanges(true).then((ok) => { settled = true; return ok; });
 
-      global.confirm.mockReturnValue(false);
-      expect(confirmDiscardUnsavedChanges(true)).toBe(false);
+      await Promise.resolve();
+      expect(settled).toBe(false);
+
+      answer(false);
+      expect(await pending).toBe(false);
     });
   });
 

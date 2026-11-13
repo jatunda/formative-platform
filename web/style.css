@@ -627,6 +627,7 @@ select:focus {
 .confirm-message {
   margin: 0 0 var(--spacing-xl);
   line-height: 1.5;
+  white-space: pre-line; /* keep the line breaks in multi-line prompts */
 }
 
 .confirm-actions {

@@ -7,6 +7,7 @@ import { db } from './firebase-config.js';
 import { initializeDatabase } from './database-handle.js';
 import { renderTeacherNav } from './teacher-nav.js';
 import { showNotification } from './notification-utils.js';
+import { showConfirm } from './confirm-dialog.js';
 import { withWorkingIndicator } from './ui-components.js';
 import { showQuestionPicker } from './question-picker.js';
 import { deriveQuestionLabel } from './question-label.js';
@@ -129,7 +130,7 @@ async function refreshSlugList(practiceSetId, slugListEl) {
     removeBtn.textContent = 'Remove';
     removeBtn.className = 'schedule-action-btn delete-btn';
     removeBtn.onclick = withWorkingIndicator(removeBtn, async () => {
-      const confirmed = confirm(`Remove "/practice/${slug}"?`);
+      const confirmed = await showConfirm({ message: `Remove "/practice/${slug}"?`, confirmLabel: 'Remove' });
       if (!confirmed) return;
       await removePracticeSetSlug(slug);
       await refreshSlugList(practiceSetId, slugListEl);
@@ -228,10 +229,11 @@ export async function main() {
   };
 
   deleteBtn.onclick = async () => {
-    const confirmed = confirm(
-      'Are you sure you want to delete this practice set?\n\n' +
+    const confirmed = await showConfirm({
+      confirmLabel: 'Delete',
+      message: 'Are you sure you want to delete this practice set?\n\n' +
       'This also removes every URL pointing to it. This action cannot be undone.'
-    );
+    });
     if (!confirmed) return;
     await deletePracticeSetAndSlugs(practiceSetId);
     markClean();
