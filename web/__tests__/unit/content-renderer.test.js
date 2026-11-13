@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { renderContent, renderMultipleContent, processInlineCode, installSpoilerToggle } from '../../content-renderer.js';
 import { CONTENT_NOT_FOUND } from '../../constants.js';
 
@@ -181,8 +181,22 @@ describe('spoiler reveal on tap and keyboard', () => {
     return container.querySelector('.spoiler');
   }
 
+  /**
+   * jsdom has no matchMedia; stand in for a device that can hover (a mouse)
+   * or can't (a touch screen).
+   * @param {boolean} canHover
+   */
+  function stubHover(canHover) {
+    window.matchMedia = /** @type {any} */ ((query) => ({ media: query, matches: query === '(hover: hover)' && canHover }));
+  }
+
   beforeEach(() => {
     document.body.innerHTML = '';
+    stubHover(false);
+  });
+
+  afterEach(() => {
+    delete window.matchMedia;
   });
 
   it('starts hidden', () => {
@@ -204,6 +218,39 @@ describe('spoiler reveal on tap and keyboard', () => {
   it('toggles when the tap lands on formatted text inside the spoiler', () => {
     const spoiler = renderSpoiler();
     spoiler.querySelector('strong').click();
+    expect(spoiler.classList.contains('spoiler-revealed')).toBe(true);
+  });
+
+  it('on a mouse device, one click on a link inside a hidden spoiler follows the link', () => {
+    stubHover(true);
+    const spoiler = renderSpoiler();
+    const event = new MouseEvent('click', { bubbles: true, cancelable: true });
+    spoiler.querySelector('a').dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(false);
+  });
+
+  it('on a touch screen, the first tap on a link reveals and the second follows it', () => {
+    const spoiler = renderSpoiler();
+    const link = spoiler.querySelector('a');
+    const first = new MouseEvent('click', { bubbles: true, cancelable: true });
+    link.dispatchEvent(first);
+    expect(first.defaultPrevented).toBe(true);
+    expect(spoiler.classList.contains('spoiler-revealed')).toBe(true);
+
+    const second = new MouseEvent('click', { bubbles: true, cancelable: true });
+    link.dispatchEvent(second);
+    expect(second.defaultPrevented).toBe(false);
+    expect(spoiler.classList.contains('spoiler-revealed')).toBe(true);
+  });
+
+  it('a touch tap on a device that can also hover still reveals first', () => {
+    stubHover(true);
+    const spoiler = renderSpoiler();
+    // Browsers send a click as a PointerEvent; jsdom has no PointerEvent.
+    const event = new MouseEvent('click', { bubbles: true, cancelable: true });
+    Object.defineProperty(event, 'pointerType', { value: 'touch' });
+    spoiler.querySelector('a').dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(true);
     expect(spoiler.classList.contains('spoiler-revealed')).toBe(true);
   });
 

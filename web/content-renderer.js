@@ -172,6 +172,18 @@ function toggleSpoiler(spoiler) {
 }
 
 /**
+ * Whether this click came from a pointer that hovered first (a mouse), so
+ * a hidden spoiler has already shown itself (style.css reveals on :hover).
+ * A touch tap never hovered, even on a laptop with a touch screen.
+ * @param {MouseEvent} event
+ * @param {Document} doc
+ */
+function clickFollowedHover(event, doc) {
+	if (/** @type {PointerEvent} */ (event).pointerType === 'touch') return false;
+	return /** @type {Window} */ (doc.defaultView).matchMedia('(hover: hover)').matches;
+}
+
+/**
  * Let a tap, click, Enter or Space toggle any spoiler in the document. One
  * delegated listener covers every renderer and every re-render (the editor
  * preview re-renders on each keystroke). Hover and keyboard focus reveal
@@ -187,12 +199,13 @@ function installSpoilerToggle(doc) {
 		const spoiler = target.closest('.spoiler');
 		if (!spoiler) return;
 		const onLink = target.closest('a') !== null;
-		// A link inside a revealed spoiler works as normal.
-		if (onLink && spoiler.classList.contains('spoiler-revealed')) return;
+		// A link inside a revealed spoiler works as normal, and so does one
+		// clicked with a mouse: hovering has already shown the text.
+		if (onLink && (spoiler.classList.contains('spoiler-revealed') || clickFollowedHover(event, doc))) return;
 		// A tap on a link inside a hidden spoiler reveals it rather than
-		// following the link; one in a Question option's <label> or a
-		// collapsible's <summary> doesn't also pick the option or toggle the
-		// section.
+		// following the link, since a touch screen couldn't show it first;
+		// one in a Question option's <label> or a collapsible's <summary>
+		// doesn't also pick the option or toggle the section.
 		if (onLink || spoiler.closest('label, summary')) event.preventDefault();
 		toggleSpoiler(spoiler);
 	});
