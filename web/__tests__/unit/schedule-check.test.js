@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
-  PAGES, SIZES, TAP_EXCEPTIONS, KNOWN_FAILURES, tapTargetProblem, describeFailure, classify, parseArgs,
+  PAGES, SIZES, TAP_EXCEPTIONS, KNOWN_FAILURES, tapTargetProblem, rowMisalignment, describeFailure, classify, parseArgs,
 } from '../../scripts/schedule-check-matrix.js';
 import { buildFixtureDb, todayIndex, TODAY, DATE_OFFSET, SCHEDULES, LONG_TITLE } from '../../scripts/schedule-check-fixtures.js';
 import { getBusinessDaysBetween, createLocalDate, DEFAULT_CLASS_START_DATE } from '../../business-days.js';
@@ -41,11 +41,37 @@ describe('tapTargetProblem', () => {
   });
 });
 
+/** A day row whose cells span `edges` ([top, bottom] each), in cell order. */
+const dayRow = (...edges) => ({
+  label: 'P1 day 12 (1 Lesson)',
+  cells: edges.map(([top, bottom], i) => ({ name: ['Day Index', 'Date', 'Lessons', 'Delete Day'][i], top, bottom })),
+});
+
+describe('rowMisalignment', () => {
+  it('passes a row whose cells share one top and one bottom', () => {
+    expect(rowMisalignment(dayRow([10, 60], [10, 60], [10, 60], [10, 60]))).toBeNull();
+  });
+
+  it('rounds to the half pixel, so subpixel layout noise still lines up', () => {
+    expect(rowMisalignment(dayRow([10, 60], [10.1, 59.9], [10, 60.2], [10, 60]))).toBeNull();
+  });
+
+  it('names the cells that end at a different height', () => {
+    expect(rowMisalignment(dayRow([10, 60], [10, 60], [10, 52], [10, 60])))
+      .toBe('P1 day 12 (1 Lesson): cells end at different heights (Day Index 60, Date 60, Lessons 52, Delete Day 60)');
+  });
+
+  it('names the cells that start at a different height', () => {
+    expect(rowMisalignment(dayRow([10, 60], [14, 60], [10, 60], [10, 60])))
+      .toBe('P1 day 12 (1 Lesson): cells start at different heights (Day Index 10, Date 14, Lessons 10, Delete Day 10)');
+  });
+});
+
 /** A clean render, with `change` applied. */
 const checked = (change = {}) => ({
   scrollWidth: 375, viewportWidth: 375, touch: true, coarse: true,
   shortTables: [{ name: 'P1', lessonsPerDay: 1, contentWidth: 359, paneWidth: 359 }],
-  targets: [target(44, 44)], errors: [], violations: [], ...change,
+  targets: [target(44, 44)], rows: [dayRow([0, 50], [0, 50])], errors: [], violations: [], ...change,
 });
 
 describe('describeFailure', () => {
@@ -60,6 +86,13 @@ describe('describeFailure', () => {
   it('reports a short day wider than its pane (ticket 02)', () => {
     const shortTables = [{ name: 'P1', lessonsPerDay: 1, contentWidth: 600, paneWidth: 359 }];
     expect(describeFailure(checked({ shortTables }))).toEqual(['P1: days of at most 1 Lesson(s) are 600px wide in a 359px pane']);
+  });
+
+  it('reports day rows whose cells do not line up in one line, naming the first (ticket 09)', () => {
+    const rows = [dayRow([0, 50], [0, 50]), dayRow([0, 50], [0, 40]), dayRow([0, 50], [4, 50])];
+    expect(describeFailure(checked({ rows }))).toEqual([
+      "2 of 3 day rows don't line up, first P1 day 12 (1 Lesson): cells end at different heights (Day Index 50, Date 40)",
+    ]);
   });
 
   it('reports a browser whose pointer does not match the size', () => {
