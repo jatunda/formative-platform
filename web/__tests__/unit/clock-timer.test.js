@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  MAX_NAME_LENGTH, PRESET_MINUTES, QUICK_PICKS, cancelTimer, cleanTimerName, durationLabel, nameQuickPick, nameTimer,
+  MAX_NAME_LENGTH, PRESET_MINUTES, QUICK_PICKS, cancelTimer, cleanTimerName, createTabTimer, durationLabel, nameQuickPick, nameTimer,
   parseDuration, parseMinutesSeconds, pauseTimer, quickPickName, quickPickText, rememberQuickPick, resumeTimer, settleTimer,
   startTimer, fullTimerName, timerProgress, timerRingView, timerStatus,
 } from '../../clock/timer.js';
@@ -275,5 +275,29 @@ describe('the classroom timer', () => {
     ])('%s : %s is refused', (minutes, seconds, error) => {
       expect(parseMinutesSeconds(minutes, seconds)).toEqual({ ok: false, error });
     });
+  });
+});
+
+describe("the tab's timer", () => {
+  const saved = { division: 'HS', volume: 0.5, ...startTimer(5 * MIN, t0, 'Quiz') };
+
+  it('in real time is the saved timer: loaded, saved as it is, and cleared once its end has passed', () => {
+    const tab = createTabTimer(saved, { simulated: false });
+    expect(tab.settings).toBe(saved);
+    const paused = { ...saved, ...pauseTimer(saved, t0 + MIN) };
+    expect(tab.toSave(paused)).toBe(paused);
+    expect(tab.settle(saved, t0 + 5 * MIN)).toBe(saved);
+    expect(tab.settle(saved, t0 + 5 * MIN + 1)).toEqual({ division: 'HS', volume: 0.5, ...cancelTimer() });
+  });
+
+  it("in simulated time belongs to this tab: it starts with none, and every save keeps the real one as loaded", () => {
+    const tab = createTabTimer(saved, { simulated: true });
+    expect(tab.settings).toEqual({ division: 'HS', volume: 0.5, ...cancelTimer() });
+    const own = { ...tab.settings, ...startTimer(MIN, t0 + 60 * MIN), volume: 1 };
+    expect(tab.toSave(own)).toEqual({ ...saved, volume: 1 });
+    // Its own timer settles as any does, and the saved one is still kept.
+    const settled = tab.settle(own, t0 + 62 * MIN);
+    expect(settled).toEqual({ ...own, ...cancelTimer() });
+    expect(tab.toSave(settled)).toEqual({ ...saved, volume: 1 });
   });
 });

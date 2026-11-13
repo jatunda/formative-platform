@@ -14,7 +14,7 @@ import { closeButton, drawerSection, feedbackLink, fieldset, segmented, soundCho
 import { BAR_SETTING_NAMES, barSetting, dayStripOf } from './day-bar.js';
 import { el } from './dom.js';
 import { createModal } from './modal.js';
-import { BELL_AUTO_DISMISS_SECONDS } from './sound.js';
+import { BELL_AUTO_DISMISS_SECONDS } from './ringing.js';
 
 const ID = 'clock-settings';
 
