@@ -79,3 +79,6 @@ jobs:
 
     - name: Test merge-ticket script
       run: bash scripts/merge-ticket.test.sh
+
+    - name: Test remove-worktree script
+      run: bash scripts/remove-worktree.test.sh

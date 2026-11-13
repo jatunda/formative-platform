@@ -40,7 +40,7 @@ It must exit clean. Request handling lives in `functions/preview-handler.js` as 
 
 ## Merging a ticket branch
 
-To merge a ticket branch into an integration branch, run `scripts/merge-ticket.sh <branch>` from the integration branch's checkout: it merges, runs the checks above only when the merge brought in something new, and reports in a few lines (behaviour in its header).
+To merge a ticket branch into an integration branch, run `scripts/merge-ticket.sh <branch>` from the integration branch's checkout: it merges, runs the checks above only when the merge brought in something new, and reports in a few lines (behaviour in its header). Then run `scripts/remove-worktree.sh <branch>` to remove the merged branch's worktree and the branch, stopping any dev server left running there.
 
 ## Agent skills
 
