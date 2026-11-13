@@ -39,13 +39,6 @@ export function defaultMode(moment) {
 export const UNTIL_END = 'until end';
 
 /**
- * The caption on a Segment's time left with the Segment named, where the
- * heading doesn't name it: "until end of Period 3".
- * @param {string} segmentName
- */
-export const untilEndOf = (segmentName) => `${UNTIL_END} of ${segmentName}`;
-
-/**
  * What a Readout shows: a length of time with its caption ("43:00 until end",
  * "2:00 since start", "2:40 until Period 4", "4d 22h until Mon, Nov 30"), or
  * the current time. `long` durations can run for days.
@@ -87,14 +80,14 @@ export function readoutValue(mode, moment, now, periodLabels = {}) {
 
 /**
  * A Readout's value in words: "43:00 until end", "4d 22h until next school day",
- * or the time ("1:04:09 PM"). With `seconds` off: "12 min until end" (but
+ * or the time ("1:04:09 PM"). With `showSeconds` off: "12 min until end" (but
  * "0:59 until end" in the last minute) and "1:04 PM".
  * @param {ReadoutValue} value
- * @param {{ use24Hour?: boolean, seconds?: boolean }} [options]
+ * @param {Partial<import('./format.js').WordSettings>} [settings] the time format (seconds on unless off)
  * @returns {string}
  */
-export function readoutText(value, options = {}) {
-  const { amount, caption } = readoutParts(value, options);
+export function readoutText(value, settings = {}) {
+  const { amount, caption } = readoutParts(value, settings);
   return value.kind === 'time' ? amount : `${amount} ${caption}`;
 }
 
@@ -104,11 +97,11 @@ export function readoutText(value, options = {}) {
  * are set small and clock seconds are not; its caption ("until end"; none for the current time); and
  * the glyph counts the big Readout's size rule needs.
  * @param {ReadoutValue} value
- * @param {{ use24Hour?: boolean, seconds?: boolean }} [options]
+ * @param {Partial<import('./format.js').WordSettings>} [settings] the time format (seconds on unless off)
  * @returns {{ amount: string, caption: string, pieces: { text: string, small: boolean }[],
  *   glyphs: { digits: number, colons: number, letters: number } }}
  */
-export function readoutParts(value, { use24Hour = false, seconds = true } = {}) {
+export function readoutParts(value, { use24Hour = false, showSeconds: seconds = true } = {}) {
   const amount = value.kind === 'time'
     ? formatClockTime(value.at, { seconds, use24Hour })
     : (value.long ? formatLongDuration : formatDuration)(value.ms, { seconds });

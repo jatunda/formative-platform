@@ -138,10 +138,9 @@ export function createRinging({ realNow, speed, schoolYears }) {
      * `soundWindowDue` says the sound window needs redoing: after a stall, so
      * the player drops what was missed too, and halfway through the window.
      * @param {Date} lastTick @param {Date} now @param {ClockSettings} settings
-     * @param {import('./ring-words.js').RingText} text how the Rings are put into words
      * @returns {{ rang: Ring[], soundWindowDue: boolean }} `rang`: every Ring in [lastTick, now)
      */
-    advance(lastTick, now, settings, text) {
+    advance(lastTick, now, settings) {
       const t = realNow();
       stack = stack.filter((ring) => t < ring.until);
       const staleBefore = now.getTime() - STALE_MS * speed;
@@ -154,7 +153,7 @@ export function createRinging({ realNow, speed, schoolYears }) {
         if (ring.at.getTime() < staleBefore) continue;
         if (ring.source === 'timer') rangTimer = { totalMs: ring.totalMs, name: ring.name ?? null };
         const length = lengthOf(ring.source, ring.sound, settings.bells);
-        start(ringWords(ring, text), length.shownSeconds, {
+        start(ringWords(ring, settings), length.shownSeconds, {
           // A Bell that stops on its own does so when its sound ends, counted
           // from when it came due as its sound is, even in a throttled tab.
           lateMs: length.stopsOnItsOwn ? (now.getTime() - ring.at.getTime()) / speed : 0,

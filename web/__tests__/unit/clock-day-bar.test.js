@@ -82,7 +82,7 @@ describe('the bar on just this Segment', () => {
     const bar = barAt(tue(10, 39), { dayStrip: false, periodLabels: { 'Period 3': 'AP CSA' } });
     expect(bar.setting).toBe('segment');
     expect(bar.blocks).toEqual([expect.objectContaining({
-      name: 'Period 3', label: 'AP CSA', state: 'now', left: 0, width: 100, start: tue(10, 30), end: tue(11, 15),
+      name: 'Period 3', label: 'AP CSA', fullName: 'Period 3 · AP CSA', state: 'now', left: 0, width: 100, start: tue(10, 30), end: tue(11, 15),
     })]);
     expect(bar.done).toBeCloseTo(20);
     expect(bar.nowAt).toBeCloseTo(20);
@@ -155,7 +155,9 @@ describe('the bar during Off-Hours on just this Segment: a countdown to the Next
   });
 
   it("gives the countdown the first Segment's Period Label", () => {
-    expect(countdownAt(tue(16, 0), { periodLabels: { 'Period 2': 'AP CSA' } }).blocks[0].label).toBe('AP CSA');
+    const [block] = countdownAt(tue(16, 0), { periodLabels: { 'Period 2': 'AP CSA' } }).blocks;
+    expect(block.label).toBe('AP CSA');
+    expect(block.fullName).toBe('Until Period 2 · AP CSA');
   });
 
   it('starts from midnight on the first day of the School Year, when no earlier School Day is known', () => {

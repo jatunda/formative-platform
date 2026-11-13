@@ -6,18 +6,25 @@
 // and the Settings drawer's "Next rings today" lines.
 
 import { ringsInWindow } from './clock-model.js';
+import { formatClockTime, formatSegmentName } from './format.js';
 import { fullTimerName } from './timer.js';
 import { SOUND_NAMES } from './sound.js';
 
 /** @typedef {{ kind: string, title: string, detail: string }} RingWords */
 /** @typedef {import('./clock-model.js').Ring} Ring */
 
+/** @typedef {import('./format.js').WordSettings} WordSettings */
+
 /**
- * How the page writes Segment names and clock times (the settings' Period
- * Labels and 24-hour clock).
- * @typedef {{ name: (segment: import('./clock-model.js').TimedSegment) => string,
- *   time: (date: Date, options?: { seconds?: boolean }) => string }} RingText
+ * How the settings write Segment names and clock times (Period Labels, the 24-hour clock).
+ * @param {Pick<WordSettings, 'use24Hour' | 'periodLabels'>} settings
  */
+const writer = ({ use24Hour, periodLabels }) => ({
+  /** @param {{ name: string, kind: string }} segment */
+  name: (segment) => formatSegmentName(segment, periodLabels),
+  /** @param {Date} date */
+  time: (date, seconds = false) => formatClockTime(date, { seconds, use24Hour }),
+});
 
 /**
  * Where in its Period a Period Alarm rings: "minute 5", "5 min before the end"
@@ -39,10 +46,11 @@ export const repeatText = (alarm) => (alarm.repeat === 'once' ? 'once' : 'every 
 /**
  * The ring card's words for a ring.
  * @param {Ring} ring
- * @param {RingText} text
+ * @param {Pick<WordSettings, 'use24Hour' | 'periodLabels'>} settings
  * @returns {RingWords}
  */
-export function ringWords(ring, text) {
+export function ringWords(ring, settings) {
+  const text = writer(settings);
   switch (ring.source) {
     case 'bell': {
       // A Bell between two Segments is named for the one starting.
@@ -73,9 +81,9 @@ export function ringWords(ring, text) {
  * What rang, in one line: "Bell · Period 2 ends, Nutrition starts",
  * "Clock Alarm · Lunch duty, every School Day", "Period Alarm · Period 3, halfway".
  * @param {Ring} ring
- * @param {RingText} text
+ * @param {ReturnType<typeof writer>} text
  */
-export function ringSourceText(ring, text) {
+function ringSourceText(ring, text) {
   switch (ring.source) {
     case 'bell': {
       const parts = [];
@@ -101,13 +109,13 @@ export function ringSourceText(ring, text) {
  * time, what rings and its sound.
  * @param {Date} now
  * @param {import('./school-years.js').SchoolYear[]} schoolYears
- * @param {import('./clock-settings.js').RingSettings} ringSettings
- * @param {RingText} text
+ * @param {import('./clock-settings.js').RingSettings & Pick<WordSettings, 'use24Hour' | 'periodLabels'>} settings
  */
-export function nextRingLines(now, schoolYears, ringSettings, text) {
+export function nextRingLines(now, schoolYears, settings) {
   const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
-  return ringsInWindow(now, midnight, schoolYears, ringSettings).map((ring) => {
-    const time = text.time(ring.at, { seconds: ring.at.getSeconds() !== 0 });
+  const text = writer(settings);
+  return ringsInWindow(now, midnight, schoolYears, settings).map((ring) => {
+    const time = text.time(ring.at, ring.at.getSeconds() !== 0);
     return `${time} · ${ringSourceText(ring, text)} · ${SOUND_NAMES[ring.sound]}`;
   });
 }
