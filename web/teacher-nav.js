@@ -19,6 +19,24 @@ const PAGES = [
 ];
 
 /**
+ * Query param that makes Full Schedule scroll to today's row on arrival,
+ * overriding the scroll position it would otherwise restore. teacher.js
+ * consumes it (removes it from the URL) once used.
+ */
+export const SCROLL_TO_TODAY_PARAM = "scroll";
+export const SCROLL_TO_TODAY_VALUE = "today";
+
+/**
+ * Href of Full Schedule for one Class, scrolled to today on arrival.
+ * @param {string} classId
+ * @returns {string}
+ */
+export function fullScheduleTodayHref(classId) {
+  const params = new URLSearchParams({ class: classId, [SCROLL_TO_TODAY_PARAM]: SCROLL_TO_TODAY_VALUE });
+  return `teacher.html?${params}`;
+}
+
+/**
  * Render the teacher nav into the given mount point.
  * @param {"teacher"|"lesson-planning"|"editor"} activeKey - Which page is currently active
  * @param {string} [mountId="teacherNav"] - Id of the element to render into

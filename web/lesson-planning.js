@@ -28,7 +28,7 @@ import {
   makeDeleteDayHandler,
   getLessonTitles
 } from './schedule-day-view.js';
-import { renderTeacherNav } from './teacher-nav.js';
+import { renderTeacherNav, fullScheduleTodayHref } from './teacher-nav.js';
 
 // Number of upcoming Day Indices shown per Class in each pane's Planning
 // Window (today, +1, +2, ...) when the pane is first rendered. Each pane's
@@ -212,6 +212,15 @@ export async function renderClassPane(classId, className, containerEl, uiState =
   const heading = document.createElement('h2');
   heading.textContent = className;
   header.appendChild(heading);
+
+  // Stays visible when collapsed: setCollapsed below never hides it.
+  const scheduleLink = document.createElement('a');
+  scheduleLink.className = 'full-schedule-link';
+  scheduleLink.href = fullScheduleTodayHref(classId);
+  scheduleLink.textContent = '↗';
+  scheduleLink.title = 'Full schedule';
+  scheduleLink.setAttribute('aria-label', `Full schedule for ${className}`);
+  header.appendChild(scheduleLink);
 
   const offsetControl = createDateOffsetControl({
     label: 'Offset:',

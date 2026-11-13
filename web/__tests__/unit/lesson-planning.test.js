@@ -68,7 +68,8 @@ vi.mock('../../schedule-day-view.js', () => ({
   getLessonTitles: (...args) => mockGetLessonTitles(...args),
 }));
 
-vi.mock('../../teacher-nav.js', () => ({
+vi.mock('../../teacher-nav.js', async (importOriginal) => ({
+  ...(await importOriginal()),
   renderTeacherNav: vi.fn(),
 }));
 
@@ -400,6 +401,34 @@ describe('lesson-planning', () => {
         const freshEl = document.querySelector('.lesson-planning-pane');
         expect(chevron(freshEl).getAttribute('aria-expanded')).toBe('true');
         expect(dayIndicesShown(freshEl)).toEqual(['10', '11', '12']);
+      });
+    });
+
+    describe('Full schedule link', () => {
+      const scheduleLink = (containerEl) => containerEl.querySelector('.lesson-planning-pane-header a');
+
+      it("sits right after the Class name and opens that Class's Full Schedule at today, in the same tab", async () => {
+        mockGetFullSchedule.mockResolvedValue({});
+        const containerEl = document.createElement('div');
+        await renderClassPane('csa', 'CS A', containerEl);
+
+        const link = scheduleLink(containerEl);
+        expect(containerEl.querySelector('h2').nextElementSibling).toBe(link);
+        expect(link.textContent).toBe('↗');
+        expect(link.getAttribute('href')).toBe('teacher.html?class=csa&scroll=today');
+        expect(link.target).toBe('');
+        expect(link.title).toBe('Full schedule');
+        expect(link.getAttribute('aria-label')).toBe('Full schedule for CS A');
+      });
+
+      it('stays visible when the Class is collapsed', async () => {
+        mockGetFullSchedule.mockResolvedValue({});
+        const containerEl = document.createElement('div');
+        await renderClassPane('csa', 'CS A', containerEl);
+
+        await containerEl.querySelector('.lesson-planning-pane-header button[aria-expanded]').onclick();
+
+        expect(scheduleLink(containerEl).hidden).toBe(false);
       });
     });
 

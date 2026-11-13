@@ -806,6 +806,12 @@ select:focus,
   margin: 0;
 }
 
+/* The pane header's gap would push the ↗ away from the Class name it labels. */
+.lesson-planning-pane-header .full-schedule-link {
+  margin-left: calc(-1 * var(--spacing-md) + var(--spacing-xs));
+  text-decoration: none;
+}
+
 .lesson-planning-pane-header .date-offset-control {
   flex-wrap: wrap;
 }
