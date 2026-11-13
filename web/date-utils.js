@@ -3,6 +3,7 @@ import {
   getClassDateOffset as getClassDateOffsetFromDB,
   setClassDateOffset as setClassDateOffsetInDB
 } from "./database-utils.js";
+import { addBusinessDays, createLocalDate, getBusinessDaysBetween, shortDateLabel } from "./school-day.js";
 
 /**
  * Default class start date in YYYY-MM-DD format
@@ -80,50 +81,6 @@ export function clearDateOffsetCache(classId = null) {
   }
 }
 
-// Helper function to create a proper local date from YYYY-MM-DD string
-function createLocalDate(dateString) {
-  const [year, month, day] = dateString.split('-').map(Number);
-  return new Date(year, month - 1, day); // month is 0-indexed
-}
-
-// Helper function to add business days (skipping weekends)
-function addBusinessDays(startDate, businessDaysToAdd) {
-  const date = new Date(startDate);
-  let daysAdded = 0;
-  
-  while (daysAdded < businessDaysToAdd) {
-    date.setDate(date.getDate() + 1);
-    const dayOfWeek = date.getDay(); // 0 = Sunday, 6 = Saturday
-    
-    // Only count weekdays (Monday = 1, Friday = 5)
-    if (dayOfWeek >= 1 && dayOfWeek <= 5) {
-      daysAdded++;
-    }
-  }
-  
-  return date;
-}
-
-// Helper function to calculate business days between two dates
-function getBusinessDaysBetween(startDate, endDate) {
-  const start = createLocalDate(startDate);
-  const end = new Date(endDate);
-  let businessDays = 0;
-  
-  const current = new Date(start);
-  while (current <= end) {
-    const dayOfWeek = current.getDay();
-    // Count weekdays only (Monday = 1, Friday = 5)
-    if (dayOfWeek >= 1 && dayOfWeek <= 5) {
-      businessDays++;
-    }
-    current.setDate(current.getDate() + 1);
-  }
-  
-  // Subtract 1 because we don't want to count the start date itself
-  return Math.max(0, businessDays - 1);
-}
-
 /**
  * Calculate day index for today with offset applied (business days only)
  * @param {string} classId - The class ID
@@ -167,10 +124,9 @@ export async function getDateForDayIndex(dayIndex, classId, classStartDate = DEF
 export async function getDayDateLabels(dayIndex, classId, classStartDate = DEFAULT_CLASS_START_DATE) {
   const date = await getDateObjectForDayIndex(dayIndex, classId, classStartDate);
   const longWeekday = date.toLocaleDateString(undefined, { weekday: "long" });
-  const shortWeekday = date.toLocaleDateString(undefined, { weekday: "short" });
   return {
     full: `${date.toLocaleDateString()} (${longWeekday})`,
-    short: `${shortWeekday} ${date.getMonth() + 1}/${date.getDate()}`
+    short: shortDateLabel(date)
   };
 }
 

@@ -7,11 +7,11 @@
 
 **Blocked by:** 07 (Rename the student landing page), which sets the heading this ticket replaces; 06 (Keyboard navigation in search lists), the last earlier ticket that edits the shared stylesheet.
 
-**Status:** ready-for-agent
+**Status:** closed
 
-- [ ] Landing heading reads "<M/D> Do Nows" for the school day being listed, with no leading zeros and no year
-- [ ] On Saturday and Sunday the heading shows Friday's date, matching the Do Nows listed
-- [ ] The tab title stays "mrhsieh.app"; the loading text matches the new heading wording
-- [ ] Do Now page shows today's date at the top right, on the same row as the back link, on desktop and portrait phone
-- [ ] That row is more compact than before and the back link is still easy to tap
-- [ ] The date logic is a pure, tested helper shared by both pages (reusing the business-day code that already exists), not two copies
+- [x] Landing heading reads "<M/D> Do Nows" for the school day being listed, with no leading zeros and no year
+- [x] On Saturday and Sunday the heading shows Friday's date, matching the Do Nows listed
+- [x] The tab title stays "mrhsieh.app"; the loading text matches the new heading wording
+- [x] Do Now page shows today's date at the top right, on the same row as the back link, on desktop and portrait phone
+- [x] That row is more compact than before and the back link is still easy to tap
+- [x] The date logic is a pure, tested helper shared by both pages (reusing the business-day code that already exists), not two copies

@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { expectConsoleErrors } from '../helpers/quiet-console.js';
-import { getClassesWithTodaySchedule, renderClassList, loadAndRenderClasses, loadWithErrorHandling } from '../../landing.js';
+import {
+  getClassesWithTodaySchedule, renderClassList, renderDoNowsHeading, loadAndRenderClasses, loadWithErrorHandling,
+} from '../../landing.js';
 
 vi.mock('../../date-utils.js', () => ({
   getTodayDayIndex: vi.fn(async (classId) => ({ csa: 5, csp: 3 })[classId] ?? 0),
@@ -125,6 +127,26 @@ describe('landing', () => {
       renderClassList(container, [{ classId: 'csp', name: 'CS Principles', dayIndex: 3, schedule: [] }]);
 
       expect(container.children).toHaveLength(1);
+    });
+  });
+
+  describe('renderDoNowsHeading', () => {
+    it("names the listed school day's date, Friday's on a weekend", () => {
+      const heading = document.createElement('h1');
+      renderDoNowsHeading(heading, new Date(2026, 10, 14)); // Saturday
+      expect(heading.textContent).toBe('11/13 Do Nows');
+    });
+
+    it('defaults to the current date', () => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date(2026, 10, 11, 9));
+      try {
+        const heading = document.createElement('h1');
+        renderDoNowsHeading(heading);
+        expect(heading.textContent).toBe('11/11 Do Nows');
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 

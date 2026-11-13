@@ -3,6 +3,7 @@ import { ref, get } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-dat
 import { db } from './firebase-config.js';
 import { initializeDatabase } from './database-handle.js';
 import { getTodayDayIndex, primeDateOffsetCache } from './date-utils.js';
+import { doNowsHeading } from './school-day.js';
 import { showErrorState, showSlowConnectionMessage, withConnectionTimeout } from './error-ui-utils.js';
 
 
@@ -95,6 +96,17 @@ export function renderClassList(container, classesWithSchedule) {
 }
 
 /**
+ * Name the date of the school day whose Do Nows are listed, e.g.
+ * "11/11 Do Nows" (Friday's date on a weekend). Every Class shares it: a
+ * Date Offset shifts which Day Index is shown, not which calendar day.
+ * @param {HTMLElement} heading
+ * @param {Date} [today=new Date()]
+ */
+export function renderDoNowsHeading(heading, today = new Date()) {
+  heading.textContent = doNowsHeading(today);
+}
+
+/**
  * Fetch and render the class list into the given container, hiding the
  * loading state once data arrives.
  * @param {HTMLElement} container
@@ -144,5 +156,6 @@ export async function loadWithErrorHandling() {
 // element (i.e. index.html) - importing this module elsewhere (tests) never
 // triggers real Firebase/DOM side effects on its own.
 if (document.getElementById("class-list")) {
+  renderDoNowsHeading(document.getElementById("do-nows-heading"));
   loadWithErrorHandling();
 }

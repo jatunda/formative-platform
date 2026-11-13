@@ -2197,3 +2197,22 @@ ol.lesson-list {
     min-width: 0;
   }
 }
+
+/* ========================================
+   Do Now page header row: the back link on the left, today's date on the
+   right. Pulled up into the body padding and with a small gap below, so it
+   takes less height than a plain nav line; the link keeps its padded,
+   full-line-height tap area.
+   ======================================== */
+.do-now-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+  margin: calc(-1 * var(--spacing-sm)) 0 var(--spacing-xs);
+}
+
+.do-now-header time {
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
