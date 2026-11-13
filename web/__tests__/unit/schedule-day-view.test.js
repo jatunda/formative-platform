@@ -7,7 +7,9 @@ import {
   getLessonTitles,
   createEndButtonsContainer,
   createDateCell,
+  createActionsCell,
 } from '../../schedule-day-view.js';
+import { lineIcon } from '../../line-icons.js';
 import { initializeDatabase } from '../../database-handle.js';
 import { DEFAULT_LESSON_TITLE, UNTITLED_LESSON } from '../../constants.js';
 import { setupDragHandlers } from '../../drag-drop-utils.js';
@@ -124,8 +126,16 @@ describe('schedule-day-view', () => {
       const container = createEndButtonsContainer(2, { classId: 'class1', onReload });
       const buttons = [...container.querySelectorAll('button')];
 
-      expect(buttons.map(b => b.textContent)).toEqual(['➕', '🔗']);
       expect(buttons.map(b => b.title)).toEqual(['New Lesson', 'Link Lesson']);
+    });
+
+    it('New Lesson is still ➕; Link Lesson is the flat link icon', () => {
+      const container = createEndButtonsContainer(2, { classId: 'class1', onReload });
+
+      expect(byLabel(container, 'New Lesson').textContent).toBe('➕');
+      const link = byLabel(container, 'Link Lesson');
+      expect(link.textContent).toBe('');
+      expect(link.querySelector('svg').outerHTML).toBe(lineIcon('link', 'line-icon').outerHTML);
     });
 
     it('New Lesson creates an Empty Lesson and adds it to the end of that Day Index', async () => {
@@ -158,6 +168,35 @@ describe('schedule-day-view', () => {
       await mockSearchPopupOptions.onSelect('hashB');
 
       expect(mockData['schedule/class1/4']).toEqual(['hashB']);
+    });
+  });
+
+  describe('createActionsCell', () => {
+    it('Delete Day is the flat trash icon, its tooltip naming the day', () => {
+      const button = createActionsCell(3, vi.fn()).querySelector('button');
+
+      expect(button.className).toBe('delete-day-btn');
+      expect(button.title).toBe('Delete day 3');
+      expect(button.textContent).toBe('');
+      expect(button.querySelector('svg').outerHTML).toBe(lineIcon('trash', 'line-icon').outerHTML);
+    });
+
+    it('shows the saving spinner, not words, while a slow delete saves', async () => {
+      vi.useFakeTimers();
+      try {
+        let finish;
+        const button = createActionsCell(3, () => new Promise((r) => { finish = r; })).querySelector('button');
+
+        const done = button.onclick();
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(button.querySelector('svg').getAttribute('class')).toBe('line-icon line-icon-spin');
+
+        finish();
+        await done;
+        expect(button.querySelector('svg').getAttribute('class')).toBe('line-icon');
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 

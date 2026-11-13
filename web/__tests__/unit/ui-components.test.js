@@ -11,7 +11,9 @@ import {
   createDateOffsetControl,
   getShiftAmount,
   withWorkingIndicator,
+  savingSpinner,
 } from '../../ui-components.js';
+import { lineIcon } from '../../line-icons.js';
 
 describe('ui-components', () => {
   let popup;
@@ -53,6 +55,43 @@ describe('ui-components', () => {
       const onClick = vi.fn();
       createIconButton('🔗', 'Link Lesson', onClick).click();
       expect(onClick).toHaveBeenCalledTimes(1);
+    });
+
+    it('can show a flat line icon instead of text', () => {
+      const icon = lineIcon('link', 'line-icon');
+      const button = createIconButton(icon, 'Link Lesson', vi.fn());
+
+      expect(button.firstChild).toBe(icon);
+      expect(button.textContent).toBe('');
+      expect(button.getAttribute('aria-label')).toBe('Link Lesson');
+    });
+
+    it('shows the saving spinner in place of its icon while a slow change saves', async () => {
+      vi.useFakeTimers();
+      try {
+        const icon = lineIcon('link', 'line-icon');
+        let finish;
+        const button = createIconButton(icon, 'Link Lesson', () => new Promise((r) => { finish = r; }));
+
+        const done = button.onclick();
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(button.querySelector('svg').getAttribute('class')).toBe('line-icon line-icon-spin');
+
+        finish();
+        await done;
+        expect(button.firstChild).toBe(icon);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
+  describe('savingSpinner', () => {
+    it('is the flat spinner icon with the spinning class, a fresh element each time', () => {
+      const spinner = savingSpinner();
+      expect(spinner.getAttribute('class')).toBe('line-icon line-icon-spin');
+      expect(spinner.innerHTML).toBe(lineIcon('spinner', 'x').innerHTML);
+      expect(savingSpinner()).not.toBe(spinner);
     });
   });
 
@@ -365,6 +404,22 @@ describe('ui-components', () => {
 
       expect(btn.disabled).toBe(false);
       expect(btn.textContent).toBe('Do Thing');
+    });
+
+    it('can show an element as the working label, then puts the original contents back', async () => {
+      const icon = lineIcon('trash', 'line-icon');
+      btn.replaceChildren(icon);
+      let resolveOnClick;
+      const onClick = vi.fn(() => new Promise((resolve) => { resolveOnClick = resolve; }));
+      const wrapped = withWorkingIndicator(btn, onClick, { workingLabel: savingSpinner });
+
+      const promise = wrapped();
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(btn.querySelector('svg').getAttribute('class')).toBe('line-icon line-icon-spin');
+
+      resolveOnClick();
+      await promise;
+      expect([...btn.childNodes]).toEqual([icon]);
     });
 
     it('passes through arguments and the resolved value', async () => {

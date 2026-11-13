@@ -150,6 +150,30 @@ describe('lesson-manager', () => {
     });
   });
 
+  describe('saving a slow move', () => {
+    it("shows the spinner in the ⋮ button until the move saves, then the ⋮ again", async () => {
+      vi.useFakeTimers();
+      try {
+        let finish;
+        const el = cluster({ onMoveRight: () => new Promise((r) => { finish = r; }) });
+        const menuBtn = el.querySelector('[aria-haspopup="menu"]');
+        const glyph = menuBtn.textContent;
+        openMenu(el);
+        menuItem('Move right').click();
+
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(menuBtn.querySelector('svg').getAttribute('class')).toBe('line-icon line-icon-spin');
+
+        finish();
+        await vi.advanceTimersByTimeAsync(0);
+        expect(menuBtn.querySelector('svg')).toBeNull();
+        expect(menuBtn.textContent).toBe(glyph);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
   describe('createLessonClusterWithDB', () => {
     function dbCluster(overrides = {}) {
       const onScheduleReload = vi.fn();

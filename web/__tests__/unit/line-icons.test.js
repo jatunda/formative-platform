@@ -19,6 +19,11 @@ describe('lineIcon', () => {
       + '<path d="M14 4h6v6M20 4l-9 9"></path>');
   });
 
+  it('draws link as two interlocking chain loops and spinner as an open arc', () => {
+    expect(lineIcon('link', 'line-icon').querySelectorAll('path')).toHaveLength(2);
+    expect(lineIcon('spinner', 'line-icon').innerHTML).toBe('<path d="M12 3a9 9 0 1 0 9 9"></path>');
+  });
+
   it('gives each call its own element', () => {
     expect(lineIcon('check', 'a')).not.toBe(lineIcon('check', 'a'));
   });

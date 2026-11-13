@@ -4,7 +4,7 @@
  */
 
 import { DEFAULT_LESSON_TITLE } from './constants.js';
-import { withWorkingIndicator } from './ui-components.js';
+import { savingSpinner, withWorkingIndicator } from './ui-components.js';
 import { createMenuButton } from './action-menu.js';
 import { setupDragHandlers } from './drag-drop-utils.js';
 import { moveLessonBetweenDays, updateScheduleForDay } from './database-utils.js';
@@ -72,8 +72,8 @@ export function createLessonCluster({
   mainBtn.onclick = onClick;
 
   // The items are built when the menu opens, by which point menuBtn exists;
-  // it shows an hourglass while a slow move is saving.
-  const run = (fn) => withWorkingIndicator(menuBtn, fn, { workingLabel: "⏳" });
+  // it shows a spinner while a slow move is saving.
+  const run = (fn) => withWorkingIndicator(menuBtn, fn, { workingLabel: savingSpinner });
   const menuBtn = createMenuButton(`Actions for ${title}`, () => [
     { label: "Move left", disabled: lessonIndex === 0, onSelect: run(onMoveLeft) },
     { label: "Move right", disabled: lessonIndex === lessons.length - 1, onSelect: run(onMoveRight) },

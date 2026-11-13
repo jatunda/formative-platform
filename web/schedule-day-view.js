@@ -11,8 +11,10 @@ import { DEFAULT_LESSON_TITLE, UNTITLED_LESSON } from './constants.js';
 import {
   createIconButton,
   createInsertDayButton,
+  savingSpinner,
   withWorkingIndicator
 } from './ui-components.js';
+import { lineIcon } from './line-icons.js';
 import { createLessonClusterWithDB } from './lesson-manager.js';
 import { setupDropHandlers } from './drag-drop-utils.js';
 import { showLessonSearchPopup } from './lesson-search.js';
@@ -124,10 +126,11 @@ export function createActionsCell(dayIndex, onDeleteDay) {
   tdActions.className = "day-actions-cell";
 
   const deleteButton = document.createElement("button");
-  deleteButton.textContent = "🗑️";
+  deleteButton.appendChild(lineIcon("trash", "line-icon"));
   deleteButton.className = "delete-day-btn";
   deleteButton.title = `Delete day ${dayIndex}`;
-  deleteButton.onclick = withWorkingIndicator(deleteButton, () => onDeleteDay(dayIndex));
+  deleteButton.onclick = withWorkingIndicator(deleteButton, () => onDeleteDay(dayIndex),
+    { workingLabel: savingSpinner });
   tdActions.appendChild(deleteButton);
 
   return tdActions;
@@ -145,7 +148,7 @@ async function appendLessonToDay(lessonId, dayIndex, ctx) {
 }
 
 /**
- * Create the side-by-side New Lesson (➕) / Link Lesson (🔗) icon buttons
+ * Create the side-by-side New Lesson (➕) / Link Lesson (link icon) buttons
  * that follow a day's last Lesson.
  * @param {number} dayIndex
  * @param {{classId: string, onReload: () => void}} ctx
@@ -160,7 +163,7 @@ export function createEndButtonsContainer(dayIndex, ctx) {
     await appendLessonToDay(lessonId, dayIndex, ctx);
   });
 
-  const linkBtn = createIconButton("🔗", "Link Lesson", () => {
+  const linkBtn = createIconButton(lineIcon("link", "line-icon"), "Link Lesson", () => {
     showLessonSearchPopup({
       onSelect: (lessonId) => appendLessonToDay(lessonId, dayIndex, ctx)
     });

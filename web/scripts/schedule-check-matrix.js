@@ -53,7 +53,7 @@ export const TAP_EXCEPTIONS = [
     selector: '.schedule-icon-btn',
     minWidth: 40,
     maxViewportWidth: 600,
-    reason: '➕ New Lesson and 🔗 Link Lesson: 40px wide on a phone so a one-Lesson day fits 375px (ticket 02).',
+    reason: '➕ New Lesson and Link Lesson: 40px wide on a phone so a one-Lesson day fits 375px (ticket 02).',
   },
 ];
 
@@ -133,7 +133,7 @@ export const KNOWN_FAILURES = [
     failure: 'tap target "Delete day ',
     touch: true,
     maxWidth: 600,
-    note: 'The 🗑 Delete Day button is about 29px wide on a phone; a wider one would squeeze the Lessons column (ticket 02).',
+    note: 'The Delete Day (trash icon) button is about 29px wide on a phone; a wider one would squeeze the Lessons column (ticket 02).',
   },
   {
     failure: 'color-contrast: 1 node(s)',
@@ -147,7 +147,7 @@ export const KNOWN_FAILURES = [
   },
   {
     failure: 'empty-table-header:',
-    note: 'The day actions column (🗑) has an empty header cell: accepted by Eric (a header word would widen the column for no gain).',
+    note: 'The day actions column (Delete Day) has an empty header cell: accepted by Eric (a header word would widen the column for no gain).',
   },
 ];
 
