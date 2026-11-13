@@ -141,14 +141,24 @@ function processMarkdownLinks(text) {
     return text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="lesson-link">$1</a>');
 }
 
+/** Backtick-enclosed inline code span. */
+const INLINE_CODE_PATTERN = /`([^`]+)`/g;
+
 /**
- * Process inline code formatting with backticks, escaping HTML to prevent XSS
- * Processes text in order: HTML escape, links, text formatting, then code blocks
+ * Stands in for an inline code span while links and formatting run: a
+ * Private Use Area character, which no link or formatting pattern matches.
+ */
+const CODE_SPAN_PLACEHOLDER = /(\d+)/g;
+
+/**
+ * Process inline formatting, escaping HTML to prevent XSS.
+ * Order: HTML escape, set inline code spans aside, links, text formatting,
+ * then put the code spans back - so text inside backticks renders exactly
+ * as typed (no links, bold or italic inside it).
  * @param {string} text - The text to process
  * @returns {string} The HTML formatted text with code tags
  */
 function processInlineCode(text, headingIds = new Map()) {
-	// Escape HTML to prevent XSS, then process backticks
 	const escaped = text
 		.replace(/&/g, '&amp;')
 		.replace(/</g, '&lt;')
@@ -156,13 +166,18 @@ function processInlineCode(text, headingIds = new Map()) {
 		.replace(/"/g, '&quot;')
 		.replace(/'/g, '&#39;');
 
-	// Process in order: Page/Section Links, plain links, text formatting, then code
-	const withPageLinks = processPageAndSectionLinks(escaped, headingIds);
+	/** @type {string[]} */
+	const codeSpans = [];
+	const withoutCode = escaped.replace(INLINE_CODE_PATTERN, (_match, code) => {
+		codeSpans.push(code);
+		return `${codeSpans.length - 1}`;
+	});
+
+	const withPageLinks = processPageAndSectionLinks(withoutCode, headingIds);
 	const withLinks = processMarkdownLinks(withPageLinks);
 	const withFormatting = processTextFormatting(withLinks);
 
-	// Replace backtick-enclosed text with <code> tags
-	return withFormatting.replace(/`([^`]+)`/g, '<code>$1</code>');
+	return withFormatting.replace(CODE_SPAN_PLACEHOLDER, (_match, index) => `<code>${codeSpans[Number(index)]}</code>`);
 }
 
 /**
@@ -192,7 +207,11 @@ function processInlineCode(text, headingIds = new Map()) {
 function expandQuestionLinkLines(rawLines) {
 	const expanded = [];
 	for (const rawLine of rawLines) {
-		const matches = [...rawLine.matchAll(QUESTION_LINK_PATTERN)];
+		// A Question Link typed inside backticks is literal code, not an embed.
+		const codeSpans = [...rawLine.matchAll(INLINE_CODE_PATTERN)]
+			.map((span) => [span.index, span.index + span[0].length]);
+		const matches = [...rawLine.matchAll(QUESTION_LINK_PATTERN)]
+			.filter((match) => !codeSpans.some(([start, end]) => match.index >= start && match.index < end));
 		if (matches.length === 0) {
 			expanded.push(rawLine);
 			continue;
