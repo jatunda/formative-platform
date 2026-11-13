@@ -66,8 +66,9 @@ export function extractPageLinkSlugs(parsedContent) {
  * touching an unrelated slug that happens to share a prefix (e.g. renaming
  * "syllabus" must not touch "syllabus-2026") - Slugs are validated to
  * lowercase-alphanumeric-and-hyphens only, so no regex escaping is needed.
- * Links written as inline code or in code blocks are examples, not links,
- * and stay as written. Returns a new content object; does not mutate the input. Used by Slug
+ * Code blocks are code items, which were never rewritten; a link written as
+ * inline code in a text item is an example too, so it is now skipped as well.
+ * Returns a new content object; does not mutate the input. Used by Slug
  * Rename to fix up every Page that links to the renamed Page.
  * @param {{title: string, blocks: Array}} parsedContent
  * @param {string} oldSlug

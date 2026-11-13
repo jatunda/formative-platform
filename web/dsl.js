@@ -1,9 +1,15 @@
+/** One quote marker, `>` and an optional space, as regex source. */
+const QUOTE_MARKER = String.raw`\s*>(?!>>) ?`;
+
 /**
  * A blockquote line: `> text`. A line starting `>>>` is a collapsible marker
  * (parseDSL takes those before they reach a text item), so it never starts a
  * quote, and one inside a quote (`> >>> x`) stays literal text.
  */
-export const QUOTE_LINE_PATTERN = /^\s*>(?!>>) ?(.*)$/;
+export const QUOTE_LINE_PATTERN = new RegExp(String.raw`^${QUOTE_MARKER}(.*)$`);
+
+/** Every leading quote marker on a line, nested ones (`>> `) included. */
+export const QUOTE_PREFIX_PATTERN = new RegExp(String.raw`^(?:${QUOTE_MARKER})+`);
 
 /**
  * Content item type for a blank line between two quote lines: it splits them

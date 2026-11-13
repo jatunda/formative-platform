@@ -5,10 +5,7 @@ import { CONTENT_NOT_FOUND } from './constants.js';
 import { PAGE_LINK_PATTERN, parsePageLinkMatch } from './page-links.js';
 import { QUESTION_LINK_PATTERN, parseQuestionLinkMatch } from './question-links.js';
 import { INLINE_CODE_PATTERN, matchAllOutsideInlineCode } from './inline-code.js';
-import { QUOTE_LINE_PATTERN } from './dsl.js';
-
-/** Every leading quote marker on a line, nested ones (`>> `) included. */
-const QUOTE_PREFIX_PATTERN = /^(\s*>(?!>>) ?)+/;
+import { QUOTE_LINE_PATTERN, QUOTE_PREFIX_PATTERN, QUOTE_BREAK } from './dsl.js';
 
 /**
  * Turn heading text into a URL-safe id fragment for Section Link targets.
@@ -172,13 +169,13 @@ function toggleSpoiler(spoiler) {
 }
 
 /**
- * Whether this click came from a pointer that hovered first (a mouse), so
+ * Whether this click came from a pointer that can hover (a mouse), so
  * a hidden spoiler has already shown itself (style.css reveals on :hover).
  * A touch tap never hovered, even on a laptop with a touch screen.
  * @param {MouseEvent} event
  * @param {Document} doc
  */
-function clickFollowedHover(event, doc) {
+function pointerCanHover(event, doc) {
 	if (/** @type {PointerEvent} */ (event).pointerType === 'touch') return false;
 	return /** @type {Window} */ (doc.defaultView).matchMedia('(hover: hover)').matches;
 }
@@ -201,7 +198,7 @@ function installSpoilerToggle(doc) {
 		const onLink = target.closest('a') !== null;
 		// A link inside a revealed spoiler works as normal, and so does one
 		// clicked with a mouse: hovering has already shown the text.
-		if (onLink && (spoiler.classList.contains('spoiler-revealed') || clickFollowedHover(event, doc))) return;
+		if (onLink && (spoiler.classList.contains('spoiler-revealed') || pointerCanHover(event, doc))) return;
 		// A tap on a link inside a hidden spoiler reveals it rather than
 		// following the link, since a touch screen couldn't show it first;
 		// one in a Question option's <label> or a collapsible's <summary>
@@ -321,7 +318,7 @@ const CALLOUT_ICONS = new Map([
 /**
  * Split text items into runs of plain lines and runs of quote lines, so
  * consecutive `>` lines become one quote item even though parseDSL stores
- * each line as its own text item. Code, collapsible and quote break items
+ * each line as its own text item. Code, collapsible and QUOTE_BREAK items
  * pass through, so a quote line after a quote break starts a new quote.
  * @param {Array<Object>} contentItems
  * @returns {Array<Object>} items, where `{type: "quote", lines}` holds a quote's lines with the `>` removed
@@ -406,6 +403,8 @@ function renderContentItems(contentItems, containerEl, headingIds = new Map(), h
 	let indentUnit = null;
 
 	groupQuoteLines(contentItems).forEach(item => {
+		// A quote break only splits two quotes (groupQuoteLines); it shows nothing.
+		if (item.type === QUOTE_BREAK) return;
 		if (item.type === "quote") {
 			listStack.length = 0;
 			indentUnit = null;

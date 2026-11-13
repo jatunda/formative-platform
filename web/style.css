@@ -394,31 +394,36 @@ a:not(.class-link):not(.schedule-action-btn):hover {
   transition: background-color var(--transition-fast), color var(--transition-fast);
 }
 
-/* Hidden state. Touch screens skip :hover, which sticks after a tap and
-   would stop a second tap from hiding the spoiler again. */
-@media (hover: none) {
-  .spoiler:not(.spoiler-revealed):not(:focus-visible):not(:has(:focus-visible)) {
-    background-color: var(--text-secondary);
-    color: transparent;
+/* Hidden state: not toggled open, and no keyboard focus on it or inside it.
+   Devices that can hover also show it while hovered; touch screens skip
+   :hover, which sticks after a tap and would stop a second tap from hiding
+   the spoiler again. The cover goes on the spoiler itself; what's inside
+   it (links, inline code) turns transparent. */
+.spoiler:not(.spoiler-revealed):not(:focus-visible):not(:has(:focus-visible)) {
+  @media (hover: none) {
+    & {
+      background-color: var(--text-secondary);
+      color: transparent;
+    }
+
+    & * {
+      color: transparent;
+      background-color: transparent;
+      border-color: transparent;
+    }
   }
 
-  .spoiler:not(.spoiler-revealed):not(:focus-visible):not(:has(:focus-visible)) * {
-    color: transparent;
-    background-color: transparent;
-    border-color: transparent;
-  }
-}
+  @media (hover: hover) {
+    &:not(:hover) {
+      background-color: var(--text-secondary);
+      color: transparent;
+    }
 
-@media (hover: hover) {
-  .spoiler:not(.spoiler-revealed):not(:focus-visible):not(:has(:focus-visible)):not(:hover) {
-    background-color: var(--text-secondary);
-    color: transparent;
-  }
-
-  .spoiler:not(.spoiler-revealed):not(:focus-visible):not(:has(:focus-visible)):not(:hover) * {
-    color: transparent;
-    background-color: transparent;
-    border-color: transparent;
+    &:not(:hover) * {
+      color: transparent;
+      background-color: transparent;
+      border-color: transparent;
+    }
   }
 }
 
