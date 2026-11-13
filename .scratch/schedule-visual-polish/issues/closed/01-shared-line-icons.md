@@ -4,7 +4,7 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** closed
 
-- [ ] The clock's icons come from the shared module and look the same
-- [ ] `npm run check:clock` passes
+- [x] The clock's icons come from the shared module and look the same
+- [x] `npm run check:clock` passes
