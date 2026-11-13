@@ -2195,8 +2195,9 @@ ol.lesson-list {
 /* ========================================
    Do Now page header row: the back link on the left, today's date on the
    right. Pulled up into the body padding and with a small gap below, so it
-   takes less height than a plain nav line; the link keeps its padded,
-   full-line-height tap area.
+   takes less height than a plain nav line. The link's tap area reaches
+   past its box (an invisible ::before) to the 44px touch minimum, so the
+   row stays short and the underline stays put.
    ======================================== */
 .do-now-header {
   display: flex;
@@ -2204,6 +2205,16 @@ ol.lesson-list {
   justify-content: space-between;
   gap: var(--spacing-md);
   margin: calc(-1 * var(--spacing-sm)) 0 var(--spacing-xs);
+}
+
+.do-now-header a {
+  position: relative;
+}
+
+.do-now-header a::before {
+  content: "";
+  position: absolute;
+  inset: calc(-1 * var(--spacing-sm)) 0;
 }
 
 .do-now-header time {
