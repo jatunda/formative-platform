@@ -4,11 +4,11 @@
 
 **Blocked by:** None (can start immediately; touches only the landing page's HTML)
 
-**Status:** ready-for-agent
+**Status:** closed
 
-- [ ] Tab title is "mrhsieh.app"
-- [ ] Heading is "Today's Do Now"
-- [ ] The loading text matches ("Loading today's Do Now...")
+- [x] Tab title is "mrhsieh.app"
+- [x] Heading is "Today's Do Now"
+- [x] The loading text matches ("Loading today's Do Now...")
 
 ## Comments
 
