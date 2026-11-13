@@ -27,6 +27,7 @@ import { showQuestionLinkPicker } from "./question-link-picker.js";
 
 import { NO_CONTENT_SELECTED, UNTITLED_LESSON, UNTITLED_LESSON_LOWERCASE, CONTENT_NOT_FOUND } from './constants.js';
 import { showNotification } from './notification-utils.js';
+import { showConfirm } from './confirm-dialog.js';
 
 // Database is imported from centralized firebase-config.js
 
@@ -180,12 +181,12 @@ export function updateUnsavedIndicator(indicatorEl, isDirty) {
 /**
  * Gate an in-app action that would discard the current unsaved edits (e.g.
  * switching to a different lesson). Returns true immediately when there's
- * nothing to lose; otherwise asks via the native confirm dialog.
+ * nothing to lose; otherwise asks in the in-app confirm dialog.
  * @param {boolean} isDirty
- * @returns {boolean} Whether it's safe to proceed
+ * @returns {Promise<boolean>} Whether it's safe to proceed
  */
-export function confirmDiscardUnsavedChanges(isDirty) {
-  return !isDirty || confirm("You have unsaved changes. Discard them and continue?");
+export async function confirmDiscardUnsavedChanges(isDirty) {
+  return !isDirty || showConfirm({ message: "You have unsaved changes. Discard them and continue?", confirmLabel: "Discard" });
 }
 
 /**
@@ -329,7 +330,8 @@ export async function deleteLesson(id, dslText) {
 
   try {
     const uses = await lessons.findScheduleUses(id);
-    if (!confirm(deleteLessonConfirmMessage(title, id, uses))) return false;
+    const confirmed = await showConfirm({ title: "Delete Lesson", message: deleteLessonConfirmMessage(title, id, uses), confirmLabel: "Delete" });
+    if (!confirmed) return false;
 
     await lessons.delete(id);
     showNotification("Lesson deleted.", "success");
@@ -484,7 +486,7 @@ export async function main() {
   searchLessonBtn.onclick = () => {
     showLessonSearchPopup({
       onSelect: async (lessonId) => {
-        if (!confirmDiscardUnsavedChanges(isDirty)) return;
+        if (!(await confirmDiscardUnsavedChanges(isDirty))) return;
 
         for (let i = 0; i < existingContentSelect.options.length; i++) {
           if (existingContentSelect.options[i].value === lessonId) {
@@ -548,7 +550,7 @@ export async function main() {
   };
 
   existingContentSelect.onchange = async () => {
-    if (!confirmDiscardUnsavedChanges(isDirty)) {
+    if (!(await confirmDiscardUnsavedChanges(isDirty))) {
       existingContentSelect.value = previousSelectedValue;
       return;
     }

@@ -72,7 +72,12 @@ vi.mock('../../question-database-utils.js', () => ({
 }));
 
 global.alert = vi.fn();
+const mockShowConfirm = vi.fn(async () => true);
+vi.mock('../../confirm-dialog.js', () => ({ showConfirm: (...args) => mockShowConfirm(...args) }));
 global.confirm = vi.fn(() => true);
+/** Expect the in-app confirm dialog to have asked with a message containing `text`. */
+const expectAskedWith = (text) =>
+  expect(mockShowConfirm).toHaveBeenCalledWith(expect.objectContaining({ message: expect.stringContaining(text) }));
 global.prompt = vi.fn();
 
 function renderEditorDom() {
@@ -114,7 +119,7 @@ describe('question-editor', () => {
     mockParseQuestionDSL.mockReset().mockReturnValue(SAMPLE_PARSED);
     mockValidateQuestionDSL.mockReset().mockReturnValue(null);
     global.alert.mockClear();
-    global.confirm.mockReturnValue(true);
+    mockShowConfirm.mockResolvedValue(true);
     global.prompt.mockReset();
 
     Object.defineProperty(window, 'location', {
@@ -237,12 +242,13 @@ describe('question-editor', () => {
         document.getElementById('deleteBtn').onclick();
         await new Promise((resolve) => setTimeout(resolve, 0));
 
+        expectAskedWith('Are you sure you want to delete this question?\n\nThis also removes every Question Link pointing to it. This action cannot be undone.');
         expect(mockDeleteQuestionAndSlugs).toHaveBeenCalledWith('abc123');
         expect(window.location.href).toContain('question-bank-manager.html');
       });
 
       it('does nothing when the teacher cancels the confirmation', async () => {
-        global.confirm.mockReturnValue(false);
+        mockShowConfirm.mockResolvedValue(false);
         await main();
 
         document.getElementById('deleteBtn').onclick();
@@ -258,7 +264,7 @@ describe('question-editor', () => {
         document.getElementById('deleteBtn').onclick();
         await new Promise((resolve) => setTimeout(resolve, 0));
 
-        expect(global.confirm).toHaveBeenCalledWith(expect.stringContaining('1 page currently links'));
+        expectAskedWith('1 page currently links');
       });
 
       it('mentions multiple affected pages in the plural when deleting with more than one backlink', async () => {
@@ -268,7 +274,7 @@ describe('question-editor', () => {
         document.getElementById('deleteBtn').onclick();
         await new Promise((resolve) => setTimeout(resolve, 0));
 
-        expect(global.confirm).toHaveBeenCalledWith(expect.stringContaining('2 pages currently link'));
+        expectAskedWith('2 pages currently link');
       });
     });
 
@@ -324,13 +330,13 @@ describe('question-editor', () => {
         document.querySelector('#slugList .delete-btn').onclick();
         await new Promise((resolve) => setTimeout(resolve, 0));
 
-        expect(global.confirm).toHaveBeenCalledWith(expect.stringContaining('[[q:loops-1]]'));
+        expectAskedWith('[[q:loops-1]]');
         expect(mockRemoveQuestionSlug).toHaveBeenCalledWith('loops-1');
       });
 
       it('does not remove a slug when the confirmation is cancelled', async () => {
         mockGetAllQuestionSlugs.mockResolvedValue({ 'loops-1': 'abc123' });
-        global.confirm.mockReturnValue(false);
+        mockShowConfirm.mockResolvedValue(false);
         await main();
 
         document.querySelector('#slugList .delete-btn').onclick();
