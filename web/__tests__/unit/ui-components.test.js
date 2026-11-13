@@ -4,13 +4,10 @@ import {
   createIconButton,
   createCloseButton,
   createArrowButton,
-  createDeleteButton,
   createInsertDayButton,
   createElement,
   createUpArrowButton,
   createDownArrowButton,
-  createLeftArrowButton,
-  createRightArrowButton,
   createDateOffsetControl,
   withWorkingIndicator,
 } from '../../ui-components.js';
@@ -101,24 +98,6 @@ describe('ui-components', () => {
     });
   });
 
-  describe('createDeleteButton', () => {
-    it('should create button with trash icon', () => {
-      const onClick = vi.fn();
-      const button = createDeleteButton(onClick);
-      
-      expect(button.textContent).toBe('🗑️');
-      expect(button.className).toBe('schedule-action-btn delete-btn');
-    });
-
-    it('should call onClick when clicked', () => {
-      const onClick = vi.fn();
-      const button = createDeleteButton(onClick);
-      
-      button.click();
-      expect(onClick).toHaveBeenCalledTimes(1);
-    });
-  });
-
   describe('createInsertDayButton', () => {
     it('should create button with correct text', () => {
       const insertFn = vi.fn();
@@ -176,28 +155,6 @@ describe('ui-components', () => {
       const button = createDownArrowButton(onClick);
       
       expect(button.textContent).toBe('↓');
-      expect(button.style.width).toBe('auto');
-    });
-  });
-
-  describe('createLeftArrowButton', () => {
-    it('should create button with left arrow and respect disabled state', () => {
-      const onClick = vi.fn();
-      const button = createLeftArrowButton(true, onClick);
-      
-      expect(button.textContent).toBe('←');
-      expect(button.disabled).toBe(true);
-      expect(button.style.width).toBe('auto');
-    });
-  });
-
-  describe('createRightArrowButton', () => {
-    it('should create button with right arrow and respect disabled state', () => {
-      const onClick = vi.fn();
-      const button = createRightArrowButton(false, onClick);
-      
-      expect(button.textContent).toBe('→');
-      expect(button.disabled).toBe(false);
       expect(button.style.width).toBe('auto');
     });
   });

@@ -99,19 +99,6 @@ export function createArrowButton(direction, isDisabled, onClick) {
 }
 
 /**
- * Create a delete button with trash icon
- * @param {() => void} onClick - The click handler function
- * @returns {HTMLButtonElement} The created button element
- */
-export function createDeleteButton(onClick) {
-  const btn = document.createElement("button");
-  btn.textContent = "🗑️";
-  btn.className = "schedule-action-btn delete-btn";
-  btn.onclick = withWorkingIndicator(btn, onClick);
-  return btn;
-}
-
-/**
  * Create an "Insert Day Here" button
  * @param {number} dayIndex - The day index where the new day should be inserted
  * @param {(dayIndex: number) => void} insertFunction - Function to insert the day
@@ -163,38 +150,6 @@ export function createUpArrowButton(onClick) {
 export function createDownArrowButton(onClick) {
   const btn = createArrowButton("down", false, onClick);
   btn.textContent = "↓";
-  // Minimize width to fit content only
-  btn.style.width = "auto";
-  btn.style.minWidth = "auto";
-  btn.style.maxWidth = "none";
-  btn.style.padding = "4px 8px";
-  return btn;
-}
-
-/**
- * Create a button with left arrow (←) with minimized width
- * @param {boolean} isDisabled - Whether the button should be disabled
- * @param {() => void} onClick - The click handler function
- * @returns {HTMLButtonElement} The created button element with left arrow
- */
-export function createLeftArrowButton(isDisabled, onClick) {
-  const btn = createArrowButton("left", isDisabled, onClick);
-  // Minimize width to fit content only
-  btn.style.width = "auto";
-  btn.style.minWidth = "auto";
-  btn.style.maxWidth = "none";
-  btn.style.padding = "4px 8px";
-  return btn;
-}
-
-/**
- * Create a button with right arrow (→) with minimized width
- * @param {boolean} isDisabled - Whether the button should be disabled
- * @param {() => void} onClick - The click handler function
- * @returns {HTMLButtonElement} The created button element with right arrow
- */
-export function createRightArrowButton(isDisabled, onClick) {
-  const btn = createArrowButton("right", isDisabled, onClick);
   // Minimize width to fit content only
   btn.style.width = "auto";
   btn.style.minWidth = "auto";

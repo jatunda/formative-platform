@@ -5,18 +5,16 @@
 
 import { ref, set } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js";
 import { DEFAULT_LESSON_TITLE } from './constants.js';
-import {
-  createLeftArrowButton,
-  createRightArrowButton,
-  createDeleteButton
-} from './ui-components.js';
-import {
-  setupDragHandlers
-} from './drag-drop-utils.js';
+import { withWorkingIndicator } from './ui-components.js';
+import { createMenuButton } from './action-menu.js';
+import { setupDragHandlers } from './drag-drop-utils.js';
+import { moveLessonBetweenDays } from './database-utils.js';
 import { getDb } from './database-handle.js';
 
 /**
- * Create a lesson cluster UI component with drag-and-drop support
+ * Create a lesson cluster: one row holding the Lesson's title button and a ⋮
+ * button whose menu moves or removes this placement. Drag-and-drop still
+ * moves it between days on a mouse; the menu is the touch way (ADR 0003).
  * @param {Object} options - Configuration options
  * @param {string} options.lessonHash - The lesson hash/ID
  * @param {number} options.dayIndex - The day index
@@ -24,9 +22,11 @@ import { getDb } from './database-handle.js';
  * @param {string[]} options.lessons - Array of all lesson hashes for this day
  * @param {string} options.lessonTitle - The lesson title to display
  * @param {string} options.classId - The current class ID
- * @param {Function} options.onMoveLeft - Callback when left arrow is clicked
- * @param {Function} options.onMoveRight - Callback when right arrow is clicked
- * @param {Function} options.onDelete - Callback when delete button is clicked
+ * @param {Function} options.onMoveLeft - Move left (earlier in the day)
+ * @param {Function} options.onMoveRight - Move right (later in the day)
+ * @param {Function} options.onMoveToPreviousDay - Move to the end of the previous Day Index
+ * @param {Function} options.onMoveToNextDay - Move to the end of the next Day Index
+ * @param {Function} options.onRemove - Remove this placement (the Lesson itself stays)
  * @param {Function} options.onClick - Callback when main lesson button is clicked
  * @returns {HTMLElement} The lesson cluster element
  */
@@ -39,7 +39,9 @@ export function createLessonCluster({
   classId,
   onMoveLeft,
   onMoveRight,
-  onDelete,
+  onMoveToPreviousDay,
+  onMoveToNextDay,
+  onRemove,
   onClick
 }) {
   const cluster = document.createElement("span");
@@ -59,33 +61,29 @@ export function createLessonCluster({
     classId
   });
 
-  // Top row: Main lesson button
-  const topRow = document.createElement("div");
-  topRow.className = "lesson-cluster-top";
+  const title = lessonTitle || DEFAULT_LESSON_TITLE;
+
+  const row = document.createElement("div");
+  row.className = "lesson-cluster-row";
+
   const mainBtn = document.createElement("button");
-  mainBtn.textContent = lessonTitle || DEFAULT_LESSON_TITLE;
+  mainBtn.textContent = title;
   mainBtn.className = "schedule-action-btn lesson-main-btn";
   mainBtn.onclick = onClick;
-  topRow.appendChild(mainBtn);
 
-  // Bottom row: left, right, delete
-  const bottomRow = document.createElement("div");
-  bottomRow.className = "lesson-cluster-bottom";
+  // The items are built when the menu opens, by which point menuBtn exists;
+  // it shows an hourglass while a slow move is saving.
+  const run = (fn) => withWorkingIndicator(menuBtn, fn, { workingLabel: "⏳" });
+  const menuBtn = createMenuButton(`Actions for ${title}`, () => [
+    { label: "Move left", disabled: lessonIndex === 0, onSelect: run(onMoveLeft) },
+    { label: "Move right", disabled: lessonIndex === lessons.length - 1, onSelect: run(onMoveRight) },
+    { label: "Move to previous day", disabled: dayIndex === 0, onSelect: run(onMoveToPreviousDay) },
+    { label: "Move to next day", onSelect: run(onMoveToNextDay) },
+    { label: "Remove from this day", onSelect: run(onRemove) }
+  ]);
 
-  // Left arrow
-  const leftBtn = createLeftArrowButton(lessonIndex === 0, onMoveLeft);
-  bottomRow.appendChild(leftBtn);
-
-  // Right arrow
-  const rightBtn = createRightArrowButton(lessonIndex === lessons.length - 1, onMoveRight);
-  bottomRow.appendChild(rightBtn);
-
-  // Delete button
-  const delBtn = createDeleteButton(onDelete);
-  bottomRow.appendChild(delBtn);
-
-  cluster.appendChild(topRow);
-  cluster.appendChild(bottomRow);
+  row.append(mainBtn, menuBtn);
+  cluster.appendChild(row);
 
   return cluster;
 }
@@ -101,7 +99,7 @@ export function createLessonCluster({
  * @param {string} options.lessonTitle - The lesson title to display
  * @param {string} options.classId - The current class ID
  * @param {Function} options.onScheduleReload - Callback to reload the schedule after changes
- * @param {Function} options.onLessonClick - Callback when lesson is clicked (optional)
+ * @param {Function} [options.onLessonClick] - Callback when lesson is clicked (optional)
  * @returns {HTMLElement} The lesson cluster element
  */
 export function createLessonClusterWithDB({
@@ -119,6 +117,27 @@ export function createLessonClusterWithDB({
     window.location.href = `editor.html?page=${lessonHash}&fromClass=${classId}`;
   };
 
+  const writeDay = async (newLessons) => {
+    await set(ref(getDb(), `schedule/${classId}/${dayIndex}`), newLessons);
+    onScheduleReload();
+  };
+
+  /** Swap this Lesson with its neighbour `step` places away (-1 or +1). */
+  const swap = (step) => () => {
+    const newLessons = [...lessons];
+    const other = lessonIndex + step;
+    [newLessons[other], newLessons[lessonIndex]] = [newLessons[lessonIndex], newLessons[other]];
+    return writeDay(newLessons);
+  };
+
+  // Appends to the end of the target day, same as a drag-and-drop move; it
+  // reads that day from the database, so it works for a Day Index outside
+  // the visible Planning Window too.
+  const moveToDay = (step) => async () => {
+    await moveLessonBetweenDays(classId, dayIndex, lessonIndex, dayIndex + step);
+    onScheduleReload();
+  };
+
   return createLessonCluster({
     lessonHash,
     dayIndex,
@@ -126,31 +145,11 @@ export function createLessonClusterWithDB({
     lessons,
     lessonTitle,
     classId,
-    onMoveLeft: async () => {
-      if (lessonIndex > 0) {
-        const dayRef = ref(getDb(), `schedule/${classId}/${dayIndex}`);
-        const newLessons = [...lessons];
-        [newLessons[lessonIndex - 1], newLessons[lessonIndex]] = [newLessons[lessonIndex], newLessons[lessonIndex - 1]];
-        await set(dayRef, newLessons);
-        onScheduleReload();
-      }
-    },
-    onMoveRight: async () => {
-      if (lessonIndex < lessons.length - 1) {
-        const dayRef = ref(getDb(), `schedule/${classId}/${dayIndex}`);
-        const newLessons = [...lessons];
-        [newLessons[lessonIndex], newLessons[lessonIndex + 1]] = [newLessons[lessonIndex + 1], newLessons[lessonIndex]];
-        await set(dayRef, newLessons);
-        onScheduleReload();
-      }
-    },
-    onDelete: async () => {
-      const dayRef = ref(getDb(), `schedule/${classId}/${dayIndex}`);
-      const newLessons = lessons.filter((_, idx) => idx !== lessonIndex);
-      await set(dayRef, newLessons);
-      onScheduleReload();
-    },
+    onMoveLeft: swap(-1),
+    onMoveRight: swap(1),
+    onMoveToPreviousDay: moveToDay(-1),
+    onMoveToNextDay: moveToDay(1),
+    onRemove: () => writeDay(lessons.filter((_, idx) => idx !== lessonIndex)),
     onClick: onLessonClick || defaultOnClick
   });
 }
-

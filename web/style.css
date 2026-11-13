@@ -202,17 +202,6 @@ button:focus-visible {
   opacity: 0.6;
 }
 
-.lesson-cluster-bottom .delete-btn {
-  width: auto !important;
-  min-width: auto !important;
-  max-width: none !important;
-  padding: 2px 6px !important;
-  font-size: 11px !important;
-  height: auto !important;
-  min-height: auto !important;
-  line-height: 1.2 !important;
-}
-
 .delete-day-btn {
   width: auto !important;
   min-width: auto !important;
@@ -953,11 +942,27 @@ td > * {
   line-height: 1;
 }
 
-/* Touch screens: keep the icons a comfortable finger-sized target. */
+/* Touch screens: keep the icons, and each Lesson's title and ⋮ button, a
+   comfortable finger-sized target (44px, the usual touch minimum). */
 @media (pointer: coarse) {
+  .schedule-icon-btn,
+  .action-menu-btn,
+  .lesson-cluster .lesson-main-btn {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
+/* Touch phones in portrait: a day with one Lesson must still fit 375px, so
+   these keep the full 44px height but give up some width (the ⋮ glyph is
+   thin, and the title needs the room more). */
+@media (pointer: coarse) and (max-width: 600px) {
+  .lesson-cluster .action-menu-btn {
+    min-width: 32px;
+  }
+
   .schedule-icon-btn {
     min-width: 40px;
-    min-height: 40px;
   }
 }
 
@@ -975,7 +980,6 @@ td > * {
 /* Lesson cluster styles */
 .lesson-cluster {
   display: inline-flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
   border: 2px solid var(--border-color);
@@ -986,7 +990,6 @@ td > * {
   color: var(--text-primary);
   box-shadow: 1px 1px 3px var(--bg-dark);
   cursor: grab;
-  min-width: 140px;
   font-weight: normal;
 }
 
@@ -994,16 +997,57 @@ td > * {
   font-weight: normal;
 }
 
-.lesson-cluster-top {
+/* One row: the Lesson's title button, then its ⋮ action menu button. */
+.lesson-cluster-row {
   display: flex;
-  justify-content: center;
+  align-items: center;
+  gap: var(--spacing-xxs);
+  min-width: 0;
 }
 
-.lesson-cluster-bottom {
+/* ⋮ (action-menu.js): narrow, and never squeezed by a long title. */
+.action-menu-btn {
+  flex-shrink: 0;
+  width: auto;
+  padding: 0.3rem 0.4rem;
+  line-height: 1;
+}
+
+.action-menu {
+  position: fixed;
+  z-index: 1000;
   display: flex;
-  justify-content: center;
-  gap: var(--spacing-xxs);
-  margin-top: var(--spacing-xxs);
+  flex-direction: column;
+  min-width: 12rem;
+  padding: var(--spacing-xs);
+  background-color: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-modal);
+}
+
+.action-menu-item {
+  text-align: left;
+  white-space: nowrap;
+  border-color: transparent;
+  background-color: transparent;
+  padding: var(--spacing-sm) var(--spacing-md);
+}
+
+.action-menu-item:disabled {
+  color: var(--text-secondary);
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.action-menu-item:disabled:hover {
+  background-color: transparent;
+}
+
+@media (pointer: coarse) {
+  .action-menu-item {
+    min-height: 44px;
+  }
 }
 
 .td-drop-hover {
@@ -2038,32 +2082,27 @@ ol.lesson-list {
 
   .lesson-cluster {
     min-width: 0;
-    width: 5.75rem;
+    width: 6.25rem;
     margin-right: 0;
-    padding: var(--spacing-xxs);
+    padding: 0;
     box-sizing: border-box;
   }
 
-  /* Rows fill the cluster's fixed width (rather than centering at their
-     content width), so a long title truncates instead of spilling out. */
-  .lesson-cluster-top,
-  .lesson-cluster-bottom {
-    align-self: stretch;
-    min-width: 0;
+  /* The row fills the cluster's fixed width and the title takes what the ⋮
+     button leaves, so a long title truncates instead of spilling out. */
+  .lesson-cluster-row {
+    flex: 1 1 auto;
   }
 
   .lesson-cluster .lesson-main-btn {
+    flex: 1 1 auto;
     min-width: 0;
-    width: 100%;
-    max-width: 100%;
+    width: auto;
+    max-width: none;
   }
 
-  .lesson-cluster-bottom .schedule-action-btn {
-    flex: 1 1 0;
-    width: auto;
-    min-width: 0;
-    max-width: none;
-    padding: 0.3rem 0;
+  .lesson-cluster .action-menu-btn {
+    padding: 0.3rem 0.4rem;
   }
 
   .lesson-collapsible .lesson-collapsible {
