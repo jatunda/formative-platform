@@ -23,7 +23,7 @@ import {
 import { showErrorState } from './error-ui-utils.js';
 import {
   createDayRow,
-  createInsertDayRow,
+  addInsertDayPlus,
   makeInsertDayHandler,
   makeDeleteDayHandler,
   getLessonTitles
@@ -192,12 +192,14 @@ export async function renderClassPane(classId, className, containerEl, uiState =
     renderClassPane(classId, className, containerEl, { ...paneUiStates.get(classId), ...change });
   const renderAtSize = (/** @type {number} */ size) => rerender({ windowSize: size });
   const onReload = () => rerender();
+  const onInsertDay = makeInsertDayHandler(classId, maxDayIndex, onReload);
+  // onInsertDay gives each day row an Insert Day "+" on the line above it.
   const ctx = {
     classId,
     onReload,
-    onDeleteDay: makeDeleteDayHandler(classId, onReload)
+    onDeleteDay: makeDeleteDayHandler(classId, onReload),
+    onInsertDay
   };
-  const onInsertDay = makeInsertDayHandler(classId, maxDayIndex, onReload);
 
   const header = document.createElement('div');
   header.className = 'lesson-planning-pane-header';
@@ -244,19 +246,17 @@ export async function renderClassPane(classId, className, containerEl, uiState =
 
   const tbody = document.createElement('tbody');
 
+  let dayRow;
   for (const dayIndex of windowIndexes) {
-    tbody.appendChild(createInsertDayRow(dayIndex, onInsertDay));
-
     const lessons = schedule[dayIndex] || [];
     const dateLabel = await getDateForDayIndex(dayIndex, classId);
-    const dayRow = await createDayRow(dayIndex, lessons, todayDayIndex, dateLabel, ctx);
+    dayRow = await createDayRow(dayIndex, lessons, todayDayIndex, dateLabel, ctx);
     tbody.appendChild(dayRow);
   }
 
-  // Insert point after the window too, matching the full scheduling table's
-  // N+1 insert-points-for-N-days pattern.
+  // One more "+" below the last day: N+1 insert points for N days.
   const afterWindowIndex = windowIndexes[windowIndexes.length - 1] + 1;
-  tbody.appendChild(createInsertDayRow(afterWindowIndex, onInsertDay));
+  addInsertDayPlus(/** @type {HTMLTableRowElement} */ (dayRow), afterWindowIndex, onInsertDay, 'below');
 
   table.appendChild(tbody);
 

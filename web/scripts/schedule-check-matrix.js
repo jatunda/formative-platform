@@ -115,14 +115,48 @@ function misalignedRows(rows) {
 }
 
 /**
+ * @typedef {{ label: string, x: number, y: number, gutterLeft: number, gutterRight: number, line: number }} InsertPlus
+ * One Insert Day "+" as measured: its glyph's centre (x, y), the left gutter
+ * it belongs in (from the pane's inner left edge to the table's left edge)
+ * and the y of the line between days it sits on.
+ */
+
+/**
+ * Why an Insert Day "+" isn't in the left gutter, centred on the line
+ * between two days (ticket 10), or null when it is. Positions round to the
+ * nearest half pixel first; a pixel off the line is still on it.
+ * @param {InsertPlus} p @returns {string | null}
+ */
+export function insertPlusMisplacement(p) {
+  const round = (/** @type {number} */ n) => Math.round(n * 2) / 2;
+  const [x, y] = [round(p.x), round(p.y)];
+  if (x < p.gutterLeft || x > p.gutterRight) {
+    return `Insert Day "+" ${p.label} is at x ${x}, outside the gutter (${round(p.gutterLeft)} to ${round(p.gutterRight)})`;
+  }
+  const off = Math.abs(y - round(p.line));
+  return off > 1 ? `Insert Day "+" ${p.label} is ${off}px off its line` : null;
+}
+
+/**
+ * One phrase for every misplaced Insert Day "+", naming the first, or for
+ * day rows with none at all; null when they're all in place.
+ * @param {InsertPlus[]} pluses @param {DayRow[]} rows @returns {string | null}
+ */
+function misplacedPluses(pluses, rows) {
+  if (rows.length && !pluses.length) return `no Insert Day "+" beside the ${rows.length} day rows`;
+  const problems = pluses.map(insertPlusMisplacement).filter((why) => why !== null);
+  return problems.length ? `${problems.length} of ${pluses.length} Insert Day "+"s are misplaced, first ${problems[0]}` : null;
+}
+
+/**
  * @typedef {{ name: string, lessonsPerDay: number, contentWidth: number, paneWidth: number }} ShortTable
  * A schedule table with no day over one Lesson: how wide its content is and
  * how wide its pane is.
- * @typedef {{ scrollWidth: number, shortTables: ShortTable[], targets: Target[] | null, rows: DayRow[],
+ * @typedef {{ scrollWidth: number, shortTables: ShortTable[], targets: Target[] | null, rows: DayRow[], pluses: InsertPlus[],
  *   coarse: boolean, touch: boolean, viewportWidth: number, errors: string[], violations: string[] }} Checked
  * One render as measured: `scrollWidth` is the document's; `targets` is null
  * where tap targets aren't checked (a mouse size); `rows` are the day rows
- * of every schedule table shown.
+ * of every schedule table shown, and `pluses` their Insert Day "+"s.
  */
 
 /**
@@ -138,6 +172,7 @@ export function describeFailure(r) {
       .map((t) => `${t.name}: days of at most ${t.lessonsPerDay} Lesson(s) are ${t.contentWidth}px wide in a ${t.paneWidth}px pane`),
     ...(r.targets ?? []).map((t) => tapTargetProblem(t, r.viewportWidth)),
     misalignedRows(r.rows),
+    misplacedPluses(r.pluses, r.rows),
     ...r.errors,
     ...r.violations,
   ].filter((why) => typeof why === 'string');
@@ -160,11 +195,6 @@ export function describeFailure(r) {
  * @type {KnownFailure[]}
  */
 export const KNOWN_FAILURES = [
-  {
-    failure: 'tap target "+ Insert Day Here',
-    touch: true,
-    note: 'The Insert Day Here buttons between days are about 22px tall on touch screens. Making them 44px makes every gap between days twice as tall: a design call for Eric.',
-  },
   {
     failure: 'tap target "Delete day ',
     touch: true,

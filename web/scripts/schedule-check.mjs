@@ -18,6 +18,8 @@
 // - every day row's cells (Day Index, Date, Lessons, Delete Day) share one
 //   top and one bottom edge, so the row's borders form straight lines
 //   (ticket 09); report.json also records each day row's height;
+// - every Insert Day "+" sits in the table's left gutter, centred on the line
+//   between days it belongs to (ticket 10);
 // - on touch sizes, every control in the schedule rows is at least 44px tall
 //   and 44px wide, except the narrower widths TAP_EXCEPTIONS accepts, each
 //   with its reason.
@@ -166,7 +168,7 @@ async function checkPage(page, url, size) {
           exceptions: exceptionSelectors.flatMap((selector, i) => el.matches(selector) ? [i] : []),
         };
       }) : null;
-    // Day rows: rows with a Day Index cell (not the Insert Day rows between them).
+    // Day rows: rows with a Day Index cell (Full Schedule's last row, the next day to add, counts).
     const cellNames = { 'day-index-cell': 'Day Index', 'date-cell': 'Date', 'lessons-cell': 'Lessons', 'day-actions-cell': 'Delete Day' };
     const rows = tables.flatMap((table) => [...table.querySelectorAll('tbody tr')]
       .filter((tr) => tr.querySelector(':scope > .day-index-cell') && tr.getClientRects().length)
@@ -178,11 +180,31 @@ async function checkPage(page, url, size) {
         });
         const lessons = tr.querySelectorAll('.lesson-cluster').length;
         const heading = table.closest('.lesson-planning-pane')?.querySelector('h2')?.textContent ?? 'schedule';
-        const day = tr.querySelector('.day-index-cell')?.textContent;
+        const day = tr.querySelector('.day-index-cell')?.firstChild?.textContent;
         const box = tr.getBoundingClientRect();
         return { label: `${heading} day ${day} (${lessons} Lesson${lessons === 1 ? '' : 's'})`, lessons, height: box.height, cells };
       }));
+    // Insert Day "+"s: each glyph's centre, its gutter and the line it belongs on.
+    const pluses = tables.flatMap((table) => [...table.querySelectorAll('.insert-day-btn')]
+      .filter((btn) => btn.getClientRects().length)
+      .map((btn) => {
+        const glyph = /** @type {Element} */ (btn.querySelector('.text-icon') ?? btn).getBoundingClientRect();
+        const row = /** @type {HTMLTableRowElement} */ (btn.closest('tr')).getBoundingClientRect();
+        const pane = /** @type {HTMLElement} */ (table.parentElement);
+        const below = btn.classList.contains('insert-day-below');
+        const heading = table.closest('.lesson-planning-pane')?.querySelector('h2')?.textContent ?? 'schedule';
+        const day = btn.closest('tr')?.querySelector('.day-index-cell')?.firstChild?.textContent;
+        return {
+          label: `${heading} ${below ? 'below' : 'above'} day ${day}`,
+          x: glyph.left + glyph.width / 2 + scrollX,
+          y: glyph.top + glyph.height / 2 + scrollY,
+          gutterLeft: pane.getBoundingClientRect().left + pane.clientLeft + scrollX,
+          gutterRight: table.getBoundingClientRect().left + scrollX,
+          line: (below ? row.bottom : row.top) + scrollY,
+        };
+      }));
     return {
+      pluses,
       scrollWidth: document.documentElement.scrollWidth,
       shortTables,
       targets,

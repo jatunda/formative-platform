@@ -26,7 +26,6 @@ import {
 import {
   createDayRow,
   createDateCell,
-  createInsertDayRow,
   createEndButtonsContainer,
   makeInsertDayHandler,
   makeDeleteDayHandler,
@@ -339,19 +338,17 @@ export async function renderScheduleTable(schedule, classId = currentClassId) {
   }
   await getLessonTitles(allLessonHashes);
 
+  // onInsertDay gives each day row an Insert Day "+" on the line above it.
+  // None below the final row: inserting after the last day adds nothing.
   const ctx = {
     classId,
     onReload: loadFullSchedule,
-    onDeleteDay: makeDeleteDayHandler(classId, loadFullSchedule)
+    onDeleteDay: makeDeleteDayHandler(classId, loadFullSchedule),
+    onInsertDay: makeInsertDayHandler(classId, maxDayIndex, loadFullSchedule)
   };
-  const onInsertDay = makeInsertDayHandler(classId, maxDayIndex, loadFullSchedule);
 
   // Render all days
   for (let dayIndex = 0; dayIndex <= maxDayIndex; dayIndex++) {
-    // Insert row before each day
-    scheduleTableBody.appendChild(createInsertDayRow(dayIndex, onInsertDay));
-
-    // Day row
     const lessons = schedule[dayIndex] || [];
     const dateLabel = await getDateForDayIndex(dayIndex, classId);
     const dayRow = await createDayRow(dayIndex, lessons, todayDayIndex, dateLabel, ctx);
