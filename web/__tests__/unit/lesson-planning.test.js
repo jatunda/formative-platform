@@ -27,7 +27,7 @@ vi.mock('https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js', () => 
 }));
 
 vi.mock('../../date-utils.js', () => ({
-  getDayDateLabels: vi.fn(async (dayIndex) => ({ full: `date-for-${dayIndex}`, short: `short-${dayIndex}` })),
+  getDateForDayIndex: vi.fn(async (dayIndex) => `date-for-${dayIndex}`),
   getTodayDayIndex: vi.fn(async () => 10),
   getClassDateOffset: vi.fn(async (classId) => ({ csa: 5, csp: 2 })[classId] ?? 0),
   setClassDateOffset: vi.fn(async () => {}),

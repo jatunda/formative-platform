@@ -39,10 +39,6 @@ vi.mock('../../date-utils.js', () => ({
   // it from constants.js - needs to be here for that chain to resolve.
   DEFAULT_CLASS_START_DATE: '2024-08-19',
   getDateForDayIndex: vi.fn(async (dayIndex, classId) => `date-for-${classId}-${dayIndex}`),
-  getDayDateLabels: vi.fn(async (dayIndex, classId) => ({
-    full: `full-date-for-${classId}-${dayIndex}`,
-    short: `short-date-for-${classId}-${dayIndex}`,
-  })),
   getTodayDayIndex: vi.fn(async () => 10),
   getClassDateOffset: vi.fn(async () => 5),
   setClassDateOffset: vi.fn(async () => {}),
@@ -87,10 +83,9 @@ vi.mock('../../schedule-day-view.js', () => ({
     return tr;
   }),
   createEndButtonsContainer: vi.fn(() => document.createElement('div')),
-  createDateCell: vi.fn(({ full, short }) => {
+  createDateCell: vi.fn((dateLabel) => {
     const td = document.createElement('td');
-    td.dataset.full = full;
-    td.dataset.short = short;
+    td.textContent = dateLabel;
     return td;
   }),
   makeInsertDayHandler: vi.fn(() => vi.fn()),
@@ -267,14 +262,13 @@ describe('teacher', () => {
       expect(tbody.children).toHaveLength(7); // 3 insert + 3 day + 1 final
     });
 
-    it("gives each day row both of that Day Index's date labels", async () => {
+    it("gives each day row that Day Index's date label", async () => {
       scheduleFixture();
       const { createDayRow } = await import('../../schedule-day-view.js');
 
       await renderScheduleTable({ 0: [], 1: [] }, 'csa');
 
-      expect(createDayRow).toHaveBeenCalledWith(1, [], 10,
-        { full: 'full-date-for-csa-1', short: 'short-date-for-csa-1' }, expect.anything());
+      expect(createDayRow).toHaveBeenCalledWith(1, [], 10, 'date-for-csa-1', expect.anything());
     });
 
     it('preloads lesson titles for every Lesson across the whole Schedule', async () => {
@@ -310,8 +304,7 @@ describe('teacher', () => {
 
       const cells = row.querySelectorAll('td');
       expect(cells[0].textContent).toBe('7');
-      expect(cells[1].dataset.full).toBe('full-date-for-csa-7');
-      expect(cells[1].dataset.short).toBe('short-date-for-csa-7');
+      expect(cells[1].textContent).toBe('date-for-csa-7');
       expect(cells[2].className).toBe('lessons-cell');
     });
   });

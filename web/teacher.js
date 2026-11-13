@@ -11,7 +11,6 @@ import { db } from './firebase-config.js';
 import { initializeDatabase } from './database-handle.js';
 import {
   getDateForDayIndex as sharedGetDateForDayIndex,
-  getDayDateLabels,
   getTodayDayIndex,
   getClassDateOffset,
   setClassDateOffset
@@ -303,7 +302,7 @@ export async function createFinalRow(nextIndex, ctx) {
   addRow.appendChild(tdDay);
 
   // Date column
-  addRow.appendChild(createDateCell(await getDayDateLabels(nextIndex, ctx.classId)));
+  addRow.appendChild(createDateCell(await getDateForDayIndex(nextIndex, ctx.classId)));
 
   // Lessons column with just the New Lesson / Link Lesson buttons
   const tdLessons = document.createElement("td");
@@ -354,8 +353,8 @@ export async function renderScheduleTable(schedule, classId = currentClassId) {
 
     // Day row
     const lessons = schedule[dayIndex] || [];
-    const dateLabels = await getDayDateLabels(dayIndex, classId);
-    const dayRow = await createDayRow(dayIndex, lessons, todayDayIndex, dateLabels, ctx);
+    const dateLabel = await getDateForDayIndex(dayIndex, classId);
+    const dayRow = await createDayRow(dayIndex, lessons, todayDayIndex, dateLabel, ctx);
     scheduleTableBody.appendChild(dayRow);
   }
 

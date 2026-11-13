@@ -162,11 +162,11 @@ describe('schedule-day-view', () => {
   });
 
   describe('createDateCell', () => {
-    it('holds both the full date (wide screens) and the short one (narrow screens)', () => {
-      const cell = createDateCell({ full: '11/2/2026 (Monday)', short: 'Mon 11/2' });
+    it('shows the short date as its only text', () => {
+      const cell = createDateCell('Mon 11/2');
 
-      expect(cell.querySelector('.date-full').textContent).toBe('11/2/2026 (Monday)');
-      expect(cell.querySelector('.date-short').textContent).toBe('Mon 11/2');
+      expect(cell.className).toBe('date-cell');
+      expect(cell.textContent).toBe('Mon 11/2');
     });
   });
 

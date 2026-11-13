@@ -799,12 +799,6 @@ select:focus {
   width: auto;
 }
 
-/* The Date cell holds both labels; narrow screens swap to the short one
-   (see the max-width: 600px block under Responsive). */
-.date-short {
-  display: none;
-}
-
 /* ========================================
    Lesson Planning page
    ======================================== */
@@ -2128,14 +2122,6 @@ ol.lesson-list {
   button {
     font-size: 1rem;
     padding: 0.8rem;
-  }
-
-  .date-full {
-    display: none;
-  }
-
-  .date-short {
-    display: inline;
   }
 
   /* Portrait phones: tighter cells and a narrower Lesson cluster, so a day

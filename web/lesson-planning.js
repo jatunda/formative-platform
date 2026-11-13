@@ -10,7 +10,7 @@ import {
 import { db } from './firebase-config.js';
 import { initializeDatabase } from './database-handle.js';
 import {
-  getDayDateLabels,
+  getDateForDayIndex,
   getTodayDayIndex,
   getClassDateOffset,
   setClassDateOffset
@@ -248,8 +248,8 @@ export async function renderClassPane(classId, className, containerEl, uiState =
     tbody.appendChild(createInsertDayRow(dayIndex, onInsertDay));
 
     const lessons = schedule[dayIndex] || [];
-    const dateLabels = await getDayDateLabels(dayIndex, classId);
-    const dayRow = await createDayRow(dayIndex, lessons, todayDayIndex, dateLabels, ctx);
+    const dateLabel = await getDateForDayIndex(dayIndex, classId);
+    const dayRow = await createDayRow(dayIndex, lessons, todayDayIndex, dateLabel, ctx);
     tbody.appendChild(dayRow);
   }
 

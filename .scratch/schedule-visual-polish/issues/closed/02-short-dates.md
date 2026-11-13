@@ -4,7 +4,7 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** closed
 
-- [ ] Both pages show `Tue 11/3` at desktop, tablet and phone widths
-- [ ] No leftover long-date code or per-width CSS
+- [x] Both pages show `Tue 11/3` at desktop, tablet and phone widths
+- [x] No leftover long-date code or per-width CSS
