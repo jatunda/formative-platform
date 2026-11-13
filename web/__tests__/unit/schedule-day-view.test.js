@@ -28,10 +28,11 @@ vi.mock('https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js', () => 
       val: () => value,
     });
   },
+  // A test can hold a write open by having mockSet return a pending promise.
   set: (ref, value) => {
-    mockSet(ref.path, value);
+    const pending = mockSet(ref.path, value);
     mockData[ref.path] = value;
-    return Promise.resolve();
+    return pending ?? Promise.resolve();
   },
   // The Lesson store writes through multi-path updates (realtime-store.js)
   update: (ref, updates) => {
@@ -129,10 +130,13 @@ describe('schedule-day-view', () => {
       expect(buttons.map(b => b.title)).toEqual(['New Lesson', 'Link Lesson']);
     });
 
-    it('New Lesson is still ➕; Link Lesson is the flat link icon', () => {
+    it('New Lesson is a plain-text "+" in an icon-sized box; Link Lesson is the flat link icon', () => {
       const container = createEndButtonsContainer(2, { classId: 'class1', onReload });
 
-      expect(byLabel(container, 'New Lesson').textContent).toBe('➕');
+      const plus = byLabel(container, 'New Lesson').firstElementChild;
+      expect(plus.tagName).toBe('SPAN');
+      expect(plus.className).toBe('text-icon');
+      expect(plus.textContent).toBe('+');
       const link = byLabel(container, 'Link Lesson');
       expect(link.textContent).toBe('');
       expect(link.querySelector('svg').outerHTML).toBe(lineIcon('link', 'line-icon').outerHTML);
@@ -148,6 +152,30 @@ describe('schedule-day-view', () => {
       expect(newId).toMatch(/^[0-9a-f]{32}$/);
       expect(mockData[`content/${newId}`]).toEqual({ title: DEFAULT_LESSON_TITLE });
       expect(onReload).toHaveBeenCalled();
+    });
+
+    it('New Lesson shows the saving spinner while a slow save runs, then its "+" again', async () => {
+      vi.useFakeTimers();
+      try {
+        const container = createEndButtonsContainer(2, { classId: 'class1', onReload });
+        const newBtn = byLabel(container, 'New Lesson');
+        const plus = newBtn.firstElementChild;
+        let release;
+        mockSet.mockImplementationOnce(() => new Promise((r) => { release = r; }));
+
+        const done = newBtn.onclick();
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(newBtn.querySelector('svg').getAttribute('class')).toBe('line-icon line-icon-spin');
+        expect(newBtn.textContent).toBe('');
+
+        release();
+        await done;
+        expect([...newBtn.childNodes]).toEqual([plus]);
+        expect(newBtn.textContent).toBe('+');
+        expect(newBtn.disabled).toBe(false);
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it('Link Lesson adds the Lesson picked in the search popup to the end of that Day Index', async () => {

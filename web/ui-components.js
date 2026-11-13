@@ -12,6 +12,20 @@ export function savingSpinner() {
 }
 
 /**
+ * A text glyph (e.g. "+") in a box the size of a line icon, so an icon
+ * button showing text matches its line-icon neighbours. Text, not an icon or
+ * emoji, so it looks the same in every browser and font.
+ * @param {string} glyph
+ * @returns {HTMLSpanElement}
+ */
+export function textIcon(glyph) {
+  const span = document.createElement('span');
+  span.className = 'text-icon';
+  span.textContent = glyph;
+  return span;
+}
+
+/**
  * Wrap a button's click handler so that if the resulting work takes longer
  * than `delayMs`, the button disables itself and shows `workingLabel` until
  * it settles - so a slow auto-save operation (e.g. inserting a day) doesn't

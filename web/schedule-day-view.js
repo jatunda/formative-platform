@@ -12,6 +12,7 @@ import {
   createIconButton,
   createInsertDayButton,
   savingSpinner,
+  textIcon,
   withWorkingIndicator
 } from './ui-components.js';
 import { lineIcon } from './line-icons.js';
@@ -148,7 +149,7 @@ async function appendLessonToDay(lessonId, dayIndex, ctx) {
 }
 
 /**
- * Create the side-by-side New Lesson (➕) / Link Lesson (link icon) buttons
+ * Create the side-by-side New Lesson (text "+") / Link Lesson (link icon) buttons
  * that follow a day's last Lesson.
  * @param {number} dayIndex
  * @param {{classId: string, onReload: () => void}} ctx
@@ -158,7 +159,7 @@ export function createEndButtonsContainer(dayIndex, ctx) {
   const container = document.createElement("div");
   container.className = "lessons-end-buttons";
 
-  const newBtn = createIconButton("➕", "New Lesson", async () => {
+  const newBtn = createIconButton(textIcon("+"), "New Lesson", async () => {
     const lessonId = await lessonStore().create({ title: DEFAULT_LESSON_TITLE });
     await appendLessonToDay(lessonId, dayIndex, ctx);
   });
