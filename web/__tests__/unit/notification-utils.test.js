@@ -21,6 +21,14 @@ describe('showNotification', () => {
     expect(document.body.contains(notification)).toBe(true);
   });
 
+  it('mounts inside <main> when the page has one, so it sits in a landmark', () => {
+    const main = document.createElement('main');
+    document.body.appendChild(main);
+    showNotification('In main');
+
+    expect(document.querySelector('.notification').parentElement).toBe(main);
+  });
+
     it('should apply default info styling', () => {
       showNotification('Info message');
       

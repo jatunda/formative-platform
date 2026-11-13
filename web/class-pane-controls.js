@@ -7,9 +7,8 @@
  * them to the pane's state; each factory here only builds its DOM.
  */
 
-import { createIconButton, createStyledButton } from './ui-components.js';
+import { createIconButton, createStyledButton, teacherIcon } from './ui-components.js';
 import { fullScheduleTodayHref } from './teacher-nav.js';
-import { lineIcon } from './line-icons.js';
 
 // Number of upcoming Day Indices shown per Class in each pane's Planning
 // Window (today, +1, +2, ...) when the pane is first rendered. Each pane's
@@ -66,7 +65,7 @@ export function createFullScheduleLink(classId, className) {
   link.href = fullScheduleTodayHref(classId);
   link.target = '_blank';
   link.rel = 'noopener';
-  link.appendChild(lineIcon('openInNew', 'line-icon'));
+  link.appendChild(teacherIcon('openInNew'));
   link.title = 'Full schedule';
   link.setAttribute('aria-label', `Full schedule for ${className}`);
   return link;

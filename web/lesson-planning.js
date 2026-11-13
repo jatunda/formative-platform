@@ -246,17 +246,17 @@ export async function renderClassPane(classId, className, containerEl, uiState =
 
   const tbody = document.createElement('tbody');
 
-  let dayRow;
+  const dayRows = [];
   for (const dayIndex of windowIndexes) {
     const lessons = schedule[dayIndex] || [];
     const dateLabel = await getDateForDayIndex(dayIndex, classId);
-    dayRow = await createDayRow(dayIndex, lessons, todayDayIndex, dateLabel, ctx);
-    tbody.appendChild(dayRow);
+    dayRows.push(await createDayRow(dayIndex, lessons, todayDayIndex, dateLabel, ctx));
   }
+  tbody.append(...dayRows);
 
   // One more "+" below the last day: N+1 insert points for N days.
   const afterWindowIndex = windowIndexes[windowIndexes.length - 1] + 1;
-  addInsertDayPlus(/** @type {HTMLTableRowElement} */ (dayRow), afterWindowIndex, onInsertDay, 'below');
+  addInsertDayPlus(dayRows[dayRows.length - 1], afterWindowIndex, onInsertDay, 'below');
 
   table.appendChild(tbody);
 

@@ -12,10 +12,10 @@ import {
   createIconButton,
   createInsertDayButton,
   savingSpinner,
+  teacherIcon,
   textIcon,
   withWorkingIndicator
 } from './ui-components.js';
-import { lineIcon } from './line-icons.js';
 import { createLessonClusterWithDB } from './lesson-manager.js';
 import { setupDropHandlers } from './drag-drop-utils.js';
 import { showLessonSearchPopup } from './lesson-search.js';
@@ -126,7 +126,7 @@ export function createActionsCell(dayIndex, onDeleteDay) {
   tdActions.className = "day-actions-cell";
 
   const deleteButton = document.createElement("button");
-  deleteButton.appendChild(lineIcon("trash", "line-icon"));
+  deleteButton.appendChild(teacherIcon("trash"));
   deleteButton.className = "delete-day-btn";
   deleteButton.title = `Delete day ${dayIndex}`;
   deleteButton.onclick = withWorkingIndicator(deleteButton, () => onDeleteDay(dayIndex),
@@ -163,7 +163,7 @@ export function createEndButtonsContainer(dayIndex, ctx) {
     await appendLessonToDay(lessonId, dayIndex, ctx);
   });
 
-  const linkBtn = createIconButton(lineIcon("link", "line-icon"), "Link Lesson", () => {
+  const linkBtn = createIconButton(teacherIcon("link"), "Link Lesson", () => {
     showLessonSearchPopup({
       onSelect: (lessonId) => appendLessonToDay(lessonId, dayIndex, ctx)
     });

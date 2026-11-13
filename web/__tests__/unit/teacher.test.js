@@ -7,7 +7,6 @@ import {
   getSavedScrollPosition,
   saveScrollPosition,
   loadClasses,
-  getDateForDayIndex,
   applyDateOffset,
   showScheduleError,
   renderScheduleTable,
@@ -84,6 +83,7 @@ vi.mock('../../schedule-day-view.js', () => ({
   }),
   makeInsertDayHandler: vi.fn(() => vi.fn()),
   makeDeleteDayHandler: vi.fn(() => vi.fn()),
+  addInsertDayPlus: vi.fn(),
   getLessonTitles: (...args) => mockGetLessonTitles(...args),
 }));
 
@@ -199,13 +199,6 @@ describe('teacher', () => {
     });
   });
 
-  describe('getDateForDayIndex', () => {
-    it('forwards to the shared date-utils implementation with the given Class', async () => {
-      const result = await getDateForDayIndex(5, 'csa');
-      expect(result).toBe('date-for-csa-5');
-    });
-  });
-
   describe('applyDateOffset', () => {
     it('persists the new offset and reloads the schedule', async () => {
       scheduleFixture();
@@ -261,6 +254,17 @@ describe('teacher', () => {
 
       const onInsertDay = makeInsertDayHandler.mock.results.at(-1).value;
       expect(createDayRow.mock.calls.map((c) => c[4].onInsertDay)).toEqual([onInsertDay, onInsertDay]);
+    });
+
+    it('puts one more "+" below the last day, inserting a day before the add-day row', async () => {
+      scheduleFixture();
+      const { addInsertDayPlus, makeInsertDayHandler } = await import('../../schedule-day-view.js');
+
+      await renderScheduleTable({ 0: [], 1: [] }, 'csa');
+
+      const onInsertDay = makeInsertDayHandler.mock.results.at(-1).value;
+      const lastDay = document.querySelector('.day-row[data-day-index="1"]');
+      expect(addInsertDayPlus).toHaveBeenCalledWith(lastDay, 2, onInsertDay, 'below');
     });
 
     it("gives each day row that Day Index's date label", async () => {
