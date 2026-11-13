@@ -601,6 +601,77 @@ select:focus,
   padding: var(--spacing-xl);
 }
 
+/* In-app confirm dialog (confirm-dialog.js), in place of the browser's confirm(). */
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-lg);
+  background-color: var(--bg-modal-overlay);
+  backdrop-filter: blur(4px);
+}
+
+.confirm-overlay-visible {
+  display: flex;
+}
+
+.confirm-dialog {
+  width: 100%;
+  max-width: 420px;
+  box-sizing: border-box;
+  padding: var(--spacing-xl);
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-2xl);
+  box-shadow: var(--shadow-modal);
+}
+
+.confirm-title {
+  margin: 0 0 var(--spacing-sm);
+  color: var(--accent-blue);
+}
+
+.confirm-message {
+  margin: 0 0 var(--spacing-xl);
+  line-height: 1.5;
+}
+
+.confirm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--spacing-md);
+}
+
+/* At least 44px tall: easy to tap on a phone. */
+.confirm-actions button {
+  width: auto;
+  min-width: 110px;
+  min-height: 44px;
+  padding: var(--spacing-sm) var(--spacing-lg);
+}
+
+.confirm-confirm-btn {
+  background-color: var(--error-red);
+  border-color: var(--error-red);
+  color: white;
+}
+
+.confirm-confirm-btn:hover {
+  background-color: var(--error-red-hover);
+  border-color: var(--error-red-hover);
+}
+
+@media (max-width: 600px) {
+  .confirm-actions button {
+    flex: 1 1 0;
+  }
+}
+
 .lesson-popup {
   position: fixed;
   inset: 0;

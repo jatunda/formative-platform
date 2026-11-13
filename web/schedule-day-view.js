@@ -23,6 +23,7 @@ import { createLessonClusterWithDB } from './lesson-manager.js';
 import { setupDropHandlers } from './drag-drop-utils.js';
 import { showLessonSearchPopup } from './lesson-search.js';
 import { showNotification } from './notification-utils.js';
+import { showConfirm } from './confirm-dialog.js';
 import {
   insertDayAt,
   deleteDayAt
@@ -57,7 +58,7 @@ export async function getLessonTitles(lessonIds) {
 }
 
 /**
- * Build an onDeleteDay handler: confirms, deletes via deleteDayAt, reloads, and
+ * Build an onDeleteDay handler: confirms in the in-app dialog, deletes via deleteDayAt, reloads, and
  * reports failure through showNotification. Shared so both pages behave identically.
  * @param {string} classId
  * @param {() => void} onReload
@@ -65,9 +66,12 @@ export async function getLessonTitles(lessonIds) {
  */
 export function makeDeleteDayHandler(classId, onReload) {
   return async (dayIndex) => {
-    if (!confirm(`Are you sure you want to delete day ${dayIndex}? This will shift all future days back by one.`)) {
-      return;
-    }
+    const confirmed = await showConfirm({
+      title: 'Delete Day',
+      message: `Are you sure you want to delete day ${dayIndex}? This will shift all future days back by one.`,
+      confirmLabel: 'Delete Day'
+    });
+    if (!confirmed) return;
     try {
       await deleteDayAt(classId, dayIndex);
       onReload();
