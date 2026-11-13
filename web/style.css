@@ -206,10 +206,12 @@ button:focus-visible {
   width: auto !important;
   min-width: auto !important;
   max-width: none !important;
-  padding: var(--delete-day-padding, var(--spacing-sm) var(--spacing-md)) !important;
+  padding: var(--delete-day-padding, var(--spacing-xs) var(--spacing-md)) !important;
   font-size: 14px !important;
+  /* Fills its cell's height (see .day-actions-cell), so it is as tall as the
+     row the Lessons set, and never under the touch minimum. */
   height: 100% !important;
-  min-height: 60px !important;
+  min-height: var(--touch-min, 0) !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
@@ -794,11 +796,21 @@ select:focus {
 }
 
 /* The delete-day column (schedule-day-view.js's createActionsCell). Narrow
-   screens tighten it with the other schedule cells. */
+   screens tighten it with the other schedule cells. The 1px height is the
+   table idiom that lets the Delete Day button's height: 100% fill the row
+   (a table cell grows to its row, so 1px only acts as a floor). */
 .day-actions-cell {
   text-align: center;
   vertical-align: middle;
   padding: var(--spacing-xs);
+  height: 1px;
+}
+
+/* Compact day rows (ticket 09): little space above and below each Lesson. */
+.schedule-table .lessons-cell,
+#scheduleTable .lessons-cell {
+  padding-top: var(--spacing-xxs);
+  padding-bottom: var(--spacing-xxs);
 }
 
 /* Insert-day rows are one cell spanning the row; they must not shrink. */
@@ -953,18 +965,26 @@ td > * {
   gap: 4px;
 }
 
+/* The Lessons cell stays a table cell (display: flex would take it out of
+   the row's table layout, so its bottom border ended above the other
+   cells'): its Lessons and end buttons sit side by side on one line,
+   centred, 4px apart. */
 .lessons-cell {
-  display: flex;
-  flex-wrap: nowrap;
-  align-items: center;
-  gap: 4px;
-  min-height: 48px;
-  flex: 1 1 auto;
+  white-space: nowrap;
+  vertical-align: middle;
   position: relative;
 }
 
+.lessons-cell > * {
+  vertical-align: middle;
+}
+
+.lessons-cell > * + * {
+  margin-left: var(--lessons-gap, 4px);
+}
+
 .lessons-end-buttons {
-  display: flex;
+  display: inline-flex;
   flex-direction: row;
   gap: var(--spacing-xxs);
   align-items: center;
@@ -1022,7 +1042,7 @@ td > * {
   justify-content: center;
   border: 2px solid var(--border-color);
   border-radius: var(--radius-xl);
-  padding: var(--spacing-xxs) var(--radius-lg);
+  padding: 0 var(--radius-lg);
   margin-right: var(--radius-lg);
   background: var(--bg-secondary);
   color: var(--text-primary);
@@ -2182,7 +2202,7 @@ ol.lesson-list {
   }
 
   .lessons-cell {
-    gap: var(--spacing-xxs);
+    --lessons-gap: var(--spacing-xxs);
   }
 
   /* Measured at 375px: with 4px cell padding and the delete button's 8px

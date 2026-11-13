@@ -4,9 +4,9 @@
 
 **Blocked by:** 08 (Text "+"). Ordering note: tickets 06–11 change the same schedule rows and stylesheet, so they run in order to avoid merge conflicts.
 
-**Status:** ready-for-agent
+**Status:** closed
 
-- [ ] Rows are visibly shorter than before on both pages
-- [ ] At 1280, 800 and 375 wide, a day row's cell borders form straight lines
-- [ ] Days with 0, 1 and several Lessons all line up
-- [ ] Touch-screen tap targets in the row stay at least 44px tall
+- [x] Rows are visibly shorter than before on both pages
+- [x] At 1280, 800 and 375 wide, a day row's cell borders form straight lines
+- [x] Days with 0, 1 and several Lessons all line up
+- [x] Touch-screen tap targets in the row stay at least 44px tall

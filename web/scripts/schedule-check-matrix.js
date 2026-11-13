@@ -81,13 +81,48 @@ export function tapTargetProblem(target, viewportWidth, exceptions = TAP_EXCEPTI
 }
 
 /**
+ * @typedef {{ name: string, top: number, bottom: number }} Cell
+ * @typedef {{ label: string, cells: Cell[] }} DayRow
+ * One day row as measured: each cell's top and bottom edge (its border box,
+ * in px from the top of the page), in cell order.
+ */
+
+/**
+ * Why a day row's cells don't form straight lines (ticket 09: every cell of
+ * a day row shares one top and one bottom), or null when they do. Edges
+ * round to the nearest half pixel first.
+ * @param {DayRow} row @returns {string | null}
+ */
+export function rowMisalignment(row) {
+  const round = (/** @type {number} */ n) => Math.round(n * 2) / 2;
+  for (const [edge, verb] of /** @type {const} */ ([['top', 'start'], ['bottom', 'end']])) {
+    const at = row.cells.map((c) => round(c[edge]));
+    if (new Set(at).size > 1) {
+      return `${row.label}: cells ${verb} at different heights (${row.cells.map((c, i) => `${c.name} ${at[i]}`).join(', ')})`;
+    }
+  }
+  return null;
+}
+
+/**
+ * One phrase for every day row that doesn't line up (Full Schedule shows
+ * hundreds of days), naming the first, or null when they all do.
+ * @param {DayRow[]} rows @returns {string | null}
+ */
+function misalignedRows(rows) {
+  const problems = rows.map(rowMisalignment).filter((why) => why !== null);
+  return problems.length ? `${problems.length} of ${rows.length} day rows don't line up, first ${problems[0]}` : null;
+}
+
+/**
  * @typedef {{ name: string, lessonsPerDay: number, contentWidth: number, paneWidth: number }} ShortTable
  * A schedule table with no day over one Lesson: how wide its content is and
  * how wide its pane is.
- * @typedef {{ scrollWidth: number, shortTables: ShortTable[], targets: Target[] | null,
+ * @typedef {{ scrollWidth: number, shortTables: ShortTable[], targets: Target[] | null, rows: DayRow[],
  *   coarse: boolean, touch: boolean, viewportWidth: number, errors: string[], violations: string[] }} Checked
  * One render as measured: `scrollWidth` is the document's; `targets` is null
- * where tap targets aren't checked (a mouse size).
+ * where tap targets aren't checked (a mouse size); `rows` are the day rows
+ * of every schedule table shown.
  */
 
 /**
@@ -102,6 +137,7 @@ export function describeFailure(r) {
       .filter((t) => t.contentWidth > t.paneWidth)
       .map((t) => `${t.name}: days of at most ${t.lessonsPerDay} Lesson(s) are ${t.contentWidth}px wide in a ${t.paneWidth}px pane`),
     ...(r.targets ?? []).map((t) => tapTargetProblem(t, r.viewportWidth)),
+    misalignedRows(r.rows),
     ...r.errors,
     ...r.violations,
   ].filter((why) => typeof why === 'string');

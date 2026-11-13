@@ -15,6 +15,9 @@
 // - the page doesn't scroll sideways (document scrollWidth <= the viewport's width);
 // - a schedule table whose days each have at most one Lesson fits its pane
 //   without scrolling sideways (ticket 02: a short day fits a portrait phone);
+// - every day row's cells (Day Index, Date, Lessons, Delete Day) share one
+//   top and one bottom edge, so the row's borders form straight lines
+//   (ticket 09); report.json also records each day row's height;
 // - on touch sizes, every control in the schedule rows is at least 44px tall
 //   and 44px wide, except the narrower widths TAP_EXCEPTIONS accepts, each
 //   with its reason.
@@ -163,10 +166,27 @@ async function checkPage(page, url, size) {
           exceptions: exceptionSelectors.flatMap((selector, i) => el.matches(selector) ? [i] : []),
         };
       }) : null;
+    // Day rows: rows with a Day Index cell (not the Insert Day rows between them).
+    const cellNames = { 'day-index-cell': 'Day Index', 'date-cell': 'Date', 'lessons-cell': 'Lessons', 'day-actions-cell': 'Delete Day' };
+    const rows = tables.flatMap((table) => [...table.querySelectorAll('tbody tr')]
+      .filter((tr) => tr.querySelector(':scope > .day-index-cell') && tr.getClientRects().length)
+      .map((tr) => {
+        const cells = [...tr.children].map((td) => {
+          const box = td.getBoundingClientRect();
+          const name = Object.entries(cellNames).find(([cls]) => td.classList.contains(cls))?.[1] ?? td.className;
+          return { name, top: box.top + scrollY, bottom: box.bottom + scrollY };
+        });
+        const lessons = tr.querySelectorAll('.lesson-cluster').length;
+        const heading = table.closest('.lesson-planning-pane')?.querySelector('h2')?.textContent ?? 'schedule';
+        const day = tr.querySelector('.day-index-cell')?.textContent;
+        const box = tr.getBoundingClientRect();
+        return { label: `${heading} day ${day} (${lessons} Lesson${lessons === 1 ? '' : 's'})`, lessons, height: box.height, cells };
+      }));
     return {
       scrollWidth: document.documentElement.scrollWidth,
       shortTables,
       targets,
+      rows,
       coarse: matchMedia('(pointer: coarse)').matches,
     };
   }, /** @type {[string[], boolean]} */ ([TAP_EXCEPTIONS.map((e) => e.selector), size.touch]));
