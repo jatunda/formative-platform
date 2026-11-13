@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   createStyledButton,
-  createNewLessonButton,
+  createIconButton,
   createCloseButton,
   createArrowButton,
   createDeleteButton,
@@ -42,21 +42,19 @@ describe('ui-components', () => {
     });
   });
 
-  describe('createNewLessonButton', () => {
-    it('should create button with correct text and class', () => {
-      const callback = vi.fn();
-      const button = createNewLessonButton(5, callback);
-      
-      expect(button.textContent).toBe('New Lesson');
-      expect(button.className).toBe('schedule-action-btn new-lesson-btn');
+  describe('createIconButton', () => {
+    it('shows the icon, and names the action in a tooltip and an accessible label', () => {
+      const button = createIconButton('➕', 'New Lesson', vi.fn());
+
+      expect(button.textContent).toBe('➕');
+      expect(button.title).toBe('New Lesson');
+      expect(button.getAttribute('aria-label')).toBe('New Lesson');
     });
 
-    it('should call callback with dayIndex when clicked', () => {
-      const callback = vi.fn();
-      const button = createNewLessonButton(3, callback);
-      
-      button.click();
-      expect(callback).toHaveBeenCalledWith(3);
+    it('runs its handler when clicked', () => {
+      const onClick = vi.fn();
+      createIconButton('🔗', 'Link Lesson', onClick).click();
+      expect(onClick).toHaveBeenCalledTimes(1);
     });
   });
 

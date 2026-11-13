@@ -49,16 +49,23 @@ export function createStyledButton(text, onClick) {
 }
 
 /**
- * Create a "New Lesson" button for a specific day
- * @param {number} dayIndex - The day index to add the lesson to
- * @param {(dayIndex: number) => void} addLessonCallback - Callback function to add lesson
+ * Create a compact icon-only button; `label` names the action as both its
+ * tooltip and its accessible label, since the icon alone says nothing to a
+ * screen reader.
+ * @param {string} icon - The icon (emoji) shown on the button
+ * @param {string} label - What the button does, e.g. "New Lesson"
+ * @param {() => any} onClick - The click handler function
  * @returns {HTMLButtonElement} The created button element
  */
-export function createNewLessonButton(dayIndex, addLessonCallback) {
+export function createIconButton(icon, label, onClick) {
   const btn = document.createElement("button");
-  btn.textContent = "New Lesson";
-  btn.className = "schedule-action-btn new-lesson-btn";
-  btn.onclick = withWorkingIndicator(btn, () => addLessonCallback(dayIndex));
+  btn.textContent = icon;
+  btn.title = label;
+  btn.setAttribute("aria-label", label);
+  btn.className = "schedule-icon-btn";
+  // An hourglass, not the default "Working…" text, so a slow click doesn't
+  // stretch the compact button and shove the row around.
+  btn.onclick = withWorkingIndicator(btn, onClick, { workingLabel: "⏳" });
   return btn;
 }
 

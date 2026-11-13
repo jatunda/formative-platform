@@ -6,6 +6,7 @@ import {
   makeInsertDayHandler,
   getLessonTitles,
   createEndButtonsContainer,
+  createDateCell,
 } from '../../schedule-day-view.js';
 import { initializeDatabase } from '../../database-handle.js';
 import { DEFAULT_LESSON_TITLE, UNTITLED_LESSON } from '../../constants.js';
@@ -44,6 +45,11 @@ vi.mock('../../database-utils.js', () => ({
   insertDayAt: (...args) => mockInsertDayAt(...args),
   deleteDayAt: (...args) => mockDeleteDayAt(...args),
   generateUniqueHash: vi.fn(),
+}));
+
+let mockSearchPopupOptions;
+vi.mock('../../lesson-search.js', () => ({
+  showLessonSearchPopup: (options) => { mockSearchPopupOptions = options; },
 }));
 
 const mockShowNotification = vi.fn();
@@ -109,18 +115,57 @@ describe('schedule-day-view', () => {
     });
   });
 
-  describe('New Lesson button', () => {
-    it('creates an Empty Lesson and adds it to the end of that Day Index', async () => {
+  describe('end-of-day buttons', () => {
+    const byLabel = (container, label) =>
+      [...container.querySelectorAll('button')].find(b => b.getAttribute('aria-label') === label);
+
+    it('are two icon buttons side by side: New Lesson then Link Lesson, each with a tooltip', () => {
+      const container = createEndButtonsContainer(2, { classId: 'class1', onReload });
+      const buttons = [...container.querySelectorAll('button')];
+
+      expect(buttons.map(b => b.textContent)).toEqual(['➕', '🔗']);
+      expect(buttons.map(b => b.title)).toEqual(['New Lesson', 'Link Lesson']);
+    });
+
+    it('New Lesson creates an Empty Lesson and adds it to the end of that Day Index', async () => {
       mockData['schedule/class1/2'] = ['hashA'];
       const container = createEndButtonsContainer(2, { classId: 'class1', onReload });
-      const newBtn = [...container.querySelectorAll('button')].find(b => b.textContent === 'New Lesson');
 
-      await newBtn.onclick();
+      await byLabel(container, 'New Lesson').onclick();
 
       const [, newId] = mockData['schedule/class1/2'];
       expect(newId).toMatch(/^[0-9a-f]{32}$/);
       expect(mockData[`content/${newId}`]).toEqual({ title: DEFAULT_LESSON_TITLE });
       expect(onReload).toHaveBeenCalled();
+    });
+
+    it('Link Lesson adds the Lesson picked in the search popup to the end of that Day Index', async () => {
+      mockData['schedule/class1/2'] = ['hashA'];
+      const container = createEndButtonsContainer(2, { classId: 'class1', onReload });
+
+      await byLabel(container, 'Link Lesson').onclick();
+      await mockSearchPopupOptions.onSelect('hashB');
+
+      expect(mockData['schedule/class1/2']).toEqual(['hashA', 'hashB']);
+      expect(onReload).toHaveBeenCalled();
+    });
+
+    it('Link Lesson starts a Day Index that had no Lessons yet', async () => {
+      const container = createEndButtonsContainer(4, { classId: 'class1', onReload });
+
+      await byLabel(container, 'Link Lesson').onclick();
+      await mockSearchPopupOptions.onSelect('hashB');
+
+      expect(mockData['schedule/class1/4']).toEqual(['hashB']);
+    });
+  });
+
+  describe('createDateCell', () => {
+    it('holds both the full date (wide screens) and the short one (narrow screens)', () => {
+      const cell = createDateCell({ full: '11/2/2026 (Monday)', short: 'Mon 11/2' });
+
+      expect(cell.querySelector('.date-full').textContent).toBe('11/2/2026 (Monday)');
+      expect(cell.querySelector('.date-short').textContent).toBe('Mon 11/2');
     });
   });
 

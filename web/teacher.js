@@ -11,6 +11,7 @@ import { db } from './firebase-config.js';
 import { initializeDatabase } from './database-handle.js';
 import {
   getDateForDayIndex as sharedGetDateForDayIndex,
+  getDayDateLabels,
   getTodayDayIndex,
   getClassDateOffset,
   setClassDateOffset
@@ -25,6 +26,7 @@ import {
 } from "./error-ui-utils.js";
 import {
   createDayRow,
+  createDateCell,
   createInsertDayRow,
   createEndButtonsContainer,
   makeInsertDayHandler,
@@ -279,15 +281,14 @@ export async function createFinalRow(nextIndex, ctx) {
 
   // Day Index column
   const tdDay = document.createElement("td");
+  tdDay.className = "day-index-cell";
   tdDay.textContent = nextIndex;
   addRow.appendChild(tdDay);
 
   // Date column
-  const tdDate = document.createElement("td");
-  tdDate.textContent = await getDateForDayIndex(nextIndex, ctx.classId);
-  addRow.appendChild(tdDate);
+  addRow.appendChild(createDateCell(await getDayDateLabels(nextIndex, ctx.classId)));
 
-  // Lessons column with "Link Lesson" and "New Lesson" buttons
+  // Lessons column with just the New Lesson / Link Lesson buttons
   const tdLessons = document.createElement("td");
   tdLessons.className = "lessons-cell";
   tdLessons.appendChild(createEndButtonsContainer(nextIndex, ctx));
@@ -336,8 +337,8 @@ export async function renderScheduleTable(schedule, classId = currentClassId) {
 
     // Day row
     const lessons = schedule[dayIndex] || [];
-    const dateLabel = await getDateForDayIndex(dayIndex, classId);
-    const dayRow = await createDayRow(dayIndex, lessons, todayDayIndex, dateLabel, ctx);
+    const dateLabels = await getDayDateLabels(dayIndex, classId);
+    const dayRow = await createDayRow(dayIndex, lessons, todayDayIndex, dateLabels, ctx);
     scheduleTableBody.appendChild(dayRow);
   }
 
