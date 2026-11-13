@@ -25,3 +25,6 @@ dist-ssr
 
 # npm run check:clock output
 .clock-check/
+
+# npm run check:schedule output
+.schedule-check/

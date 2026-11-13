@@ -17,7 +17,8 @@
     "lint": "eslint .",
     "typecheck": "tsc -p jsconfig.json",
     "check:clock": "node scripts/clock-check.mjs",
-    "check:clock:full": "node scripts/clock-check-full.mjs"
+    "check:clock:full": "node scripts/clock-check-full.mjs",
+    "check:schedule": "node scripts/schedule-check.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
