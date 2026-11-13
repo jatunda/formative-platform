@@ -4,9 +4,9 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** closed
 
-- [ ] A multi-line code block containing `# comment here` renders that line in the code block, and the Lesson title is unchanged
-- [ ] A `---` line inside a code block stays in the code block
-- [ ] Round-trip (parse then generate DSL) preserves both
-- [ ] Indented `# ` lines inside code are preserved verbatim
+- [x] A multi-line code block containing `# comment here` renders that line in the code block, and the Lesson title is unchanged
+- [x] A `---` line inside a code block stays in the code block
+- [x] Round-trip (parse then generate DSL) preserves both
+- [x] Indented `# ` lines inside code are preserved verbatim
