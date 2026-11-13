@@ -12,6 +12,7 @@ import {
   getShiftAmount,
   withWorkingIndicator,
   savingSpinner,
+  textIcon,
 } from '../../ui-components.js';
 import { lineIcon } from '../../line-icons.js';
 
@@ -83,6 +84,15 @@ describe('ui-components', () => {
       } finally {
         vi.useRealTimers();
       }
+    });
+  });
+
+  describe('textIcon', () => {
+    it('is the glyph as text in an icon-sized span', () => {
+      const plus = textIcon('+');
+      expect(plus.tagName).toBe('SPAN');
+      expect(plus.className).toBe('text-icon');
+      expect(plus.textContent).toBe('+');
     });
   });
 

@@ -53,7 +53,7 @@ export const TAP_EXCEPTIONS = [
     selector: '.schedule-icon-btn',
     minWidth: 40,
     maxViewportWidth: 600,
-    reason: '➕ New Lesson and Link Lesson: 40px wide on a phone so a one-Lesson day fits 375px (ticket 02).',
+    reason: 'New Lesson (+) and Link Lesson: 40px wide on a phone so a one-Lesson day fits 375px (ticket 02).',
   },
 ];
 

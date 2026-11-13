@@ -1514,6 +1514,20 @@ ol.lesson-list {
   vertical-align: -0.125em;
 }
 
+/* A text glyph in a line icon's box (textIcon in ui-components.js), e.g.
+   New Lesson's "+": the same size as the link icon beside it, in bold light
+   text so it reads clearly on the gray button. */
+.text-icon {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  line-height: 1em;
+  text-align: center;
+  vertical-align: -0.125em;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
 /* The saving spinner (savingSpinner in ui-components.js) a schedule button
    shows in place of its icon while a change saves. */
 .line-icon-spin {

@@ -4,7 +4,7 @@
 
 **Blocked by:** 07 (Flat icons). Ordering note: tickets 06–11 change the same schedule rows and stylesheet, so they run in order to avoid merge conflicts.
 
-**Status:** ready-for-agent
+**Status:** closed
 
-- [ ] The "+" reads clearly on the gray button on both schedule pages
-- [ ] New Lesson and Link Lesson buttons are the same size; aria-label and tooltip unchanged
+- [x] The "+" reads clearly on the gray button on both schedule pages
+- [x] New Lesson and Link Lesson buttons are the same size; aria-label and tooltip unchanged
