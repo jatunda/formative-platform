@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   addBusinessDays, createLocalDate, doNowsHeading, getBusinessDaysBetween, listedBusinessDay,
-  localDateString, shortDateLabel,
+  localDateString, monthNameDayLabel, shortDateLabel,
 } from '../../business-days.js';
 
 describe('localDateString', () => {
@@ -20,14 +20,14 @@ const nov = (day) => new Date(2026, 10, day, 10, 30);
 
 describe('doNowsHeading', () => {
   it("names a business day's own date, with no leading zeros or year", () => {
-    expect(doNowsHeading(nov(11))).toBe('11/11 Do Nows');
-    expect(doNowsHeading(new Date(2026, 0, 5))).toBe('1/5 Do Nows');
+    expect(doNowsHeading(nov(11))).toBe('Do Now - November 11');
+    expect(doNowsHeading(new Date(2026, 0, 5))).toBe('Do Now - January 5');
   });
 
   it("names Friday's date on Saturday and Sunday, the day whose Do Nows are listed", () => {
-    expect(doNowsHeading(nov(14))).toBe('11/13 Do Nows');
-    expect(doNowsHeading(nov(15))).toBe('11/13 Do Nows');
-    expect(doNowsHeading(nov(16))).toBe('11/16 Do Nows');
+    expect(doNowsHeading(nov(14))).toBe('Do Now - November 13');
+    expect(doNowsHeading(nov(15))).toBe('Do Now - November 13');
+    expect(doNowsHeading(nov(16))).toBe('Do Now - November 16');
   });
 
   it("lists the same business day as Today's Day Index on a weekend", () => {
@@ -36,6 +36,13 @@ describe('doNowsHeading', () => {
       expect(getBusinessDaysBetween('2026-11-09', nov(day))).toBe(4);
       expect(listedBusinessDay(nov(day))).toEqual(addBusinessDays(new Date(2026, 10, 9), 4));
     }
+  });
+});
+
+describe('monthNameDayLabel', () => {
+  it('spells out the month of the real calendar date, with no weekday, leading zero or year', () => {
+    expect(monthNameDayLabel(nov(14))).toBe('November 14');
+    expect(monthNameDayLabel(new Date(2027, 0, 5))).toBe('January 5');
   });
 });
 

@@ -4,7 +4,7 @@ import { db } from './firebase-config.js';
 import { initializeDatabase } from './database-handle.js';
 import { lessonStore } from './lesson-store.js';
 import { getTodayDayIndex } from './date-utils.js';
-import { localDateString, shortDateLabel } from './business-days.js';
+import { localDateString, monthNameDayLabel } from './business-days.js';
 import { renderMultipleContent } from './content-renderer.js';
 import { mountQuestionEmbeds } from './question-embed.js';
 import { NO_CONTENT_FOR_TODAY } from './constants.js';
@@ -13,14 +13,14 @@ import { showErrorState, showSlowConnectionMessage, withConnectionTimeout } from
 initializeDatabase(db);
 
 /**
- * Show today's real calendar date (e.g. "Thu 11/12") in the header row, so
+ * Show today's real calendar date (e.g. "November 12") in the header row, so
  * students can see the date without asking.
  * @param {HTMLTimeElement} slot
  * @param {Date} [today=new Date()]
  */
 export function renderTodayDate(slot, today = new Date()) {
   slot.dateTime = localDateString(today);
-  slot.textContent = shortDateLabel(today);
+  slot.textContent = monthNameDayLabel(today);
 }
 
 /**

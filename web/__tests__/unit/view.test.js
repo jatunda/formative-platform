@@ -79,7 +79,7 @@ describe('view', () => {
     it("shows today's real calendar date, even on a weekend", () => {
       const slot = document.createElement('time');
       renderTodayDate(slot, new Date(2026, 10, 14, 8));
-      expect(slot.textContent).toBe('Sat 11/14');
+      expect(slot.textContent).toBe('November 14');
       expect(slot.getAttribute('datetime')).toBe('2026-11-14');
     });
 
@@ -89,7 +89,7 @@ describe('view', () => {
       try {
         const slot = document.createElement('time');
         renderTodayDate(slot);
-        expect(slot.textContent).toBe('Thu 11/12');
+        expect(slot.textContent).toBe('November 12');
       } finally {
         vi.useRealTimers();
       }

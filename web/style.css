@@ -2225,3 +2225,15 @@ ol.lesson-list {
   color: var(--text-secondary);
   white-space: nowrap;
 }
+
+/* On the narrowest phones a long month ("September 30") would push the back
+   link onto two lines, so the date shrinks a little to keep one row. */
+@media (max-width: 359px) {
+  .do-now-header {
+    gap: var(--spacing-sm);
+  }
+
+  .do-now-header time {
+    font-size: 0.875rem;
+  }
+}
