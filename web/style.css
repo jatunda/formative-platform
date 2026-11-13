@@ -810,6 +810,12 @@ select:focus,
   flex-wrap: wrap;
 }
 
+/* A collapsed pane hides its body via the hidden attribute; the display: flex
+   rules on these blocks would otherwise win over it. */
+.lesson-planning-pane [hidden] {
+  display: none;
+}
+
 /* "−3 days" / "+3 days" under each pane's table (lesson-planning.js). */
 .planning-window-resize {
   display: flex;

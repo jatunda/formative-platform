@@ -87,6 +87,13 @@ vi.mock('../../ui-components.js', () => ({
     btn.onclick = onClick;
     return btn;
   },
+  createIconButton: (icon, label, onClick) => {
+    const btn = document.createElement('button');
+    btn.textContent = icon;
+    btn.setAttribute('aria-label', label);
+    btn.onclick = onClick;
+    return btn;
+  },
 }));
 
 const dayIndicesShown = (containerEl) =>
@@ -299,6 +306,99 @@ describe('lesson-planning', () => {
         const freshEl = document.createElement('div');
         await renderClassPane('csa', 'CS A', freshEl);
 
+        expect(dayIndicesShown(freshEl)).toEqual(['10', '11', '12']);
+      });
+    });
+
+    describe('collapsing a Class', () => {
+      const chevron = (containerEl) => containerEl.querySelector('.lesson-planning-pane-header button[aria-expanded]');
+      const isShown = (el) => el !== null && !el.hidden;
+      const bodyShown = (containerEl) => ({
+        table: isShown(containerEl.querySelector('.schedule-pane')),
+        resize: isShown(containerEl.querySelector('.planning-window-resize')),
+        offset: isShown(containerEl.querySelector('.date-offset-control')),
+      });
+
+      it('puts an expanded chevron button before the Class name', async () => {
+        mockGetFullSchedule.mockResolvedValue({});
+        const containerEl = document.createElement('div');
+        await renderClassPane('csa', 'CS A', containerEl);
+
+        const header = containerEl.querySelector('.lesson-planning-pane-header');
+        expect(header.firstElementChild).toBe(chevron(containerEl));
+        expect(chevron(containerEl).getAttribute('aria-expanded')).toBe('true');
+        expect(chevron(containerEl).textContent).toBe('▾');
+        expect(bodyShown(containerEl)).toEqual({ table: true, resize: true, offset: true });
+      });
+
+      it('hides the table, window-size buttons and Date Offset control when clicked, and shows them again', async () => {
+        mockGetFullSchedule.mockResolvedValue({});
+        const containerEl = document.createElement('div');
+        await renderClassPane('csa', 'CS A', containerEl);
+
+        await chevron(containerEl).onclick();
+
+        expect(chevron(containerEl).getAttribute('aria-expanded')).toBe('false');
+        expect(chevron(containerEl).textContent).toBe('▸');
+        expect(bodyShown(containerEl)).toEqual({ table: false, resize: false, offset: false });
+        expect(containerEl.querySelector('h2').textContent).toBe('CS A');
+
+        await chevron(containerEl).onclick();
+
+        expect(chevron(containerEl).getAttribute('aria-expanded')).toBe('true');
+        expect(bodyShown(containerEl)).toEqual({ table: true, resize: true, offset: true });
+      });
+
+      it("stays collapsed, at its widened size, across the pane's own re-renders", async () => {
+        mockGetFullSchedule.mockResolvedValue({});
+        const { createDayRow } = await import('../../schedule-day-view.js');
+        const containerEl = document.createElement('div');
+        await renderClassPane('csa', 'CS A', containerEl);
+        await resizeButton(containerEl, '+3 days').onclick();
+        await chevron(containerEl).onclick();
+
+        await createDayRow.mock.calls.at(-1)[4].onReload();
+
+        expect(chevron(containerEl).getAttribute('aria-expanded')).toBe('false');
+        expect(bodyShown(containerEl).table).toBe(false);
+        await chevron(containerEl).onclick();
+        expect(dayIndicesShown(containerEl)).toHaveLength(6);
+      });
+
+      it('keeps each pane\'s collapse state and window size across the all-classes shift', async () => {
+        document.body.innerHTML = '<div id="classPanesContainer"></div>';
+        mockData['classes'] = {
+          csa: { name: 'CS A', displayOrder: 1 },
+          csp: { name: 'CS P', displayOrder: 2 },
+        };
+        mockGetFullSchedule.mockResolvedValue({});
+        await loadAndRenderAllPanes();
+        const [csaEl, cspEl] = document.querySelectorAll('.lesson-planning-pane');
+        await resizeButton(csaEl, '+3 days').onclick();
+        await chevron(cspEl).onclick();
+
+        await applyBulkShift(1);
+
+        const [csaAfter, cspAfter] = document.querySelectorAll('.lesson-planning-pane');
+        expect(dayIndicesShown(csaAfter)).toHaveLength(6);
+        expect(chevron(csaAfter).getAttribute('aria-expanded')).toBe('true');
+        expect(chevron(cspAfter).getAttribute('aria-expanded')).toBe('false');
+        expect(bodyShown(cspAfter).table).toBe(false);
+      });
+
+      it('shows every Class expanded at 3 days on a fresh load (e.g. a page reload)', async () => {
+        document.body.innerHTML = '<div id="classPanesContainer"></div>';
+        mockData['classes'] = { csa: { name: 'CS A', displayOrder: 1 } };
+        mockGetFullSchedule.mockResolvedValue({});
+        await loadAndRenderAllPanes();
+        const paneEl = document.querySelector('.lesson-planning-pane');
+        await resizeButton(paneEl, '+3 days').onclick();
+        await chevron(paneEl).onclick();
+
+        await loadAndRenderAllPanes();
+
+        const freshEl = document.querySelector('.lesson-planning-pane');
+        expect(chevron(freshEl).getAttribute('aria-expanded')).toBe('true');
         expect(dayIndicesShown(freshEl)).toEqual(['10', '11', '12']);
       });
     });
