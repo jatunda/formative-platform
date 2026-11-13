@@ -444,9 +444,9 @@ describe('lesson-planning', () => {
       });
     });
 
-    it('has no Insert Day rows: each day gets a "+" on the line above it, and the last day one below it too', async () => {
-      mockGetFullSchedule.mockResolvedValue({});
-      const { createDayRow, makeInsertDayHandler, addInsertDayPlus } = await import('../../schedule-day-view.js');
+    it('has no Insert Day rows: each day gets the insert handler and the last stored Day Index, for its "+" above', async () => {
+      mockGetFullSchedule.mockResolvedValue({ 11: ['a'] });
+      const { createDayRow, makeInsertDayHandler } = await import('../../schedule-day-view.js');
       const containerEl = document.createElement('div');
 
       await renderClassPane('csa', 'CS A', containerEl);
@@ -455,9 +455,30 @@ describe('lesson-planning', () => {
       const rows = [...containerEl.querySelectorAll('tbody > tr')];
       expect(rows.map((r) => r.className)).toEqual(['day-row', 'day-row', 'day-row']);
       expect(createDayRow.mock.calls.map((c) => c[4].onInsertDay)).toEqual([onInsertDay, onInsertDay, onInsertDay]);
+      expect(createDayRow.mock.calls.map((c) => c[4].lastDayIndex)).toEqual([11, 11, 11]);
+    });
+
+    it('puts a "+" below the last day in the window when a stored day comes after it', async () => {
+      mockGetFullSchedule.mockResolvedValue({ 20: ['later'] });
+      const { makeInsertDayHandler, addInsertDayPlus } = await import('../../schedule-day-view.js');
+      const containerEl = document.createElement('div');
+
+      await renderClassPane('csa', 'CS A', containerEl);
+
+      const rows = [...containerEl.querySelectorAll('tbody > tr')];
       expect(addInsertDayPlus).toHaveBeenCalledTimes(1);
       expect(rows.at(-1).dataset.plusBelow).toBe('13:below');
-      expect(addInsertDayPlus.mock.calls[0][2]).toBe(onInsertDay);
+      expect(addInsertDayPlus.mock.calls[0][2]).toBe(makeInsertDayHandler.mock.results.at(-1).value);
+    });
+
+    it('puts no "+" below the window when no stored day comes after it: that would only add an empty day (ticket 13)', async () => {
+      mockGetFullSchedule.mockResolvedValue({ 12: ['last'] });
+      const { addInsertDayPlus } = await import('../../schedule-day-view.js');
+      const containerEl = document.createElement('div');
+
+      await renderClassPane('csa', 'CS A', containerEl);
+
+      expect(addInsertDayPlus).not.toHaveBeenCalled();
     });
 
     it('only preloads lesson titles for hashes inside the Planning Window', async () => {

@@ -27,7 +27,6 @@ import {
   createDateCell,
   createEndButtonsContainer,
   makeInsertDayHandler,
-  addInsertDayPlus,
   makeDeleteDayHandler,
   getLessonTitles
 } from "./schedule-day-view.js";
@@ -315,7 +314,9 @@ export async function renderScheduleTable(schedule, classId = currentClassId) {
   const scheduleTableBody = document.querySelector("#scheduleTable tbody");
   scheduleTableBody.innerHTML = "";
   const dayIndexes = Object.keys(schedule).map(Number).sort((a, b) => a - b);
-  const maxDayIndex = dayIndexes.length > 0 ? Math.max(...dayIndexes) : 0;
+  // The last stored Day Index (-1 for an empty Schedule, which still shows day 0).
+  const lastDayIndex = dayIndexes.length > 0 ? Math.max(...dayIndexes) : -1;
+  const maxDayIndex = Math.max(lastDayIndex, 0);
 
   // Get today's day index for highlighting
   let todayDayIndex;
@@ -333,13 +334,16 @@ export async function renderScheduleTable(schedule, classId = currentClassId) {
   }
   await getLessonTitles(allLessonHashes);
 
-  // onInsertDay gives each day row an Insert Day "+" on the line above it;
-  // one more goes below the last day, on its line with the add-day row.
+  // onInsertDay gives each stored day's row an Insert Day "+" on the line
+  // above it. There is none below the last day: an empty day there isn't
+  // stored, so the add-day row's New Lesson / Link Lesson buttons add a day
+  // after the last one, and only once it holds a Lesson (ticket 13).
   const ctx = {
     classId,
     onReload: loadFullSchedule,
     onDeleteDay: makeDeleteDayHandler(classId, loadFullSchedule),
-    onInsertDay: makeInsertDayHandler(classId, maxDayIndex, loadFullSchedule)
+    onInsertDay: makeInsertDayHandler(classId, lastDayIndex, loadFullSchedule),
+    lastDayIndex
   };
 
   // Render all days
@@ -353,7 +357,6 @@ export async function renderScheduleTable(schedule, classId = currentClassId) {
 
   // Final row for adding a new day
   const nextIndex = maxDayIndex + 1;
-  addInsertDayPlus(dayRows[dayRows.length - 1], nextIndex, ctx.onInsertDay, 'below');
   const finalRow = await createFinalRow(nextIndex, ctx);
   scheduleTableBody.appendChild(finalRow);
 }

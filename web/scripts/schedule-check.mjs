@@ -19,8 +19,8 @@
 //   top and one bottom edge, so the row's borders form straight lines
 //   (ticket 09); report.json also records each day row's height;
 // - every Insert Day "+" sits in the table's left gutter, centred on the line
-//   between days it belongs to, and every table has one below its last
-//   day (ticket 10);
+//   between days it belongs to (ticket 10), and none sits past the last
+//   stored day, where it would only add an empty day (ticket 13);
 // - axe also runs with the lesson actions menu and the Link Lesson popup
 //   open (POPUPS), so a pop-up outside the page's landmarks is caught;
 // - on touch sizes, every control in the schedule rows is at least 44px tall
@@ -212,11 +212,20 @@ async function checkPage(page, url, size) {
           line: (below ? row.bottom : row.top) + scrollY,
         };
       }));
-    // The "+" below the last day (ticket 10), on both pages.
-    const tablesWithoutEndPlus = tables.filter((table) => !table.querySelector('.insert-day-below')).map(tableName);
+    // "+"s past the last stored day (ticket 13). The fixtures store no day
+    // after a Planning Window, so on every table the last day row with a
+    // Lesson is the last stored day; a "+" inserts at its row (above) or the
+    // row after (below), which must not be past that day.
+    const strayPluses = tables.flatMap((table) => {
+      const dayRows = [...table.querySelectorAll('tbody tr')];
+      const lastStored = dayRows.map((tr) => Boolean(tr.querySelector('.lesson-cluster'))).lastIndexOf(true);
+      return dayRows.flatMap((tr, i) => [...tr.querySelectorAll('.insert-day-btn')]
+        .filter((btn) => i + (btn.classList.contains('insert-day-below') ? 1 : 0) > lastStored)
+        .map((btn) => `${btn.classList.contains('insert-day-below') ? 'below' : 'above'} ${rowLabel(table, tr)}`));
+    });
     return {
       pluses,
-      tablesWithoutEndPlus,
+      strayPluses,
       scrollWidth: document.documentElement.scrollWidth,
       shortTables,
       targets,

@@ -173,7 +173,8 @@ export async function renderClassPane(classId, className, containerEl, uiState =
   const { windowSize } = uiState;
   const schedule = await getFullSchedule(classId);
   const dayIndexes = Object.keys(schedule).map(Number);
-  const maxDayIndex = dayIndexes.length > 0 ? Math.max(...dayIndexes) : 0;
+  // The last stored Day Index (-1 for an empty Schedule).
+  const lastDayIndex = dayIndexes.length > 0 ? Math.max(...dayIndexes) : -1;
   const currentOffset = await getClassDateOffset(classId);
   const todayDayIndex = await getTodayDayIndex(classId);
 
@@ -192,13 +193,16 @@ export async function renderClassPane(classId, className, containerEl, uiState =
     renderClassPane(classId, className, containerEl, { ...paneUiStates.get(classId), ...change });
   const renderAtSize = (/** @type {number} */ size) => rerender({ windowSize: size });
   const onReload = () => rerender();
-  const onInsertDay = makeInsertDayHandler(classId, maxDayIndex, onReload);
-  // onInsertDay gives each day row an Insert Day "+" on the line above it.
+  const onInsertDay = makeInsertDayHandler(classId, lastDayIndex, onReload);
+  // onInsertDay gives each day row up to the last stored day an Insert Day
+  // "+" on the line above it. Past that day, inserting would only add an
+  // empty day, which isn't stored, so there is no "+" (ticket 13).
   const ctx = {
     classId,
     onReload,
     onDeleteDay: makeDeleteDayHandler(classId, onReload),
-    onInsertDay
+    onInsertDay,
+    lastDayIndex
   };
 
   const header = document.createElement('div');
@@ -254,9 +258,11 @@ export async function renderClassPane(classId, className, containerEl, uiState =
   }
   tbody.append(...dayRows);
 
-  // One more "+" below the last day: N+1 insert points for N days.
+  // One more "+" below the window's last day, when a stored day follows it.
   const afterWindowIndex = windowIndexes[windowIndexes.length - 1] + 1;
-  addInsertDayPlus(dayRows[dayRows.length - 1], afterWindowIndex, onInsertDay, 'below');
+  if (afterWindowIndex <= lastDayIndex) {
+    addInsertDayPlus(dayRows[dayRows.length - 1], afterWindowIndex, onInsertDay, 'below');
+  }
 
   table.appendChild(tbody);
 

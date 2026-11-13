@@ -164,12 +164,13 @@ function misplacedPluses(pluses, rows) {
  * A schedule table with no day over one Lesson: how wide its content is and
  * how wide its pane is.
  * @typedef {{ scrollWidth: number, shortTables: ShortTable[], targets: Target[] | null, rows: DayRow[], pluses: InsertPlus[],
- *   tablesWithoutEndPlus: string[], coarse: boolean, touch: boolean, viewportWidth: number, errors: string[],
+ *   strayPluses: string[], coarse: boolean, touch: boolean, viewportWidth: number, errors: string[],
  *   violations: string[] }} Checked
  * One render as measured: `scrollWidth` is the document's; `targets` is null
  * where tap targets aren't checked (a mouse size); `rows` are the day rows
  * of every schedule table shown, and `pluses` their Insert Day "+"s;
- * `tablesWithoutEndPlus` names the tables with no "+" below their last day.
+ * `strayPluses` labels the "+"s past the last stored day, where inserting
+ * would only add an empty day, which isn't stored (ticket 13).
  */
 
 /**
@@ -186,7 +187,7 @@ export function describeFailure(r) {
     ...(r.targets ?? []).map((t) => tapTargetProblem(t, r.viewportWidth)),
     misalignedRows(r.rows),
     misplacedPluses(r.pluses, r.rows),
-    ...r.tablesWithoutEndPlus.map((name) => `${name}: no Insert Day "+" below the last day`),
+    ...r.strayPluses.map((label) => `Insert Day "+" ${label} is past the last stored day`),
     ...r.errors,
     ...r.violations,
   ].filter((why) => typeof why === 'string');
