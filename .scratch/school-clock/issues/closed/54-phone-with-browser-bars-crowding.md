@@ -10,7 +10,7 @@ Built behaviour: closed tickets 43 (the phone's visible height, `--bars`), 52 (t
 
 **Blocked by:** None (can start immediately)
 
-**Status:** needs-triage
+**Status:** closed (won't do)
 
 - [ ] Eric has decided what gives at these heights
 - [ ] `npm run check:clock -- --size 375x567 --size 375x611 --size 360x640 --layout countdown,clock,countup` passes, with and without `--editing`
@@ -20,3 +20,5 @@ Built behaviour: closed tickets 43 (the phone's visible height, `--bars`), 52 (t
 ## Comments
 
 Found while building ticket 52 (see its `## Comments`).
+
+**2026-11-12: closed, won't do.** Eric decided not to pursue this: small phones with the browser's toolbars showing may still crowd in some states with two or three Readouts. `check:clock:full` does not cover these sizes, so nothing tracks it.
