@@ -1,4 +1,4 @@
-import { matchAllOutsideInlineCode } from "./inline-code.js";
+import { matchAllOutsideInlineCode, replaceOutsideInlineCode } from "./inline-code.js";
 
 // Shared pattern for Question Links: [[q:slug]], [[q:slug|text]]. A Question
 // Link is the Question equivalent of a Page Link, but lives in its own
@@ -60,7 +60,8 @@ export function extractQuestionLinkSlugs(parsedContent) {
 
 /**
  * Replace every `[[q:oldSlug` Question Link reference with `[[q:newSlug`,
- * without touching an unrelated slug that happens to share a prefix. Returns
+ * without touching an unrelated slug that happens to share a prefix. Links
+ * written as inline code or in code blocks stay as written. Returns
  * a new content object; does not mutate the input. Used when a Question's
  * Slug is renamed, to fix up every Page that links to it.
  * @param {{title: string, blocks: Array}} parsedContent
@@ -74,7 +75,7 @@ export function rewriteQuestionSlugInContent(parsedContent, oldSlug, newSlug) {
   function rewriteItems(items) {
     return (items || []).map((item) => {
       if (item.type === "text") {
-        return { ...item, value: item.value.replace(boundaryPattern, `[[q:${newSlug}`) };
+        return { ...item, value: replaceOutsideInlineCode(item.value, boundaryPattern, `[[q:${newSlug}`) };
       }
       if (item.type === "collapsible") {
         return { ...item, content: rewriteItems(item.content) };

@@ -1,4 +1,4 @@
-import { matchAllOutsideInlineCode } from "./inline-code.js";
+import { matchAllOutsideInlineCode, replaceOutsideInlineCode } from "./inline-code.js";
 
 // Shared pattern for Obsidian-style [[...]] links: [[slug]], [[slug|text]],
 // [[#Header]], [[#Header|text]]. Used both to render them (content-renderer.js)
@@ -66,7 +66,8 @@ export function extractPageLinkSlugs(parsedContent) {
  * touching an unrelated slug that happens to share a prefix (e.g. renaming
  * "syllabus" must not touch "syllabus-2026") - Slugs are validated to
  * lowercase-alphanumeric-and-hyphens only, so no regex escaping is needed.
- * Returns a new content object; does not mutate the input. Used by Slug
+ * Links written as inline code or in code blocks are examples, not links,
+ * and stay as written. Returns a new content object; does not mutate the input. Used by Slug
  * Rename to fix up every Page that links to the renamed Page.
  * @param {{title: string, blocks: Array}} parsedContent
  * @param {string} oldSlug
@@ -79,7 +80,7 @@ export function rewriteSlugInContent(parsedContent, oldSlug, newSlug) {
   function rewriteItems(items) {
     return (items || []).map((item) => {
       if (item.type === "text") {
-        return { ...item, value: item.value.replace(boundaryPattern, `[[${newSlug}`) };
+        return { ...item, value: replaceOutsideInlineCode(item.value, boundaryPattern, `[[${newSlug}`) };
       }
       if (item.type === "collapsible") {
         return { ...item, content: rewriteItems(item.content) };
