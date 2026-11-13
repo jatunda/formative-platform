@@ -133,4 +133,19 @@ describe('rewriteQuestionSlugInContent', () => {
     rewriteQuestionSlugInContent(content, 'old-slug', 'new-slug');
     expect(content.blocks[0].content[0].value).toBe('[[q:old-slug]]');
   });
+
+  it('leaves a Question Link written as inline code alone, since it renders as a literal example', () => {
+    const content = {
+      title: 'T',
+      blocks: [{ type: 'question', content: [{ type: 'text', value: 'Type `[[q:old-slug]]` to get [[q:old-slug]].\nOr `see [[q:old-slug|Text]]` vs [[q:old-slug|Text]]' }] }]
+    };
+    const result = rewriteQuestionSlugInContent(content, 'old-slug', 'new-slug');
+    expect(result.blocks[0].content[0].value).toBe('Type `[[q:old-slug]]` to get [[q:new-slug]].\nOr `see [[q:old-slug|Text]]` vs [[q:new-slug|Text]]');
+  });
+
+  it('leaves a Question Link inside a code block alone', () => {
+    const content = { title: 'T', blocks: [{ type: 'question', content: [{ type: 'code', value: '[[q:old-slug]]' }] }] };
+    const result = rewriteQuestionSlugInContent(content, 'old-slug', 'new-slug');
+    expect(result.blocks[0].content[0].value).toBe('[[q:old-slug]]');
+  });
 });

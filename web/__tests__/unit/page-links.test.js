@@ -185,4 +185,19 @@ describe('rewriteSlugInContent', () => {
     const content = { title: 'T', blocks: [{ type: 'question', content: [{ type: 'collapsible', title: 'Empty', expanded: false }] }] };
     expect(() => rewriteSlugInContent(content, 'old-slug', 'new-slug')).not.toThrow();
   });
+
+  it('leaves a Page Link written as inline code alone, since it renders as a literal example', () => {
+    const content = {
+      title: 'T',
+      blocks: [{ type: 'question', content: [{ type: 'text', value: 'Type `[[old-slug]]` to get [[old-slug]].\nOr `see [[old-slug|Text]]` vs [[old-slug|Text]]' }] }]
+    };
+    const result = rewriteSlugInContent(content, 'old-slug', 'new-slug');
+    expect(result.blocks[0].content[0].value).toBe('Type `[[old-slug]]` to get [[new-slug]].\nOr `see [[old-slug|Text]]` vs [[new-slug|Text]]');
+  });
+
+  it('leaves a Page Link inside a code block alone', () => {
+    const content = { title: 'T', blocks: [{ type: 'question', content: [{ type: 'code', value: '[[old-slug]]' }] }] };
+    const result = rewriteSlugInContent(content, 'old-slug', 'new-slug');
+    expect(result.blocks[0].content[0].value).toBe('[[old-slug]]');
+  });
 });

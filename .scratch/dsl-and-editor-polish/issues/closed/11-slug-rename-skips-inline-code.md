@@ -6,9 +6,9 @@ Reuse the code-span check in `web/inline-code.js` (added in the code-review fixe
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** closed
 
-- [ ] Renaming a Page Slug rewrites real links but not ones inside backticks
-- [ ] Same for Question Slugs (`[[q:…]]`)
-- [ ] Display-text forms (`[[old-slug|Text]]`) follow the same rule
-- [ ] Links inside code blocks stay untouched (regression test)
+- [x] Renaming a Page Slug rewrites real links but not ones inside backticks
+- [x] Same for Question Slugs (`[[q:…]]`)
+- [x] Display-text forms (`[[old-slug|Text]]`) follow the same rule
+- [x] Links inside code blocks stay untouched (regression test)
