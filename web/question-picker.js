@@ -6,6 +6,7 @@
 import { getAllQuestions } from './question-database-utils.js';
 import { getClasses } from './database-utils.js';
 import { deriveQuestionLabel } from './question-label.js';
+import { attachSearchListKeys } from './search-list-keys.js';
 
 /**
  * Show a popup listing every Question, filterable by Class and topic.
@@ -91,9 +92,14 @@ export function showQuestionPicker({ onSelect }) {
         }
       }
 
-      classSelect.onchange = renderResults;
-      searchInput.oninput = renderResults;
-      renderResults();
+      const keys = attachSearchListKeys({ popup, input: searchInput, list: resultsDiv });
+      const update = () => {
+        renderResults();
+        keys.refresh();
+      };
+      classSelect.onchange = update;
+      searchInput.oninput = update;
+      update();
 
       box.appendChild(closeBtn);
       box.appendChild(classSelect);
