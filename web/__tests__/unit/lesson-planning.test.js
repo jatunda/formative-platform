@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { expectConsoleErrors } from '../helpers/quiet-console.js';
+import { lineIcon } from '../../line-icons.js';
 import {
   initializeBulkShiftControl,
   applyBulkShift,
@@ -407,18 +408,31 @@ describe('lesson-planning', () => {
     describe('Full schedule link', () => {
       const scheduleLink = (containerEl) => containerEl.querySelector('.lesson-planning-pane-header a');
 
-      it("sits right after the Class name and opens that Class's Full Schedule at today, in the same tab", async () => {
+      it("sits right after the Class name and opens that Class's Full Schedule at today, in a new tab", async () => {
         mockGetFullSchedule.mockResolvedValue({});
         const containerEl = document.createElement('div');
         await renderClassPane('csa', 'CS A', containerEl);
 
         const link = scheduleLink(containerEl);
         expect(containerEl.querySelector('h2').nextElementSibling).toBe(link);
-        expect(link.textContent).toBe('↗');
         expect(link.getAttribute('href')).toBe('teacher.html?class=csa&scroll=today');
-        expect(link.target).toBe('');
+        expect(link.target).toBe('_blank');
+        expect(link.rel).toBe('noopener');
         expect(link.title).toBe('Full schedule');
         expect(link.getAttribute('aria-label')).toBe('Full schedule for CS A');
+      });
+
+      it('shows a flat open-in-new icon instead of a text arrow', async () => {
+        mockGetFullSchedule.mockResolvedValue({});
+        const containerEl = document.createElement('div');
+        await renderClassPane('csa', 'CS A', containerEl);
+
+        const link = scheduleLink(containerEl);
+        expect(link.textContent).toBe('');
+        const svg = link.querySelector('svg');
+        expect(svg.getAttribute('class')).toBe('line-icon');
+        expect(svg.getAttribute('aria-hidden')).toBe('true');
+        expect(svg.innerHTML).toBe(lineIcon('openInNew', 'line-icon').innerHTML);
       });
 
       it('stays visible when the Class is collapsed', async () => {

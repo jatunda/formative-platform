@@ -13,6 +13,12 @@ describe('lineIcon', () => {
     expect(svg.innerHTML).toBe('<path d="M12 5v14M5 12h14"></path>');
   });
 
+  it('draws open-in-new as a square open at the top right with an arrow leaving that corner', () => {
+    expect(lineIcon('openInNew', 'line-icon').innerHTML).toBe(
+      '<path d="M11 5H6a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-5"></path>'
+      + '<path d="M14 4h6v6M20 4l-9 9"></path>');
+  });
+
   it('gives each call its own element', () => {
     expect(lineIcon('check', 'a')).not.toBe(lineIcon('check', 'a'));
   });

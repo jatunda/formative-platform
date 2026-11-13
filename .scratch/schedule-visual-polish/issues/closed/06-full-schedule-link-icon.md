@@ -4,8 +4,8 @@
 
 **Blocked by:** 01 (Shared line-icon module), 02 (Short dates), 03 (lang and main), 04 (Lesson title tooltip). Ordering note: tickets 06–11 change the same schedule rows and stylesheet, so they run in order to avoid merge conflicts.
 
-**Status:** ready-for-agent
+**Status:** closed
 
-- [ ] Icon matches the reference shape and sits neatly beside the Class name
-- [ ] Opens in a new tab and scrolls to today there
-- [ ] Tooltip "Full schedule" and the aria-label are kept; the link stays visible when the Class is collapsed
+- [x] Icon matches the reference shape and sits neatly beside the Class name
+- [x] Opens in a new tab and scrolls to today there
+- [x] Tooltip "Full schedule" and the aria-label are kept; the link stays visible when the Class is collapsed
