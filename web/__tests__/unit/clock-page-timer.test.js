@@ -1,17 +1,15 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { initClockApp } from '../../clock/clock.js';
-import { SETTINGS_KEY } from '../../clock/clock-storage.js';
 import { createFakeStorage } from '../helpers/fake-storage.js';
 import { createFakeSoundPlayer } from '../helpers/fake-sound-player.js';
+import { accessibleName, isShown } from '../helpers/clock-dom.js';
+import {
+  button, clockMount as mount, createRealClock, openClockPage, savedSettings as saved, storageWith,
+} from '../helpers/clock-page.js';
 
 const SEC = 1000;
 const MIN = 60 * SEC;
-const mount = () => document.getElementById('clockApp');
-const isShown = (node) => !node.closest('[hidden]');
-const nameOf = (node) => node.getAttribute('aria-label') ?? node.textContent.replace(/\s+/g, ' ').trim();
 const visibleButtons = (root) => [...root.querySelectorAll('button')].filter(isShown);
-const buttonIn = (root, name) => visibleButtons(root).find((b) => nameOf(b) === name);
-const timerControl = () => buttonIn(mount().querySelector('.clock-top'), 'Timer');
+const timerControl = () => button('Timer', mount().querySelector('.clock-top'));
 
 /** The picker: a dialog named "Start a timer". */
 const picker = () => {
@@ -23,7 +21,7 @@ const pickerOpen = () => isShown(picker());
 /** A picker button, opening the picker with the Timer control first if it's closed. */
 const pick = (name) => {
   if (!pickerOpen()) timerControl().click();
-  buttonIn(picker(), name).click();
+  button(name, picker()).click();
 };
 const field = (label) => [...picker().querySelectorAll('label')]
   .find((l) => l.textContent.trim().startsWith(label)).querySelector('input');
@@ -36,27 +34,26 @@ function typeDuration(minutes, seconds = '') {
 const quickPicks = () => {
   if (!pickerOpen()) timerControl().click();
   const group = picker().querySelector('[role="group"][aria-labelledby="clock-picker-recent"]');
-  return isShown(group) ? visibleButtons(group).map(nameOf) : [];
+  return isShown(group) ? visibleButtons(group).map(accessibleName) : [];
 };
 
 /** The running timer in the big spot: its ring, digits and buttons. */
 const ring = () => mount().querySelector('.clock-stage [role="group"][aria-label="Timer"]');
 const ringShown = () => Boolean(ring()) && isShown(ring());
 const digits = () => ring().querySelector('[role="timer"]');
-const ringButton = (name) => buttonIn(ring(), name);
+const ringButton = (name) => button(name, ring());
 /** The line above the digits: "5:00 timer". */
 const title = () => ring().querySelector('.clock-ring__title').textContent.trim();
 /** The arc's length: the share of time left, out of 100. */
 const arc = () => Number.parseFloat(ring().querySelector('.clock-ring__arc').getAttribute('stroke-dasharray'));
 const ringing = () => mount().querySelector('[role="alertdialog"]');
-const saved = (storage) => JSON.parse(storage.getItem(SETTINGS_KEY));
 
 // Tue 2026-10-27, 10:40, in Period 3 of an All Day.
 const START = new Date(2026, 9, 27, 10, 40).getTime();
 
 describe('School Clock classroom timer', () => {
   let app;
-  let t;
+  let clock;
   let storage;
   let player;
 
@@ -64,22 +61,22 @@ describe('School Clock classroom timer', () => {
   function open({ sound = {}, search = '' } = {}) {
     app?.destroy();
     player = createFakeSoundPlayer(sound);
-    app = initClockApp({
-      realNow: () => t, storage, tabStorage: createFakeStorage(), soundPlayer: player,
+    app = openClockPage({
+      clock, storage, soundPlayer: player,
       prefersReducedMotion: () => false, search,
     });
   }
   /** Time passes and the page ticks as usual. */
-  const advance = (ms) => { t += ms; vi.advanceTimersByTime(ms); };
+  const advance = (ms) => clock.advance(ms);
   /** Time passes with the page closed (or asleep): no ticks. */
-  const jump = (ms) => { t += ms; };
+  const jump = (ms) => clock.jump(ms);
   const press = (key, options = {}) =>
     document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, ...options }));
 
   beforeEach(() => {
     vi.useFakeTimers();
-    t = START;
-    storage = createFakeStorage({ [SETTINGS_KEY]: JSON.stringify({ division: 'HS' }) });
+    clock = createRealClock(START);
+    storage = storageWith({ division: 'HS' });
     document.body.innerHTML = '<div id="clockApp"></div>';
   });
 
@@ -98,9 +95,9 @@ describe('School Clock classroom timer', () => {
       expect(pickerOpen()).toBe(true);
       expect(picker().getAttribute('aria-modal')).toBe('true');
       expect(timerControl().getAttribute('aria-expanded')).toBe('true');
-      expect(visibleButtons(picker().querySelector('[aria-label="Presets"]')).map(nameOf))
+      expect(visibleButtons(picker().querySelector('[aria-label="Presets"]')).map(accessibleName))
         .toEqual(['1 min', '2 min', '5 min', '10 min']);
-      expect(document.activeElement).toBe(buttonIn(picker(), '1 min'));
+      expect(document.activeElement).toBe(button('1 min', picker()));
     });
 
     it('closes with Escape or Close, and hands focus back to the Timer control', () => {
@@ -111,7 +108,7 @@ describe('School Clock classroom timer', () => {
       expect(document.activeElement).toBe(timerControl());
 
       timerControl().click();
-      buttonIn(picker(), 'Close').click();
+      button('Close', picker()).click();
       expect(pickerOpen()).toBe(false);
       expect(timerControl().getAttribute('aria-expanded')).toBe('false');
       expect(saved(storage).timerEndsAt ?? null).toBeNull();
@@ -120,9 +117,9 @@ describe('School Clock classroom timer', () => {
     it('keeps Tab inside it while open', () => {
       open();
       timerControl().click();
-      buttonIn(picker(), 'Start').focus();
+      button('Start', picker()).focus();
       press('Tab');
-      expect(document.activeElement).toBe(buttonIn(picker(), 'Close'));
+      expect(document.activeElement).toBe(button('Close', picker()));
     });
 
     it('is hidden until a Division is chosen', () => {
@@ -245,7 +242,7 @@ describe('School Clock classroom timer', () => {
       expect(ringButton('Pause')).toBeUndefined();
       expect(ringButton('Cancel')).toBeUndefined();
 
-      buttonIn(ringing(), 'Dismiss').click();
+      button('Dismiss', ringing()).click();
       expect(player.dismissals).toBe(1);
       expect(ringing().hidden).toBe(true);
       expect(ringShown()).toBe(false);
@@ -263,7 +260,7 @@ describe('School Clock classroom timer', () => {
 
     it('is handed to the sound engine ahead of time, with the timer sound, repeating', async () => {
       open({ sound: { time: 50 } });
-      buttonIn(mount(), 'Turn sound on').click();
+      button('Turn sound on', mount()).click();
       await Promise.resolve();
       pick('2 min');
       expect(player.scheduled).toContainEqual({
@@ -312,9 +309,7 @@ describe('School Clock classroom timer', () => {
 
     it('neither loads nor clears a real timer saved by another tab', () => {
       // A real 10 min timer ending at 10:45 — already in the past for the simulated 13:00 clock.
-      storage = createFakeStorage({
-        [SETTINGS_KEY]: JSON.stringify({ division: 'HS', timerEndsAt: START + 5 * MIN, timerTotalMs: 10 * MIN }),
-      });
+      storage = storageWith({ division: 'HS', timerEndsAt: START + 5 * MIN, timerTotalMs: 10 * MIN });
       open({ search: SIMULATED });
       expect(ringShown()).toBe(false);
       advance(2 * SEC);
@@ -324,7 +319,7 @@ describe('School Clock classroom timer', () => {
       expect(ringing().textContent).toContain('Ringing · Timer');
       expect(saved(storage)).toMatchObject({ timerEndsAt: START + 5 * MIN, timerTotalMs: 10 * MIN });
 
-      t = START;
+      clock.set(START);
       open();
       expect(digits().getAttribute('aria-label')).toBe('10:00 timer, running, 5:00 to go');
     });
@@ -389,7 +384,7 @@ describe('School Clock classroom timer', () => {
     });
 
     it('quick picks saved before timers had names still load', () => {
-      storage = createFakeStorage({ [SETTINGS_KEY]: JSON.stringify({ division: 'HS', recentDurations: [20 * MIN, 7.5 * MIN] }) });
+      storage = storageWith({ division: 'HS', recentDurations: [20 * MIN, 7.5 * MIN] });
       open();
       expect(quickPicks()).toEqual(['20:00', '7:30']);
       pick('20:00');

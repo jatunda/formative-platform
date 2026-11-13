@@ -1,17 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { initClockApp } from '../../clock/clock.js';
-import { SETTINGS_KEY } from '../../clock/clock-storage.js';
-import { createFakeStorage } from '../helpers/fake-storage.js';
 import { createFakeSoundPlayer } from '../helpers/fake-sound-player.js';
 import { accessibleName, field, isShown, setValue, toggle } from '../helpers/clock-dom.js';
+import {
+  button, clockMount as mount, createRealClock, openClockPage, savedSettings as saved, storageWith,
+} from '../helpers/clock-page.js';
 
 const SEC = 1000;
-const mount = () => document.getElementById('clockApp');
-/** A shown button by its accessible name. */
-const button = (name) => [...mount().querySelectorAll('button')].find((b) => accessibleName(b) === name && isShown(b));
 const drawer = () => mount().querySelector('[role="dialog"][aria-labelledby="clock-settings-title"]');
 const drawerOpen = () => isShown(drawer());
-const saved = (storage) => JSON.parse(storage.getItem(SETTINGS_KEY));
 const stageText = () => mount().querySelector('.clock-stage').textContent.replace(/\s+/g, ' ').trim();
 const readoutTexts = () => [...mount().querySelectorAll('.clock-readout__face')]
   .map((face) => face.textContent.replace(/\s+/g, ' ').trim());
@@ -31,17 +27,17 @@ describe('School Clock settings drawer', () => {
   let app;
   let storage;
   let player;
-  let t;
+  let clock;
 
   /** Open the page on an HS device with `settings` saved, at `when`. */
   function open({ when = at(10, 32), settings = {} } = {}) {
     app?.destroy();
-    t = when.getTime();
-    storage = createFakeStorage({ [SETTINGS_KEY]: JSON.stringify({ division: 'HS', ...settings }) });
+    clock = createRealClock(when);
+    storage = storageWith({ division: 'HS', ...settings });
     player = createFakeSoundPlayer({ state: 'running' });
-    app = initClockApp({ realNow: () => t, storage, tabStorage: createFakeStorage(), soundPlayer: player, capabilities: {} });
+    app = openClockPage({ clock, storage, soundPlayer: player, capabilities: {} });
   }
-  const advance = (ms) => { t += ms; vi.advanceTimersByTime(ms); };
+  const advance = (ms) => clock.advance(ms);
 
   beforeEach(() => {
     vi.useFakeTimers();
