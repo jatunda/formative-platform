@@ -27,6 +27,8 @@ Lowering `coverage.thresholds` to make a failing run pass is not an acceptable f
 
 A School Clock (`/clock`) CSS or layout change is not done until `npm run check:clock:full` in `web/` passes: it sweeps the layout matrix, where layout bugs hide (`fullMatrix()` and the ticketed `KNOWN_FAILURES` in `web/scripts/clock-check-matrix.js`). For single screenshots, quick looks or accessibility checks, run `npm run check:clock` (options in `web/scripts/clock-check.mjs`'s header) rather than writing a new harness.
 
+A Lesson Planning or Full Schedule CSS or layout change is not done until `npm run check:schedule` in `web/` passes (options, checks and fixture data in `web/scripts/schedule-check.mjs`'s header; known failures and tap-target exceptions in `schedule-check-matrix.js`); use it, not a throwaway Playwright mock-up, to check those pages' layout.
+
 ## Before considering any `functions/` change complete
 
 Run the link-preview function's tests (Node's built-in test runner, no emulator or network; run `npm ci` first in a fresh checkout):

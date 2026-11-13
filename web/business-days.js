@@ -5,6 +5,13 @@
 // student pages use them to label dates.
 
 /**
+ * Default class start date in YYYY-MM-DD format: Day Index 0 (before a
+ * Class's Date Offset). Here, not in date-utils.js, so pure code can use it.
+ * @type {string}
+ */
+export const DEFAULT_CLASS_START_DATE = "2024-08-19";
+
+/**
  * A local-time Date from a YYYY-MM-DD string.
  * @param {string} dateString
  * @returns {Date}

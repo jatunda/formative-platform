@@ -1,41 +1,21 @@
 // @ts-check
 // Drives the real /clock page in Chromium for clock-check.mjs and
-// clock-check-full.mjs: starts a Vite server on 127.0.0.1 (a free port) and
-// the browsers, renders states at a size and checks each render (what the
+// clock-check-full.mjs: starts a Vite server on 127.0.0.1 (a free port, via
+// page-check-browser.mjs, which the schedule check shares) and the browsers, renders states at a size and checks each render (what the
 // checks are is in clock-check.mjs's header). stop() closes the browsers and
 // the server; it also runs on Ctrl-C, so nothing is left running.
-import { createServer } from 'vite';
+import { resolve } from 'path';
 import { chromium } from 'playwright';
-import { createRequire } from 'module';
-import { fileURLToPath } from 'url';
-import { resolve, dirname } from 'path';
-import { mkdirSync, writeFileSync, rmSync } from 'fs';
 import { SETTINGS_KEY } from '../clock/clock-storage.js';
 import { LAYOUT_KEY } from '../clock/readout-layout.js';
 import { describeFailure, ringGapAt } from './clock-check-matrix.js';
+import { checkOutput, startServer, recordPageErrors, axeViolations } from './page-check-browser.mjs';
 
-const webDir =resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const axeSource = createRequire(import.meta.url).resolve('axe-core/axe.min.js');
 /** ring-geometry.js as the page's server serves it, for the ring check inside the page. */
 const RING_GEOMETRY_URL = '/clock/ring-geometry.js';
 
-/** Where screenshots and report.json go (gitignored). */
-export const outDir = resolve(webDir, '.clock-check');
-
-/** Empties outDir for a new run, so it holds only this run's files. */
-export function resetOutDir() {
-  rmSync(outDir, { recursive: true, force: true });
-  mkdirSync(outDir, { recursive: true });
-}
-
-/**
- * Writes every result to outDir/report.json and prints one ✗ line per failure.
- * @param {object[]} results @param {string[]} failures what failed, one line each
- */
-export function report(results, failures) {
-  writeFileSync(resolve(outDir, 'report.json'), JSON.stringify(results, null, 2));
-  for (const line of failures) console.log(`✗ ${line}`);
-}
+/** Where screenshots and report.json go (gitignored), emptying it for a run, and writing the report. */
+export const { outDir, resetOutDir, report } = checkOutput('.clock-check');
 
 /**
  * @typedef {import('./clock-check-matrix.js').Config & { states: { name: string, query: string }[],
@@ -46,29 +26,16 @@ export function report(results, failures) {
 
 /** Starts the server; browsers launch on first use (sound-on needs its own). */
 export async function startClockCheck() {
-  /** @type {import('vite').ViteDevServer | undefined} */
-  let server;
   /** @type {Map<boolean, Promise<import('playwright').Browser>>} */
   const browsers = new Map();
+  let closeServer = async () => {};
   async function stop() {
     for (const browser of browsers.values()) await (await browser.catch(() => null))?.close().catch(() => {});
-    await server?.close().catch(() => {});
+    await closeServer();
   }
-  for (const signal of ['SIGINT', 'SIGTERM']) {
-    process.on(signal, () => { stop().finally(() => process.exit(130)); });
-  }
-  let port;
-  try {
-    server = await createServer({ root: webDir, logLevel: 'error', server: { host: '127.0.0.1', port: 0 } });
-    await server.listen();
-    const address = server.httpServer?.address();
-    if (!address || typeof address === 'string') throw new Error('The Vite server is not listening on a port');
-    port = address.port;
-  } catch (e) {
-    await stop();
-    throw e;
-  }
-  const base = `http://127.0.0.1:${port}/clock/`;
+  const { origin, close } = await startServer(stop);
+  closeServer = close;
+  const base = `${origin}/clock/`;
   /** @param {boolean} soundOn */
   function browserFor(soundOn) {
     if (!browsers.has(soundOn)) {
@@ -128,9 +95,7 @@ export async function startClockCheck() {
  * @param {number} [ringGap] the ring's gap at this size, where it isn't ring-fit's (ringGapAt)
  */
 async function checkPage(page, url, opts, ringGap) {
-  /** @type {string[]} */
-  const errors = [];
-  page.on('pageerror', (e) => errors.push(e.message));
+  const errors = recordPageErrors(page);
   await page.goto(url);
   if (opts.timer) {
     await page.getByRole('button', { name: 'Timer', exact: true }).click();
@@ -200,17 +165,7 @@ async function checkPage(page, url, opts, ringGap) {
     return { reachable: row.top >= box.top - 0.5 && row.bottom <= Math.min(box.bottom, visible) + 0.5 && !covered && below,
       listHeight: Math.round(box.height), rowBottom: row.bottom, listBottom: box.bottom, visible };
   }, opts.bars);
-  /** @type {string[]} */
-  let violations = [];
-  if (opts.axe) {
-    await page.addScriptTag({ path: axeSource });
-    violations = await page.evaluate(async () => {
-      // axe is the global the script tag above injects.
-      const { axe } = /** @type {Window & { axe: typeof import('axe-core') }} */ (/** @type {unknown} */ (window));
-      const { violations } = await axe.run(document);
-      return violations.map((v) => `${v.id}: ${v.nodes.length} node(s)`);
-    });
-  }
+  const violations = opts.axe ? await axeViolations(page) : [];
   const checked = { scroll, stage, agenda, overlaps, errors, violations };
   return { ok: describeFailure(checked).length === 0, ...checked };
 }
