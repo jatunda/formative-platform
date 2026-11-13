@@ -818,9 +818,16 @@ select:focus {
   margin: 0;
 }
 
-/* The pane header's gap would push the ↗ away from the Class name it labels. */
-.lesson-planning-pane-header .full-schedule-link {
+/* The pane header's gap would push the open-in-new icon away from the Class
+   name it labels. The icon is in the text colour, not the link colour, and
+   has no link underline (the a:not(...) link rule is overridden, hence a.). */
+.lesson-planning-pane-header a.full-schedule-link {
+  display: inline-flex;
   margin-left: calc(-1 * var(--spacing-md) + var(--spacing-xs));
+  padding: 0;
+  border-bottom: none;
+  font-size: 1.25rem;
+  color: var(--text-primary);
   text-decoration: none;
 }
 
@@ -1485,6 +1492,19 @@ ol.lesson-list {
 /* ========================================
    Utility Components
    ======================================== */
+/* Flat line icons (line-icons.js) on the teacher pages: sized to the text
+   around them and drawn in its colour. Decorative; the control names itself. */
+.line-icon {
+  width: 1em;
+  height: 1em;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 #contentId {
   font-family: var(--font-mono) !important;
   background-color: var(--bg-secondary) !important;
