@@ -98,7 +98,8 @@ vi.mock('../../schedule-day-view.js', () => ({
   getLessonTitles: (...args) => mockGetLessonTitles(...args),
 }));
 
-vi.mock('../../teacher-nav.js', () => ({
+vi.mock('../../teacher-nav.js', async (importOriginal) => ({
+  ...(await importOriginal()),
   renderTeacherNav: vi.fn(),
 }));
 
@@ -344,6 +345,50 @@ describe('teacher', () => {
 
       expect(schedulePane.scrollTop).toBe(321);
       vi.useRealTimers();
+    });
+
+    describe("arriving from Lesson Planning's Full schedule link", () => {
+      const savedScrollAt = (scrollTop) => {
+        markVisit(); // a recent visit, which would normally restore scroll
+        localStorage.setItem('teacher-schedule-scroll', JSON.stringify({ classId: 'csa', scrollTop, timestamp: Date.now() }));
+      };
+
+      it("scrolls to today's row even though a saved scroll position exists", async () => {
+        vi.useFakeTimers();
+        history.replaceState({}, '', '/teacher.html?class=csa&scroll=today');
+        document.body.innerHTML = '<div id="schedulePane"><table><tr class="today-row"></tr></table></div>';
+        const schedulePane = document.getElementById('schedulePane');
+        schedulePane.scrollTo = vi.fn();
+        savedScrollAt(321);
+
+        await handleScrollPositioning('csa');
+        vi.advanceTimersByTime(150);
+
+        expect(schedulePane.scrollTo).toHaveBeenCalled();
+        expect(schedulePane.scrollTop).not.toBe(321);
+        vi.useRealTimers();
+      });
+
+      it('drops the link\'s marker from the URL so later loads restore scroll as usual', async () => {
+        vi.useFakeTimers();
+        history.replaceState({}, '', '/teacher.html?class=csa&scroll=today');
+        document.body.innerHTML = '<div id="schedulePane"><table><tr class="today-row"></tr></table></div>';
+        const schedulePane = document.getElementById('schedulePane');
+        schedulePane.scrollTo = vi.fn();
+        savedScrollAt(321);
+
+        await handleScrollPositioning('csa');
+        vi.advanceTimersByTime(150);
+        expect(window.location.search).toBe('?class=csa');
+
+        schedulePane.scrollTo.mockClear();
+        await handleScrollPositioning('csa');
+        vi.advanceTimersByTime(150);
+
+        expect(schedulePane.scrollTo).not.toHaveBeenCalled();
+        expect(schedulePane.scrollTop).toBe(321);
+        vi.useRealTimers();
+      });
     });
 
     it('does nothing without a schedulePane element', async () => {
