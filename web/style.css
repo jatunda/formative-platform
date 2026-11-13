@@ -195,7 +195,8 @@ button:focus-visible {
 
 .delete-day-btn {
   width: auto !important;
-  min-width: auto !important;
+  /* Never under the touch minimum wide either (ticket 11). */
+  min-width: var(--touch-min, auto) !important;
   max-width: none !important;
   padding: var(--delete-day-padding, var(--spacing-xs) var(--spacing-md)) !important;
   font-size: 14px !important;
@@ -2266,9 +2267,16 @@ ol.lesson-list {
     --delete-day-padding: var(--spacing-xs);
   }
 
+  /* Smaller header labels: "Index" is what sets the Day Index column's
+     width, so this frees room for Delete Day's 44px touch width (ticket 11). */
+  .schedule-table th,
+  #scheduleTable th {
+    font-size: 0.75rem;
+  }
+
   .lesson-cluster {
     min-width: 0;
-    width: 6.25rem;
+    width: 6rem;
     margin-right: 0;
     padding: 0;
     box-sizing: border-box;
