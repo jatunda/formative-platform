@@ -688,3 +688,52 @@ More text`;
   });
 });
 
+describe('code blocks keep # and --- lines literally', () => {
+  it('keeps a "# comment" line inside a code block and leaves the title alone', () => {
+    const dsl = '# Lesson\n\n```python\nx = 1\n# comment here\nprint(x)\n```';
+    const result = parseDSL(dsl);
+    expect(result.title).toBe('Lesson');
+    expect(result.blocks).toEqual([
+      { type: 'question', content: [
+        { type: 'code', language: 'python', value: 'x = 1\n# comment here\nprint(x)' },
+      ] },
+    ]);
+  });
+
+  it('keeps a "---" line inside a code block instead of splitting the question', () => {
+    const dsl = '# Lesson\n\nQ1\n\n```\nabove\n---\nbelow\n```\n\nafter';
+    const result = parseDSL(dsl);
+    expect(result.blocks).toEqual([
+      { type: 'question', content: [
+        { type: 'text', value: 'Q1' },
+        { type: 'code', value: 'above\n---\nbelow' },
+        { type: 'text', value: 'after' },
+      ] },
+    ]);
+  });
+
+  it('keeps indented "# " lines verbatim', () => {
+    const dsl = '```python\ndef f():\n    # explain\n    return 1\n```';
+    const result = parseDSL(dsl);
+    expect(result.title).toBe('');
+    expect(result.blocks[0].content).toEqual([
+      { type: 'code', language: 'python', value: 'def f():\n    # explain\n    return 1' },
+    ]);
+  });
+
+  it('round-trips "# " and "---" code lines through generate and parse', () => {
+    const dsl = '# Lesson\n\n```python\n# comment here\n---\n    # indented\n```\n\n---\n\nQ2';
+    const parsed = parseDSL(dsl);
+    const reparsed = parseDSL(generateDSLFromContent(parsed));
+    expect(reparsed).toEqual({
+      title: 'Lesson',
+      blocks: [
+        { type: 'question', content: [
+          { type: 'code', language: 'python', value: '# comment here\n---\n    # indented' },
+        ] },
+        { type: 'question', content: [{ type: 'text', value: 'Q2' }] },
+      ],
+    });
+  });
+});
+

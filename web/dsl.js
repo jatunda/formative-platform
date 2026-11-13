@@ -39,8 +39,16 @@ export function parseDSL(dslText) {
     const line = raw.trim();
     if (line === "" && !inCode) continue; // Allow empty lines in code blocks
     
+    // Inside a code block every line but the closing fence is literal code,
+    // so this is checked before the title, separator and collapsible markers
+    // (a Python "# comment" or a "---" line must stay in the code).
+    // Use the raw line to preserve indentation.
+    if (inCode && !line.startsWith("```")) {
+      codeBuffer.push(raw);
+    }
+
     // Title line starts with #
-    if (line.startsWith("# ")) {
+    else if (line.startsWith("# ")) {
       result.title = line.replace("# ", "").trim();
     }
     
@@ -110,15 +118,8 @@ export function parseDSL(dslText) {
       }
     }
     
-    // Collect code lines
-    else if (inCode) {
-      // Use raw line to preserve indentation in code blocks
-      codeBuffer.push(raw);
-    }
-    
     // Collapsible section closing marker (<<<)
-    // Must check after inCode to avoid treating <<< inside code blocks as markers
-    else if (line === "<<<" && !inCode) {
+    else if (line === "<<<") {
       // Close the current collapsible section if one is open
       if (collapsibleStack.length > 0) {
         collapsibleStack.pop();
@@ -128,7 +129,6 @@ export function parseDSL(dslText) {
     }
     
     // Collapsible section marker (>>> or >>>!)
-    // Must check after inCode to avoid treating >>> inside code blocks as markers
     else if (line.startsWith(">>>")) {
       // If we haven't started a question yet and no separator encountered, start one
       if (!inQuestion && !hasEncounteredSeparator) {
