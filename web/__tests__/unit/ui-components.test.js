@@ -1,17 +1,15 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   createStyledButton,
-  createNewLessonButton,
+  createIconButton,
   createCloseButton,
   createArrowButton,
-  createDeleteButton,
   createInsertDayButton,
   createElement,
   createUpArrowButton,
   createDownArrowButton,
-  createLeftArrowButton,
-  createRightArrowButton,
   createDateOffsetControl,
+  getShiftAmount,
   withWorkingIndicator,
 } from '../../ui-components.js';
 
@@ -42,21 +40,19 @@ describe('ui-components', () => {
     });
   });
 
-  describe('createNewLessonButton', () => {
-    it('should create button with correct text and class', () => {
-      const callback = vi.fn();
-      const button = createNewLessonButton(5, callback);
-      
-      expect(button.textContent).toBe('New Lesson');
-      expect(button.className).toBe('schedule-action-btn new-lesson-btn');
+  describe('createIconButton', () => {
+    it('shows the icon, and names the action in a tooltip and an accessible label', () => {
+      const button = createIconButton('➕', 'New Lesson', vi.fn());
+
+      expect(button.textContent).toBe('➕');
+      expect(button.title).toBe('New Lesson');
+      expect(button.getAttribute('aria-label')).toBe('New Lesson');
     });
 
-    it('should call callback with dayIndex when clicked', () => {
-      const callback = vi.fn();
-      const button = createNewLessonButton(3, callback);
-      
-      button.click();
-      expect(callback).toHaveBeenCalledWith(3);
+    it('runs its handler when clicked', () => {
+      const onClick = vi.fn();
+      createIconButton('🔗', 'Link Lesson', onClick).click();
+      expect(onClick).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -97,24 +93,6 @@ describe('ui-components', () => {
     it('should call onClick when clicked', () => {
       const onClick = vi.fn();
       const button = createArrowButton('left', false, onClick);
-      
-      button.click();
-      expect(onClick).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  describe('createDeleteButton', () => {
-    it('should create button with trash icon', () => {
-      const onClick = vi.fn();
-      const button = createDeleteButton(onClick);
-      
-      expect(button.textContent).toBe('🗑️');
-      expect(button.className).toBe('schedule-action-btn delete-btn');
-    });
-
-    it('should call onClick when clicked', () => {
-      const onClick = vi.fn();
-      const button = createDeleteButton(onClick);
       
       button.click();
       expect(onClick).toHaveBeenCalledTimes(1);
@@ -182,181 +160,149 @@ describe('ui-components', () => {
     });
   });
 
-  describe('createLeftArrowButton', () => {
-    it('should create button with left arrow and respect disabled state', () => {
-      const onClick = vi.fn();
-      const button = createLeftArrowButton(true, onClick);
-      
-      expect(button.textContent).toBe('←');
-      expect(button.disabled).toBe(true);
-      expect(button.style.width).toBe('auto');
+  describe('getShiftAmount', () => {
+    it('reads a positive whole amount', () => {
+      expect(getShiftAmount({ value: '3' })).toBe(3);
     });
-  });
 
-  describe('createRightArrowButton', () => {
-    it('should create button with right arrow and respect disabled state', () => {
-      const onClick = vi.fn();
-      const button = createRightArrowButton(false, onClick);
-      
-      expect(button.textContent).toBe('→');
-      expect(button.disabled).toBe(false);
-      expect(button.style.width).toBe('auto');
+    it('uses the magnitude of a negative entry', () => {
+      expect(getShiftAmount({ value: '-4' })).toBe(4);
+    });
+
+    it('falls back to 1 for zero or non-numeric input', () => {
+      expect(getShiftAmount({ value: '0' })).toBe(1);
+      expect(getShiftAmount({ value: 'abc' })).toBe(1);
     });
   });
 
   describe('createDateOffsetControl', () => {
     function makeControl(overrides = {}) {
       return createDateOffsetControl({
+        label: 'Offset:',
         currentOffset: 5,
-        onApply: vi.fn().mockResolvedValue(undefined),
-        computeTodayDayIndex: vi.fn().mockResolvedValue(12),
+        onShift: vi.fn().mockResolvedValue(undefined),
         ...overrides,
       });
     }
 
     // Let any pending refreshTodayDisplay() microtasks settle
     const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+    const buttonTexts = (control) => [...control.querySelectorAll('button')].map((b) => b.textContent);
+    const button = (control, text) => [...control.querySelectorAll('button')].find((b) => b.textContent === text);
+    const amount = (control) => control.querySelector('input.offset-shift-amount');
 
-    it('should create control with label, current-offset badge, input, and Apply button', () => {
+    it('shows the label, the current offset, an amount box defaulting to 1, and Skip/Delay buttons', () => {
       const control = makeControl();
 
-      expect(control.querySelector('label')).toBeTruthy();
+      expect(control.querySelector('label').textContent).toBe('Offset:');
       expect(control.querySelector('.current-offset-display').textContent).toBe('Current: 5');
-      expect(control.querySelector('input[type="number"]')).toBeTruthy();
-      expect(control.querySelector('button').textContent).toBe('Apply');
+      expect(amount(control).value).toBe('1');
+      expect(buttonTexts(control)).toEqual(['Skip', 'Delay']);
     });
 
-    it('should set initial value in input', () => {
-      const control = makeControl({ currentOffset: 10 });
-      const input = control.querySelector('input');
-      expect(input.value).toBe('10');
+    it('explains Skip and Delay in a "?" tooltip', () => {
+      const control = makeControl();
+      const tip = control.querySelector('.info-tooltip');
+      expect(tip.textContent).toContain('?');
+      expect(tip.querySelector('.info-tooltip-text').textContent).toBe(
+        'Delay: lessons move to later dates (e.g. after a snow day). Skip: lessons move to earlier dates, jumping ahead.'
+      );
     });
 
-    it("should show today's Day Index from computeTodayDayIndex on mount", async () => {
-      const control = makeControl({ computeTodayDayIndex: vi.fn().mockResolvedValue(3) });
+    it('Delay raises the offset by the amount and updates the current offset', async () => {
+      const onShift = vi.fn().mockResolvedValue(undefined);
+      const control = makeControl({ onShift });
+
+      amount(control).value = '3';
+      button(control, 'Delay').click();
       await flush();
-      expect(control.querySelector('.today-dayindex-display').textContent).toBe('(Today is Day 3)');
+
+      expect(onShift).toHaveBeenCalledWith(3);
+      expect(control.querySelector('.current-offset-display').textContent).toBe('Current: 8');
     });
 
-    it('should call onApply with the parsed input value when Apply is clicked, and update the display on success', async () => {
-      const onApply = vi.fn().mockResolvedValue(undefined);
-      const control = makeControl({ onApply, computeTodayDayIndex: vi.fn().mockResolvedValue(9) });
+    it('Skip lowers the offset by the amount', async () => {
+      const onShift = vi.fn().mockResolvedValue(undefined);
+      const control = makeControl({ onShift });
+
+      amount(control).value = '2';
+      button(control, 'Skip').click();
       await flush();
 
-      control.querySelector('input').value = '7';
-      control.querySelector('button').click();
-      await flush();
-
-      expect(onApply).toHaveBeenCalledWith(7);
-      expect(control.querySelector('.current-offset-display').textContent).toBe('Current: 7');
-      expect(control.querySelector('.today-dayindex-display').textContent).toBe('(Today is Day 9)');
+      expect(onShift).toHaveBeenCalledWith(-2);
+      expect(control.querySelector('.current-offset-display').textContent).toBe('Current: 3');
     });
 
-    it('should leave the display unchanged if onApply rejects', async () => {
-      const onApply = vi.fn().mockRejectedValue(new Error('write failed'));
-      const control = makeControl({ onApply, currentOffset: 5 });
+    it('leaves the current offset unchanged if onShift rejects', async () => {
+      const onShift = vi.fn().mockRejectedValue(new Error('write failed'));
+      const control = makeControl({ onShift });
+
+      button(control, 'Delay').click();
       await flush();
 
-      control.querySelector('input').value = '7';
-      control.querySelector('button').click();
-      await flush();
-
+      expect(onShift).toHaveBeenCalledWith(1);
       expect(control.querySelector('.current-offset-display').textContent).toBe('Current: 5');
     });
 
-    it('should default to 0 for invalid input', async () => {
-      const onApply = vi.fn().mockResolvedValue(undefined);
-      const control = makeControl({ onApply });
-      await flush();
+    it('omits the current offset when none is given (the all-classes shift)', async () => {
+      const onShift = vi.fn().mockResolvedValue(undefined);
+      const control = makeControl({ currentOffset: undefined, onShift });
 
-      control.querySelector('input').value = 'invalid';
-      control.querySelector('button').click();
+      expect(control.querySelector('.current-offset-display')).toBeNull();
+      button(control, 'Delay').click();
       await flush();
-
-      expect(onApply).toHaveBeenCalledWith(0);
+      expect(onShift).toHaveBeenCalledWith(1);
     });
 
-    it('should have an updateOffset method that refreshes both displays', async () => {
-      const computeTodayDayIndex = vi.fn().mockResolvedValue(12).mockResolvedValueOnce(1);
+    describe("today's Day Index", () => {
+      it('is shown on mount and refreshed after a shift when computeTodayDayIndex is given', async () => {
+        const computeTodayDayIndex = vi.fn().mockResolvedValueOnce(3).mockResolvedValue(4);
+        const control = makeControl({ computeTodayDayIndex });
+        await flush();
+        expect(control.querySelector('.today-dayindex-display').textContent).toBe('(Today is Day 3)');
+
+        button(control, 'Skip').click();
+        await flush();
+        expect(control.querySelector('.today-dayindex-display').textContent).toBe('(Today is Day 4)');
+      });
+
+      it('is not shown when computeTodayDayIndex is omitted', () => {
+        const control = makeControl();
+        expect(control.querySelector('.today-dayindex-display')).toBeNull();
+      });
+    });
+
+    it('updateOffset refreshes the current offset and the today display', async () => {
+      const computeTodayDayIndex = vi.fn().mockResolvedValueOnce(1).mockResolvedValue(12);
       const control = makeControl({ computeTodayDayIndex });
       await flush();
 
       await control.updateOffset(15);
 
-      expect(control.querySelector('input').value).toBe('15');
       expect(control.querySelector('.current-offset-display').textContent).toBe('Current: 15');
       expect(control.querySelector('.today-dayindex-display').textContent).toBe('(Today is Day 12)');
     });
 
-    it('should not render a "Go to Today" button when onGoToToday is omitted', () => {
+    it('later shifts build on an updateOffset value', async () => {
       const control = makeControl();
-      const buttons = [...control.querySelectorAll('button')].map((b) => b.textContent);
-      expect(buttons).not.toContain('Go to Today');
+      await control.updateOffset(15);
+
+      button(control, 'Delay').click();
+      await flush();
+
+      expect(control.querySelector('.current-offset-display').textContent).toBe('Current: 16');
+    });
+
+    it('should not render a "Go to Today" button when onGoToToday is omitted', () => {
+      expect(buttonTexts(makeControl())).not.toContain('Go to Today');
     });
 
     it('should render and wire a "Go to Today" button when onGoToToday is provided', () => {
       const onGoToToday = vi.fn();
       const control = makeControl({ onGoToToday });
 
-      const buttons = [...control.querySelectorAll('button')];
-      const goToTodayBtn = buttons.find((b) => b.textContent === 'Go to Today');
-      expect(goToTodayBtn).toBeTruthy();
-
-      goToTodayBtn.click();
+      button(control, 'Go to Today').click();
       expect(onGoToToday).toHaveBeenCalled();
-    });
-
-    describe('compact mode', () => {
-      it('shortens the label and omits the "(Today is Day N)" indicator', () => {
-        const control = makeControl({ compact: true });
-
-        expect(control.querySelector('label').textContent).toBe('Offset:');
-        expect(control.querySelector('.today-dayindex-display')).toBeNull();
-      });
-
-      it('never calls computeTodayDayIndex, on mount or after apply', async () => {
-        const computeTodayDayIndex = vi.fn().mockResolvedValue(12);
-        const onApply = vi.fn().mockResolvedValue(undefined);
-        const control = makeControl({ compact: true, computeTodayDayIndex, onApply });
-        await flush();
-
-        control.querySelector('input').value = '7';
-        control.querySelector('button').click();
-        await flush();
-
-        expect(computeTodayDayIndex).not.toHaveBeenCalled();
-      });
-
-      it('still updates the current-offset badge on a successful apply', async () => {
-        const onApply = vi.fn().mockResolvedValue(undefined);
-        const control = makeControl({ compact: true, onApply });
-        await flush();
-
-        control.querySelector('input').value = '9';
-        control.querySelector('button').click();
-        await flush();
-
-        expect(onApply).toHaveBeenCalledWith(9);
-        expect(control.querySelector('.current-offset-display').textContent).toBe('Current: 9');
-      });
-
-      it('updateOffset also skips the today-index computation in compact mode', async () => {
-        const computeTodayDayIndex = vi.fn().mockResolvedValue(12);
-        const control = makeControl({ compact: true, computeTodayDayIndex });
-        await flush();
-        computeTodayDayIndex.mockClear();
-
-        await control.updateOffset(15);
-
-        expect(control.querySelector('.current-offset-display').textContent).toBe('Current: 15');
-        expect(computeTodayDayIndex).not.toHaveBeenCalled();
-      });
-
-      it('defaults to non-compact when the option is omitted', () => {
-        const control = makeControl();
-        expect(control.querySelector('label').textContent).toBe('Date Offset (days): ');
-        expect(control.querySelector('.today-dayindex-display')).toBeTruthy();
-      });
     });
   });
 

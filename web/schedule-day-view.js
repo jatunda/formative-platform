@@ -7,15 +7,9 @@
  * instead of two. See docs/adr/0002-extract-shared-schedule-editing-module.md.
  */
 
-import {
-  ref,
-  get,
-  set
-} from "https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js";
 import { DEFAULT_LESSON_TITLE, UNTITLED_LESSON } from './constants.js';
 import {
-  createStyledButton,
-  createNewLessonButton as createNewLessonButtonShared,
+  createIconButton,
   createInsertDayButton,
   withWorkingIndicator
 } from './ui-components.js';
@@ -23,12 +17,14 @@ import { createLessonClusterWithDB } from './lesson-manager.js';
 import { setupDropHandlers } from './drag-drop-utils.js';
 import { showLessonSearchPopup } from './lesson-search.js';
 import { showNotification } from './notification-utils.js';
+import { showConfirm } from './confirm-dialog.js';
 import {
   insertDayAt,
-  deleteDayAt
+  deleteDayAt,
+  addLessonToSchedule,
+  moveLessonBetweenDays
 } from './database-utils.js';
 import { lessonStore } from './lesson-store.js';
-import { getDb } from './database-handle.js';
 
 // Lesson titles are keyed by Lesson id, which is global (not per-Class),
 // so a single cache here is correct even when multiple Classes are rendered
@@ -57,7 +53,7 @@ export async function getLessonTitles(lessonIds) {
 }
 
 /**
- * Build an onDeleteDay handler: confirms, deletes via deleteDayAt, reloads, and
+ * Build an onDeleteDay handler: confirms in the in-app dialog, deletes via deleteDayAt, reloads, and
  * reports failure through showNotification. Shared so both pages behave identically.
  * @param {string} classId
  * @param {() => void} onReload
@@ -65,9 +61,12 @@ export async function getLessonTitles(lessonIds) {
  */
 export function makeDeleteDayHandler(classId, onReload) {
   return async (dayIndex) => {
-    if (!confirm(`Are you sure you want to delete day ${dayIndex}? This will shift all future days back by one.`)) {
-      return;
-    }
+    const confirmed = await showConfirm({
+      title: 'Delete Day',
+      message: `Are you sure you want to delete day ${dayIndex}? This will shift all future days back by one.`,
+      confirmLabel: 'Delete Day'
+    });
+    if (!confirmed) return;
     try {
       await deleteDayAt(classId, dayIndex);
       onReload();
@@ -122,9 +121,7 @@ export function createInsertDayRow(dayIndex, onInsert) {
  */
 export function createActionsCell(dayIndex, onDeleteDay) {
   const tdActions = document.createElement("td");
-  tdActions.style.textAlign = "center";
-  tdActions.style.verticalAlign = "middle";
-  tdActions.style.padding = "4px";
+  tdActions.className = "day-actions-cell";
 
   const deleteButton = document.createElement("button");
   deleteButton.textContent = "🗑️";
@@ -137,7 +134,19 @@ export function createActionsCell(dayIndex, onDeleteDay) {
 }
 
 /**
- * Create the stacked "Link Lesson" / "New Lesson" buttons for a day's lessons cell.
+ * Append a Lesson to the end of one Day Index of a Class's Schedule, then reload.
+ * @param {string} lessonId
+ * @param {number} dayIndex
+ * @param {{classId: string, onReload: () => void}} ctx
+ */
+async function appendLessonToDay(lessonId, dayIndex, ctx) {
+  await addLessonToSchedule(ctx.classId, dayIndex, lessonId);
+  ctx.onReload();
+}
+
+/**
+ * Create the side-by-side New Lesson (➕) / Link Lesson (🔗) icon buttons
+ * that follow a day's last Lesson.
  * @param {number} dayIndex
  * @param {{classId: string, onReload: () => void}} ctx
  * @returns {HTMLDivElement}
@@ -146,32 +155,39 @@ export function createEndButtonsContainer(dayIndex, ctx) {
   const container = document.createElement("div");
   container.className = "lessons-end-buttons";
 
-  const linkBtn = createStyledButton("Link Lesson", () => {
+  const newBtn = createIconButton("➕", "New Lesson", async () => {
+    const lessonId = await lessonStore().create({ title: DEFAULT_LESSON_TITLE });
+    await appendLessonToDay(lessonId, dayIndex, ctx);
+  });
+
+  const linkBtn = createIconButton("🔗", "Link Lesson", () => {
     showLessonSearchPopup({
-      onSelect: async (lessonId) => {
-        const dayRef = ref(getDb(), `schedule/${ctx.classId}/${dayIndex}`);
-        const snap = await get(dayRef);
-        const lessons = snap.exists() ? snap.val() : [];
-        lessons.push(lessonId);
-        await set(dayRef, lessons);
-        ctx.onReload();
-      }
+      onSelect: (lessonId) => appendLessonToDay(lessonId, dayIndex, ctx)
     });
   });
 
-  const newBtn = createNewLessonButtonShared(dayIndex, async (idx) => {
-    const lessonId = await lessonStore().create({ title: DEFAULT_LESSON_TITLE });
-    const dayRef = ref(getDb(), `schedule/${ctx.classId}/${idx}`);
-    const snap = await get(dayRef);
-    const lessons = snap.exists() ? snap.val() : [];
-    lessons.push(lessonId);
-    await set(dayRef, lessons);
-    ctx.onReload();
-  });
-
-  container.appendChild(linkBtn);
   container.appendChild(newBtn);
+  container.appendChild(linkBtn);
   return container;
+}
+
+/**
+ * Create a day row's Date cell. It holds both labels; the stylesheet shows
+ * `short` ("Mon 11/2") on narrow screens and `full` everywhere else.
+ * @param {{full: string, short: string}} dateLabels
+ * @returns {HTMLTableCellElement}
+ */
+export function createDateCell(dateLabels) {
+  const tdDate = document.createElement("td");
+  tdDate.className = "date-cell";
+  const full = document.createElement("span");
+  full.className = "date-full";
+  full.textContent = dateLabels.full;
+  const short = document.createElement("span");
+  short.className = "date-short";
+  short.textContent = dateLabels.short;
+  tdDate.append(full, short);
+  return tdDate;
 }
 
 /**
@@ -184,7 +200,7 @@ export function createEndButtonsContainer(dayIndex, ctx) {
  */
 export function setupLessonDropHandlers(tdLessons, toDayIndex, ctx) {
   setupDropHandlers(tdLessons, async (data) => {
-    const { lessonHash, fromDayIndex, fromLessonIndex, classId: fromClassId } = data;
+    const { fromDayIndex, fromLessonIndex, classId: fromClassId } = data;
 
     // Block drops originating from a different Class's pane.
     if (fromClassId && fromClassId !== ctx.classId) return;
@@ -192,21 +208,8 @@ export function setupLessonDropHandlers(tdLessons, toDayIndex, ctx) {
     // Prevent dropping into the same day
     if (Number(fromDayIndex) === Number(toDayIndex)) return;
 
-    const [fromSnap, toSnap] = await Promise.all([
-      get(ref(getDb(), `schedule/${ctx.classId}/${fromDayIndex}`)),
-      get(ref(getDb(), `schedule/${ctx.classId}/${toDayIndex}`))
-    ]);
-
-    const fromLessons = fromSnap.exists() ? fromSnap.val() : [];
-    const toLessons = toSnap.exists() ? toSnap.val() : [];
-
-    fromLessons.splice(fromLessonIndex, 1);
-    toLessons.push(lessonHash);
-
-    await Promise.all([
-      set(ref(getDb(), `schedule/${ctx.classId}/${fromDayIndex}`), fromLessons),
-      set(ref(getDb(), `schedule/${ctx.classId}/${toDayIndex}`), toLessons)
-    ]);
+    // The same move the ⋮ menu's "Move to previous/next day" makes.
+    await moveLessonBetweenDays(ctx.classId, Number(fromDayIndex), Number(fromLessonIndex), toDayIndex);
     ctx.onReload();
   }, {
     // Reject the hover state (and let the browser show its "not allowed"
@@ -221,11 +224,11 @@ export function setupLessonDropHandlers(tdLessons, toDayIndex, ctx) {
  * @param {number} dayIndex
  * @param {string[]} lessons - Lesson hashes for this day
  * @param {number|undefined} todayDayIndex - Today's Day Index, for highlighting
- * @param {string} dateLabel - Pre-formatted calendar date for this Day Index
+ * @param {{full: string, short: string}} dateLabels - This Day Index's calendar date (see getDayDateLabels)
  * @param {{classId: string, onReload: () => void, onDeleteDay: (dayIndex: number) => void}} ctx
  * @returns {Promise<HTMLTableRowElement>}
  */
-export async function createDayRow(dayIndex, lessons, todayDayIndex, dateLabel, ctx) {
+export async function createDayRow(dayIndex, lessons, todayDayIndex, dateLabels, ctx) {
   const tr = document.createElement("tr");
 
   if (todayDayIndex !== undefined && dayIndex === todayDayIndex) {
@@ -233,12 +236,11 @@ export async function createDayRow(dayIndex, lessons, todayDayIndex, dateLabel, 
   }
 
   const tdDay = document.createElement("td");
+  tdDay.className = "day-index-cell";
   tdDay.textContent = dayIndex;
   tr.appendChild(tdDay);
 
-  const tdDate = document.createElement("td");
-  tdDate.textContent = dateLabel;
-  tr.appendChild(tdDate);
+  tr.appendChild(createDateCell(dateLabels));
 
   const tdLessons = document.createElement("td");
   tdLessons.className = "lessons-cell";

@@ -53,6 +53,20 @@ describe('extractQuestionLinkSlugs', () => {
     expect(extractQuestionLinkSlugs(content)).toEqual(['loops-1']);
   });
 
+  it("doesn't count a Question Link typed inside inline code or a code block, which render as literal code", () => {
+    const content = {
+      title: 'T',
+      blocks: [{
+        type: 'question',
+        content: [
+          { type: 'text', value: 'Write `[[q:loops-1]]` to embed.\nTry [[q:loops-2]], then `x`.' },
+          { type: 'code', value: '[[q:loops-3]]' }
+        ]
+      }]
+    };
+    expect(extractQuestionLinkSlugs(content)).toEqual(['loops-2']);
+  });
+
   it('finds Question Links nested inside a collapsible', () => {
     const content = {
       title: 'T',
@@ -118,5 +132,20 @@ describe('rewriteQuestionSlugInContent', () => {
     const content = { title: 'T', blocks: [{ type: 'question', content: [{ type: 'text', value: '[[q:old-slug]]' }] }] };
     rewriteQuestionSlugInContent(content, 'old-slug', 'new-slug');
     expect(content.blocks[0].content[0].value).toBe('[[q:old-slug]]');
+  });
+
+  it('leaves a Question Link written as inline code alone, since it renders as a literal example', () => {
+    const content = {
+      title: 'T',
+      blocks: [{ type: 'question', content: [{ type: 'text', value: 'Type `[[q:old-slug]]` to get [[q:old-slug]].\nOr `see [[q:old-slug|Text]]` vs [[q:old-slug|Text]]' }] }]
+    };
+    const result = rewriteQuestionSlugInContent(content, 'old-slug', 'new-slug');
+    expect(result.blocks[0].content[0].value).toBe('Type `[[q:old-slug]]` to get [[q:new-slug]].\nOr `see [[q:old-slug|Text]]` vs [[q:new-slug|Text]]');
+  });
+
+  it('leaves a Question Link inside a code block alone', () => {
+    const content = { title: 'T', blocks: [{ type: 'question', content: [{ type: 'code', value: '[[q:old-slug]]' }] }] };
+    const result = rewriteQuestionSlugInContent(content, 'old-slug', 'new-slug');
+    expect(result.blocks[0].content[0].value).toBe('[[q:old-slug]]');
   });
 });

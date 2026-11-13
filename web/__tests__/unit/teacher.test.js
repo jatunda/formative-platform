@@ -39,6 +39,10 @@ vi.mock('../../date-utils.js', () => ({
   // it from constants.js - needs to be here for that chain to resolve.
   DEFAULT_CLASS_START_DATE: '2024-08-19',
   getDateForDayIndex: vi.fn(async (dayIndex, classId) => `date-for-${classId}-${dayIndex}`),
+  getDayDateLabels: vi.fn(async (dayIndex, classId) => ({
+    full: `full-date-for-${classId}-${dayIndex}`,
+    short: `short-date-for-${classId}-${dayIndex}`,
+  })),
   getTodayDayIndex: vi.fn(async () => 10),
   getClassDateOffset: vi.fn(async () => 5),
   setClassDateOffset: vi.fn(async () => {}),
@@ -83,12 +87,19 @@ vi.mock('../../schedule-day-view.js', () => ({
     return tr;
   }),
   createEndButtonsContainer: vi.fn(() => document.createElement('div')),
+  createDateCell: vi.fn(({ full, short }) => {
+    const td = document.createElement('td');
+    td.dataset.full = full;
+    td.dataset.short = short;
+    return td;
+  }),
   makeInsertDayHandler: vi.fn(() => vi.fn()),
   makeDeleteDayHandler: vi.fn(() => vi.fn()),
   getLessonTitles: (...args) => mockGetLessonTitles(...args),
 }));
 
-vi.mock('../../teacher-nav.js', () => ({
+vi.mock('../../teacher-nav.js', async (importOriginal) => ({
+  ...(await importOriginal()),
   renderTeacherNav: vi.fn(),
 }));
 
@@ -256,6 +267,16 @@ describe('teacher', () => {
       expect(tbody.children).toHaveLength(7); // 3 insert + 3 day + 1 final
     });
 
+    it("gives each day row both of that Day Index's date labels", async () => {
+      scheduleFixture();
+      const { createDayRow } = await import('../../schedule-day-view.js');
+
+      await renderScheduleTable({ 0: [], 1: [] }, 'csa');
+
+      expect(createDayRow).toHaveBeenCalledWith(1, [], 10,
+        { full: 'full-date-for-csa-1', short: 'short-date-for-csa-1' }, expect.anything());
+    });
+
     it('preloads lesson titles for every Lesson across the whole Schedule', async () => {
       scheduleFixture();
       await renderScheduleTable({ 0: ['hashA'], 1: ['hashB', 'hashC'] }, 'csa');
@@ -289,7 +310,8 @@ describe('teacher', () => {
 
       const cells = row.querySelectorAll('td');
       expect(cells[0].textContent).toBe('7');
-      expect(cells[1].textContent).toBe('date-for-csa-7');
+      expect(cells[1].dataset.full).toBe('full-date-for-csa-7');
+      expect(cells[1].dataset.short).toBe('short-date-for-csa-7');
       expect(cells[2].className).toBe('lessons-cell');
     });
   });
@@ -323,6 +345,50 @@ describe('teacher', () => {
 
       expect(schedulePane.scrollTop).toBe(321);
       vi.useRealTimers();
+    });
+
+    describe("arriving from Lesson Planning's Full schedule link", () => {
+      const savedScrollAt = (scrollTop) => {
+        markVisit(); // a recent visit, which would normally restore scroll
+        localStorage.setItem('teacher-schedule-scroll', JSON.stringify({ classId: 'csa', scrollTop, timestamp: Date.now() }));
+      };
+
+      it("scrolls to today's row even though a saved scroll position exists", async () => {
+        vi.useFakeTimers();
+        history.replaceState({}, '', '/teacher.html?class=csa&scroll=today');
+        document.body.innerHTML = '<div id="schedulePane"><table><tr class="today-row"></tr></table></div>';
+        const schedulePane = document.getElementById('schedulePane');
+        schedulePane.scrollTo = vi.fn();
+        savedScrollAt(321);
+
+        await handleScrollPositioning('csa');
+        vi.advanceTimersByTime(150);
+
+        expect(schedulePane.scrollTo).toHaveBeenCalled();
+        expect(schedulePane.scrollTop).not.toBe(321);
+        vi.useRealTimers();
+      });
+
+      it('drops the link\'s marker from the URL so later loads restore scroll as usual', async () => {
+        vi.useFakeTimers();
+        history.replaceState({}, '', '/teacher.html?class=csa&scroll=today');
+        document.body.innerHTML = '<div id="schedulePane"><table><tr class="today-row"></tr></table></div>';
+        const schedulePane = document.getElementById('schedulePane');
+        schedulePane.scrollTo = vi.fn();
+        savedScrollAt(321);
+
+        await handleScrollPositioning('csa');
+        vi.advanceTimersByTime(150);
+        expect(window.location.search).toBe('?class=csa');
+
+        schedulePane.scrollTo.mockClear();
+        await handleScrollPositioning('csa');
+        vi.advanceTimersByTime(150);
+
+        expect(schedulePane.scrollTo).not.toHaveBeenCalled();
+        expect(schedulePane.scrollTop).toBe(321);
+        vi.useRealTimers();
+      });
     });
 
     it('does nothing without a schedulePane element', async () => {
@@ -383,15 +449,38 @@ describe('teacher', () => {
   });
 
   describe('initializeDateOffsetControl', () => {
-    it('wires onApply/computeTodayDayIndex/onGoToToday and mounts the control', () => {
+    it('wires onShift/computeTodayDayIndex/onGoToToday and mounts the control', () => {
       scheduleFixture();
       initializeDateOffsetControl();
 
       const config = mockCreateDateOffsetControl.mock.calls[0][0];
-      expect(config.onApply).toBe(applyDateOffset);
+      expect(typeof config.onShift).toBe('function');
       expect(typeof config.computeTodayDayIndex).toBe('function');
       expect(typeof config.onGoToToday).toBe('function');
       expect(document.getElementById('dateOffsetContainer').children).toHaveLength(1);
+    });
+  });
+
+  describe('Skip/Delay on the Full Schedule', () => {
+    it("onShift moves the selected Class's Date Offset by the signed amount", async () => {
+      scheduleFixture();
+      mockData['schedule/csa'] = {};
+      const { getClassDateOffset, setClassDateOffset } = await import('../../date-utils.js');
+      let stored = 5;
+      getClassDateOffset.mockImplementation(async () => stored);
+      setClassDateOffset.mockImplementation(async (_classId, offset) => { stored = offset; });
+      await loadFullSchedule();
+      initializeDateOffsetControl();
+      const config = mockCreateDateOffsetControl.mock.calls.at(-1)[0];
+
+      await config.onShift(-2);
+      expect(setClassDateOffset).toHaveBeenLastCalledWith('csa', 3);
+
+      await config.onShift(4);
+      expect(setClassDateOffset).toHaveBeenLastCalledWith('csa', 7);
+
+      getClassDateOffset.mockImplementation(async () => 5);
+      setClassDateOffset.mockImplementation(async () => {});
     });
   });
 

@@ -30,6 +30,19 @@ describe('createDslCheatSheetPanel', () => {
     expect(codeCells.some((text) => text.includes('Explanation:'))).toBe(false);
   });
 
+  it('documents the spoiler syntax', () => {
+    const panel = createDslCheatSheetPanel();
+    const codeCells = [...panel.querySelectorAll('td code')].map((el) => el.textContent);
+    expect(codeCells).toContain('||hidden text||');
+  });
+
+  it('documents blockquotes and callouts', () => {
+    const panel = createDslCheatSheetPanel();
+    const codeCells = [...panel.querySelectorAll('td code')].map((el) => el.textContent);
+    expect(codeCells).toContain('> quoted text');
+    expect(codeCells.some((text) => text.startsWith('> [!tip]'))).toBe(true);
+  });
+
   it('creates a fresh element each call rather than sharing one node', () => {
     const first = createDslCheatSheetPanel();
     const second = createDslCheatSheetPanel();

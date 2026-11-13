@@ -7,6 +7,7 @@ import {
   primeDateOffsetCache,
   getTodayDayIndex,
   getDateForDayIndex,
+  getDayDateLabels,
   getDateObjectForDayIndex,
   isDayIndexToday,
   DEFAULT_CLASS_START_DATE,
@@ -143,6 +144,21 @@ describe('date-utils', () => {
     it('should apply date offset', async () => {
       const dateStr = await getDateForDayIndex(5, 'testClass', '2024-01-01');
       expect(dateStr).toBeDefined();
+    });
+  });
+
+  describe('getDayDateLabels', () => {
+    it('gives the full label for wide screens and a short one (weekday + month/day) for narrow ones', async () => {
+      // 2024-01-01 is a Monday; Day 0 plus testClass's offset of 2 lands on Wednesday 1/3.
+      expect(await getDayDateLabels(0, 'testClass', '2024-01-01')).toEqual({
+        full: '1/3/2024 (Wednesday)',
+        short: 'Wed 1/3'
+      });
+    });
+
+    it('matches getDateForDayIndex for the full label', async () => {
+      const { full } = await getDayDateLabels(4, 'testClass', '2024-01-01');
+      expect(full).toBe(await getDateForDayIndex(4, 'testClass', '2024-01-01'));
     });
   });
 

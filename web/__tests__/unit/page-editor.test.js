@@ -81,7 +81,12 @@ vi.mock('../../page-database-utils.js', () => ({
 }));
 
 global.alert = vi.fn();
+const mockShowConfirm = vi.fn(async () => true);
+vi.mock('../../confirm-dialog.js', () => ({ showConfirm: (...args) => mockShowConfirm(...args) }));
 global.confirm = vi.fn(() => true);
+/** Expect the in-app confirm dialog to have asked with a message containing `text`. */
+const expectAskedWith = (text) =>
+  expect(mockShowConfirm).toHaveBeenCalledWith(expect.objectContaining({ message: expect.stringContaining(text) }));
 global.prompt = vi.fn();
 
 function renderEditorDom() {
@@ -119,7 +124,7 @@ describe('page-editor', () => {
     mockParseDSL.mockReset().mockReturnValue({ title: 'Parsed Title', blocks: [{ type: 'question', content: [] }] });
     mockGenerateDSLFromContent.mockClear();
     global.alert.mockClear();
-    global.confirm.mockReturnValue(true);
+    mockShowConfirm.mockResolvedValue(true);
     global.prompt.mockReset();
 
     Object.defineProperty(window, 'location', {
@@ -243,12 +248,13 @@ describe('page-editor', () => {
         document.getElementById('deleteBtn').onclick();
         await new Promise((resolve) => setTimeout(resolve, 0));
 
+        expectAskedWith('Are you sure you want to delete this page?\n\nThis also removes every URL pointing to it. This action cannot be undone.');
         expect(mockDeletePageAndSlugs).toHaveBeenCalledWith('abc123');
         expect(window.location.href).toContain('page-manager.html');
       });
 
       it('does nothing when the teacher cancels the confirmation', async () => {
-        global.confirm.mockReturnValue(false);
+        mockShowConfirm.mockResolvedValue(false);
         await main();
 
         document.getElementById('deleteBtn').onclick();
@@ -264,7 +270,7 @@ describe('page-editor', () => {
         document.getElementById('deleteBtn').onclick();
         await new Promise((resolve) => setTimeout(resolve, 0));
 
-        expect(global.confirm).toHaveBeenCalledWith(expect.stringContaining('1 other page'));
+        expectAskedWith('1 other page');
       });
     });
 
@@ -312,13 +318,13 @@ describe('page-editor', () => {
         document.querySelector('#slugList .delete-btn').onclick();
         await new Promise((resolve) => setTimeout(resolve, 0));
 
-        expect(global.confirm).toHaveBeenCalledWith(expect.stringContaining('/p/syllabus'));
+        expectAskedWith('/p/syllabus');
         expect(mockRemoveSlug).toHaveBeenCalledWith('syllabus');
       });
 
       it('does not remove a slug when the confirmation is cancelled', async () => {
         mockGetAllSlugs.mockResolvedValue({ syllabus: 'abc123' });
-        global.confirm.mockReturnValue(false);
+        mockShowConfirm.mockResolvedValue(false);
         await main();
 
         document.querySelector('#slugList .delete-btn').onclick();
@@ -335,7 +341,7 @@ describe('page-editor', () => {
         document.querySelector('#slugList .delete-btn').onclick();
         await new Promise((resolve) => setTimeout(resolve, 0));
 
-        expect(global.confirm).toHaveBeenCalledWith(expect.stringContaining('2 other pages'));
+        expectAskedWith('2 other pages');
       });
 
       it('renames a slug via the Rename button', async () => {

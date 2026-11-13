@@ -4,6 +4,8 @@
 import { CONTENT_NOT_FOUND } from './constants.js';
 import { PAGE_LINK_PATTERN, parsePageLinkMatch } from './page-links.js';
 import { QUESTION_LINK_PATTERN, parseQuestionLinkMatch } from './question-links.js';
+import { INLINE_CODE_PATTERN, matchAllOutsideInlineCode } from './inline-code.js';
+import { QUOTE_LINE_PATTERN, QUOTE_PREFIX_PATTERN, QUOTE_BREAK } from './dsl.js';
 
 /**
  * Turn heading text into a URL-safe id fragment for Section Link targets.
@@ -45,7 +47,8 @@ function collectHeadingIds(data) {
 		for (const item of items || []) {
 			if (item.type === "text") {
 				for (const line of item.value.split('\n')) {
-					const headingMatch = line.match(/^(#{1,6})\s+(.+)$/);
+					// Headings inside quotes render too, so look past the `>`s.
+					const headingMatch = line.replace(QUOTE_PREFIX_PATTERN, '').match(/^(#{1,6})\s+(.+)$/);
 					if (!headingMatch) continue;
 					const headingText = headingMatch[2].trim();
 					const normalized = normalizeHeadingText(headingText);
@@ -142,13 +145,94 @@ function processMarkdownLinks(text) {
 }
 
 /**
- * Process inline code formatting with backticks, escaping HTML to prevent XSS
- * Processes text in order: HTML escape, links, text formatting, then code blocks
+ * A spoiler: `||hidden text||`. Runs after links and formatting, so they
+ * work inside it; inline code is already set aside, so `||x||` inside
+ * backticks stays literal. Like Markdown emphasis, the hidden text can't
+ * start or end with whitespace, so `a || b || c` in prose stays as typed
+ * while `||x y||` is still a spoiler.
+ */
+const SPOILER_PATTERN = /\|\|(?!\s)(.+?)(?<!\s)\|\|/g;
+
+/** Opening tag of a spoiler span; installSpoilerToggle reveals it on tap. */
+const SPOILER_OPEN_TAG = '<span class="spoiler" tabindex="0" role="button" aria-expanded="false">';
+
+/** Documents that already have the spoiler toggle listeners. */
+const spoilerToggleDocuments = new WeakSet();
+
+/**
+ * Flip a spoiler between hidden and revealed.
+ * @param {Element} spoiler
+ */
+function toggleSpoiler(spoiler) {
+	const revealed = spoiler.classList.toggle('spoiler-revealed');
+	spoiler.setAttribute('aria-expanded', String(revealed));
+}
+
+/**
+ * Whether this click came from a pointer that can hover (a mouse), so
+ * a hidden spoiler has already shown itself (style.css reveals on :hover).
+ * A touch tap never hovered, even on a laptop with a touch screen.
+ * @param {MouseEvent} event
+ * @param {Document} doc
+ */
+function pointerCanHover(event, doc) {
+	if (/** @type {PointerEvent} */ (event).pointerType === 'touch') return false;
+	return /** @type {Window} */ (doc.defaultView).matchMedia('(hover: hover)').matches;
+}
+
+/**
+ * Let a tap, click, Enter or Space toggle any spoiler in the document. One
+ * delegated listener covers every renderer and every re-render (the editor
+ * preview re-renders on each keystroke). Hover and keyboard focus reveal
+ * through CSS alone (style.css). Safe to call more than once per document.
+ * @param {Document} doc
+ */
+function installSpoilerToggle(doc) {
+	if (spoilerToggleDocuments.has(doc)) return;
+	spoilerToggleDocuments.add(doc);
+
+	doc.addEventListener('click', (event) => {
+		const target = /** @type {Element} */ (event.target);
+		const spoiler = target.closest('.spoiler');
+		if (!spoiler) return;
+		const onLink = target.closest('a') !== null;
+		// A link inside a revealed spoiler works as normal, and so does one
+		// clicked with a mouse: hovering has already shown the text.
+		if (onLink && (spoiler.classList.contains('spoiler-revealed') || pointerCanHover(event, doc))) return;
+		// A tap on a link inside a hidden spoiler reveals it rather than
+		// following the link, since a touch screen couldn't show it first;
+		// one in a Question option's <label> or a collapsible's <summary>
+		// doesn't also pick the option or toggle the section.
+		if (onLink || spoiler.closest('label, summary')) event.preventDefault();
+		toggleSpoiler(spoiler);
+	});
+
+	doc.addEventListener('keydown', (event) => {
+		const target = /** @type {Element} */ (event.target);
+		if (event.key !== 'Enter' && event.key !== ' ') return;
+		if (!target.classList.contains('spoiler')) return;
+		event.preventDefault();
+		toggleSpoiler(target);
+	});
+}
+
+if (typeof document !== 'undefined') installSpoilerToggle(document);
+
+/**
+ * Stands in for an inline code span while links and formatting run: a
+ * Private Use Area character, which no link or formatting pattern matches.
+ */
+const CODE_SPAN_PLACEHOLDER = /î€€(\d+)î€€/g;
+
+/**
+ * Process inline formatting, escaping HTML to prevent XSS.
+ * Order: HTML escape, set inline code spans aside, links, text formatting,
+ * then put the code spans back - so text inside backticks renders exactly
+ * as typed (no links, bold or italic inside it).
  * @param {string} text - The text to process
  * @returns {string} The HTML formatted text with code tags
  */
 function processInlineCode(text, headingIds = new Map()) {
-	// Escape HTML to prevent XSS, then process backticks
 	const escaped = text
 		.replace(/&/g, '&amp;')
 		.replace(/</g, '&lt;')
@@ -156,13 +240,19 @@ function processInlineCode(text, headingIds = new Map()) {
 		.replace(/"/g, '&quot;')
 		.replace(/'/g, '&#39;');
 
-	// Process in order: Page/Section Links, plain links, text formatting, then code
-	const withPageLinks = processPageAndSectionLinks(escaped, headingIds);
+	/** @type {string[]} */
+	const codeSpans = [];
+	const withoutCode = escaped.replace(INLINE_CODE_PATTERN, (_match, code) => {
+		codeSpans.push(code);
+		return `î€€${codeSpans.length - 1}î€€`;
+	});
+
+	const withPageLinks = processPageAndSectionLinks(withoutCode, headingIds);
 	const withLinks = processMarkdownLinks(withPageLinks);
 	const withFormatting = processTextFormatting(withLinks);
+	const withSpoilers = withFormatting.replace(SPOILER_PATTERN, `${SPOILER_OPEN_TAG}$1</span>`);
 
-	// Replace backtick-enclosed text with <code> tags
-	return withFormatting.replace(/`([^`]+)`/g, '<code>$1</code>');
+	return withSpoilers.replace(CODE_SPAN_PLACEHOLDER, (_match, index) => `<code>${codeSpans[Number(index)]}</code>`);
 }
 
 /**
@@ -192,7 +282,8 @@ function processInlineCode(text, headingIds = new Map()) {
 function expandQuestionLinkLines(rawLines) {
 	const expanded = [];
 	for (const rawLine of rawLines) {
-		const matches = [...rawLine.matchAll(QUESTION_LINK_PATTERN)];
+		// A Question Link typed inside backticks is literal code, not an embed.
+		const matches = matchAllOutsideInlineCode(rawLine, QUESTION_LINK_PATTERN);
 		if (matches.length === 0) {
 			expanded.push(rawLine);
 			continue;
@@ -211,12 +302,115 @@ function expandQuestionLinkLines(rawLines) {
 	return expanded;
 }
 
+/** A quote's first line `[!type] Optional title` makes it a callout. */
+const CALLOUT_HEADER_PATTERN = /^\[!([A-Za-z]+)\](.*)$/;
+
+/** Callout types and their icons; any other type draws as a note. */
+const CALLOUT_ICONS = new Map([
+	["note", "📝"],
+	["tip", "💡"],
+	["warning", "⚠️"],
+	["danger", "⛔"],
+	["question", "❓"],
+	["example", "📋"],
+]);
+
+/**
+ * Split text items into runs of plain lines and runs of quote lines, so
+ * consecutive `>` lines become one quote item even though parseDSL stores
+ * each line as its own text item. Code, collapsible and QUOTE_BREAK items
+ * pass through, so a quote line after a quote break starts a new quote.
+ * @param {Array<Object>} contentItems
+ * @returns {Array<Object>} items, where `{type: "quote", lines}` holds a quote's lines with the `>` removed
+ * @private
+ */
+function groupQuoteLines(contentItems) {
+	const grouped = [];
+	for (const item of contentItems) {
+		if (item.type !== "text") {
+			grouped.push(item);
+			continue;
+		}
+		for (const line of item.value.split('\n')) {
+			const last = grouped[grouped.length - 1];
+			const quoteMatch = line.match(QUOTE_LINE_PATTERN);
+			if (quoteMatch) {
+				// A `[!type]` line always starts a new callout.
+				if (last && last.type === "quote" && !CALLOUT_HEADER_PATTERN.test(quoteMatch[1])) {
+					last.lines.push(quoteMatch[1]);
+				} else {
+					grouped.push({ type: "quote", lines: [quoteMatch[1]] });
+				}
+			} else if (last && last.type === "text") {
+				last.value += `\n${line}`;
+			} else {
+				grouped.push({ type: "text", value: line });
+			}
+		}
+	}
+	return grouped;
+}
+
+/**
+ * Render one quote run: inline formatting and lists work inside it, through
+ * the same text rendering as everywhere else.
+ * @param {string[]} lines - The quote's lines, `>` removed
+ * @param {HTMLElement} containerEl
+ * @param {Map<string, string>} headingIds
+ * @param {string[]} headingIdQueue
+ * @private
+ */
+function renderQuote(lines, containerEl, headingIds, headingIdQueue) {
+	const calloutMatch = lines[0].match(CALLOUT_HEADER_PATTERN);
+	if (!calloutMatch) {
+		const blockquote = document.createElement("blockquote");
+		blockquote.className = "lesson-blockquote";
+		renderContentItems([{ type: "text", value: lines.join('\n') }], blockquote, headingIds, headingIdQueue);
+		containerEl.appendChild(blockquote);
+		return;
+	}
+
+	const typedName = calloutMatch[1].toLowerCase();
+	const type = CALLOUT_ICONS.has(typedName) ? typedName : "note";
+	const title = calloutMatch[2].trim() || typedName.charAt(0).toUpperCase() + typedName.slice(1);
+
+	const callout = document.createElement("div");
+	callout.className = `lesson-callout lesson-callout-${type}`;
+	callout.setAttribute("role", "note");
+
+	const titleEl = document.createElement("div");
+	titleEl.className = "lesson-callout-title";
+	const icon = document.createElement("span");
+	icon.className = "lesson-callout-icon";
+	icon.setAttribute("aria-hidden", "true");
+	icon.textContent = CALLOUT_ICONS.get(type);
+	const titleText = document.createElement("span");
+	titleText.className = "lesson-callout-title-text";
+	titleText.innerHTML = processInlineCode(title, headingIds);
+	titleEl.append(icon, titleText);
+
+	const content = document.createElement("div");
+	content.className = "lesson-callout-content";
+	renderContentItems([{ type: "text", value: lines.slice(1).join('\n') }], content, headingIds, headingIdQueue);
+
+	callout.append(titleEl, content);
+	containerEl.appendChild(callout);
+}
+
 function renderContentItems(contentItems, containerEl, headingIds = new Map(), headingIdQueue = []) {
 	// Stack to track list hierarchy (separate from parent list stack)
 	const listStack = [];
 	let indentUnit = null;
-	
-	contentItems.forEach(item => {
+
+	groupQuoteLines(contentItems).forEach(item => {
+		// A quote break only splits two quotes (groupQuoteLines); it shows nothing.
+		if (item.type === QUOTE_BREAK) return;
+		if (item.type === "quote") {
+			listStack.length = 0;
+			indentUnit = null;
+			renderQuote(item.lines, containerEl, headingIds, headingIdQueue);
+			return;
+		}
 		if (item.type === "text") {
 			// Split text into lines to process each separately, expanding out
 			// any [[q:slug]] Question Links into their own placeholder markers
@@ -516,5 +710,6 @@ export {
 	renderContent,
 	renderMultipleContent,
 	processInlineCode,
-	renderContentItems
+	renderContentItems,
+	installSpoilerToggle
 };

@@ -1,3 +1,5 @@
+import { matchAllOutsideInlineCode, replaceOutsideInlineCode } from "./inline-code.js";
+
 // Shared pattern for Question Links: [[q:slug]], [[q:slug|text]]. A Question
 // Link is the Question equivalent of a Page Link, but lives in its own
 // namespace/syntax (docs/adr/0011) since Questions keep a separate
@@ -45,7 +47,9 @@ export function extractQuestionLinkSlugs(parsedContent) {
   const slugs = new Set();
   for (const block of (parsedContent && parsedContent.blocks) || []) {
     walkTextValues(block.content, (text) => {
-      for (const match of text.matchAll(QUESTION_LINK_PATTERN)) {
+      // Skips links written as inline code, which render as literal code.
+      const matches = text.split("\n").flatMap((line) => matchAllOutsideInlineCode(line, QUESTION_LINK_PATTERN));
+      for (const match of matches) {
         const { slug } = parseQuestionLinkMatch(match[1], match[2]);
         if (slug) slugs.add(slug);
       }
@@ -56,9 +60,11 @@ export function extractQuestionLinkSlugs(parsedContent) {
 
 /**
  * Replace every `[[q:oldSlug` Question Link reference with `[[q:newSlug`,
- * without touching an unrelated slug that happens to share a prefix. Returns
- * a new content object; does not mutate the input. Used when a Question's
- * Slug is renamed, to fix up every Page that links to it.
+ * without touching an unrelated slug that happens to share a prefix. Code
+ * blocks are code items, which were never rewritten; a link written as
+ * inline code in a text item is an example too, so it is now skipped as well.
+ * Returns a new content object; does not mutate the input. Used when a
+ * Question's Slug is renamed, to fix up every Page that links to it.
  * @param {{title: string, blocks: Array}} parsedContent
  * @param {string} oldSlug
  * @param {string} newSlug
@@ -70,7 +76,7 @@ export function rewriteQuestionSlugInContent(parsedContent, oldSlug, newSlug) {
   function rewriteItems(items) {
     return (items || []).map((item) => {
       if (item.type === "text") {
-        return { ...item, value: item.value.replace(boundaryPattern, `[[q:${newSlug}`) };
+        return { ...item, value: replaceOutsideInlineCode(item.value, boundaryPattern, `[[q:${newSlug}`) };
       }
       if (item.type === "collapsible") {
         return { ...item, content: rewriteItems(item.content) };

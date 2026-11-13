@@ -6,6 +6,7 @@
 import { getAllQuestions } from './question-database-utils.js';
 import { getClasses } from './database-utils.js';
 import { deriveQuestionLabel } from './question-label.js';
+import { attachSearchListKeys } from './search-list-keys.js';
 
 /**
  * Show a popup listing every Question, filterable by Class and topic.
@@ -62,10 +63,11 @@ export function showQuestionPicker({ onSelect }) {
       const resultsDiv = document.createElement('div');
       resultsDiv.className = 'lesson-popup-results';
 
-      function renderResults() {
+      /** @param {string} filter */
+      function renderResults(filter) {
         resultsDiv.innerHTML = '';
         const classId = classSelect.value;
-        const filterLower = searchInput.value.trim().toLowerCase();
+        const filterLower = filter.trim().toLowerCase();
         const matches = questions.filter((question) => {
           if (classId && question.classId !== classId) return false;
           if (filterLower && !question.label.toLowerCase().includes(filterLower) && !question.topic.toLowerCase().includes(filterLower)) return false;
@@ -91,9 +93,8 @@ export function showQuestionPicker({ onSelect }) {
         }
       }
 
-      classSelect.onchange = renderResults;
-      searchInput.oninput = renderResults;
-      renderResults();
+      const keys = attachSearchListKeys({ popup, input: searchInput, list: resultsDiv, render: renderResults });
+      classSelect.onchange = keys.update;
 
       box.appendChild(closeBtn);
       box.appendChild(classSelect);

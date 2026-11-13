@@ -49,16 +49,23 @@ export function createStyledButton(text, onClick) {
 }
 
 /**
- * Create a "New Lesson" button for a specific day
- * @param {number} dayIndex - The day index to add the lesson to
- * @param {(dayIndex: number) => void} addLessonCallback - Callback function to add lesson
+ * Create a compact icon-only button; `label` names the action as both its
+ * tooltip and its accessible label, since the icon alone says nothing to a
+ * screen reader.
+ * @param {string} icon - The icon (emoji) shown on the button
+ * @param {string} label - What the button does, e.g. "New Lesson"
+ * @param {() => any} onClick - The click handler function
  * @returns {HTMLButtonElement} The created button element
  */
-export function createNewLessonButton(dayIndex, addLessonCallback) {
+export function createIconButton(icon, label, onClick) {
   const btn = document.createElement("button");
-  btn.textContent = "New Lesson";
-  btn.className = "schedule-action-btn new-lesson-btn";
-  btn.onclick = withWorkingIndicator(btn, () => addLessonCallback(dayIndex));
+  btn.textContent = icon;
+  btn.title = label;
+  btn.setAttribute("aria-label", label);
+  btn.className = "schedule-icon-btn";
+  // An hourglass, not the default "Working…" text, so a slow click doesn't
+  // stretch the compact button and shove the row around.
+  btn.onclick = withWorkingIndicator(btn, onClick, { workingLabel: "⏳" });
   return btn;
 }
 
@@ -87,19 +94,6 @@ export function createArrowButton(direction, isDisabled, onClick) {
   btn.textContent = direction === "left" ? "←" : "→";
   btn.className = "schedule-action-btn";
   btn.disabled = isDisabled;
-  btn.onclick = withWorkingIndicator(btn, onClick);
-  return btn;
-}
-
-/**
- * Create a delete button with trash icon
- * @param {() => void} onClick - The click handler function
- * @returns {HTMLButtonElement} The created button element
- */
-export function createDeleteButton(onClick) {
-  const btn = document.createElement("button");
-  btn.textContent = "🗑️";
-  btn.className = "schedule-action-btn delete-btn";
   btn.onclick = withWorkingIndicator(btn, onClick);
   return btn;
 }
@@ -165,126 +159,124 @@ export function createDownArrowButton(onClick) {
 }
 
 /**
- * Create a button with left arrow (←) with minimized width
- * @param {boolean} isDisabled - Whether the button should be disabled
- * @param {() => void} onClick - The click handler function
- * @returns {HTMLButtonElement} The created button element with left arrow
+ * Read a Skip/Delay amount box: the magnitude of a whole number, falling
+ * back to 1 for zero, blank, or non-numeric input.
+ * @param {{value: string}} input
+ * @returns {number}
  */
-export function createLeftArrowButton(isDisabled, onClick) {
-  const btn = createArrowButton("left", isDisabled, onClick);
-  // Minimize width to fit content only
-  btn.style.width = "auto";
-  btn.style.minWidth = "auto";
-  btn.style.maxWidth = "none";
-  btn.style.padding = "4px 8px";
-  return btn;
+export function getShiftAmount(input) {
+  const magnitude = Math.abs(parseInt(input.value, 10));
+  return Number.isFinite(magnitude) && magnitude > 0 ? magnitude : 1;
+}
+
+export const SKIP_DELAY_HELP =
+  "Delay: lessons move to later dates (e.g. after a snow day). Skip: lessons move to earlier dates, jumping ahead.";
+
+/**
+ * Create a "?" icon whose hover/focus tooltip shows `text` (CSS-only, see
+ * .info-tooltip in style.css).
+ * @param {string} text
+ * @returns {HTMLSpanElement}
+ */
+export function createInfoTooltip(text) {
+  const icon = document.createElement("span");
+  icon.className = "info-tooltip";
+  icon.textContent = "?";
+  icon.tabIndex = 0;
+  const tip = document.createElement("span");
+  tip.className = "info-tooltip-text";
+  tip.textContent = text;
+  icon.appendChild(tip);
+  return icon;
 }
 
 /**
- * Create a button with right arrow (→) with minimized width
- * @param {boolean} isDisabled - Whether the button should be disabled
- * @param {() => void} onClick - The click handler function
- * @returns {HTMLButtonElement} The created button element with right arrow
- */
-export function createRightArrowButton(isDisabled, onClick) {
-  const btn = createArrowButton("right", isDisabled, onClick);
-  // Minimize width to fit content only
-  btn.style.width = "auto";
-  btn.style.minWidth = "auto";
-  btn.style.maxWidth = "none";
-  btn.style.padding = "4px 8px";
-  return btn;
-}
-
-/**
- * Create a Date Offset editing control: a "Current: N" badge, a "(Today is
- * Day N)" indicator, an input + Apply button, and an optional "Go to Today"
- * button. Has no data or notification dependencies of its own - persistence,
- * the today-index computation, and any scroll behavior are all supplied by
- * the caller, so the same control works both in teacher.js's full-schedule
- * view and in a lesson-planning.html per-class pane.
+ * Create the Skip / Delay Date Offset control: a label, an optional
+ * "Current: N" badge, an optional "(Today is Day N)" indicator, a "?"
+ * tooltip, an amount box (default 1), Skip and Delay buttons that apply
+ * instantly, and an optional "Go to Today" button. Delay raises the Date
+ * Offset by the amount, Skip lowers it. Has no data or notification
+ * dependencies of its own - persistence, the today-index computation, and
+ * any scroll behavior are all supplied by the caller, so the same control
+ * serves the all-classes Bulk Offset Shift, each Class's Lesson Planning
+ * pane, and the Full Schedule page.
  * @param {Object} config
- * @param {number} config.currentOffset - The current date offset value
- * @param {(newOffset: number) => Promise<void>} config.onApply - Persist the new offset (and notify the user of success/failure); the control re-renders its display only if this resolves, and swallows a thrown failure since the caller already handled it
- * @param {() => Promise<number>} config.computeTodayDayIndex - Resolve today's Day Index for display, called on mount and after a successful apply. Never called when config.compact is true.
+ * @param {string} config.label - Text shown before the control
+ * @param {number} [config.currentOffset] - The Class's current Date Offset; omit (e.g. for the all-classes shift) to show no badge
+ * @param {(delta: number) => Promise<void>} config.onShift - Persist the signed change (+amount for Delay, -amount for Skip) and notify the user; the control updates its displays only if this resolves, and swallows a thrown failure since the caller already handled it
+ * @param {() => Promise<number>} [config.computeTodayDayIndex] - If provided, "(Today is Day N)" is shown, refreshed on mount and after each shift
  * @param {() => void} [config.onGoToToday] - If provided, a "Go to Today" button is rendered
- * @param {boolean} [config.compact=false] - Shorten the label and drop the "(Today is Day N)" indicator, for placements too narrow for the full control (e.g. one per pane on the Lesson Planning page)
  * @returns {HTMLElement & {updateOffset: (offset: number) => Promise<void>}} The container element with an updateOffset method
  */
-export function createDateOffsetControl({ currentOffset, onApply, computeTodayDayIndex, onGoToToday, compact = false }) {
+export function createDateOffsetControl({ label, currentOffset, onShift, computeTodayDayIndex, onGoToToday }) {
   const container = document.createElement("div");
   container.className = "date-offset-control";
-  container.style.display = "flex";
-  container.style.alignItems = "center";
-  container.style.gap = "8px";
 
-  const label = document.createElement("label");
-  label.textContent = compact ? "Offset:" : "Date Offset (days): ";
+  let offset = currentOffset;
+
+  const labelEl = document.createElement("label");
+  labelEl.textContent = label;
+  container.appendChild(labelEl);
 
   const currentDisplay = document.createElement("span");
   currentDisplay.className = "current-offset-display";
-  currentDisplay.textContent = `Current: ${currentOffset}`;
-  currentDisplay.style.fontWeight = "bold";
-  currentDisplay.style.color = "#007cba";
-  currentDisplay.style.backgroundColor = "#e8f4fd";
-  currentDisplay.style.padding = "4px 8px";
-  currentDisplay.style.borderRadius = "4px";
-  currentDisplay.style.border = "1px solid #b3d9f7";
-  currentDisplay.style.fontSize = "0.9rem";
+  const renderCurrent = () => { currentDisplay.textContent = `Current: ${offset}`; };
+  if (offset !== undefined) {
+    renderCurrent();
+    container.appendChild(currentDisplay);
+  }
 
   const todayDisplay = document.createElement("span");
   todayDisplay.className = "today-dayindex-display";
-  todayDisplay.style.fontSize = "0.85rem";
-  todayDisplay.style.color = "#666";
-  todayDisplay.style.fontStyle = "italic";
-
   async function refreshTodayDisplay() {
-    if (compact) return;
-    const todayDayIndex = await computeTodayDayIndex();
-    todayDisplay.textContent = `(Today is Day ${todayDayIndex})`;
+    if (!computeTodayDayIndex) return;
+    todayDisplay.textContent = `(Today is Day ${await computeTodayDayIndex()})`;
   }
-  refreshTodayDisplay();
-
-  const input = document.createElement("input");
-  input.type = "number";
-  input.value = currentOffset;
-  input.style.width = "80px";
-  input.placeholder = "New offset";
-
-  const applyBtn = createStyledButton("Apply", async () => {
-    const newOffset = parseInt(input.value) || 0;
-    try {
-      await onApply(newOffset);
-      currentDisplay.textContent = `Current: ${newOffset}`;
-      await refreshTodayDisplay();
-    } catch (error) {
-      // onApply is responsible for notifying the user of the failure
-    }
-  });
-  applyBtn.style.width = "auto";
-  applyBtn.style.padding = "4px 12px";
-  applyBtn.style.fontSize = "0.9rem";
-
-  container.appendChild(label);
-  container.appendChild(currentDisplay);
-  if (!compact) {
+  if (computeTodayDayIndex) {
     container.appendChild(todayDisplay);
+    refreshTodayDisplay();
   }
-  container.appendChild(input);
-  container.appendChild(applyBtn);
+
+  container.appendChild(createInfoTooltip(SKIP_DELAY_HELP));
+
+  const amountInput = document.createElement("input");
+  amountInput.type = "number";
+  amountInput.className = "offset-shift-amount";
+  amountInput.value = "1";
+  amountInput.min = "1";
+  amountInput.setAttribute("aria-label", "Number of days");
+  container.appendChild(amountInput);
+
+  const shiftButton = (text, sign, title) => {
+    const btn = createStyledButton(text, async () => {
+      const delta = sign * getShiftAmount(amountInput);
+      try {
+        await onShift(delta);
+      } catch {
+        return; // onShift is responsible for notifying the user of the failure
+      }
+      if (offset !== undefined) {
+        offset += delta;
+        renderCurrent();
+      }
+      await refreshTodayDisplay();
+    });
+    btn.title = title;
+    return btn;
+  };
+  container.appendChild(shiftButton("Skip", -1, "Lessons move to earlier dates"));
+  container.appendChild(shiftButton("Delay", 1, "Lessons move to later dates"));
 
   if (onGoToToday) {
     const goToTodayBtn = createStyledButton("Go to Today", onGoToToday);
     goToTodayBtn.className = "schedule-action-btn go-to-today-btn";
-    goToTodayBtn.style.padding = "4px 12px";
-    goToTodayBtn.style.fontSize = "0.9rem";
     container.appendChild(goToTodayBtn);
   }
 
   // Method to update the displayed offset (e.g. after switching classes)
   container.updateOffset = async (newOffset) => {
-    input.value = newOffset;
-    currentDisplay.textContent = `Current: ${newOffset}`;
+    offset = newOffset;
+    renderCurrent();
     await refreshTodayDisplay();
   };
 

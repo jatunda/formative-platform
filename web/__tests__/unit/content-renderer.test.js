@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { renderContent, renderMultipleContent, processInlineCode } from '../../content-renderer.js';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { renderContent, renderMultipleContent, processInlineCode, installSpoilerToggle } from '../../content-renderer.js';
 import { CONTENT_NOT_FOUND } from '../../constants.js';
 
 describe('processInlineCode', () => {
@@ -73,6 +73,285 @@ describe('processInlineCode', () => {
     const result = processInlineCode('[[#GRADING POLICY|Jump here]]', headingIds);
     expect(result).toBe('<a href="#grading-policy" class="lesson-link">Jump here</a>');
   });
+
+  describe('inline code is literal', () => {
+    it('keeps a Page Link inside backticks as literal code', () => {
+      expect(processInlineCode('Type `[[asdf]]` to link')).toBe('Type <code>[[asdf]]</code> to link');
+    });
+
+    it.each([
+      ['a Section Link', '[[#Header]]'],
+      ['a Question Link', '[[q:slug]]'],
+      ['a markdown link', '[a](b)'],
+      ['bold', '**x**'],
+      ['italic', '_x_'],
+    ])('keeps %s inside backticks as literal code', (_name, literal) => {
+      const headingIds = new Map([['header', 'header']]);
+      expect(processInlineCode(`\`${literal}\``, headingIds)).toBe(`<code>${literal}</code>`);
+    });
+
+    it('still applies links and formatting outside backticks on the same line', () => {
+      const result = processInlineCode('See [[syllabus]] and **bold**, not `[[syllabus]]` or `**bold**`');
+      expect(result).toBe(
+        'See <a href="/p/syllabus" class="lesson-link">syllabus</a> and <strong>bold</strong>, ' +
+        'not <code>[[syllabus]]</code> or <code>**bold**</code>'
+      );
+    });
+
+    it('still formats bold that wraps an inline code span', () => {
+      expect(processInlineCode('**use `x` here**')).toBe('<strong>use <code>x</code> here</strong>');
+    });
+
+    it('still escapes HTML inside inline code', () => {
+      expect(processInlineCode('`<b onclick="x">&</b>`')).toBe(
+        '<code>&lt;b onclick=&quot;x&quot;&gt;&amp;&lt;/b&gt;</code>'
+      );
+    });
+  });
+});
+
+describe('spoilers', () => {
+  const SPOILER_OPEN = '<span class="spoiler" tabindex="0" role="button" aria-expanded="false">';
+
+  it('renders ||text|| as a spoiler span', () => {
+    expect(processInlineCode('The answer is ||42||.')).toBe(`The answer is ${SPOILER_OPEN}42</span>.`);
+  });
+
+  it('renders several spoilers on one line separately', () => {
+    expect(processInlineCode('||a|| and ||b||')).toBe(`${SPOILER_OPEN}a</span> and ${SPOILER_OPEN}b</span>`);
+  });
+
+  it.each([
+    ['bold', '||**x**||', '<strong>x</strong>'],
+    ['italic', '||_x_||', '<em>x</em>'],
+    ['inline code', '||`x`||', '<code>x</code>'],
+    ['a markdown link', '||[a](b)||', '<a href="b" class="lesson-link">a</a>'],
+    ['a Page Link', '||[[slug]]||', '<a href="/p/slug" class="lesson-link">slug</a>'],
+  ])('formats %s inside a spoiler', (_name, input, inner) => {
+    expect(processInlineCode(input)).toBe(`${SPOILER_OPEN}${inner}</span>`);
+  });
+
+  it('keeps ||text|| literal inside inline code', () => {
+    expect(processInlineCode('Type `||secret||` to hide')).toBe('Type <code>||secret||</code> to hide');
+  });
+
+  it('leaves a lone || alone', () => {
+    expect(processInlineCode('a || b')).toBe('a || b');
+  });
+
+  it('leaves "or" pipes in prose alone', () => {
+    expect(processInlineCode('if a || b || c then')).toBe('if a || b || c then');
+  });
+
+  it('still hides text with spaces inside, as long as it doesn\'t start or end with one', () => {
+    expect(processInlineCode('||x y||')).toBe(`${SPOILER_OPEN}x y</span>`);
+    expect(processInlineCode('|| x|| and ||y ||')).toBe('|| x|| and ||y ||');
+  });
+
+  it('escapes HTML inside a spoiler', () => {
+    expect(processInlineCode('||<b>||')).toBe(`${SPOILER_OPEN}&lt;b&gt;</span>`);
+  });
+
+  it('keeps ||text|| literal inside a code block', () => {
+    const container = document.createElement('div');
+    renderContent({
+      title: 'T',
+      blocks: [{ type: 'question', content: [{ type: 'code', value: 'if (a || b || c) {}' }] }]
+    }, container);
+    expect(container.querySelector('.spoiler')).toBeNull();
+    expect(container.querySelector('pre').textContent).toContain('if (a || b || c) {}');
+  });
+
+  it('renders a spoiler in rendered content (student view and editor preview)', () => {
+    const container = document.createElement('div');
+    renderContent({
+      title: 'T',
+      blocks: [{ type: 'question', content: [{ type: 'text', value: 'Answer: ||blue||' }] }]
+    }, container);
+    expect(container.querySelector('p .spoiler').textContent).toBe('blue');
+  });
+});
+
+describe('spoiler reveal on tap and keyboard', () => {
+  /** @returns {HTMLElement} a rendered spoiler attached to the document */
+  function renderSpoiler(value = 'Answer: ||**blue** [here](#top)||') {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    renderContent({ title: 'T', blocks: [{ type: 'question', content: [{ type: 'text', value }] }] }, container);
+    return container.querySelector('.spoiler');
+  }
+
+  /**
+   * jsdom has no matchMedia; stand in for a device that can hover (a mouse)
+   * or can't (a touch screen).
+   * @param {boolean} canHover
+   */
+  function stubHover(canHover) {
+    window.matchMedia = /** @type {any} */ ((query) => ({ media: query, matches: query === '(hover: hover)' && canHover }));
+  }
+
+  beforeEach(() => {
+    document.body.innerHTML = '';
+    stubHover(false);
+  });
+
+  afterEach(() => {
+    delete window.matchMedia;
+  });
+
+  it('starts hidden', () => {
+    const spoiler = renderSpoiler();
+    expect(spoiler.classList.contains('spoiler-revealed')).toBe(false);
+    expect(spoiler.getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('reveals on a tap and hides again on a second tap', () => {
+    const spoiler = renderSpoiler();
+    spoiler.click();
+    expect(spoiler.classList.contains('spoiler-revealed')).toBe(true);
+    expect(spoiler.getAttribute('aria-expanded')).toBe('true');
+    spoiler.click();
+    expect(spoiler.classList.contains('spoiler-revealed')).toBe(false);
+    expect(spoiler.getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('toggles when the tap lands on formatted text inside the spoiler', () => {
+    const spoiler = renderSpoiler();
+    spoiler.querySelector('strong').click();
+    expect(spoiler.classList.contains('spoiler-revealed')).toBe(true);
+  });
+
+  it('on a mouse device, one click on a link inside a hidden spoiler follows the link', () => {
+    stubHover(true);
+    const spoiler = renderSpoiler();
+    const event = new MouseEvent('click', { bubbles: true, cancelable: true });
+    spoiler.querySelector('a').dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(false);
+  });
+
+  it('on a touch screen, the first tap on a link reveals and the second follows it', () => {
+    const spoiler = renderSpoiler();
+    const link = spoiler.querySelector('a');
+    const first = new MouseEvent('click', { bubbles: true, cancelable: true });
+    link.dispatchEvent(first);
+    expect(first.defaultPrevented).toBe(true);
+    expect(spoiler.classList.contains('spoiler-revealed')).toBe(true);
+
+    const second = new MouseEvent('click', { bubbles: true, cancelable: true });
+    link.dispatchEvent(second);
+    expect(second.defaultPrevented).toBe(false);
+    expect(spoiler.classList.contains('spoiler-revealed')).toBe(true);
+  });
+
+  it('a touch tap on a device that can also hover still reveals first', () => {
+    stubHover(true);
+    const spoiler = renderSpoiler();
+    // Browsers send a click as a PointerEvent; jsdom has no PointerEvent.
+    const event = new MouseEvent('click', { bubbles: true, cancelable: true });
+    Object.defineProperty(event, 'pointerType', { value: 'touch' });
+    spoiler.querySelector('a').dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(true);
+    expect(spoiler.classList.contains('spoiler-revealed')).toBe(true);
+  });
+
+  it('a tap on a link inside a hidden spoiler reveals it instead of following the link', () => {
+    const spoiler = renderSpoiler();
+    const event = new MouseEvent('click', { bubbles: true, cancelable: true });
+    spoiler.querySelector('a').dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(true);
+    expect(spoiler.classList.contains('spoiler-revealed')).toBe(true);
+  });
+
+  it('a link inside a revealed spoiler works normally', () => {
+    const spoiler = renderSpoiler();
+    spoiler.click();
+    const event = new MouseEvent('click', { bubbles: true, cancelable: true });
+    spoiler.querySelector('a').dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(false);
+    expect(spoiler.classList.contains('spoiler-revealed')).toBe(true);
+  });
+
+  it.each(['Enter', ' '])('toggles on the %j key', (key) => {
+    const spoiler = renderSpoiler();
+    const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
+    spoiler.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(true);
+    expect(spoiler.classList.contains('spoiler-revealed')).toBe(true);
+  });
+
+  it('ignores other keys and clicks outside spoilers', () => {
+    const spoiler = renderSpoiler();
+    spoiler.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', bubbles: true }));
+    spoiler.parentElement.click();
+    expect(spoiler.classList.contains('spoiler-revealed')).toBe(false);
+  });
+
+  it('a tap on a spoiler in an option label only toggles the spoiler, not the option', () => {
+    const label = document.createElement('label');
+    const radio = document.createElement('input');
+    radio.type = 'radio';
+    const text = document.createElement('span');
+    text.innerHTML = processInlineCode('Pick ||me||');
+    label.append(radio, text);
+    document.body.appendChild(label);
+
+    const spoiler = label.querySelector('.spoiler');
+    const event = new MouseEvent('click', { bubbles: true, cancelable: true });
+    spoiler.dispatchEvent(event);
+
+    expect(spoiler.classList.contains('spoiler-revealed')).toBe(true);
+    // jsdom doesn't pass a tap on a tabindex span to the label's radio, but
+    // Chromium does unless the click's default action is cancelled.
+    expect(event.defaultPrevented).toBe(true);
+    expect(radio.checked).toBe(false);
+  });
+
+  it('a tap on a spoiler in a collapsible title only toggles the spoiler, not the section', () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    renderContent({
+      title: 'T',
+      blocks: [{ type: 'question', content: [{ type: 'collapsible', title: 'Hint: ||x||', content: [{ type: 'text', value: 'body' }] }] }]
+    }, container);
+    const details = container.querySelector('details');
+
+    const spoiler = details.querySelector('summary .spoiler');
+    spoiler.click();
+
+    expect(spoiler.classList.contains('spoiler-revealed')).toBe(true);
+    expect(details.open).toBe(false);
+  });
+
+  it('installing twice still toggles once per tap', () => {
+    installSpoilerToggle(document);
+    const spoiler = renderSpoiler();
+    spoiler.click();
+    expect(spoiler.classList.contains('spoiler-revealed')).toBe(true);
+  });
+});
+
+describe('renderContent: Question Link inside backticks', () => {
+    it('renders as literal code, not an embed placeholder', () => {
+      const container = document.createElement('div');
+      renderContent({
+        title: 'T',
+        blocks: [{ type: 'question', content: [{ type: 'text', value: 'Type `[[q:loops-1]]` to embed' }] }]
+      }, container);
+      expect(container.querySelector('.question-embed-placeholder')).toBeNull();
+      expect(container.querySelector('code').textContent).toBe('[[q:loops-1]]');
+      expect(container.querySelector('p').textContent).toBe('Type [[q:loops-1]] to embed');
+    });
+
+    it('still embeds a Question Link outside backticks on the same line', () => {
+      const container = document.createElement('div');
+      renderContent({
+        title: 'T',
+        blocks: [{ type: 'question', content: [{ type: 'text', value: '`[[q:a]]` then [[q:b]]' }] }]
+      }, container);
+      const slugs = [...container.querySelectorAll('.question-embed-placeholder')].map((el) => el.dataset.questionSlug);
+      expect(slugs).toEqual(['b']);
+      expect(container.querySelector('code').textContent).toBe('[[q:a]]');
+    });
 });
 
 describe('renderContent', () => {

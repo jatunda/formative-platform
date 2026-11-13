@@ -11,6 +11,7 @@ import { db } from './firebase-config.js';
 import { initializeDatabase } from './database-handle.js';
 import {
   getDateForDayIndex as sharedGetDateForDayIndex,
+  getDayDateLabels,
   getTodayDayIndex,
   getClassDateOffset,
   setClassDateOffset
@@ -25,13 +26,14 @@ import {
 } from "./error-ui-utils.js";
 import {
   createDayRow,
+  createDateCell,
   createInsertDayRow,
   createEndButtonsContainer,
   makeInsertDayHandler,
   makeDeleteDayHandler,
   getLessonTitles
 } from "./schedule-day-view.js";
-import { renderTeacherNav } from "./teacher-nav.js";
+import { renderTeacherNav, SCROLL_TO_TODAY_PARAM, SCROLL_TO_TODAY_VALUE } from "./teacher-nav.js";
 
 // Database is imported from centralized firebase-config.js
 
@@ -221,7 +223,11 @@ export async function handleScrollPositioning(classId = currentClassId) {
   const savedScrollData = getSavedScrollPosition(classId);
 
   // Determine scrolling behavior
-  if (isFirstVisit && todayDayIndex !== undefined) {
+  if (consumeScrollToTodayParam()) {
+    // Arrived from Lesson Planning's Full schedule link - today wins over a
+    // saved position.
+    setTimeout(() => scrollToToday(), 100);
+  } else if (isFirstVisit && todayDayIndex !== undefined) {
     // First visit in a while - scroll to today
     setTimeout(() => scrollToToday(), 100);
   } else if (savedScrollData && !isFirstVisit) {
@@ -236,6 +242,19 @@ export async function handleScrollPositioning(classId = currentClassId) {
 
   // Save scroll position on scroll
   schedulePane.addEventListener('scroll', debounce(() => saveScrollPosition(classId), 500));
+}
+
+/**
+ * Whether the page was opened by the Full schedule link (see
+ * fullScheduleTodayHref). Removes the marker from the URL so a reload or a
+ * later Class switch restores scroll as usual.
+ */
+function consumeScrollToTodayParam() {
+  const url = new URL(window.location.href);
+  if (url.searchParams.get(SCROLL_TO_TODAY_PARAM) !== SCROLL_TO_TODAY_VALUE) return false;
+  url.searchParams.delete(SCROLL_TO_TODAY_PARAM);
+  history.replaceState({}, '', url);
+  return true;
 }
 
 export function scrollToToday() {
@@ -279,15 +298,14 @@ export async function createFinalRow(nextIndex, ctx) {
 
   // Day Index column
   const tdDay = document.createElement("td");
+  tdDay.className = "day-index-cell";
   tdDay.textContent = nextIndex;
   addRow.appendChild(tdDay);
 
   // Date column
-  const tdDate = document.createElement("td");
-  tdDate.textContent = await getDateForDayIndex(nextIndex, ctx.classId);
-  addRow.appendChild(tdDate);
+  addRow.appendChild(createDateCell(await getDayDateLabels(nextIndex, ctx.classId)));
 
-  // Lessons column with "Link Lesson" and "New Lesson" buttons
+  // Lessons column with just the New Lesson / Link Lesson buttons
   const tdLessons = document.createElement("td");
   tdLessons.className = "lessons-cell";
   tdLessons.appendChild(createEndButtonsContainer(nextIndex, ctx));
@@ -336,8 +354,8 @@ export async function renderScheduleTable(schedule, classId = currentClassId) {
 
     // Day row
     const lessons = schedule[dayIndex] || [];
-    const dateLabel = await getDateForDayIndex(dayIndex, classId);
-    const dayRow = await createDayRow(dayIndex, lessons, todayDayIndex, dateLabel, ctx);
+    const dateLabels = await getDayDateLabels(dayIndex, classId);
+    const dayRow = await createDayRow(dayIndex, lessons, todayDayIndex, dateLabels, ctx);
     scheduleTableBody.appendChild(dayRow);
   }
 
@@ -350,8 +368,9 @@ export async function renderScheduleTable(schedule, classId = currentClassId) {
 // Initialize date offset control
 export function initializeDateOffsetControl() {
   dateOffsetControl = createDateOffsetControl({
+    label: "Date Offset (days):",
     currentOffset: currentDateOffset,
-    onApply: applyDateOffset,
+    onShift: (delta) => applyDateOffset(currentDateOffset + delta),
     computeTodayDayIndex: () => getTodayDayIndex(currentClassId),
     onGoToToday: () => scrollToToday()
   });

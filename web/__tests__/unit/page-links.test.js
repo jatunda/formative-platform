@@ -73,6 +73,20 @@ describe('extractPageLinkSlugs', () => {
     expect(extractPageLinkSlugs(content)).toEqual(['syllabus']);
   });
 
+  it("doesn't count a Page Link typed inside inline code or a code block, which render as literal code", () => {
+    const content = {
+      title: 'T',
+      blocks: [{
+        type: 'question',
+        content: [
+          { type: 'text', value: 'Write `[[syllabus]]` to link.\nSee [[resources]], then `x`.' },
+          { type: 'code', value: '[[grading]]' }
+        ]
+      }]
+    };
+    expect(extractPageLinkSlugs(content)).toEqual(['resources']);
+  });
+
   it('ignores Section Links (no slug)', () => {
     const content = {
       title: 'T',
@@ -170,5 +184,20 @@ describe('rewriteSlugInContent', () => {
   it('does not throw when a collapsible has no content field', () => {
     const content = { title: 'T', blocks: [{ type: 'question', content: [{ type: 'collapsible', title: 'Empty', expanded: false }] }] };
     expect(() => rewriteSlugInContent(content, 'old-slug', 'new-slug')).not.toThrow();
+  });
+
+  it('leaves a Page Link written as inline code alone, since it renders as a literal example', () => {
+    const content = {
+      title: 'T',
+      blocks: [{ type: 'question', content: [{ type: 'text', value: 'Type `[[old-slug]]` to get [[old-slug]].\nOr `see [[old-slug|Text]]` vs [[old-slug|Text]]' }] }]
+    };
+    const result = rewriteSlugInContent(content, 'old-slug', 'new-slug');
+    expect(result.blocks[0].content[0].value).toBe('Type `[[old-slug]]` to get [[new-slug]].\nOr `see [[old-slug|Text]]` vs [[new-slug|Text]]');
+  });
+
+  it('leaves a Page Link inside a code block alone', () => {
+    const content = { title: 'T', blocks: [{ type: 'question', content: [{ type: 'code', value: '[[old-slug]]' }] }] };
+    const result = rewriteSlugInContent(content, 'old-slug', 'new-slug');
+    expect(result.blocks[0].content[0].value).toBe('[[old-slug]]');
   });
 });

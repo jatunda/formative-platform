@@ -10,13 +10,13 @@ import {
 import { db } from './firebase-config.js';
 import { initializeDatabase } from './database-handle.js';
 import {
-  getDateForDayIndex,
+  getDayDateLabels,
   getTodayDayIndex,
   getClassDateOffset,
   setClassDateOffset
 } from './date-utils.js';
 import { showNotification } from './notification-utils.js';
-import { createDateOffsetControl, withWorkingIndicator } from './ui-components.js';
+import { createDateOffsetControl } from './ui-components.js';
 import {
   getFullSchedule
 } from './database-utils.js';
@@ -29,10 +29,26 @@ import {
   getLessonTitles
 } from './schedule-day-view.js';
 import { renderTeacherNav } from './teacher-nav.js';
+import {
+  PLANNING_WINDOW_SIZE,
+  createWindowResizeControls,
+  createCollapseChevron,
+  createFullScheduleLink
+} from './class-pane-controls.js';
 
-// Number of upcoming Day Indices shown per Class in each pane's Planning
-// Window (today, +1, +2, ...). Change this single constant to widen it later.
-const PLANNING_WINDOW_SIZE = 3;
+/**
+ * Per-Class pane UI state: the Planning Window's size and whether the pane is
+ * collapsed to its header. Not persisted - a page reload starts every Class
+ * expanded at PLANNING_WINDOW_SIZE.
+ * @typedef {{ windowSize: number, collapsed: boolean }} PaneUiState
+ */
+/** @type {PaneUiState} */
+const DEFAULT_PANE_UI_STATE = { windowSize: PLANNING_WINDOW_SIZE, collapsed: false };
+
+// Each Class's latest pane UI state, so the all-classes Bulk Offset Shift's
+// re-render of every pane keeps it. Cleared on a fresh load.
+/** @type {Map<string, PaneUiState>} */
+const paneUiStates = new Map();
 
 initializeDatabase(db);
 
@@ -60,64 +76,21 @@ async function main() {
 }
 
 /**
- * Build the compact "shift all classes" toolbar: a magnitude input
- * (default 1) with separate + and − buttons, each applying that magnitude
- * instantly. The description/warning that used to sit below it as always-
- * visible text now lives behind a "?" tooltip icon instead.
+ * Mount the all-classes Bulk Offset Shift: the shared Skip/Delay control,
+ * with no current offset (each Class has its own), applying instantly.
  */
 export function initializeBulkShiftControl() {
   const container = document.getElementById('bulkShiftContainer');
-
-  const controls = document.createElement('div');
-  controls.className = 'bulk-shift-control';
-
-  const label = document.createElement('label');
-  label.textContent = 'Shift all classes:';
-
-  const infoIcon = document.createElement('span');
-  infoIcon.className = 'info-tooltip';
-  infoIcon.textContent = '?';
-  infoIcon.tabIndex = 0;
-  const infoText = document.createElement('span');
-  infoText.className = 'info-tooltip-text';
-  infoText.textContent = "Moves every class's schedule forward or backward by the same number of business days at once (e.g. after a snow day). Applies immediately, no confirmation.";
-  infoIcon.appendChild(infoText);
-
-  const input = document.createElement('input');
-  input.type = 'number';
-  input.id = 'bulkShiftAmount';
-  input.value = '1';
-  input.min = '1';
-  input.style.width = '60px';
-
-  const minusBtn = document.createElement('button');
-  minusBtn.textContent = '−'; // −
-  minusBtn.className = 'schedule-action-btn';
-  minusBtn.title = 'Shift all classes backward';
-  minusBtn.onclick = withWorkingIndicator(minusBtn, () => applyBulkShift(-getShiftMagnitude(input)));
-
-  const plusBtn = document.createElement('button');
-  plusBtn.textContent = '+';
-  plusBtn.className = 'schedule-action-btn';
-  plusBtn.title = 'Shift all classes forward';
-  plusBtn.onclick = withWorkingIndicator(plusBtn, () => applyBulkShift(getShiftMagnitude(input)));
-
-  controls.appendChild(label);
-  controls.appendChild(infoIcon);
-  controls.appendChild(input);
-  controls.appendChild(minusBtn);
-  controls.appendChild(plusBtn);
-  container.appendChild(controls);
-}
-
-export function getShiftMagnitude(input) {
-  const magnitude = Math.abs(parseInt(input.value, 10));
-  return Number.isFinite(magnitude) && magnitude > 0 ? magnitude : 1;
+  container.appendChild(createDateOffsetControl({
+    label: 'All classes:',
+    onShift: applyBulkShift
+  }));
 }
 
 /**
  * Shift every Class's Date Offset by the same signed amount in one action.
  * Applies instantly, no confirmation - clicking the opposite button undoes it.
+ * Positive delta is a Delay, negative a Skip.
  */
 export async function applyBulkShift(delta) {
   try {
@@ -131,18 +104,25 @@ export async function applyBulkShift(delta) {
       await setClassDateOffset(classId, current + delta);
     }));
 
+    const days = `${Math.abs(delta)} day${Math.abs(delta) === 1 ? '' : 's'}`;
     showNotification(
-      `Shifted all classes by ${delta > 0 ? '+' : ''}${delta} day${Math.abs(delta) === 1 ? '' : 's'}.`,
+      delta > 0 ? `Delayed all classes ${days}.` : `Skipped all classes ahead ${days}.`,
       'success'
     );
-    await loadAndRenderAllPanes();
+    await loadAndRenderAllPanes({ keepUiState: true });
   } catch (error) {
     console.error('Failed to shift all classes:', error);
     showNotification('Failed to shift classes. Please try again.', 'error');
   }
 }
 
-export async function loadAndRenderAllPanes() {
+/**
+ * Render every Class's pane. A fresh load starts each pane expanded at the
+ * default window size; `keepUiState` keeps each pane's current size and
+ * collapse state instead (used by the Bulk Offset Shift).
+ */
+export async function loadAndRenderAllPanes({ keepUiState = false } = {}) {
+  if (!keepUiState) paneUiStates.clear();
   const container = document.getElementById('classPanesContainer');
 
   try {
@@ -165,7 +145,7 @@ export async function loadAndRenderAllPanes() {
       pane.className = 'lesson-planning-pane';
       container.appendChild(pane);
 
-      return renderClassPane(classId, data.name, pane);
+      return renderClassPane(classId, data.name, pane, paneUiStates.get(classId));
     });
 
     await Promise.all(renders);
@@ -184,8 +164,13 @@ export async function loadAndRenderAllPanes() {
  * functionality (drag-and-drop, lesson actions, Insert/Delete Day). Changing
  * the Class's Date Offset shifts which Day Indices the window shows, so a
  * reload re-renders the whole pane, not just the table.
+ * `uiState` holds the window size and collapse state; the pane's own
+ * re-renders (and its resize/collapse buttons) pass it along so it survives
+ * them. Collapsed, the pane shows only its header's chevron and name.
  */
-export async function renderClassPane(classId, className, containerEl) {
+export async function renderClassPane(classId, className, containerEl, uiState = DEFAULT_PANE_UI_STATE) {
+  paneUiStates.set(classId, uiState);
+  const { windowSize } = uiState;
   const schedule = await getFullSchedule(classId);
   const dayIndexes = Object.keys(schedule).map(Number);
   const maxDayIndex = dayIndexes.length > 0 ? Math.max(...dayIndexes) : 0;
@@ -193,7 +178,7 @@ export async function renderClassPane(classId, className, containerEl) {
   const todayDayIndex = await getTodayDayIndex(classId);
 
   const windowIndexes = Array.from(
-    { length: PLANNING_WINDOW_SIZE },
+    { length: windowSize },
     (_, i) => todayDayIndex + i
   );
 
@@ -201,7 +186,12 @@ export async function renderClassPane(classId, className, containerEl) {
   const lessonHashesInWindow = windowIndexes.flatMap(idx => schedule[idx] || []);
   await getLessonTitles(lessonHashesInWindow);
 
-  const onReload = () => renderClassPane(classId, className, containerEl);
+  // Read through paneUiStates, not the uiState captured above, so a collapse
+  // toggled in place since this render is kept by the next one.
+  const rerender = (/** @type {Partial<PaneUiState>} */ change = {}) =>
+    renderClassPane(classId, className, containerEl, { ...paneUiStates.get(classId), ...change });
+  const renderAtSize = (/** @type {number} */ size) => rerender({ windowSize: size });
+  const onReload = () => rerender();
   const ctx = {
     classId,
     onReload,
@@ -212,15 +202,25 @@ export async function renderClassPane(classId, className, containerEl) {
   const header = document.createElement('div');
   header.className = 'lesson-planning-pane-header';
 
+  const chevron = createCollapseChevron(className, () => {
+    const current = /** @type {PaneUiState} */ (paneUiStates.get(classId));
+    setCollapsed(!current.collapsed);
+  });
+  header.appendChild(chevron.element);
+
   const heading = document.createElement('h2');
   heading.textContent = className;
   header.appendChild(heading);
 
-  header.appendChild(createDateOffsetControl({
+  // Stays visible when collapsed: setCollapsed below never hides it.
+  header.appendChild(createFullScheduleLink(classId, className));
+
+  const offsetControl = createDateOffsetControl({
+    label: 'Offset:',
     currentOffset,
-    onApply: async (newOffset) => {
+    onShift: async (delta) => {
       try {
-        await setClassDateOffset(classId, newOffset);
+        await setClassDateOffset(classId, currentOffset + delta);
         await onReload();
         showNotification(`Date offset for ${className} updated successfully!`, 'success');
       } catch (error) {
@@ -229,12 +229,11 @@ export async function renderClassPane(classId, className, containerEl) {
         throw error;
       }
     },
-    computeTodayDayIndex: () => getTodayDayIndex(classId),
-    // No onGoToToday: the Planning Window is only PLANNING_WINDOW_SIZE days
-    // and already starts at today by definition, so there's nothing beyond
-    // it to scroll to.
-    compact: true
-  }));
+    // No computeTodayDayIndex or onGoToToday: the Planning Window already
+    // starts at today by definition, so neither would add anything (and the
+    // pane header is too narrow for them).
+  });
+  header.appendChild(offsetControl);
 
   const table = document.createElement('table');
   table.className = 'schedule-table';
@@ -249,8 +248,8 @@ export async function renderClassPane(classId, className, containerEl) {
     tbody.appendChild(createInsertDayRow(dayIndex, onInsertDay));
 
     const lessons = schedule[dayIndex] || [];
-    const dateLabel = await getDateForDayIndex(dayIndex, classId);
-    const dayRow = await createDayRow(dayIndex, lessons, todayDayIndex, dateLabel, ctx);
+    const dateLabels = await getDayDateLabels(dayIndex, classId);
+    const dayRow = await createDayRow(dayIndex, lessons, todayDayIndex, dateLabels, ctx);
     tbody.appendChild(dayRow);
   }
 
@@ -265,7 +264,18 @@ export async function renderClassPane(classId, className, containerEl) {
   tableWrapper.className = 'schedule-pane';
   tableWrapper.appendChild(table);
 
+  const resizeControls = createWindowResizeControls(windowSize, renderAtSize);
+
+  // Collapsing toggles in place (no refetch) and records the new state.
+  const setCollapsed = (/** @type {boolean} */ collapsed) => {
+    paneUiStates.set(classId, { .../** @type {PaneUiState} */ (paneUiStates.get(classId)), collapsed });
+    chevron.show(collapsed);
+    for (const el of [offsetControl, tableWrapper, resizeControls]) el.hidden = collapsed;
+  };
+  setCollapsed(uiState.collapsed);
+
   containerEl.innerHTML = '';
   containerEl.appendChild(header);
   containerEl.appendChild(tableWrapper);
+  containerEl.appendChild(resizeControls);
 }

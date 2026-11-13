@@ -19,21 +19,15 @@ import {
 import {
 	renderContent
 } from "./content-renderer.js";
-import {
-	AIQuestionGenerator
-} from "./ai-generator.js";
 import { lessonStore } from "./lesson-store.js";
 import { renderTeacherNav } from "./teacher-nav.js";
 import { createDslCheatSheetPanel } from "./dsl-cheat-sheet.js";
 import { mountQuestionEmbeds } from "./question-embed.js";
 import { showQuestionLinkPicker } from "./question-link-picker.js";
 
-import {
-	AI_CONFIG,
-	validateConfig
-} from "./ai-config.js";
 import { NO_CONTENT_SELECTED, UNTITLED_LESSON, UNTITLED_LESSON_LOWERCASE, CONTENT_NOT_FOUND } from './constants.js';
 import { showNotification } from './notification-utils.js';
+import { showConfirm } from './confirm-dialog.js';
 
 // Database is imported from centralized firebase-config.js
 
@@ -187,12 +181,12 @@ export function updateUnsavedIndicator(indicatorEl, isDirty) {
 /**
  * Gate an in-app action that would discard the current unsaved edits (e.g.
  * switching to a different lesson). Returns true immediately when there's
- * nothing to lose; otherwise asks via the native confirm dialog.
+ * nothing to lose; otherwise asks in the in-app confirm dialog.
  * @param {boolean} isDirty
- * @returns {boolean} Whether it's safe to proceed
+ * @returns {Promise<boolean>} Whether it's safe to proceed
  */
-export function confirmDiscardUnsavedChanges(isDirty) {
-  return !isDirty || confirm("You have unsaved changes. Discard them and continue?");
+export async function confirmDiscardUnsavedChanges(isDirty) {
+  return !isDirty || showConfirm({ message: "You have unsaved changes. Discard them and continue?", confirmLabel: "Discard" });
 }
 
 /**
@@ -211,8 +205,7 @@ export function handleBeforeUnload(event, isDirty) {
 
 // Enable/disable the DSL input and the action buttons together, e.g. while
 // no lesson is selected. Queries its elements fresh rather than caching
-// them, since it's called from several independent places (this file and
-// ai-generator.js, which takes it as a constructor argument).
+// them, since it's called from several independent places in this file.
 export function setEditingEnabled(enabled) {
   const dslInput = document.getElementById("dslInput");
   const saveBtn = document.getElementById("saveBtn");
@@ -337,7 +330,8 @@ export async function deleteLesson(id, dslText) {
 
   try {
     const uses = await lessons.findScheduleUses(id);
-    if (!confirm(deleteLessonConfirmMessage(title, id, uses))) return false;
+    const confirmed = await showConfirm({ title: "Delete Lesson", message: deleteLessonConfirmMessage(title, id, uses), confirmLabel: "Delete" });
+    if (!confirmed) return false;
 
     await lessons.delete(id);
     showNotification("Lesson deleted.", "success");
@@ -488,28 +482,11 @@ export async function main() {
     }
   });
 
-  // Initialize AI Question Generator - after setEditingEnabled is defined
-  // above, since the constructor takes it as an argument rather than
-  // reaching for it lazily
-  try {
-    validateConfig();
-    new AIQuestionGenerator(AI_CONFIG.ANTHROPIC_API_KEY, setEditingEnabled);
-  } catch (error) {
-    console.warn('AI Generator not available:', error.message);
-    // Disable the AI button if configuration is missing
-    const aiBtn = document.getElementById('generateAIBtn');
-    if (aiBtn) {
-      aiBtn.disabled = true;
-      aiBtn.title = 'AI Generation requires Anthropic API key configuration';
-      aiBtn.textContent = '🤖 Generate Questions (Not Configured)';
-    }
-  }
-
   // Search lesson button functionality
   searchLessonBtn.onclick = () => {
     showLessonSearchPopup({
       onSelect: async (lessonId) => {
-        if (!confirmDiscardUnsavedChanges(isDirty)) return;
+        if (!(await confirmDiscardUnsavedChanges(isDirty))) return;
 
         for (let i = 0; i < existingContentSelect.options.length; i++) {
           if (existingContentSelect.options[i].value === lessonId) {
@@ -573,7 +550,7 @@ export async function main() {
   };
 
   existingContentSelect.onchange = async () => {
-    if (!confirmDiscardUnsavedChanges(isDirty)) {
+    if (!(await confirmDiscardUnsavedChanges(isDirty))) {
       existingContentSelect.value = previousSelectedValue;
       return;
     }

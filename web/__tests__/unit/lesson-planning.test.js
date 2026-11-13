@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { expectConsoleErrors } from '../helpers/quiet-console.js';
 import {
-  getShiftMagnitude,
   initializeBulkShiftControl,
   applyBulkShift,
   loadAndRenderAllPanes,
@@ -28,7 +27,7 @@ vi.mock('https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js', () => 
 }));
 
 vi.mock('../../date-utils.js', () => ({
-  getDateForDayIndex: vi.fn(async (dayIndex) => `date-for-${dayIndex}`),
+  getDayDateLabels: vi.fn(async (dayIndex) => ({ full: `date-for-${dayIndex}`, short: `short-${dayIndex}` })),
   getTodayDayIndex: vi.fn(async () => 10),
   getClassDateOffset: vi.fn(async (classId) => ({ csa: 5, csp: 2 })[classId] ?? 0),
   setClassDateOffset: vi.fn(async () => {}),
@@ -69,7 +68,8 @@ vi.mock('../../schedule-day-view.js', () => ({
   getLessonTitles: (...args) => mockGetLessonTitles(...args),
 }));
 
-vi.mock('../../teacher-nav.js', () => ({
+vi.mock('../../teacher-nav.js', async (importOriginal) => ({
+  ...(await importOriginal()),
   renderTeacherNav: vi.fn(),
 }));
 
@@ -82,7 +82,25 @@ const mockCreateDateOffsetControl = vi.fn((config) => {
 vi.mock('../../ui-components.js', () => ({
   createDateOffsetControl: (config) => mockCreateDateOffsetControl(config),
   withWorkingIndicator: (btn, onClick) => onClick,
+  createStyledButton: (text, onClick) => {
+    const btn = document.createElement('button');
+    btn.textContent = text;
+    btn.onclick = onClick;
+    return btn;
+  },
+  createIconButton: (icon, label, onClick) => {
+    const btn = document.createElement('button');
+    btn.textContent = icon;
+    btn.setAttribute('aria-label', label);
+    btn.onclick = onClick;
+    return btn;
+  },
 }));
+
+const dayIndicesShown = (containerEl) =>
+  [...containerEl.querySelectorAll('.day-row')].map((r) => r.dataset.dayIndex);
+const resizeButton = (containerEl, text) =>
+  [...containerEl.querySelectorAll('.planning-window-resize button')].find((b) => b.textContent === text);
 
 describe('lesson-planning', () => {
   beforeEach(() => {
@@ -93,47 +111,17 @@ describe('lesson-planning', () => {
     mockGetLessonTitles.mockReset().mockResolvedValue([]);
   });
 
-  describe('getShiftMagnitude', () => {
-    it('returns the parsed positive value', () => {
-      expect(getShiftMagnitude({ value: '3' })).toBe(3);
-    });
-
-    it('takes the absolute value of a negative input', () => {
-      expect(getShiftMagnitude({ value: '-4' })).toBe(4);
-    });
-
-    it('defaults to 1 for zero', () => {
-      expect(getShiftMagnitude({ value: '0' })).toBe(1);
-    });
-
-    it('defaults to 1 for non-numeric input', () => {
-      expect(getShiftMagnitude({ value: 'abc' })).toBe(1);
-    });
-  });
-
   describe('initializeBulkShiftControl', () => {
-    it('renders a magnitude input and +/- buttons into the container', () => {
+    it('mounts the shared Skip/Delay control, with no current offset, into the container', () => {
       document.body.innerHTML = '<div id="bulkShiftContainer"></div>';
       initializeBulkShiftControl();
 
       const container = document.getElementById('bulkShiftContainer');
-      expect(container.querySelector('#bulkShiftAmount').value).toBe('1');
-      const buttons = [...container.querySelectorAll('button')].map((b) => b.textContent);
-      expect(buttons).toEqual(['−', '+']);
-    });
-
-    it('wires the buttons to shift every class by the entered magnitude', async () => {
-      document.body.innerHTML = '<div id="bulkShiftContainer"></div><div id="classPanesContainer"></div>';
-      mockData['classes'] = { csa: { name: 'CS A', displayOrder: 1 } };
-      mockGetFullSchedule.mockResolvedValue({});
-      const { setClassDateOffset } = await import('../../date-utils.js');
-
-      initializeBulkShiftControl();
-      document.getElementById('bulkShiftAmount').value = '3';
-      document.querySelector('#bulkShiftContainer button:last-child').click();
-      await vi.waitFor(() => expect(setClassDateOffset).toHaveBeenCalled());
-
-      expect(setClassDateOffset).toHaveBeenCalledWith('csa', 5 + 3);
+      expect(container.querySelector('.date-offset-control')).toBeTruthy();
+      const config = mockCreateDateOffsetControl.mock.calls[0][0];
+      expect(config.label).toBe('All classes:');
+      expect(config.currentOffset).toBeUndefined();
+      expect(config.onShift).toBe(applyBulkShift);
     });
   });
 
@@ -153,15 +141,17 @@ describe('lesson-planning', () => {
       expect(setClassDateOffset).toHaveBeenCalledWith('csp', 4);
     });
 
-    it('shows a success notification describing the shift', async () => {
+    it('shows a success notification saying what the shift did', async () => {
       document.body.innerHTML = '<div id="classPanesContainer"></div>';
       mockData['classes'] = { csa: { name: 'CS A', displayOrder: 1 } };
       mockGetFullSchedule.mockResolvedValue({});
       const { showNotification } = await import('../../notification-utils.js');
 
       await applyBulkShift(-1);
+      expect(showNotification).toHaveBeenLastCalledWith('Skipped all classes ahead 1 day.', 'success');
 
-      expect(showNotification).toHaveBeenCalledWith(expect.stringContaining('-1 day.'), 'success');
+      await applyBulkShift(3);
+      expect(showNotification).toHaveBeenLastCalledWith('Delayed all classes 3 days.', 'success');
     });
 
     it('does nothing when there are no classes', async () => {
@@ -236,6 +226,212 @@ describe('lesson-planning', () => {
       expect(dayRows).toEqual(['10', '11', '12']);
     });
 
+    describe('resizing the Planning Window', () => {
+      it('"+3 days" adds three more Day Indices', async () => {
+        mockGetFullSchedule.mockResolvedValue({});
+        const containerEl = document.createElement('div');
+        await renderClassPane('csa', 'CS A', containerEl);
+
+        await resizeButton(containerEl, '+3 days').onclick();
+
+        expect(dayIndicesShown(containerEl)).toEqual(['10', '11', '12', '13', '14', '15']);
+        await resizeButton(containerEl, '+3 days').onclick();
+        expect(dayIndicesShown(containerEl)).toHaveLength(9);
+      });
+
+      it('"−3 days" removes three, and is disabled at 3', async () => {
+        mockGetFullSchedule.mockResolvedValue({});
+        const containerEl = document.createElement('div');
+        await renderClassPane('csa', 'CS A', containerEl);
+        expect(resizeButton(containerEl, '−3 days').disabled).toBe(true);
+
+        await resizeButton(containerEl, '+3 days').onclick();
+        expect(resizeButton(containerEl, '−3 days').disabled).toBe(false);
+        await resizeButton(containerEl, '−3 days').onclick();
+
+        expect(dayIndicesShown(containerEl)).toEqual(['10', '11', '12']);
+        expect(resizeButton(containerEl, '−3 days').disabled).toBe(true);
+      });
+
+      it('places the buttons under the table', async () => {
+        mockGetFullSchedule.mockResolvedValue({});
+        const containerEl = document.createElement('div');
+        await renderClassPane('csa', 'CS A', containerEl);
+
+        expect(containerEl.lastElementChild.classList.contains('planning-window-resize')).toBe(true);
+      });
+
+      it('leaves other Classes unaffected', async () => {
+        mockGetFullSchedule.mockResolvedValue({});
+        const csaEl = document.createElement('div');
+        const cspEl = document.createElement('div');
+        await renderClassPane('csa', 'CS A', csaEl);
+        await renderClassPane('csp', 'CS P', cspEl);
+
+        await resizeButton(csaEl, '+3 days').onclick();
+
+        expect(dayIndicesShown(cspEl)).toEqual(['10', '11', '12']);
+      });
+
+      it("keeps its size across the pane's own re-renders (e.g. a Date Offset change)", async () => {
+        mockGetFullSchedule.mockResolvedValue({});
+        const containerEl = document.createElement('div');
+        await renderClassPane('csa', 'CS A', containerEl);
+        await resizeButton(containerEl, '+3 days').onclick();
+
+        const config = mockCreateDateOffsetControl.mock.calls.at(-1)[0];
+        await config.onShift(1);
+
+        expect(dayIndicesShown(containerEl)).toHaveLength(6);
+      });
+
+      it('keeps its size when a day-row action reloads the pane', async () => {
+        mockGetFullSchedule.mockResolvedValue({});
+        const { createDayRow } = await import('../../schedule-day-view.js');
+        const containerEl = document.createElement('div');
+        await renderClassPane('csa', 'CS A', containerEl);
+        await resizeButton(containerEl, '+3 days').onclick();
+
+        const ctx = createDayRow.mock.calls.at(-1)[4];
+        await ctx.onReload();
+
+        expect(dayIndicesShown(containerEl)).toHaveLength(6);
+      });
+
+      it('starts every freshly rendered pane (e.g. after a page reload) at 3', async () => {
+        mockGetFullSchedule.mockResolvedValue({});
+        const containerEl = document.createElement('div');
+        await renderClassPane('csa', 'CS A', containerEl);
+        await resizeButton(containerEl, '+3 days').onclick();
+
+        const freshEl = document.createElement('div');
+        await renderClassPane('csa', 'CS A', freshEl);
+
+        expect(dayIndicesShown(freshEl)).toEqual(['10', '11', '12']);
+      });
+    });
+
+    describe('collapsing a Class', () => {
+      const chevron = (containerEl) => containerEl.querySelector('.lesson-planning-pane-header button[aria-expanded]');
+      const isShown = (el) => el !== null && !el.hidden;
+      const bodyShown = (containerEl) => ({
+        table: isShown(containerEl.querySelector('.schedule-pane')),
+        resize: isShown(containerEl.querySelector('.planning-window-resize')),
+        offset: isShown(containerEl.querySelector('.date-offset-control')),
+      });
+
+      it('puts an expanded chevron button before the Class name', async () => {
+        mockGetFullSchedule.mockResolvedValue({});
+        const containerEl = document.createElement('div');
+        await renderClassPane('csa', 'CS A', containerEl);
+
+        const header = containerEl.querySelector('.lesson-planning-pane-header');
+        expect(header.firstElementChild).toBe(chevron(containerEl));
+        expect(chevron(containerEl).getAttribute('aria-expanded')).toBe('true');
+        expect(chevron(containerEl).textContent).toBe('▾');
+        expect(bodyShown(containerEl)).toEqual({ table: true, resize: true, offset: true });
+      });
+
+      it('hides the table, window-size buttons and Date Offset control when clicked, and shows them again', async () => {
+        mockGetFullSchedule.mockResolvedValue({});
+        const containerEl = document.createElement('div');
+        await renderClassPane('csa', 'CS A', containerEl);
+
+        await chevron(containerEl).onclick();
+
+        expect(chevron(containerEl).getAttribute('aria-expanded')).toBe('false');
+        expect(chevron(containerEl).textContent).toBe('▸');
+        expect(bodyShown(containerEl)).toEqual({ table: false, resize: false, offset: false });
+        expect(containerEl.querySelector('h2').textContent).toBe('CS A');
+
+        await chevron(containerEl).onclick();
+
+        expect(chevron(containerEl).getAttribute('aria-expanded')).toBe('true');
+        expect(bodyShown(containerEl)).toEqual({ table: true, resize: true, offset: true });
+      });
+
+      it("stays collapsed, at its widened size, across the pane's own re-renders", async () => {
+        mockGetFullSchedule.mockResolvedValue({});
+        const { createDayRow } = await import('../../schedule-day-view.js');
+        const containerEl = document.createElement('div');
+        await renderClassPane('csa', 'CS A', containerEl);
+        await resizeButton(containerEl, '+3 days').onclick();
+        await chevron(containerEl).onclick();
+
+        await createDayRow.mock.calls.at(-1)[4].onReload();
+
+        expect(chevron(containerEl).getAttribute('aria-expanded')).toBe('false');
+        expect(bodyShown(containerEl).table).toBe(false);
+        await chevron(containerEl).onclick();
+        expect(dayIndicesShown(containerEl)).toHaveLength(6);
+      });
+
+      it('keeps each pane\'s collapse state and window size across the all-classes shift', async () => {
+        document.body.innerHTML = '<div id="classPanesContainer"></div>';
+        mockData['classes'] = {
+          csa: { name: 'CS A', displayOrder: 1 },
+          csp: { name: 'CS P', displayOrder: 2 },
+        };
+        mockGetFullSchedule.mockResolvedValue({});
+        await loadAndRenderAllPanes();
+        const [csaEl, cspEl] = document.querySelectorAll('.lesson-planning-pane');
+        await resizeButton(csaEl, '+3 days').onclick();
+        await chevron(cspEl).onclick();
+
+        await applyBulkShift(1);
+
+        const [csaAfter, cspAfter] = document.querySelectorAll('.lesson-planning-pane');
+        expect(dayIndicesShown(csaAfter)).toHaveLength(6);
+        expect(chevron(csaAfter).getAttribute('aria-expanded')).toBe('true');
+        expect(chevron(cspAfter).getAttribute('aria-expanded')).toBe('false');
+        expect(bodyShown(cspAfter).table).toBe(false);
+      });
+
+      it('shows every Class expanded at 3 days on a fresh load (e.g. a page reload)', async () => {
+        document.body.innerHTML = '<div id="classPanesContainer"></div>';
+        mockData['classes'] = { csa: { name: 'CS A', displayOrder: 1 } };
+        mockGetFullSchedule.mockResolvedValue({});
+        await loadAndRenderAllPanes();
+        const paneEl = document.querySelector('.lesson-planning-pane');
+        await resizeButton(paneEl, '+3 days').onclick();
+        await chevron(paneEl).onclick();
+
+        await loadAndRenderAllPanes();
+
+        const freshEl = document.querySelector('.lesson-planning-pane');
+        expect(chevron(freshEl).getAttribute('aria-expanded')).toBe('true');
+        expect(dayIndicesShown(freshEl)).toEqual(['10', '11', '12']);
+      });
+    });
+
+    describe('Full schedule link', () => {
+      const scheduleLink = (containerEl) => containerEl.querySelector('.lesson-planning-pane-header a');
+
+      it("sits right after the Class name and opens that Class's Full Schedule at today, in the same tab", async () => {
+        mockGetFullSchedule.mockResolvedValue({});
+        const containerEl = document.createElement('div');
+        await renderClassPane('csa', 'CS A', containerEl);
+
+        const link = scheduleLink(containerEl);
+        expect(containerEl.querySelector('h2').nextElementSibling).toBe(link);
+        expect(link.textContent).toBe('↗');
+        expect(link.getAttribute('href')).toBe('teacher.html?class=csa&scroll=today');
+        expect(link.target).toBe('');
+        expect(link.title).toBe('Full schedule');
+        expect(link.getAttribute('aria-label')).toBe('Full schedule for CS A');
+      });
+
+      it('stays visible when the Class is collapsed', async () => {
+        mockGetFullSchedule.mockResolvedValue({});
+        const containerEl = document.createElement('div');
+        await renderClassPane('csa', 'CS A', containerEl);
+
+        await containerEl.querySelector('.lesson-planning-pane-header button[aria-expanded]').onclick();
+
+        expect(scheduleLink(containerEl).hidden).toBe(false);
+      });
+    });
+
     it('brackets the window with an insert-day row before and after', async () => {
       mockGetFullSchedule.mockResolvedValue({});
       const containerEl = document.createElement('div');
@@ -285,23 +481,11 @@ describe('lesson-planning', () => {
       expect(header.querySelector('.date-offset-control')).toBeTruthy();
       const config = mockCreateDateOffsetControl.mock.calls[0][0];
       expect(config.currentOffset).toBe(5); // csa's mocked offset
+      expect(config.computeTodayDayIndex).toBeUndefined();
       expect(config.onGoToToday).toBeUndefined();
     });
 
-    it("computeTodayDayIndex is wired to this Class's Today's Day Index", async () => {
-      mockGetFullSchedule.mockResolvedValue({});
-      const containerEl = document.createElement('div');
-      const { getTodayDayIndex } = await import('../../date-utils.js');
-
-      await renderClassPane('csa', 'CS A', containerEl);
-      const config = mockCreateDateOffsetControl.mock.calls[0][0];
-      getTodayDayIndex.mockClear();
-      await config.computeTodayDayIndex();
-
-      expect(getTodayDayIndex).toHaveBeenCalledWith('csa');
-    });
-
-    it("onApply persists the new offset, reloads the pane, and notifies with the Class's name", async () => {
+    it("onShift persists the shifted offset, reloads the pane, and notifies with the Class's name", async () => {
       mockGetFullSchedule.mockResolvedValue({});
       const containerEl = document.createElement('div');
       const { setClassDateOffset } = await import('../../date-utils.js');
@@ -311,15 +495,15 @@ describe('lesson-planning', () => {
       const config = mockCreateDateOffsetControl.mock.calls[0][0];
       mockCreateDateOffsetControl.mockClear();
 
-      await config.onApply(9);
+      await config.onShift(4);
 
-      expect(setClassDateOffset).toHaveBeenCalledWith('csa', 9);
+      expect(setClassDateOffset).toHaveBeenCalledWith('csa', 5 + 4);
       // Reloaded: renderClassPane ran again, rebuilding the control
       expect(mockCreateDateOffsetControl).toHaveBeenCalledTimes(1);
       expect(showNotification).toHaveBeenCalledWith(expect.stringContaining('CS A'), 'success');
     });
 
-    it('onApply shows an error notification and rethrows on failure, without reloading', async () => {
+    it('onShift shows an error notification and rethrows on failure, without reloading', async () => {
       expectConsoleErrors();
       mockGetFullSchedule.mockResolvedValue({});
       const containerEl = document.createElement('div');
@@ -331,7 +515,7 @@ describe('lesson-planning', () => {
       const config = mockCreateDateOffsetControl.mock.calls[0][0];
       mockCreateDateOffsetControl.mockClear();
 
-      await expect(config.onApply(9)).rejects.toThrow('boom');
+      await expect(config.onShift(4)).rejects.toThrow('boom');
 
       expect(mockCreateDateOffsetControl).not.toHaveBeenCalled();
       expect(showNotification).toHaveBeenCalledWith('Failed to update date offset', 'error');

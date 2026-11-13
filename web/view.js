@@ -4,12 +4,24 @@ import { db } from './firebase-config.js';
 import { initializeDatabase } from './database-handle.js';
 import { lessonStore } from './lesson-store.js';
 import { getTodayDayIndex } from './date-utils.js';
+import { localDateString, shortDateLabel } from './business-days.js';
 import { renderMultipleContent } from './content-renderer.js';
 import { mountQuestionEmbeds } from './question-embed.js';
 import { NO_CONTENT_FOR_TODAY } from './constants.js';
 import { showErrorState, showSlowConnectionMessage, withConnectionTimeout } from './error-ui-utils.js';
 
 initializeDatabase(db);
+
+/**
+ * Show today's real calendar date (e.g. "Thu 11/12") in the header row, so
+ * students can see the date without asking.
+ * @param {HTMLTimeElement} slot
+ * @param {Date} [today=new Date()]
+ */
+export function renderTodayDate(slot, today = new Date()) {
+  slot.dateTime = localDateString(today);
+  slot.textContent = shortDateLabel(today);
+}
 
 /**
  * Decide which Day Index to show: the one the landing page passed via the
@@ -102,5 +114,6 @@ export async function initializePage() {
 // element (i.e. view.html) - importing this module elsewhere (tests) never
 // triggers real Firebase/DOM side effects on its own.
 if (document.getElementById("content")) {
+  renderTodayDate(/** @type {HTMLTimeElement} */ (document.getElementById("today-date")));
   initializePage();
 }

@@ -8,6 +8,7 @@ import { initializeDatabase } from './database-handle.js';
 import { parseDSL, generateDSLFromContent } from './dsl.js';
 import { renderTeacherNav } from './teacher-nav.js';
 import { showNotification } from './notification-utils.js';
+import { showConfirm } from './confirm-dialog.js';
 import { withWorkingIndicator } from './ui-components.js';
 import { createDslCheatSheetPanel } from './dsl-cheat-sheet.js';
 import { showPageLinkPicker } from './page-link-picker.js';
@@ -95,7 +96,7 @@ async function refreshSlugList(pageId, slugListEl) {
     removeBtn.className = 'schedule-action-btn delete-btn';
     removeBtn.onclick = withWorkingIndicator(removeBtn, async () => {
       const backlinks = await getBacklinks(pageId);
-      const confirmed = confirm(`Remove "/p/${slug}"?${describeBacklinks(backlinks)}`);
+      const confirmed = await showConfirm({ message: `Remove "/p/${slug}"?${describeBacklinks(backlinks)}`, confirmLabel: 'Remove' });
       if (!confirmed) return;
       await removeSlug(slug);
       await refreshSlugList(pageId, slugListEl);
@@ -215,11 +216,12 @@ export async function main() {
 
   deleteBtn.onclick = async () => {
     const backlinks = await getBacklinks(pageId);
-    const confirmed = confirm(
-      'Are you sure you want to delete this page?\n\n' +
+    const confirmed = await showConfirm({
+      confirmLabel: 'Delete',
+      message: 'Are you sure you want to delete this page?\n\n' +
       'This also removes every URL pointing to it. This action cannot be undone.' +
       describeBacklinks(backlinks)
-    );
+    });
     if (!confirmed) return;
     await deletePageAndSlugs(pageId);
     markClean();

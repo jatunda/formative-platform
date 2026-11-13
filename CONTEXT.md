@@ -44,6 +44,9 @@ _Avoid_: Day, day number — plain "day" is ambiguous between this and a calenda
 
 **Date Offset**:
 A per-Class integer, in business days, applied when converting a Day Index to a calendar date (and back). It exists so that a real-world disruption (a snow day, a holiday) can be absorbed without renumbering every Lesson in the Schedule — the Day Index sequence stays untouched; only its mapping onto the calendar shifts. A Date Offset is a property of the Class, not of any one Day Index or Lesson.
+- **Delay**: raise a Class's Date Offset, so its Lessons land on later calendar dates (e.g. after a snow day).
+- **Skip**: lower it, so its Lessons land on earlier calendar dates, jumping ahead.
+_Avoid_: "+"/"−" or "increase"/"decrease" on their own — which direction moves Lessons later isn't obvious from the number.
 
 **Today's Day Index**:
 For a given Class, the Day Index whose calendar date (Day Index + that Class's Date Offset, in business days from the Class's start date) equals today. Each Class computes this independently, since each has its own Date Offset — two Classes can disagree on which Day Index "today" is.
@@ -52,10 +55,7 @@ For a given Class, the Day Index whose calendar date (Day Index + that Class's D
 The act of changing every Class's Date Offset by the same signed amount in one action (e.g. "shift everything forward by 2 business days" after a multi-day closure). Distinct from setting a single Class's Date Offset to a specific value — a Bulk Offset Shift is always relative, applied uniformly, and affects every Class at once.
 
 **Planning Window**:
-For a given Class, the small run of consecutive Day Indices — starting at Today's Day Index — shown together in the Lesson Planning view. The window's length is a fixed setting, not a per-Class or per-session value; every Class is shown the same number of days.
-
-**Prompt Profile**:
-Per-Class configuration used only when generating AI-assisted questions in the Content Editor: subject, grade level, and (optionally) class-specific prompting instructions and example questions. Hard-coded in `ai-generator.js`, keyed by Class id. Distinct from the Class record itself in Firebase — a new Class has no Prompt Profile until one is added there, and generation falls back to generic subject/grade-level defaults in that case (surfaced as a notice in the AI Generation modal, not a silent guess).
+For a given Class, the run of consecutive Day Indices — starting at Today's Day Index — shown together in the Lesson Planning view. Every Class's window starts at 3 days on each page load; the teacher can widen or narrow one Class's window in steps of 3 (never below 3), or collapse that Class entirely. None of this is remembered — a reload puts every Class back to 3 days, expanded.
 
 **Question**:
 A single multiple-choice item — one stem and a set of Options, exactly one of which is correct — stored as its own entity, independent of any Lesson or Practice Set that references it. Reachable by its own Slug so the same Question can be linked from many places without being copied. Tagged with a Class and a free-text topic for organization. Unlike a Lesson (placed into a Schedule) or a Page (linked directly), a Question is never viewed on its own — it's only ever encountered embedded in a Lesson/Page via a Question Link, or as part of a Practice Set.

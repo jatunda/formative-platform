@@ -1,3 +1,5 @@
+import { matchAllOutsideInlineCode, replaceOutsideInlineCode } from "./inline-code.js";
+
 // Shared pattern for Obsidian-style [[...]] links: [[slug]], [[slug|text]],
 // [[#Header]], [[#Header|text]]. Used both to render them (content-renderer.js)
 // and to index/rewrite them for Backlinks (page-database-utils.js), so the
@@ -43,7 +45,9 @@ export function extractPageLinkSlugs(parsedContent) {
   const slugs = new Set();
   for (const block of (parsedContent && parsedContent.blocks) || []) {
     walkTextValues(block.content, (text) => {
-      for (const match of text.matchAll(PAGE_LINK_PATTERN)) {
+      // Skips links written as inline code, which render as literal code.
+      const matches = text.split("\n").flatMap((line) => matchAllOutsideInlineCode(line, PAGE_LINK_PATTERN));
+      for (const match of matches) {
         const { slug } = parsePageLinkMatch(match[1], match[2], match[3]);
         // [[q:slug]] is Question Link syntax (question-links.js), not a Page
         // Link - PAGE_LINK_PATTERN's slug group has no way to exclude it
@@ -62,6 +66,8 @@ export function extractPageLinkSlugs(parsedContent) {
  * touching an unrelated slug that happens to share a prefix (e.g. renaming
  * "syllabus" must not touch "syllabus-2026") - Slugs are validated to
  * lowercase-alphanumeric-and-hyphens only, so no regex escaping is needed.
+ * Code blocks are code items, which were never rewritten; a link written as
+ * inline code in a text item is an example too, so it is now skipped as well.
  * Returns a new content object; does not mutate the input. Used by Slug
  * Rename to fix up every Page that links to the renamed Page.
  * @param {{title: string, blocks: Array}} parsedContent
@@ -75,7 +81,7 @@ export function rewriteSlugInContent(parsedContent, oldSlug, newSlug) {
   function rewriteItems(items) {
     return (items || []).map((item) => {
       if (item.type === "text") {
-        return { ...item, value: item.value.replace(boundaryPattern, `[[${newSlug}`) };
+        return { ...item, value: replaceOutsideInlineCode(item.value, boundaryPattern, `[[${newSlug}`) };
       }
       if (item.type === "collapsible") {
         return { ...item, content: rewriteItems(item.content) };
