@@ -6,443 +6,228 @@ import {
 import { DEFAULT_LESSON_TITLE } from '../../constants.js';
 import { initializeDatabase } from '../../database-handle.js';
 
-// Mock dependencies
-vi.mock('../../ui-components.js', () => ({
-  createLeftArrowButton: vi.fn((disabled, onClick) => {
-    const btn = document.createElement('button');
-    btn.textContent = '←';
-    btn.disabled = disabled;
-    btn.onclick = onClick;
-    return btn;
-  }),
-  createRightArrowButton: vi.fn((disabled, onClick) => {
-    const btn = document.createElement('button');
-    btn.textContent = '→';
-    btn.disabled = disabled;
-    btn.onclick = onClick;
-    return btn;
-  }),
-  createDeleteButton: vi.fn((onClick) => {
-    const btn = document.createElement('button');
-    btn.textContent = '🗑️';
-    btn.onclick = onClick;
-    return btn;
-  }),
-}));
-
 vi.mock('../../drag-drop-utils.js', () => ({
   setupDragHandlers: vi.fn(),
 }));
 
-// Mock Firebase
-let mockSet = vi.fn();
+// A tiny in-memory Realtime Database: paths map to values.
+let store = {};
 vi.mock('https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js', () => ({
-  ref: (db, path) => ({ path, key: path.split('/').pop() }),
-  set: (ref, value) => mockSet(ref, value),
+  ref: (db, path) => ({ path }),
+  get: async (r) => ({ exists: () => r.path in store, val: () => structuredClone(store[r.path]) ?? null }),
+  set: async (r, value) => { store[r.path] = structuredClone(value); },
 }));
+
+const menuItems = () => [...document.querySelectorAll('[role="menu"] [role="menuitem"]')];
+const menuItem = (text) => menuItems().find((b) => b.textContent === text);
+const openMenu = (cluster) => cluster.querySelector('[aria-haspopup="menu"]').click();
+const flush = () => new Promise((r) => setTimeout(r, 0));
+
+function cluster(overrides = {}) {
+  const el = createLessonCluster({
+    lessonHash: 'hash1',
+    dayIndex: 2,
+    lessonIndex: 1,
+    lessons: ['hash0', 'hash1', 'hash2'],
+    lessonTitle: 'Test Lesson',
+    classId: 'class1',
+    onMoveLeft: vi.fn(),
+    onMoveRight: vi.fn(),
+    onMoveToPreviousDay: vi.fn(),
+    onMoveToNextDay: vi.fn(),
+    onRemove: vi.fn(),
+    onClick: vi.fn(),
+    ...overrides,
+  });
+  document.body.appendChild(el);
+  return el;
+}
 
 describe('lesson-manager', () => {
   beforeEach(() => {
     document.body.innerHTML = '';
     vi.clearAllMocks();
-    mockSet.mockResolvedValue(undefined);
+    store = {};
     initializeDatabase({});
   });
 
   describe('createLessonCluster', () => {
-    it('should create a lesson cluster element', () => {
-      const onMoveLeft = vi.fn();
-      const onMoveRight = vi.fn();
-      const onDelete = vi.fn();
-      const onClick = vi.fn();
-
-      const cluster = createLessonCluster({
-        lessonHash: 'hash1',
-        dayIndex: 0,
-        lessonIndex: 1,
-        lessons: ['hash0', 'hash1', 'hash2'],
-        lessonTitle: 'Test Lesson',
-        classId: 'class1',
-        onMoveLeft,
-        onMoveRight,
-        onDelete,
-        onClick,
-      });
-
-      expect(cluster.tagName).toBe('SPAN');
-      expect(cluster.className).toBe('lesson-cluster');
-      expect(cluster.draggable).toBe(true);
-      expect(cluster.dataset.lessonHash).toBe('hash1');
-      expect(cluster.dataset.dayIndex).toBe('0');
-      expect(cluster.dataset.lessonIndex).toBe('1');
-    });
-
-    it('should set up drag handlers', async () => {
+    it('is a draggable cluster carrying its placement', async () => {
       const { setupDragHandlers } = await import('../../drag-drop-utils.js');
-      
-      createLessonCluster({
-        lessonHash: 'hash1',
-        dayIndex: 0,
-        lessonIndex: 1,
-        lessons: ['hash0', 'hash1'],
-        lessonTitle: 'Test',
-        classId: 'class1',
-        onMoveLeft: vi.fn(),
-        onMoveRight: vi.fn(),
-        onDelete: vi.fn(),
-        onClick: vi.fn(),
-      });
+      const el = cluster();
 
-      expect(setupDragHandlers).toHaveBeenCalled();
-      const call = setupDragHandlers.mock.calls[0];
-      expect(call[1].lessonHash).toBe('hash1');
-      expect(call[1].fromDayIndex).toBe(0);
-      expect(call[1].fromLessonIndex).toBe(1);
+      expect(el.className).toBe('lesson-cluster');
+      expect(el.draggable).toBe(true);
+      expect(el.dataset.lessonHash).toBe('hash1');
+      expect(el.dataset.dayIndex).toBe('2');
+      expect(el.dataset.lessonIndex).toBe('1');
+      expect(setupDragHandlers).toHaveBeenCalledWith(el, {
+        lessonHash: 'hash1', fromDayIndex: 2, fromLessonIndex: 1, classId: 'class1',
+      });
     });
 
-    it('should create main lesson button with title', () => {
-      const cluster = createLessonCluster({
-        lessonHash: 'hash1',
-        dayIndex: 0,
-        lessonIndex: 0,
-        lessons: ['hash1'],
-        lessonTitle: 'My Lesson Title',
-        classId: 'class1',
-        onMoveLeft: vi.fn(),
-        onMoveRight: vi.fn(),
-        onDelete: vi.fn(),
-        onClick: vi.fn(),
-      });
+    it('is one row: the title button and a ⋮ button, nothing else', () => {
+      const el = cluster();
+      const buttons = [...el.querySelectorAll('button')];
 
-      const mainBtn = cluster.querySelector('.lesson-main-btn');
-      expect(mainBtn).toBeTruthy();
-      expect(mainBtn.textContent).toBe('My Lesson Title');
+      expect(buttons.length).toBe(2);
+      expect(buttons[0].classList.contains('lesson-main-btn')).toBe(true);
+      expect(buttons[0].textContent).toBe('Test Lesson');
+      expect(buttons[1].textContent).toBe('⋮');
+      expect(buttons[0].parentElement).toBe(buttons[1].parentElement);
     });
 
-    it('should use default title when lessonTitle is not provided', () => {
-      const cluster = createLessonCluster({
-        lessonHash: 'hash1',
-        dayIndex: 0,
-        lessonIndex: 0,
-        lessons: ['hash1'],
-        lessonTitle: '',
-        classId: 'class1',
-        onMoveLeft: vi.fn(),
-        onMoveRight: vi.fn(),
-        onDelete: vi.fn(),
-        onClick: vi.fn(),
-      });
-
-      const mainBtn = cluster.querySelector('.lesson-main-btn');
-      expect(mainBtn.textContent).toBe(DEFAULT_LESSON_TITLE);
+    it('names the ⋮ button after the Lesson for screen readers', () => {
+      const btn = cluster().querySelector('[aria-haspopup="menu"]');
+      expect(btn.getAttribute('aria-label')).toBe('Actions for Test Lesson');
     });
 
-    it('should call onClick when main button is clicked', () => {
+    it('falls back to the default title', () => {
+      const el = cluster({ lessonTitle: '' });
+      expect(el.querySelector('.lesson-main-btn').textContent).toBe(DEFAULT_LESSON_TITLE);
+    });
+
+    it('opens the Lesson on a title click', () => {
       const onClick = vi.fn();
-      const cluster = createLessonCluster({
-        lessonHash: 'hash1',
-        dayIndex: 0,
-        lessonIndex: 0,
-        lessons: ['hash1'],
-        lessonTitle: 'Test',
-        classId: 'class1',
-        onMoveLeft: vi.fn(),
-        onMoveRight: vi.fn(),
-        onDelete: vi.fn(),
-        onClick,
-      });
-
-      const mainBtn = cluster.querySelector('.lesson-main-btn');
-      mainBtn.click();
-
+      cluster({ onClick }).querySelector('.lesson-main-btn').click();
       expect(onClick).toHaveBeenCalledTimes(1);
     });
 
-    it('should disable left arrow for first lesson', async () => {
-      const { createLeftArrowButton } = await import('../../ui-components.js');
-      
-      createLessonCluster({
-        lessonHash: 'hash0',
-        dayIndex: 0,
-        lessonIndex: 0,
-        lessons: ['hash0', 'hash1'],
-        lessonTitle: 'Test',
-        classId: 'class1',
-        onMoveLeft: vi.fn(),
-        onMoveRight: vi.fn(),
-        onDelete: vi.fn(),
-        onClick: vi.fn(),
-      });
-
-      expect(createLeftArrowButton).toHaveBeenCalledWith(true, expect.any(Function));
+    it('⋮ opens the five actions in plain words', () => {
+      openMenu(cluster());
+      expect(menuItems().map((b) => b.textContent)).toEqual([
+        'Move left', 'Move right', 'Move to previous day', 'Move to next day', 'Remove from this day',
+      ]);
+      expect(menuItems().every((b) => !b.disabled)).toBe(true);
     });
 
-    it('should disable right arrow for last lesson', async () => {
-      const { createRightArrowButton } = await import('../../ui-components.js');
-      
-      createLessonCluster({
-        lessonHash: 'hash1',
-        dayIndex: 0,
-        lessonIndex: 1,
-        lessons: ['hash0', 'hash1'],
-        lessonTitle: 'Test',
-        classId: 'class1',
-        onMoveLeft: vi.fn(),
-        onMoveRight: vi.fn(),
-        onDelete: vi.fn(),
-        onClick: vi.fn(),
-      });
-
-      expect(createRightArrowButton).toHaveBeenCalledWith(true, expect.any(Function));
+    it('disables Move left on the first Lesson', () => {
+      openMenu(cluster({ lessonIndex: 0, lessonHash: 'hash0' }));
+      expect(menuItem('Move left').disabled).toBe(true);
+      expect(menuItem('Move right').disabled).toBe(false);
     });
 
-    it('should enable arrows for middle lessons', async () => {
-      const { createLeftArrowButton, createRightArrowButton } = await import('../../ui-components.js');
-      
-      createLessonCluster({
-        lessonHash: 'hash1',
-        dayIndex: 0,
-        lessonIndex: 1,
-        lessons: ['hash0', 'hash1', 'hash2'],
-        lessonTitle: 'Test',
-        classId: 'class1',
-        onMoveLeft: vi.fn(),
-        onMoveRight: vi.fn(),
-        onDelete: vi.fn(),
-        onClick: vi.fn(),
-      });
-
-      expect(createLeftArrowButton).toHaveBeenCalledWith(false, expect.any(Function));
-      expect(createRightArrowButton).toHaveBeenCalledWith(false, expect.any(Function));
+    it('disables Move right on the last Lesson', () => {
+      openMenu(cluster({ lessonIndex: 2, lessonHash: 'hash2' }));
+      expect(menuItem('Move right').disabled).toBe(true);
+      expect(menuItem('Move left').disabled).toBe(false);
     });
 
-    it('should call onMoveLeft when left arrow is clicked', () => {
-      const onMoveLeft = vi.fn();
-      const cluster = createLessonCluster({
-        lessonHash: 'hash1',
-        dayIndex: 0,
-        lessonIndex: 1,
-        lessons: ['hash0', 'hash1'],
-        lessonTitle: 'Test',
-        classId: 'class1',
-        onMoveLeft,
-        onMoveRight: vi.fn(),
-        onDelete: vi.fn(),
-        onClick: vi.fn(),
-      });
-
-      const leftBtn = cluster.querySelector('button[textContent="←"]') || 
-                     Array.from(cluster.querySelectorAll('button')).find(b => b.textContent === '←');
-      if (leftBtn) {
-        leftBtn.click();
-        expect(onMoveLeft).toHaveBeenCalledTimes(1);
-      }
+    it('disables Move to previous day at Day Index 0', () => {
+      openMenu(cluster({ dayIndex: 0 }));
+      expect(menuItem('Move to previous day').disabled).toBe(true);
+      expect(menuItem('Move to next day').disabled).toBe(false);
     });
 
-    it('should call onDelete when delete button is clicked', () => {
-      const onDelete = vi.fn();
-      const cluster = createLessonCluster({
-        lessonHash: 'hash1',
-        dayIndex: 0,
-        lessonIndex: 0,
-        lessons: ['hash1'],
-        lessonTitle: 'Test',
-        classId: 'class1',
-        onMoveLeft: vi.fn(),
-        onMoveRight: vi.fn(),
-        onDelete,
-        onClick: vi.fn(),
-      });
-
-      const deleteBtn = Array.from(cluster.querySelectorAll('button')).find(b => b.textContent === '🗑️');
-      if (deleteBtn) {
-        deleteBtn.click();
-        expect(onDelete).toHaveBeenCalledTimes(1);
-      }
-    });
-
-    it('should have correct structure with top and bottom rows', () => {
-      const cluster = createLessonCluster({
-        lessonHash: 'hash1',
-        dayIndex: 0,
-        lessonIndex: 0,
-        lessons: ['hash1'],
-        lessonTitle: 'Test',
-        classId: 'class1',
-        onMoveLeft: vi.fn(),
-        onMoveRight: vi.fn(),
-        onDelete: vi.fn(),
-        onClick: vi.fn(),
-      });
-
-      const topRow = cluster.querySelector('.lesson-cluster-top');
-      const bottomRow = cluster.querySelector('.lesson-cluster-bottom');
-
-      expect(topRow).toBeTruthy();
-      expect(bottomRow).toBeTruthy();
-      expect(topRow.querySelector('.lesson-main-btn')).toBeTruthy();
+    it.each([
+      ['Move left', 'onMoveLeft'],
+      ['Move right', 'onMoveRight'],
+      ['Move to previous day', 'onMoveToPreviousDay'],
+      ['Move to next day', 'onMoveToNextDay'],
+      ['Remove from this day', 'onRemove'],
+    ])('%s runs %s', async (label, handler) => {
+      const fn = vi.fn();
+      openMenu(cluster({ [handler]: fn }));
+      menuItem(label).click();
+      await flush();
+      expect(fn).toHaveBeenCalledTimes(1);
     });
   });
 
   describe('createLessonClusterWithDB', () => {
-    it('should create cluster with database operations', async () => {
+    function dbCluster(overrides = {}) {
       const onScheduleReload = vi.fn();
-
-      const cluster = createLessonClusterWithDB({
+      const el = createLessonClusterWithDB({
         lessonHash: 'hash1',
-        dayIndex: 0,
-        lessonIndex: 1,
-        lessons: ['hash0', 'hash1', 'hash2'],
-        lessonTitle: 'Test Lesson',
-        classId: 'class1',
-        onScheduleReload,
-        onLessonClick: vi.fn(),
-      });
-
-      expect(cluster).toBeTruthy();
-      expect(cluster.className).toBe('lesson-cluster');
-    });
-
-    it('should move lesson left when onMoveLeft is called', async () => {
-      const onScheduleReload = vi.fn();
-
-      const cluster = createLessonClusterWithDB({
-        lessonHash: 'hash1',
-        dayIndex: 0,
+        dayIndex: 2,
         lessonIndex: 1,
         lessons: ['hash0', 'hash1', 'hash2'],
         lessonTitle: 'Test',
         classId: 'class1',
         onScheduleReload,
+        ...overrides,
       });
+      document.body.appendChild(el);
+      return { el, onScheduleReload };
+    }
 
-      // Get the left arrow button and click it
-      const leftBtn = Array.from(cluster.querySelectorAll('button')).find(b => b.textContent === '←');
-      if (leftBtn && !leftBtn.disabled) {
-        await leftBtn.onclick();
-        
-        expect(mockSet).toHaveBeenCalled();
-        expect(onScheduleReload).toHaveBeenCalled();
-      }
+    async function choose(el, label) {
+      openMenu(el);
+      menuItem(label).click();
+      await flush();
+    }
+
+    beforeEach(() => {
+      store['schedule/class1/1'] = ['p0'];
+      store['schedule/class1/2'] = ['hash0', 'hash1', 'hash2'];
+      store['schedule/class1/3'] = ['n0', 'n1'];
     });
 
-    it('should not move lesson left if already at first position', async () => {
-      const onScheduleReload = vi.fn();
-
-      const cluster = createLessonClusterWithDB({
-        lessonHash: 'hash0',
-        dayIndex: 0,
-        lessonIndex: 0,
-        lessons: ['hash0', 'hash1'],
-        lessonTitle: 'Test',
-        classId: 'class1',
-        onScheduleReload,
-      });
-
-      const leftBtn = Array.from(cluster.querySelectorAll('button')).find(b => b.textContent === '←');
-      if (leftBtn) {
-        const initialCallCount = mockSet.mock.calls.length;
-        await leftBtn.onclick();
-        
-        // Should not call set if already at first position
-        expect(mockSet.mock.calls.length).toBe(initialCallCount);
-      }
+    it('Move left swaps with the Lesson before it', async () => {
+      const { el, onScheduleReload } = dbCluster();
+      await choose(el, 'Move left');
+      expect(store['schedule/class1/2']).toEqual(['hash1', 'hash0', 'hash2']);
+      expect(onScheduleReload).toHaveBeenCalled();
     });
 
-    it('should move lesson right when onMoveRight is called', async () => {
-      const onScheduleReload = vi.fn();
-
-      const cluster = createLessonClusterWithDB({
-        lessonHash: 'hash1',
-        dayIndex: 0,
-        lessonIndex: 1,
-        lessons: ['hash0', 'hash1', 'hash2'],
-        lessonTitle: 'Test',
-        classId: 'class1',
-        onScheduleReload,
-      });
-
-      const rightBtn = Array.from(cluster.querySelectorAll('button')).find(b => b.textContent === '→');
-      if (rightBtn && !rightBtn.disabled) {
-        await rightBtn.onclick();
-        
-        expect(mockSet).toHaveBeenCalled();
-        expect(onScheduleReload).toHaveBeenCalled();
-      }
+    it('Move right swaps with the Lesson after it', async () => {
+      const { el, onScheduleReload } = dbCluster();
+      await choose(el, 'Move right');
+      expect(store['schedule/class1/2']).toEqual(['hash0', 'hash2', 'hash1']);
+      expect(onScheduleReload).toHaveBeenCalled();
     });
 
-    it('should delete lesson when onDelete is called', async () => {
-      const onScheduleReload = vi.fn();
-
-      const cluster = createLessonClusterWithDB({
-        lessonHash: 'hash1',
-        dayIndex: 0,
-        lessonIndex: 1,
-        lessons: ['hash0', 'hash1', 'hash2'],
-        lessonTitle: 'Test',
-        classId: 'class1',
-        onScheduleReload,
-      });
-
-      const deleteBtn = Array.from(cluster.querySelectorAll('button')).find(b => b.textContent === '🗑️');
-      if (deleteBtn) {
-        await deleteBtn.onclick();
-        
-        expect(mockSet).toHaveBeenCalled();
-        const setCall = mockSet.mock.calls[0];
-        expect(setCall[0].path).toContain('schedule/class1/0');
-        expect(setCall[1]).toEqual(['hash0', 'hash2']); // hash1 removed
-        expect(onScheduleReload).toHaveBeenCalled();
-      }
+    it('Move to previous day appends it to the end of that day', async () => {
+      const { el, onScheduleReload } = dbCluster();
+      await choose(el, 'Move to previous day');
+      expect(store['schedule/class1/1']).toEqual(['p0', 'hash1']);
+      expect(store['schedule/class1/2']).toEqual(['hash0', 'hash2']);
+      expect(onScheduleReload).toHaveBeenCalled();
     });
 
-    it('should use default onClick handler if not provided', () => {
-      const cluster = createLessonClusterWithDB({
-        lessonHash: 'hash1',
-        dayIndex: 0,
-        lessonIndex: 0,
-        lessons: ['hash1'],
-        lessonTitle: 'Test',
-        classId: 'class1',
-        onScheduleReload: vi.fn(),
-      });
+    it('Move to next day appends it to the end of that day', async () => {
+      const { el } = dbCluster();
+      await choose(el, 'Move to next day');
+      expect(store['schedule/class1/3']).toEqual(['n0', 'n1', 'hash1']);
+      expect(store['schedule/class1/2']).toEqual(['hash0', 'hash2']);
+    });
 
-      const mainBtn = cluster.querySelector('.lesson-main-btn');
-      expect(mainBtn).toBeTruthy();
-      
-      // Default handler should navigate to editor
+    it('Move to next day works when that day is outside what is shown (not yet in the Schedule)', async () => {
+      const { el } = dbCluster({ dayIndex: 3, lessonIndex: 1, lessonHash: 'n1', lessons: ['n0', 'n1'] });
+      await choose(el, 'Move to next day');
+      expect(store['schedule/class1/4']).toEqual(['n1']);
+      expect(store['schedule/class1/3']).toEqual(['n0']);
+    });
+
+    it('Remove from this day removes only the placement, with no confirm', async () => {
+      const confirmSpy = vi.spyOn(window, 'confirm');
+      store['content/hash1'] = { title: 'Test' };
+      const { el, onScheduleReload } = dbCluster();
+      await choose(el, 'Remove from this day');
+      expect(store['schedule/class1/2']).toEqual(['hash0', 'hash2']);
+      expect(store['content/hash1']).toEqual({ title: 'Test' });
+      expect(document.querySelector('[role="alertdialog"]')).toBeNull();
+      expect(confirmSpy).not.toHaveBeenCalled();
+      expect(onScheduleReload).toHaveBeenCalled();
+    });
+
+    it('opens the editor by default on a title click', () => {
+      const { el } = dbCluster();
       const originalLocation = window.location;
       delete window.location;
       window.location = { href: '' };
-      
-      mainBtn.click();
-      
-      expect(window.location.href).toContain('editor.html');
-      expect(window.location.href).toContain('page=hash1');
-      expect(window.location.href).toContain('fromClass=class1');
-      
+
+      el.querySelector('.lesson-main-btn').click();
+
+      expect(window.location.href).toBe('editor.html?page=hash1&fromClass=class1');
       window.location = originalLocation;
     });
 
-    it('should use custom onClick handler if provided', () => {
-      const customOnClick = vi.fn();
-      
-      const cluster = createLessonClusterWithDB({
-        lessonHash: 'hash1',
-        dayIndex: 0,
-        lessonIndex: 0,
-        lessons: ['hash1'],
-        lessonTitle: 'Test',
-        classId: 'class1',
-        onScheduleReload: vi.fn(),
-        onLessonClick: customOnClick,
-      });
-
-      const mainBtn = cluster.querySelector('.lesson-main-btn');
-      mainBtn.click();
-
-      expect(customOnClick).toHaveBeenCalledTimes(1);
+    it('uses a custom title-click handler when given', () => {
+      const onLessonClick = vi.fn();
+      const { el } = dbCluster({ onLessonClick });
+      el.querySelector('.lesson-main-btn').click();
+      expect(onLessonClick).toHaveBeenCalledTimes(1);
     });
   });
 });
-
