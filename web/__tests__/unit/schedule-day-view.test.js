@@ -12,8 +12,8 @@ import { initializeDatabase } from '../../database-handle.js';
 import { DEFAULT_LESSON_TITLE, UNTITLED_LESSON } from '../../constants.js';
 import { setupDragHandlers } from '../../drag-drop-utils.js';
 
-// Mock Firebase - schedule-day-view.js reads/writes schedule/{classId}/{dayIndex}
-// directly for the drop handler.
+// Mock Firebase - database-utils.js reads/writes schedule/{classId}/{dayIndex}
+// through it.
 let mockData = {};
 let mockSet = vi.fn();
 
@@ -41,10 +41,11 @@ vi.mock('https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js', () => 
 const mockInsertDayAt = vi.fn();
 const mockDeleteDayAt = vi.fn();
 
-vi.mock('../../database-utils.js', () => ({
+// The schedule read/write helpers stay real, so drops and appends land in mockData.
+vi.mock('../../database-utils.js', async (importOriginal) => ({
+  ...(await importOriginal()),
   insertDayAt: (...args) => mockInsertDayAt(...args),
   deleteDayAt: (...args) => mockDeleteDayAt(...args),
-  generateUniqueHash: vi.fn(),
 }));
 
 let mockSearchPopupOptions;
