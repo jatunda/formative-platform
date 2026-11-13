@@ -60,10 +60,11 @@ export function extractQuestionLinkSlugs(parsedContent) {
 
 /**
  * Replace every `[[q:oldSlug` Question Link reference with `[[q:newSlug`,
- * without touching an unrelated slug that happens to share a prefix. Links
- * written as inline code or in code blocks stay as written. Returns
- * a new content object; does not mutate the input. Used when a Question's
- * Slug is renamed, to fix up every Page that links to it.
+ * without touching an unrelated slug that happens to share a prefix. Code
+ * blocks are code items, which were never rewritten; a link written as
+ * inline code in a text item is an example too, so it is now skipped as well.
+ * Returns a new content object; does not mutate the input. Used when a
+ * Question's Slug is renamed, to fix up every Page that links to it.
  * @param {{title: string, blocks: Array}} parsedContent
  * @param {string} oldSlug
  * @param {string} newSlug
