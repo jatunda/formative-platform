@@ -16,7 +16,7 @@ import {
   setClassDateOffset
 } from './date-utils.js';
 import { showNotification } from './notification-utils.js';
-import { createDateOffsetControl, createStyledButton, createIconButton } from './ui-components.js';
+import { createDateOffsetControl } from './ui-components.js';
 import {
   getFullSchedule
 } from './database-utils.js';
@@ -28,14 +28,13 @@ import {
   makeDeleteDayHandler,
   getLessonTitles
 } from './schedule-day-view.js';
-import { renderTeacherNav, fullScheduleTodayHref } from './teacher-nav.js';
-
-// Number of upcoming Day Indices shown per Class in each pane's Planning
-// Window (today, +1, +2, ...) when the pane is first rendered. Each pane's
-// "+3 days" / "−3 days" buttons resize it by this step, never below it.
-// The size is not remembered: a page reload puts every Class back to this.
-const PLANNING_WINDOW_SIZE = 3;
-const PLANNING_WINDOW_STEP = 3;
+import { renderTeacherNav } from './teacher-nav.js';
+import {
+  PLANNING_WINDOW_SIZE,
+  createWindowResizeControls,
+  createCollapseChevron,
+  createFullScheduleLink
+} from './class-pane-controls.js';
 
 /**
  * Per-Class pane UI state: the Planning Window's size and whether the pane is
@@ -203,24 +202,18 @@ export async function renderClassPane(classId, className, containerEl, uiState =
   const header = document.createElement('div');
   header.className = 'lesson-planning-pane-header';
 
-  const chevron = createIconButton('', `Show or hide ${className}`, () => {
+  const chevron = createCollapseChevron(className, () => {
     const current = /** @type {PaneUiState} */ (paneUiStates.get(classId));
     setCollapsed(!current.collapsed);
   });
-  header.appendChild(chevron);
+  header.appendChild(chevron.element);
 
   const heading = document.createElement('h2');
   heading.textContent = className;
   header.appendChild(heading);
 
   // Stays visible when collapsed: setCollapsed below never hides it.
-  const scheduleLink = document.createElement('a');
-  scheduleLink.className = 'full-schedule-link';
-  scheduleLink.href = fullScheduleTodayHref(classId);
-  scheduleLink.textContent = '↗';
-  scheduleLink.title = 'Full schedule';
-  scheduleLink.setAttribute('aria-label', `Full schedule for ${className}`);
-  header.appendChild(scheduleLink);
+  header.appendChild(createFullScheduleLink(classId, className));
 
   const offsetControl = createDateOffsetControl({
     label: 'Offset:',
@@ -271,18 +264,12 @@ export async function renderClassPane(classId, className, containerEl, uiState =
   tableWrapper.className = 'schedule-pane';
   tableWrapper.appendChild(table);
 
-  const resizeControls = document.createElement('div');
-  resizeControls.className = 'planning-window-resize';
-  const shrinkBtn = createStyledButton('−3 days', () => renderAtSize(windowSize - PLANNING_WINDOW_STEP));
-  shrinkBtn.disabled = windowSize <= PLANNING_WINDOW_SIZE;
-  resizeControls.appendChild(shrinkBtn);
-  resizeControls.appendChild(createStyledButton('+3 days', () => renderAtSize(windowSize + PLANNING_WINDOW_STEP)));
+  const resizeControls = createWindowResizeControls(windowSize, renderAtSize);
 
   // Collapsing toggles in place (no refetch) and records the new state.
   const setCollapsed = (/** @type {boolean} */ collapsed) => {
     paneUiStates.set(classId, { .../** @type {PaneUiState} */ (paneUiStates.get(classId)), collapsed });
-    chevron.textContent = collapsed ? '▸' : '▾';
-    chevron.setAttribute('aria-expanded', String(!collapsed));
+    chevron.show(collapsed);
     for (const el of [offsetControl, tableWrapper, resizeControls]) el.hidden = collapsed;
   };
   setCollapsed(uiState.collapsed);
