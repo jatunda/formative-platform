@@ -73,6 +73,65 @@ describe('processInlineCode', () => {
     const result = processInlineCode('[[#GRADING POLICY|Jump here]]', headingIds);
     expect(result).toBe('<a href="#grading-policy" class="lesson-link">Jump here</a>');
   });
+
+  describe('inline code is literal', () => {
+    it('keeps a Page Link inside backticks as literal code', () => {
+      expect(processInlineCode('Type `[[asdf]]` to link')).toBe('Type <code>[[asdf]]</code> to link');
+    });
+
+    it.each([
+      ['a Section Link', '[[#Header]]'],
+      ['a Question Link', '[[q:slug]]'],
+      ['a markdown link', '[a](b)'],
+      ['bold', '**x**'],
+      ['italic', '_x_'],
+    ])('keeps %s inside backticks as literal code', (_name, literal) => {
+      const headingIds = new Map([['header', 'header']]);
+      expect(processInlineCode(`\`${literal}\``, headingIds)).toBe(`<code>${literal}</code>`);
+    });
+
+    it('still applies links and formatting outside backticks on the same line', () => {
+      const result = processInlineCode('See [[syllabus]] and **bold**, not `[[syllabus]]` or `**bold**`');
+      expect(result).toBe(
+        'See <a href="/p/syllabus" class="lesson-link">syllabus</a> and <strong>bold</strong>, ' +
+        'not <code>[[syllabus]]</code> or <code>**bold**</code>'
+      );
+    });
+
+    it('still formats bold that wraps an inline code span', () => {
+      expect(processInlineCode('**use `x` here**')).toBe('<strong>use <code>x</code> here</strong>');
+    });
+
+    it('still escapes HTML inside inline code', () => {
+      expect(processInlineCode('`<b onclick="x">&</b>`')).toBe(
+        '<code>&lt;b onclick=&quot;x&quot;&gt;&amp;&lt;/b&gt;</code>'
+      );
+    });
+  });
+});
+
+describe('renderContent: Question Link inside backticks', () => {
+    it('renders as literal code, not an embed placeholder', () => {
+      const container = document.createElement('div');
+      renderContent({
+        title: 'T',
+        blocks: [{ type: 'question', content: [{ type: 'text', value: 'Type `[[q:loops-1]]` to embed' }] }]
+      }, container);
+      expect(container.querySelector('.question-embed-placeholder')).toBeNull();
+      expect(container.querySelector('code').textContent).toBe('[[q:loops-1]]');
+      expect(container.querySelector('p').textContent).toBe('Type [[q:loops-1]] to embed');
+    });
+
+    it('still embeds a Question Link outside backticks on the same line', () => {
+      const container = document.createElement('div');
+      renderContent({
+        title: 'T',
+        blocks: [{ type: 'question', content: [{ type: 'text', value: '`[[q:a]]` then [[q:b]]' }] }]
+      }, container);
+      const slugs = [...container.querySelectorAll('.question-embed-placeholder')].map((el) => el.dataset.questionSlug);
+      expect(slugs).toEqual(['b']);
+      expect(container.querySelector('code').textContent).toBe('[[q:a]]');
+    });
 });
 
 describe('renderContent', () => {

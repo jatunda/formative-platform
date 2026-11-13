@@ -4,8 +4,8 @@
 
 **Blocked by:** 01 (Code blocks keep literal lines), so the two DSL fixes land in order.
 
-**Status:** ready-for-agent
+**Status:** closed
 
-- [ ] `[[asdf]]`, `[[#Header]]`, `[[q:slug]]`, `[a](b)`, `**x**` and `_x_` inside backticks all render as literal code
-- [ ] Formatting and links outside backticks on the same line still work
-- [ ] HTML in inline code is still escaped
+- [x] `[[asdf]]`, `[[#Header]]`, `[[q:slug]]`, `[a](b)`, `**x**` and `_x_` inside backticks all render as literal code
+- [x] Formatting and links outside backticks on the same line still work
+- [x] HTML in inline code is still escaped
