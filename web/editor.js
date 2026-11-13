@@ -19,19 +19,12 @@ import {
 import {
 	renderContent
 } from "./content-renderer.js";
-import {
-	AIQuestionGenerator
-} from "./ai-generator.js";
 import { lessonStore } from "./lesson-store.js";
 import { renderTeacherNav } from "./teacher-nav.js";
 import { createDslCheatSheetPanel } from "./dsl-cheat-sheet.js";
 import { mountQuestionEmbeds } from "./question-embed.js";
 import { showQuestionLinkPicker } from "./question-link-picker.js";
 
-import {
-	AI_CONFIG,
-	validateConfig
-} from "./ai-config.js";
 import { NO_CONTENT_SELECTED, UNTITLED_LESSON, UNTITLED_LESSON_LOWERCASE, CONTENT_NOT_FOUND } from './constants.js';
 import { showNotification } from './notification-utils.js';
 
@@ -211,8 +204,7 @@ export function handleBeforeUnload(event, isDirty) {
 
 // Enable/disable the DSL input and the action buttons together, e.g. while
 // no lesson is selected. Queries its elements fresh rather than caching
-// them, since it's called from several independent places (this file and
-// ai-generator.js, which takes it as a constructor argument).
+// them, since it's called from several independent places in this file.
 export function setEditingEnabled(enabled) {
   const dslInput = document.getElementById("dslInput");
   const saveBtn = document.getElementById("saveBtn");
@@ -487,23 +479,6 @@ export async function main() {
       }
     }
   });
-
-  // Initialize AI Question Generator - after setEditingEnabled is defined
-  // above, since the constructor takes it as an argument rather than
-  // reaching for it lazily
-  try {
-    validateConfig();
-    new AIQuestionGenerator(AI_CONFIG.ANTHROPIC_API_KEY, setEditingEnabled);
-  } catch (error) {
-    console.warn('AI Generator not available:', error.message);
-    // Disable the AI button if configuration is missing
-    const aiBtn = document.getElementById('generateAIBtn');
-    if (aiBtn) {
-      aiBtn.disabled = true;
-      aiBtn.title = 'AI Generation requires Anthropic API key configuration';
-      aiBtn.textContent = '🤖 Generate Questions (Not Configured)';
-    }
-  }
 
   // Search lesson button functionality
   searchLessonBtn.onclick = () => {

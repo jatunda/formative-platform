@@ -1,7 +1,6 @@
 import { defineConfig } from 'vitest/config';
 import { fileURLToPath } from 'url';
 import { resolve } from 'path';
-import { existsSync } from 'fs';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 
@@ -10,12 +9,6 @@ const __dirname = fileURLToPath(new URL('.', import.meta.url));
 // results match on any machine (CI runs in UTC). Set before the workers start,
 // so they inherit it.
 process.env.TZ = 'America/Los_Angeles';
-
-// ai-config.js holds a real API key, so it's gitignored and absent from CI
-// and fresh worktrees. Tests only need its shape: fall back to the template.
-const aiConfigFallback = existsSync(resolve(__dirname, 'ai-config.js'))
-  ? []
-  : [{ find: /^(\.{1,2}\/)+ai-config\.js$/, replacement: resolve(__dirname, 'ai-config.template.js') }];
 
 export default defineConfig({
   resolve: {
@@ -28,7 +21,6 @@ export default defineConfig({
         find: 'https://www.gstatic.com/firebasejs/10.4.0/firebase-app.js',
         replacement: resolve(__dirname, '__tests__/helpers/mock-firebase-module.js'),
       },
-      ...aiConfigFallback,
     ],
   },
   test: {
@@ -50,8 +42,6 @@ export default defineConfig({
         '**/*.config.js',
         '**/*.config.mjs',
         '**/firebase-config.js',
-        '**/ai-config.js',
-        '**/ai-config.template.js',
       ],
       // A ratcheting floor, not an aspirational target: set just under
       // today's actual coverage (~89.7%), so this catches regressions

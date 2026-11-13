@@ -65,17 +65,8 @@ vi.mock('../../content-renderer.js', () => ({
   renderContent: (...args) => mockRenderContent(...args),
 }));
 
-vi.mock('../../ai-generator.js', () => ({
-  AIQuestionGenerator: vi.fn(),
-}));
-
 vi.mock('../../teacher-nav.js', () => ({
   renderTeacherNav: vi.fn(),
-}));
-
-vi.mock('../../ai-config.js', () => ({
-  AI_CONFIG: { ANTHROPIC_API_KEY: 'test-key' },
-  validateConfig: vi.fn(),
 }));
 
 vi.mock('../../notification-utils.js', () => ({
