@@ -172,21 +172,14 @@ export function createEndButtonsContainer(dayIndex, ctx) {
 }
 
 /**
- * Create a day row's Date cell. It holds both labels; the stylesheet shows
- * `short` ("Mon 11/2") on narrow screens and `full` everywhere else.
- * @param {{full: string, short: string}} dateLabels
+ * Create a day row's Date cell, e.g. "Mon 11/2".
+ * @param {string} dateLabel - From getDateForDayIndex
  * @returns {HTMLTableCellElement}
  */
-export function createDateCell(dateLabels) {
+export function createDateCell(dateLabel) {
   const tdDate = document.createElement("td");
   tdDate.className = "date-cell";
-  const full = document.createElement("span");
-  full.className = "date-full";
-  full.textContent = dateLabels.full;
-  const short = document.createElement("span");
-  short.className = "date-short";
-  short.textContent = dateLabels.short;
-  tdDate.append(full, short);
+  tdDate.textContent = dateLabel;
   return tdDate;
 }
 
@@ -224,11 +217,11 @@ export function setupLessonDropHandlers(tdLessons, toDayIndex, ctx) {
  * @param {number} dayIndex
  * @param {string[]} lessons - Lesson hashes for this day
  * @param {number|undefined} todayDayIndex - Today's Day Index, for highlighting
- * @param {{full: string, short: string}} dateLabels - This Day Index's calendar date (see getDayDateLabels)
+ * @param {string} dateLabel - This Day Index's calendar date (see getDateForDayIndex)
  * @param {{classId: string, onReload: () => void, onDeleteDay: (dayIndex: number) => void}} ctx
  * @returns {Promise<HTMLTableRowElement>}
  */
-export async function createDayRow(dayIndex, lessons, todayDayIndex, dateLabels, ctx) {
+export async function createDayRow(dayIndex, lessons, todayDayIndex, dateLabel, ctx) {
   const tr = document.createElement("tr");
 
   if (todayDayIndex !== undefined && dayIndex === todayDayIndex) {
@@ -240,7 +233,7 @@ export async function createDayRow(dayIndex, lessons, todayDayIndex, dateLabels,
   tdDay.textContent = dayIndex;
   tr.appendChild(tdDay);
 
-  tr.appendChild(createDateCell(dateLabels));
+  tr.appendChild(createDateCell(dateLabel));
 
   const tdLessons = document.createElement("td");
   tdLessons.className = "lessons-cell";

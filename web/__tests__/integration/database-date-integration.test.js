@@ -94,7 +94,7 @@ describe('Database and Date Integration', () => {
     const dayIndex = 5;
     const dateStr = await getDateForDayIndex(dayIndex, 'class1', '2024-01-01');
     
-    expect(dateStr).toMatch(/\d+\/\d+\/\d+ \(.+day\)/);
+    expect(dateStr).toMatch(/^[A-Z][a-z]{2} \d+\/\d+$/);
     
     // Verify we can get schedule for that day
     const schedule = await getScheduleForDay('class1', dayIndex);
