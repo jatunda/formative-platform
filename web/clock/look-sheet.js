@@ -9,7 +9,7 @@
 // Focus is handled by modal.js: it moves in, Tab wraps inside, Escape closes
 // it and focus returns to Look. Its scrim is clear (no dimming), so clicking
 // the clock closes it too. Every name is a look description from themes.js,
-// never who a theme is for.
+// never who a theme is for (the Dodgers, Lakers and VCS colours keep Eric's names).
 import { closeButton, fieldset, switchControl } from './controls.js';
 import { SVG_NS, el } from './dom.js';
 import { icon } from './icons.js';

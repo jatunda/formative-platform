@@ -239,7 +239,7 @@ describe('School Clock look', () => {
       open();
       openLook();
       expect(radios('Font')).toHaveLength(13);
-      expect(radios('Colours')).toHaveLength(15);
+      expect(radios('Colours')).toHaveLength(18);
       expect(radios('Font').find((r) => r.input.checked).name).toBe("Clean sans (the theme’s own)");
       expect(radios('Colours').find((r) => r.input.checked).name).toBe("Slate blue and sky blue (the theme’s own)");
     });

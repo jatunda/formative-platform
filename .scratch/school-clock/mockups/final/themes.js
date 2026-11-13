@@ -14,7 +14,7 @@
 // so the real page can turn it into a // @ts-check ES module unchanged.
 (function (root) {
   // `native` is the palette's own mode: the version a theme using it shows
-  // until the teacher flips it. Eight are dark and seven light. Every palette
+  // until the teacher flips it. Ten are dark and eight light. Every palette
   // also has its other version (themes.css), which the flip switch shows.
   // `look` describes the native version.
   const PALETTES = [
@@ -30,6 +30,10 @@
     { id: 'stage', native: 'dark', look: 'Midnight and brass' },
     { id: 'court', native: 'light', look: 'Pale mint and forest green' },
     { id: 'team', native: 'dark', look: 'Navy and orange' },
+    // Swap-only colours Eric asked for by name, so `look` is his name for them.
+    { id: 'dodgers', native: 'light', look: 'Dodgers' },
+    { id: 'lakers', native: 'dark', look: 'Lakers' },
+    { id: 'vcs', native: 'dark', look: 'VCS' },
     { id: 'blush', native: 'light', look: 'Blush pink and rose' },
     { id: 'chalk', native: 'dark', look: 'Chalkboard green' },
     { id: 'contrast', native: 'light', look: 'High contrast, black on white' },

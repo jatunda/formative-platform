@@ -40,7 +40,7 @@ There are 32 states, each with its own URL. Every main-screen state works in bot
 | C's ring, for the timer only | Yes | While a timer runs or is paused, it is the big Readout inside a ring. The Period countdown moves to a small Readout beside the ring (below it on a phone). |
 | Seconds toggle (default on) | Yes | "Show seconds" in Settings → Time. See [Seconds and time text](#seconds-and-time-text). |
 | A set of themes, one per subject plus personality themes, never labelled by audience | Yes | 15 themes, named only by their look. |
-| Swap a theme's font or palette, only among pre-checked options | Yes | 13 fonts and 15 palettes, every combination checked. |
+| Swap a theme's font or palette, only among pre-checked options | Yes | 13 fonts and 18 palettes, every combination checked. |
 | Light / dark / auto stays a separate setting | Replaced | Revision 1: themes own their mode, one flip switch, no auto (below). |
 | Default theme: A's look, dark muted blue, light blue-grey text | Yes | "Slate": background `#1e2836`, text `#e2e8f0`, accent `#57b3ff`. Digits weight 300. |
 | "Pick a theme" hint on first visit | Yes | Now points at the Look button. |
@@ -431,7 +431,7 @@ The full 17-token values are in `themes.css`.
 
 ## Contrast results
 
-**Colour pairs** (`node contrast.mjs --table`): 15 palettes × 2 modes × 26 pairs, **0 failures**.
+**Colour pairs** (`node contrast.mjs --table`): 18 palettes × 2 modes × 26 pairs, **0 failures**.
 
 - **Text pairs (need 4.5:1):**
   - fg and muted on bg, surface and surface-2;

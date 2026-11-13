@@ -8,7 +8,9 @@
 // step.
 //
 // - A theme is never named for who it's for: `look` describes what it looks
-//   like, and is the only name a teacher (or a screen reader) ever gets.
+//   like, and is the only name a teacher (or a screen reader) ever gets. The
+//   one exception is the team colours Eric named (Dodgers, Lakers, VCS),
+//   which are swap-only palettes no theme uses.
 // - Any theme's font can be swapped for any entry in FONTS and its palette
 //   for any entry in PALETTES: every combination is contrast-checked.
 // - Themes own their mode: a theme shows its palette's own version until the
@@ -26,7 +28,7 @@
  * @typedef {{ theme: string, fontSwap: string | null, paletteSwap: string | null, flipped: boolean }} LookSettings
  */
 
-/** @type {readonly Palette[]} Eight are natively dark and seven light; `look` describes the own version. */
+/** @type {readonly Palette[]} Ten are natively dark and eight light; `look` describes the own version. */
 export const PALETTES = Object.freeze([
   { id: 'slate', native: 'dark', look: 'Slate blue and sky blue' },
   { id: 'ink', native: 'dark', look: 'Deep ink and teal' },
@@ -40,6 +42,10 @@ export const PALETTES = Object.freeze([
   { id: 'stage', native: 'dark', look: 'Midnight and brass' },
   { id: 'court', native: 'light', look: 'Pale mint and forest green' },
   { id: 'team', native: 'dark', look: 'Navy and orange' },
+  // Swap-only colours Eric asked for by name, so `look` is his name for them.
+  { id: 'dodgers', native: 'light', look: 'Dodgers' },
+  { id: 'lakers', native: 'dark', look: 'Lakers' },
+  { id: 'vcs', native: 'dark', look: 'VCS' },
   { id: 'blush', native: 'light', look: 'Blush pink and rose' },
   { id: 'chalk', native: 'dark', look: 'Chalkboard green' },
   { id: 'contrast', native: 'light', look: 'High contrast, black on white' },

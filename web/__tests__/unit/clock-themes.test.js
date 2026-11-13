@@ -7,16 +7,16 @@ import {
 const look = (settings) => lookAttributes({ theme: 'slate', fontSwap: null, paletteSwap: null, flipped: false, ...settings });
 
 describe('the theme set', () => {
-  it('has 15 themes over 15 palettes and 13 fonts; the default is the dark muted blue one', () => {
+  it('has 15 themes over 18 palettes and 13 fonts; the default is the dark muted blue one', () => {
     expect(THEMES).toHaveLength(15);
-    expect(PALETTES).toHaveLength(15);
+    expect(PALETTES).toHaveLength(18);
     expect(FONTS).toHaveLength(13);
     expect(DEFAULT_THEME).toBe('slate');
     expect(look({})).toEqual({ 'data-mode': 'dark', 'data-palette': 'slate', 'data-font': 'system', 'data-deco': '', 'data-backdrop': '' });
   });
 
-  it('mixes light and dark themes: 8 palettes are natively dark and 7 light', () => {
-    expect(PALETTES.filter((p) => p.native === 'dark')).toHaveLength(8);
+  it('mixes light and dark palettes: 10 are natively dark and 8 light', () => {
+    expect(PALETTES.filter((p) => p.native === 'dark')).toHaveLength(10);
     expect(nativeMode('paper')).toBe('light');
     expect(nativeMode('team')).toBe('dark');
     expect(nativeMode('ocean')).toBe('dark');
@@ -28,6 +28,18 @@ describe('the theme set', () => {
     expect(themeLook(THEMES.find((t) => t.id === 'bloom'))).toBe('Blush pink and rose with flowers and a soft wash, calligraphy labels');
     const names = THEMES.map((t) => `${t.id} ${themeLook(t)}`).join(' ');
     expect(names).not.toMatch(/teacher|student|kid|girl|boy|science|math|english|history|art|music|drama|sport|pe\b|cs\b|for /i);
+  });
+
+  it('has the Dodgers, Lakers and VCS colours under the names Eric gave them, as swaps only', () => {
+    const team = PALETTES.filter((p) => ['dodgers', 'lakers', 'vcs'].includes(p.id));
+    expect(team).toEqual([
+      { id: 'dodgers', native: 'light', look: 'Dodgers' },
+      { id: 'lakers', native: 'dark', look: 'Lakers' },
+      { id: 'vcs', native: 'dark', look: 'VCS' },
+    ]);
+    expect(THEMES.filter((t) => ['dodgers', 'lakers', 'vcs'].includes(t.palette))).toEqual([]);
+    expect(look({ paletteSwap: 'lakers' })).toMatchObject({ 'data-mode': 'dark', 'data-palette': 'lakers', 'data-font': 'system' });
+    expect(look({ paletteSwap: 'dodgers', flipped: true })['data-mode']).toBe('dark');
   });
 
   it('shows a theme in its own version, with its font, decoration and backdrop', () => {
