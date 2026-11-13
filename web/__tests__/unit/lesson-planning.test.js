@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { expectConsoleErrors } from '../helpers/quiet-console.js';
 import {
-  getShiftMagnitude,
   initializeBulkShiftControl,
   applyBulkShift,
   loadAndRenderAllPanes,
@@ -93,47 +92,17 @@ describe('lesson-planning', () => {
     mockGetLessonTitles.mockReset().mockResolvedValue([]);
   });
 
-  describe('getShiftMagnitude', () => {
-    it('returns the parsed positive value', () => {
-      expect(getShiftMagnitude({ value: '3' })).toBe(3);
-    });
-
-    it('takes the absolute value of a negative input', () => {
-      expect(getShiftMagnitude({ value: '-4' })).toBe(4);
-    });
-
-    it('defaults to 1 for zero', () => {
-      expect(getShiftMagnitude({ value: '0' })).toBe(1);
-    });
-
-    it('defaults to 1 for non-numeric input', () => {
-      expect(getShiftMagnitude({ value: 'abc' })).toBe(1);
-    });
-  });
-
   describe('initializeBulkShiftControl', () => {
-    it('renders a magnitude input and +/- buttons into the container', () => {
+    it('mounts the shared Skip/Delay control, with no current offset, into the container', () => {
       document.body.innerHTML = '<div id="bulkShiftContainer"></div>';
       initializeBulkShiftControl();
 
       const container = document.getElementById('bulkShiftContainer');
-      expect(container.querySelector('#bulkShiftAmount').value).toBe('1');
-      const buttons = [...container.querySelectorAll('button')].map((b) => b.textContent);
-      expect(buttons).toEqual(['−', '+']);
-    });
-
-    it('wires the buttons to shift every class by the entered magnitude', async () => {
-      document.body.innerHTML = '<div id="bulkShiftContainer"></div><div id="classPanesContainer"></div>';
-      mockData['classes'] = { csa: { name: 'CS A', displayOrder: 1 } };
-      mockGetFullSchedule.mockResolvedValue({});
-      const { setClassDateOffset } = await import('../../date-utils.js');
-
-      initializeBulkShiftControl();
-      document.getElementById('bulkShiftAmount').value = '3';
-      document.querySelector('#bulkShiftContainer button:last-child').click();
-      await vi.waitFor(() => expect(setClassDateOffset).toHaveBeenCalled());
-
-      expect(setClassDateOffset).toHaveBeenCalledWith('csa', 5 + 3);
+      expect(container.querySelector('.date-offset-control')).toBeTruthy();
+      const config = mockCreateDateOffsetControl.mock.calls[0][0];
+      expect(config.label).toBe('All classes:');
+      expect(config.currentOffset).toBeUndefined();
+      expect(config.onShift).toBe(applyBulkShift);
     });
   });
 
@@ -153,15 +122,17 @@ describe('lesson-planning', () => {
       expect(setClassDateOffset).toHaveBeenCalledWith('csp', 4);
     });
 
-    it('shows a success notification describing the shift', async () => {
+    it('shows a success notification saying what the shift did', async () => {
       document.body.innerHTML = '<div id="classPanesContainer"></div>';
       mockData['classes'] = { csa: { name: 'CS A', displayOrder: 1 } };
       mockGetFullSchedule.mockResolvedValue({});
       const { showNotification } = await import('../../notification-utils.js');
 
       await applyBulkShift(-1);
+      expect(showNotification).toHaveBeenLastCalledWith('Skipped all classes ahead 1 day.', 'success');
 
-      expect(showNotification).toHaveBeenCalledWith(expect.stringContaining('-1 day.'), 'success');
+      await applyBulkShift(3);
+      expect(showNotification).toHaveBeenLastCalledWith('Delayed all classes 3 days.', 'success');
     });
 
     it('does nothing when there are no classes', async () => {
@@ -285,23 +256,11 @@ describe('lesson-planning', () => {
       expect(header.querySelector('.date-offset-control')).toBeTruthy();
       const config = mockCreateDateOffsetControl.mock.calls[0][0];
       expect(config.currentOffset).toBe(5); // csa's mocked offset
+      expect(config.computeTodayDayIndex).toBeUndefined();
       expect(config.onGoToToday).toBeUndefined();
     });
 
-    it("computeTodayDayIndex is wired to this Class's Today's Day Index", async () => {
-      mockGetFullSchedule.mockResolvedValue({});
-      const containerEl = document.createElement('div');
-      const { getTodayDayIndex } = await import('../../date-utils.js');
-
-      await renderClassPane('csa', 'CS A', containerEl);
-      const config = mockCreateDateOffsetControl.mock.calls[0][0];
-      getTodayDayIndex.mockClear();
-      await config.computeTodayDayIndex();
-
-      expect(getTodayDayIndex).toHaveBeenCalledWith('csa');
-    });
-
-    it("onApply persists the new offset, reloads the pane, and notifies with the Class's name", async () => {
+    it("onShift persists the shifted offset, reloads the pane, and notifies with the Class's name", async () => {
       mockGetFullSchedule.mockResolvedValue({});
       const containerEl = document.createElement('div');
       const { setClassDateOffset } = await import('../../date-utils.js');
@@ -311,15 +270,15 @@ describe('lesson-planning', () => {
       const config = mockCreateDateOffsetControl.mock.calls[0][0];
       mockCreateDateOffsetControl.mockClear();
 
-      await config.onApply(9);
+      await config.onShift(4);
 
-      expect(setClassDateOffset).toHaveBeenCalledWith('csa', 9);
+      expect(setClassDateOffset).toHaveBeenCalledWith('csa', 5 + 4);
       // Reloaded: renderClassPane ran again, rebuilding the control
       expect(mockCreateDateOffsetControl).toHaveBeenCalledTimes(1);
       expect(showNotification).toHaveBeenCalledWith(expect.stringContaining('CS A'), 'success');
     });
 
-    it('onApply shows an error notification and rethrows on failure, without reloading', async () => {
+    it('onShift shows an error notification and rethrows on failure, without reloading', async () => {
       expectConsoleErrors();
       mockGetFullSchedule.mockResolvedValue({});
       const containerEl = document.createElement('div');
@@ -331,7 +290,7 @@ describe('lesson-planning', () => {
       const config = mockCreateDateOffsetControl.mock.calls[0][0];
       mockCreateDateOffsetControl.mockClear();
 
-      await expect(config.onApply(9)).rejects.toThrow('boom');
+      await expect(config.onShift(4)).rejects.toThrow('boom');
 
       expect(mockCreateDateOffsetControl).not.toHaveBeenCalled();
       expect(showNotification).toHaveBeenCalledWith('Failed to update date offset', 'error');
