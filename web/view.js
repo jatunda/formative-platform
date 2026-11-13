@@ -4,7 +4,7 @@ import { db } from './firebase-config.js';
 import { initializeDatabase } from './database-handle.js';
 import { lessonStore } from './lesson-store.js';
 import { getTodayDayIndex } from './date-utils.js';
-import { shortDateLabel } from './school-day.js';
+import { shortDateLabel } from './business-days.js';
 import { renderMultipleContent } from './content-renderer.js';
 import { mountQuestionEmbeds } from './question-embed.js';
 import { NO_CONTENT_FOR_TODAY } from './constants.js';
