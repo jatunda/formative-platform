@@ -89,10 +89,11 @@
   height: 100%;
 }
 
+/* The stroke's width is set on the circles (timer-ring.js), from ring-geometry.js,
+   which ring-fit.js and the browser check measure the ring by. */
 .clock-ring__track,
 .clock-ring__arc {
   fill: none;
-  stroke-width: 2.4;
 }
 
 .clock-ring__track {

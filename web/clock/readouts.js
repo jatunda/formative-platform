@@ -113,12 +113,16 @@ export function readoutParts(value, { use24Hour = false, seconds = true } = {}) 
     ? formatClockTime(value.at, { seconds, use24Hour })
     : (value.long ? formatLongDuration : formatDuration)(value.ms, { seconds });
   const pieces = amount.split(/( ?[a-z]+)/i).filter(Boolean).map((text) => ({ text, small: /[a-z]/i.test(text) }));
+  return { amount, caption: value.kind === 'time' ? '' : value.caption, pieces, glyphs: glyphCounts(amount) };
+}
+
+/**
+ * The glyph counts a value's size rule needs (`--d`, `--c`, `--u`): its digits, colons and
+ * letters. The timer's ring sizes its digits by the same counts.
+ * @param {string} text
+ */
+export function glyphCounts(text) {
   /** @param {RegExp} pattern */
-  const count = (pattern) => (amount.match(pattern) ?? []).length;
-  return {
-    amount,
-    caption: value.kind === 'time' ? '' : value.caption,
-    pieces,
-    glyphs: { digits: count(/\d/g), colons: count(/:/g), letters: count(/[a-z]/gi) },
-  };
+  const count = (pattern) => (text.match(pattern) ?? []).length;
+  return { digits: count(/\d/g), colons: count(/:/g), letters: count(/[a-z]/gi) };
 }

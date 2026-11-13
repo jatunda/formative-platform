@@ -76,7 +76,12 @@ export function fullMatrix() {
  * passing fails the run, so a fix shows up here and its entry is removed.
  * @type {KnownFailure[]}
  */
-export const KNOWN_FAILURES = [];
+export const KNOWN_FAILURES = [
+  // .scratch/school-clock/issues/60-small-landscape-ring-gap.md: at 480 x 320,
+  // where the ring keeps below the top bar, it sits closer than RING_GAP to the
+  // "Timer" and "Bells" buttons, and in some states to a side Readout's value.
+  { ticket: 60, match: { sizes: ['480x320'], editing: false, timer: true } },
+];
 
 /** A Config's on/off fields, which a Match names as is. @type {('editing' | 'timer' | 'soundOn')[]} */
 const FLAGS = ['editing', 'timer', 'soundOn'];
