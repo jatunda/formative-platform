@@ -139,6 +139,15 @@ describe('spoilers', () => {
     expect(processInlineCode('a || b')).toBe('a || b');
   });
 
+  it('leaves "or" pipes in prose alone', () => {
+    expect(processInlineCode('if a || b || c then')).toBe('if a || b || c then');
+  });
+
+  it('still hides text with spaces inside, as long as it doesn\'t start or end with one', () => {
+    expect(processInlineCode('||x y||')).toBe(`${SPOILER_OPEN}x y</span>`);
+    expect(processInlineCode('|| x|| and ||y ||')).toBe('|| x|| and ||y ||');
+  });
+
   it('escapes HTML inside a spoiler', () => {
     expect(processInlineCode('||<b>||')).toBe(`${SPOILER_OPEN}&lt;b&gt;</span>`);
   });

@@ -155,9 +155,11 @@ function processMarkdownLinks(text) {
 /**
  * A spoiler: `||hidden text||`. Runs after links and formatting, so they
  * work inside it; inline code is already set aside, so `||x||` inside
- * backticks stays literal.
+ * backticks stays literal. Like Markdown emphasis, the hidden text can't
+ * start or end with whitespace, so `a || b || c` in prose stays as typed
+ * while `||x y||` is still a spoiler.
  */
-const SPOILER_PATTERN = /\|\|(.+?)\|\|/g;
+const SPOILER_PATTERN = /\|\|(?!\s)(.+?)(?<!\s)\|\|/g;
 
 /** Opening tag of a spoiler span; installSpoilerToggle reveals it on tap. */
 const SPOILER_OPEN_TAG = '<span class="spoiler" tabindex="0" role="button" aria-expanded="false">';
