@@ -1,7 +1,13 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { expectConsoleErrors } from '../helpers/quiet-console.js';
-import { resolveDayIndex, fetchPages, loadContent, initializePage } from '../../view.js';
+import { readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { resolve, dirname } from 'path';
+import { resolveDayIndex, fetchPages, loadContent, initializePage, renderTodayDate } from '../../view.js';
 import { NO_CONTENT_FOR_TODAY } from '../../constants.js';
+
+// jsdom's URL isn't Node's, so derive the folder from the file path instead.
+const webDir = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
 vi.mock('../../date-utils.js', () => ({
   getTodayDayIndex: vi.fn(async () => 7),
@@ -54,6 +60,40 @@ describe('view', () => {
     for (const key of Object.keys(mockData)) delete mockData[key];
     capturedTimeoutOptions = undefined;
     mockMountQuestionEmbeds.mockReset();
+  });
+
+  describe('the header row', () => {
+    const page = new DOMParser().parseFromString(
+      readFileSync(resolve(webDir, 'view.html'), 'utf8'),
+      'text/html',
+    );
+
+    it('holds the back link and a slot for the date on one row', () => {
+      const row = page.querySelector('nav.do-now-header');
+      expect(row?.querySelector('a[href="index.html"]')?.textContent).toBe('← Back to Class Selection');
+      expect(row?.querySelector('time#today-date')).toBeTruthy();
+    });
+  });
+
+  describe('renderTodayDate', () => {
+    it("shows today's real calendar date, even on a weekend", () => {
+      const slot = document.createElement('time');
+      renderTodayDate(slot, new Date(2026, 10, 14, 8));
+      expect(slot.textContent).toBe('Sat 11/14');
+      expect(slot.getAttribute('datetime')).toBe('2026-11-14');
+    });
+
+    it('defaults to the current date', () => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date(2026, 10, 12, 9));
+      try {
+        const slot = document.createElement('time');
+        renderTodayDate(slot);
+        expect(slot.textContent).toBe('Thu 11/12');
+      } finally {
+        vi.useRealTimers();
+      }
+    });
   });
 
   describe('resolveDayIndex', () => {

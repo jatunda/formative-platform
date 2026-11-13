@@ -15,11 +15,11 @@ describe('student landing page', () => {
     expect(page.title).toBe('mrhsieh.app');
   });
 
-  it("heads the page with today's Do Now", () => {
-    expect(page.querySelector('h1')?.textContent).toBe("Today's Do Now");
+  it('heads the page with the Do Nows, before the script adds their date', () => {
+    expect(page.querySelector('h1#do-nows-heading')?.textContent).toBe('Do Nows');
   });
 
   it('says what it is loading in the same words as the heading', () => {
-    expect(page.querySelector('#loading-state .loading-text')?.textContent).toBe("Loading today's Do Now...");
+    expect(page.querySelector('#loading-state .loading-text')?.textContent).toBe('Loading Do Nows...');
   });
 });
