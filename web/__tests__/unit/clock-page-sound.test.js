@@ -1,31 +1,15 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { initClockApp } from '../../clock/clock.js';
-import { SETTINGS_KEY } from '../../clock/clock-storage.js';
-import { createFakeStorage } from '../helpers/fake-storage.js';
 import { createFakeSoundPlayer } from '../helpers/fake-sound-player.js';
 import { field, setValue } from '../helpers/clock-dom.js';
+import {
+  button, clockMount as mount, createRealClock, openClockPage, pageText, savedSettings as saved, storageWith,
+} from '../helpers/clock-page.js';
 import { SOUNDS, SOUND_NAMES } from '../../clock/sound.js';
 
-/** A real clock the test moves by hand; the page's ticks come from fake timers. */
-function fakeRealClock(date) {
-  let t = date.getTime();
-  return {
-    now: () => t,
-    advance: (ms) => { t += ms; vi.advanceTimersByTime(ms); },
-    /** Time passes with no timers firing, like a sleeping or throttled tab. */
-    jump: (ms) => { t += ms; },
-  };
-}
-
 const SEC = 1000;
-const mount = () => document.getElementById('clockApp');
-const pageText = () => mount().textContent.replace(/\s+/g, ' ');
-const button = (name) => [...mount().querySelectorAll('button')]
-  .find((b) => (b.getAttribute('aria-label') ?? b.textContent.trim()) === name && !b.closest('[hidden]'));
 /** Open the Settings drawer from the top bar, where the sound settings are. */
 const openSettings = () => button('Settings').click();
 const checkbox = (name) => field(name);
-const saved = (storage) => JSON.parse(storage.getItem(SETTINGS_KEY));
 const ringing = () => mount().querySelector('[role="alertdialog"]');
 
 // Tue 2026-10-27 is an All Day: Period 3 ends 11:15, Period 4 runs 11:20–12:05.
@@ -39,11 +23,11 @@ describe('School Clock sound', () => {
 
   /** Open the page on an HS device with `settings` saved, at `when` (real time). */
   function open({ when = at(11, 12), settings = {}, sound = {}, ...options } = {}) {
-    real = fakeRealClock(when);
+    real = createRealClock(when);
     player = createFakeSoundPlayer(sound);
-    storage = createFakeStorage({ [SETTINGS_KEY]: JSON.stringify({ division: 'HS', ...settings }) });
-    app = initClockApp({
-      realNow: real.now, storage, tabStorage: createFakeStorage(), soundPlayer: player,
+    storage = storageWith({ division: 'HS', ...settings });
+    app = openClockPage({
+      clock: real, storage, soundPlayer: player,
       prefersReducedMotion: () => false, ...options,
     });
   }

@@ -1,21 +1,16 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { initClockApp } from '../../clock/clock.js';
-import { SETTINGS_KEY } from '../../clock/clock-storage.js';
 import { SOUND_NAMES } from '../../clock/sound.js';
-import { createFakeStorage } from '../helpers/fake-storage.js';
 import { createFakeSoundPlayer } from '../helpers/fake-sound-player.js';
 import { accessibleName, field, isShown, setValue, toggle } from '../helpers/clock-dom.js';
+import {
+  button, clockMount as mount, createRealClock, openClockPage, savedSettings as saved, storageWith,
+} from '../helpers/clock-page.js';
 
-const mount = () => document.getElementById('clockApp');
 const drawer = () => mount().querySelector('#clock-settings');
 const section = () => document.getElementById('clock-settings-alarms');
-/** A shown button in the drawer by its accessible name. */
-const button = (name, root = mount()) => [...root.querySelectorAll('button')]
-  .find((b) => accessibleName(b) === name && isShown(b));
 /** The open Alarm form. */
 const form = () => section().querySelector('form');
 const inForm = (name) => field(name, form());
-const saved = (storage) => JSON.parse(storage.getItem(SETTINGS_KEY));
 const savedAlarms = (storage) => saved(storage).alarms ?? [];
 /** The Alarm list: each item's name and hint line. */
 const listed = () => [...section().querySelectorAll('.clock-alarm-item')].map((item) => ({
@@ -42,15 +37,15 @@ describe('School Clock Alarm editor', () => {
   let app;
   let storage;
   let player;
-  let t;
+  let clock;
 
   /** Open the page on an HS device with `settings` saved, at `when`, with Settings open. */
   function open({ when = at(10, 32), settings = {} } = {}) {
     app?.destroy();
-    t = when.getTime();
-    storage = createFakeStorage({ [SETTINGS_KEY]: JSON.stringify({ division: 'HS', ...settings }) });
+    clock = createRealClock(when);
+    storage = storageWith({ division: 'HS', ...settings });
     player = createFakeSoundPlayer({ state: 'running' });
-    app = initClockApp({ realNow: () => t, storage, tabStorage: createFakeStorage(), soundPlayer: player, capabilities: {} });
+    app = openClockPage({ clock, storage, soundPlayer: player, capabilities: {} });
     button('Settings').click();
   }
 
@@ -234,7 +229,7 @@ describe('School Clock Alarm editor', () => {
       button('Clock Alarm', section()).click();
       setValue('Name', 'Stretch', form());
       inForm('Name').focus();
-      t += 3000;
+      clock.jump(3000);
       vi.advanceTimersByTime(3000);
       expect(inForm('Name').value).toBe('Stretch');
       expect(document.activeElement).toBe(inForm('Name'));
@@ -503,7 +498,7 @@ describe('School Clock Alarm editor', () => {
     });
 
     it('drops the Undo after about 6 seconds, keeping focus in the drawer', () => {
-      const wait = (ms) => { t += ms; vi.advanceTimersByTime(ms); };
+      const wait = (ms) => clock.advance(ms);
       const toast = () => section().querySelector('[role="status"]');
       open({ settings: { alarms: [PERIOD_ALARM] } });
       button('Edit Wrap-up time').click();

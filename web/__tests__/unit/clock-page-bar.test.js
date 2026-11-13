@@ -1,13 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { initClockApp } from '../../clock/clock.js';
 import { SETTINGS_KEY } from '../../clock/clock-storage.js';
 import { createFakeStorage } from '../helpers/fake-storage.js';
 import { createFakeSoundPlayer } from '../helpers/fake-sound-player.js';
+import { isShown } from '../helpers/clock-dom.js';
+import {
+  button, clockMount as mount, createRealClock, openClockPage, savedSettings as saved, storageWith,
+} from '../helpers/clock-page.js';
 
 const SEC = 1000;
 const MIN = 60 * SEC;
-const mount = () => document.getElementById('clockApp');
-const isShown = (node) => !node.closest('[hidden]');
 /** The bar: the bottom row's labelled section, if it shows. */
 const bar = () => {
   const section = mount().querySelector('.clock-bottom section');
@@ -32,28 +33,27 @@ const choose = (name) => {
   input.checked = true;
   input.dispatchEvent(new Event('change'));
 };
-const saved = (storage) => JSON.parse(storage.getItem(SETTINGS_KEY));
 
 // Tue 2026-10-27 is an All Day: Period 3 runs 10:30–11:15, Period 7 ends 15:10.
 const at = (h, m, s = 0) => new Date(2026, 9, 27, h, m, s).getTime();
 
 describe('School Clock bar', () => {
   let app;
-  let t;
+  let clock;
   let storage;
 
   function open({ when } = {}) {
     app?.destroy();
-    if (when !== undefined) t = when;
-    app = initClockApp({
-      realNow: () => t, storage, tabStorage: createFakeStorage(),
+    if (when !== undefined) clock = createRealClock(when);
+    app = openClockPage({
+      clock, storage,
       soundPlayer: createFakeSoundPlayer({ state: 'running' }), prefersReducedMotion: () => false,
       capabilities: { fullscreen: null, wakeLock: null, pictureInPicture: null },
     });
   }
-  const advance = (ms) => { t += ms; vi.advanceTimersByTime(ms); };
+  const advance = (ms) => clock.advance(ms);
   const withSettings = (settings) => {
-    storage = createFakeStorage({ [SETTINGS_KEY]: JSON.stringify({ division: 'HS', ...settings }) });
+    storage = storageWith({ division: 'HS', ...settings });
   };
 
   beforeEach(() => {
@@ -303,8 +303,7 @@ describe('School Clock bar', () => {
   });
 
   describe('in Readouts edit mode', () => {
-    const control = (name) => [...mount().querySelectorAll('button')].find((b) => words(b) === name);
-    const edit = () => control('Readouts').click();
+    const edit = () => button('Readouts').click();
     /** The bar's own button, while it shows. */
     const switchButton = () => {
       const button = bar()?.querySelector('button');
@@ -375,7 +374,7 @@ describe('School Clock bar', () => {
       expect(radio('Whole day').checked).toBe(true);
       expect(storage.getItem(SETTINGS_KEY)).not.toContain('"dayStrip":false');
       edit();
-      control('Done').click();
+      button('Done').click();
       bar().click();
       expect(radio('Whole day').checked).toBe(true);
       expect(bar().classList).not.toContain('is-editing');

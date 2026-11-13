@@ -17,26 +17,14 @@
 // wide value ("10:40:01 AM") doesn't spill out of the column into the ring.
 // A value is only as wide as its own text, never its column, so this doesn't
 // feed back either.
+// The circle, the gap, the pieces and the clearing test are ring-geometry.js's,
+// which the browser check shares, so it checks what this promises.
+import { RING_GAP, SIDE_VALUES, TOP_BAR_PIECES, ringClears } from './ring-geometry.js';
 
-/** Clear space between the ring and the nearest piece of the top bar, in px. */
-export const RING_GAP = 12;
-
-/** @typedef {{ left: number, top: number, right: number, bottom: number }} Box */
+/** @typedef {import('./ring-geometry.js').Box} Box */
 
 /** Halvings in a search: far below a pixel on any screen. */
 const STEPS = 40;
-
-/**
- * Whether a ring of diameter `size` centred at (`x`, `y`) stays `gap` clear of every box.
- * @param {number} x @param {number} y @param {number} size @param {Box[]} boxes @param {number} gap
- */
-function clears(x, y, size, boxes, gap) {
-  return boxes.every((box) => {
-    const dx = Math.max(box.left - x, 0, x - box.right);
-    const dy = Math.max(box.top - y, 0, y - box.bottom);
-    return Math.hypot(dx, dy) >= size / 2 + gap;
-  });
-}
 
 /**
  * The largest `value` in [low, high] for which `ok` holds, given `ok` holds below some point and not above it.
@@ -60,7 +48,7 @@ function largest(low, high, ok) {
  */
 export function ringRoom(region, boxes, gap) {
   const x = (region.left + region.right) / 2;
-  return largest(0, region.bottom - region.top, (size) => clears(x, region.bottom - size / 2, size, boxes, gap));
+  return largest(0, region.bottom - region.top, (size) => ringClears(x, region.bottom - size / 2, size, boxes, gap));
 }
 
 /**
@@ -73,7 +61,7 @@ export function ringShift(region, boxes, gap, size) {
   const middle = (region.top + region.bottom) / 2;
   const most = Math.max(region.bottom - size / 2 - middle, 0);
   // Lower is clearer (the boxes are above), so look for the least shift that clears.
-  return most - largest(0, most, (up) => clears(x, middle + most - up, size, boxes, gap));
+  return most - largest(0, most, (up) => ringClears(x, middle + most - up, size, boxes, gap));
 }
 
 /**
@@ -87,7 +75,7 @@ export function ringShift(region, boxes, gap, size) {
  */
 export function keepRingClear(region, ring, topBar) {
   if (typeof ResizeObserver === 'undefined') return;
-  const pieces = [...topBar.querySelectorAll('.clock-day, button')];
+  const pieces = [...topBar.querySelectorAll(TOP_BAR_PIECES)];
   /** The side room last written, so a tick that leaves the widest value as wide writes nothing. */
   let sideRoom = '';
   const setSideRoom = (/** @type {string} */ value) => {
@@ -101,7 +89,7 @@ export function keepRingClear(region, ring, topBar) {
       setSideRoom('');
       return;
     }
-    const values = [...region.querySelectorAll('.clock-smalls .clock-readout__value')];
+    const values = [...region.querySelectorAll(SIDE_VALUES)];
     const widest = Math.max(0, ...values.map((value) => value.getBoundingClientRect().width));
     setSideRoom(`${widest > 0 ? widest + RING_GAP : 0}px`);
   };

@@ -1,20 +1,16 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { initClockApp } from '../../clock/clock.js';
 import { LAYOUT_KEY } from '../../clock/readout-layout.js';
-import { SETTINGS_KEY } from '../../clock/clock-storage.js';
 import { createFakeStorage } from '../helpers/fake-storage.js';
 import { createFakeSoundPlayer } from '../helpers/fake-sound-player.js';
 import { createFakePictureInPicture } from '../helpers/fake-screen.js';
 import { field, toggle } from '../helpers/clock-dom.js';
+import {
+  button, clockMount as mount, createRealClock, openClockPage, savedSettings as saved, storageWith,
+} from '../helpers/clock-page.js';
 
 const SEC = 1000;
 const MIN = 60 * SEC;
-const mount = () => document.getElementById('clockApp');
 const displayText = () => mount().querySelector('.clock-stage').textContent.replace(/\s+/g, ' ');
-const isShown = (node) => !node.closest('[hidden]');
-/** A visible button by its accessible name (its aria-label, else its text). */
-const button = (name, root = mount()) => [...root.querySelectorAll('button')]
-  .find((b) => (b.getAttribute('aria-label') ?? b.textContent.replace(/\s+/g, ' ').trim()) === name && isShown(b));
 /** A setting's switch in the Settings drawer, by its name. */
 const checkbox = (name) => field(name);
 /** The Readouts in order; the timer's ring (the big one while it shows) by its digits' accessible name. */
@@ -32,7 +28,6 @@ const picker = () => {
 };
 /** The timer's ring in the big spot. */
 const ring = () => mount().querySelector('.clock-ring');
-const saved = (storage) => JSON.parse(storage.getItem(SETTINGS_KEY));
 const settle = async () => { for (let i = 0; i < 5; i += 1) await Promise.resolve(); };
 
 // Tue 2026-10-27 is an All Day: Period 3 runs 10:30–11:15, Period 7 ends 15:10.
@@ -40,7 +35,7 @@ const at = (h, m, s = 0) => new Date(2026, 9, 27, h, m, s).getTime();
 
 describe('School Clock display preferences', () => {
   let app;
-  let t;
+  let clock;
   let storage;
   let tabStorage;
   let pip;
@@ -48,17 +43,17 @@ describe('School Clock display preferences', () => {
   /** Open (or reload) the page in this tab, on the same device. */
   function open({ when } = {}) {
     app?.destroy();
-    if (when !== undefined) t = when;
+    if (when !== undefined) clock = createRealClock(when);
     pip = createFakePictureInPicture();
-    app = initClockApp({
-      realNow: () => t, storage, tabStorage, soundPlayer: createFakeSoundPlayer({ state: 'running' }),
+    app = openClockPage({
+      clock, storage, tabStorage, soundPlayer: createFakeSoundPlayer({ state: 'running' }),
       prefersReducedMotion: () => false,
       capabilities: { fullscreen: null, wakeLock: null, pictureInPicture: pip },
     });
   }
-  const advance = (ms) => { t += ms; vi.advanceTimersByTime(ms); };
+  const advance = (ms) => clock.advance(ms);
   const withSettings = (settings) => {
-    storage = createFakeStorage({ [SETTINGS_KEY]: JSON.stringify({ division: 'HS', ...settings }) });
+    storage = storageWith({ division: 'HS', ...settings });
   };
 
   beforeEach(() => {

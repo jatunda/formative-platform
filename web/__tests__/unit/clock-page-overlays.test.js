@@ -1,18 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { initClockApp } from '../../clock/clock.js';
-import { SETTINGS_KEY } from '../../clock/clock-storage.js';
 import { createFakeStorage } from '../helpers/fake-storage.js';
 import { createFakeSoundPlayer } from '../helpers/fake-sound-player.js';
+import { isShown as visible } from '../helpers/clock-dom.js';
+import { button, clockMount as mount, createRealClock, openClockPage, storageWith } from '../helpers/clock-page.js';
 
 // What appears on top of the main screen: the first-visit Division prompt,
 // the "turn sound on" prompt, the ring card and the error toast. These tests
 // check behaviour (focus, dismissing, what's announced), not the look.
 
 const SEC = 1000;
-const mount = () => document.getElementById('clockApp');
-const visible = (node) => !node.closest('[hidden]');
-const button = (name, within = mount()) => [...within.querySelectorAll('button')]
-  .find((b) => (b.getAttribute('aria-label') ?? b.textContent.trim()) === name && visible(b));
 const ringCard = () => mount().querySelector('[role="alertdialog"]');
 const byId = (id) => document.getElementById(id);
 const liveRegions = () => [...mount().querySelectorAll('[aria-live], [role="status"], [role="alert"]')];
@@ -28,22 +24,19 @@ const wrapUp = {
 
 describe('School Clock overlays', () => {
   let app;
-  let t;
+  let clock;
   let player;
   let storage;
 
-  function advance(ms) {
-    t += ms;
-    vi.advanceTimersByTime(ms);
-  }
+  const advance = (ms) => clock.advance(ms);
 
   /** Open the page at `when` with `settings` saved (an HS device unless told otherwise). */
   function open({ when = at(10, 40), settings = {}, sound = {}, store, ...options } = {}) {
-    t = when.getTime();
+    clock = createRealClock(when);
     player = createFakeSoundPlayer(sound);
-    storage = store ?? createFakeStorage({ [SETTINGS_KEY]: JSON.stringify({ division: 'HS', ...settings }) });
-    app = initClockApp({
-      realNow: () => t, storage, tabStorage: createFakeStorage(), soundPlayer: player,
+    storage = store ?? storageWith({ division: 'HS', ...settings });
+    app = openClockPage({
+      clock, storage, soundPlayer: player,
       prefersReducedMotion: () => false, ...options,
     });
   }
@@ -276,7 +269,7 @@ describe('School Clock overlays', () => {
   describe("the \"couldn't save\" toast", () => {
     const toast = () => mount().querySelector('.clock-toast--error');
     function brokenStorage() {
-      const s = createFakeStorage({ [SETTINGS_KEY]: JSON.stringify({ division: 'HS' }) });
+      const s = storageWith({ division: 'HS' });
       s.setItem = () => { throw new Error('QuotaExceededError'); };
       return s;
     }

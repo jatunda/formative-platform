@@ -1,61 +1,47 @@
 // The words around the Readouts, drawn: the Day Label at the top left, the
 // heading, and the line under the Readouts (Up next, when this Segment ends,
 // or the Off-Hours line).
-// display-text.js decides what they say; this only puts it on the page.
-import { displayText } from './display-text.js';
+// screen-words.js decides what they say; this only puts it on the page.
 import { el } from './dom.js';
-import { formatShortDate } from './format.js';
 
 /** A dot spaced apart from the words around it, hidden from screen readers. @param {string} className */
 const dot = (className) => el('span', { className, 'aria-hidden': 'true', textContent: '·' });
-/** The line's small label ("Up next", "Ends"). @param {string} textContent */
-const label = (textContent) => el('span', { className: 'clock-next__label', textContent });
-/** The line's time. @param {string} textContent */
-const at = (textContent) => el('span', { className: 'clock-next__at', textContent });
 
 export function createStageTextView() {
   const day = el('p', { className: 'clock-day' });
   const heading = el('h1', { className: 'clock-title' });
   const underLine = el('p');
 
-  /** "All Day · Tue, Oct 27", with the dot spaced apart. @param {string} words */
-  function showDay(words) {
-    const [label, date] = words.split(' · ');
-    day.replaceChildren(...(date ? [label, ' ', dot('clock-day__dot'), ' ', date] : [label]));
-  }
-
   /**
-   * Show the words for `moment` (null before a Division is chosen: just the date).
-   * @param {Date} now @param {import('./clock-model.js').Moment | null} moment
-   * @param {{ use24Hour: boolean, showSeconds: boolean, periodLabels: Record<string, string>, showPeriodEnd: boolean }} settings
+   * Show the stage's words.
+   * @param {import('./screen-words.js').StageWords} words
    * @param {boolean} [barNamesNextDay] the Day Bar's heading names the Next School Day. Then a
    *   line that only names it too is marked to step aside; the stylesheet keeps it in the
    *   short layout, which hides the bar.
    */
-  function show(now, moment, settings, barNamesNextDay = false) {
-    if (!moment) {
-      showDay(formatShortDate(now));
-      heading.replaceChildren(el('span', { className: 'visually-hidden', textContent: 'School Clock' }));
-      underLine.replaceChildren();
-      return;
+  function show({ day: { dayLabel, date }, heading: { title, tag, hidden }, under }, barNamesNextDay = false) {
+    // "All Day · Tue, Oct 27", with the dot spaced apart.
+    day.replaceChildren(...(dayLabel ? [dayLabel, ' ', dot('clock-day__dot'), ' ', date] : [date]));
+    if (hidden) {
+      heading.replaceChildren(el('span', { className: 'visually-hidden', textContent: title }));
+    } else {
+      heading.replaceChildren(title, ...(tag ? [
+        ' ', dot('clock-title__dot'), ' ', el('span', { className: 'clock-title__tag', textContent: tag }),
+      ] : []));
     }
-    const words = displayText(now, moment, settings);
-    showDay(words.day);
-    heading.replaceChildren(words.title, ...(words.tag ? [
-      ' ', dot('clock-title__dot'), ' ', el('span', { className: 'clock-title__tag', textContent: words.tag }),
-    ] : []));
-    if (words.upNext) {
+    if (under.kind === 'none') {
+      underLine.replaceChildren();
+    } else if (under.kind === 'next') {
+      // "Up next Period 3 10:30 AM", "Ends 11:15 AM".
       underLine.className = 'clock-next';
       underLine.replaceChildren(
-        label('Up next'), ' ', el('span', { textContent: words.upNext.name }), ' ', at(words.upNext.at),
+        el('span', { className: 'clock-next__label', textContent: under.label }), ' ',
+        ...(under.name ? [el('span', { textContent: under.name }), ' '] : []),
+        el('span', { className: 'clock-next__at', textContent: under.at }),
       );
-    } else if (words.ends) {
-      // Styled like Up next: "Ends 11:15 AM".
-      underLine.className = 'clock-next';
-      underLine.replaceChildren(label('Ends'), ' ', at(words.ends));
     } else {
-      underLine.className = words.namesNextDay && barNamesNextDay ? 'clock-line clock-line--in-bar' : 'clock-line';
-      underLine.textContent = words.line ?? '';
+      underLine.className = under.namesNextDay && barNamesNextDay ? 'clock-line clock-line--in-bar' : 'clock-line';
+      underLine.textContent = under.text;
     }
   }
 

@@ -78,6 +78,24 @@ export function fullMatrix() {
  */
 export const KNOWN_FAILURES = [];
 
+/**
+ * Sizes where the ring check asks for less than ring-fit's RING_GAP. At
+ * 480 x 320 the ring keeps below the top bar and comes a few px from the
+ * "Timer" and "Bells" buttons and from a side Readout's value: Eric accepts
+ * that closeness on so small a phone (ticket 60, closed won't do), so there
+ * the ring only has to not overlap them.
+ * @type {Record<string, number>}
+ */
+export const RING_GAPS = { '480x320': 0 };
+
+/**
+ * The gap the ring check asks for at a size (`'480x320'`), or undefined for ring-fit's own.
+ * @param {string} size
+ */
+export function ringGapAt(size) {
+  return RING_GAPS[size];
+}
+
 /** A Config's on/off fields, which a Match names as is. @type {('editing' | 'timer' | 'soundOn')[]} */
 const FLAGS = ['editing', 'timer', 'soundOn'];
 

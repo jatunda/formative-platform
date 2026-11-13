@@ -10,13 +10,17 @@
 import { SVG_NS, el } from './dom.js';
 import { icon } from './icons.js';
 import { MAX_NAME_LENGTH } from './timer.js';
+import { glyphCounts } from './readouts.js';
+import { RING_BOX, RING_R, RING_STROKE } from './ring-geometry.js';
 
-/** An SVG circle on the ring's 100-unit box. @param {string} className */
+/** The middle of the ring's box, where its circle is centred. */
+const MID = String(RING_BOX / 2);
+
+/** An SVG circle on the ring's box (ring-geometry.js). @param {string} className */
 function circle(className) {
   const node = document.createElementNS(SVG_NS, 'circle');
-  for (const [name, value] of Object.entries({ class: className, cx: '50', cy: '50', r: '48', pathLength: '100' })) {
-    node.setAttribute(name, value);
-  }
+  const attributes = { class: className, cx: MID, cy: MID, r: String(RING_R), 'stroke-width': String(RING_STROKE), pathLength: '100' };
+  for (const [name, value] of Object.entries(attributes)) node.setAttribute(name, value);
   return node;
 }
 
@@ -32,11 +36,11 @@ const LONG_TITLE = 16;
 export function createTimerRing({ onPause, onResume, onCancel, onRename }) {
   const svg = document.createElementNS(SVG_NS, 'svg');
   svg.setAttribute('class', 'clock-ring__svg');
-  svg.setAttribute('viewBox', '0 0 100 100');
+  svg.setAttribute('viewBox', `0 0 ${RING_BOX} ${RING_BOX}`);
   svg.setAttribute('aria-hidden', 'true');
   svg.setAttribute('focusable', 'false');
   const arc = circle('clock-ring__arc');
-  arc.setAttribute('transform', 'rotate(-90 50 50)');
+  arc.setAttribute('transform', `rotate(-90 ${MID} ${MID})`);
   svg.append(circle('clock-ring__track'), arc);
 
   const pausedIcon = icon('pause');
@@ -109,9 +113,10 @@ export function createTimerRing({ onPause, onResume, onCancel, onRename }) {
       titleText.classList.toggle('is-long', title.lead.length + title.tail.length >= LONG_TITLE);
       digits.textContent = left;
       digits.setAttribute('aria-label', view.label);
-      // The size rule's glyph counts (as for a Readout's value).
-      digits.style.setProperty('--d', String(left.replace(/\D/g, '').length));
-      digits.style.setProperty('--c', String(left.replace(/[^:]/g, '').length));
+      // The size rule's glyph counts, as for a Readout's value.
+      const glyphs = glyphCounts(left);
+      digits.style.setProperty('--d', String(glyphs.digits));
+      digits.style.setProperty('--c', String(glyphs.colons));
       arc.setAttribute('stroke-dasharray', `${(progress * 100).toFixed(2)} 100`);
       // A zero-length arc with round caps would still draw a dot at 12.
       arc.classList.toggle('is-empty', progress <= 0);

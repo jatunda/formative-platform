@@ -74,7 +74,7 @@ describe('readoutText', () => {
   });
 
   it('with seconds off: the time and countdowns drop their seconds, except in the last minute', () => {
-    const off = { seconds: false };
+    const off = { showSeconds: false };
     expect(readoutText({ kind: 'time', at: tue(13, 4, 9) }, off)).toBe('1:04 PM');
     expect(readoutText({ kind: 'time', at: tue(13, 4, 9) }, { ...off, use24Hour: true })).toBe('13:04');
     expect(readoutText({ kind: 'duration', ms: 12 * MIN + 4000, caption: 'until end', long: false }, off)).toBe('12 min until end');
@@ -156,7 +156,7 @@ describe('readoutParts (what the page draws)', () => {
   });
 
   it('sets letters (and the space before them) small: "42 min", "1h 05m", "4d 17h"', () => {
-    const off = { seconds: false };
+    const off = { showSeconds: false };
     expect(readoutParts({ kind: 'duration', ms: 42 * MIN, caption: 'until end', long: false }, off).pieces)
       .toEqual([{ text: '42', small: false }, { text: ' min', small: true }]);
     const hourly = readoutParts({ kind: 'duration', ms: 65 * MIN, caption: 'since start', long: false }, off);
@@ -175,7 +175,7 @@ describe('readoutParts (what the page draws)', () => {
       pieces: [{ text: '10:12:43', small: false }, { text: ' AM', small: true }],
       glyphs: { digits: 6, colons: 2, letters: 2 },
     });
-    expect(readoutParts({ kind: 'time', at: tue(13, 4, 9) }, { use24Hour: true, seconds: false }).pieces)
+    expect(readoutParts({ kind: 'time', at: tue(13, 4, 9) }, { use24Hour: true, showSeconds: false }).pieces)
       .toEqual([{ text: '13:04', small: false }]);
   });
 });

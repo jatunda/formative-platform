@@ -2,6 +2,15 @@
 // Text formatting for the School Clock. Every clock time on the page goes
 // through formatClockTime, so the 24-hour setting has one place to live. Durations ("42:17 left") are separate and never affected by it.
 
+/**
+ * The settings that change the clock's words: the 24-hour clock, seconds,
+ * Period Labels and "Show period end time". Every module that writes words
+ * takes the settings themselves (any object with these fields, usually the
+ * whole ClockSettings) and reads what it needs, so there's one way to pass them.
+ * @typedef {Pick<import('./clock-settings.js').ClockSettings,
+ *   'use24Hour' | 'showSeconds' | 'periodLabels' | 'showPeriodEnd'>} WordSettings
+ */
+
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 

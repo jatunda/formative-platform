@@ -23,7 +23,8 @@
 // bottom row), checks the phone's agenda (when it shows) scrolls until its last row is
 // fully on screen and uncovered, with the window button and sound prompt on screen
 // below it (the screenshot is taken scrolled to the end), checks the timer's ring
-// (when one shows) runs into nothing in the top bar or the side Readouts, and
+// (when one shows) keeps the gap ring-fit promises from the top bar's Day Label
+// and buttons and the side Readouts' values (ring-geometry.js), and
 // records page errors. Results go to .clock-check/ (gitignored):
 // one PNG per render plus report.json. Exits 1 if anything failed.
 //

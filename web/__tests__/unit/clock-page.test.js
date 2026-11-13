@@ -4,21 +4,11 @@ import { SETTINGS_KEY } from '../../clock/clock-storage.js';
 import { BLOCK_DAYS, DEFAULT_ALARM_PERIODS } from '../../clock/clock-settings.js';
 import { SCHOOL_YEARS } from '../../clock/school-years.js';
 import { createFakeStorage } from '../helpers/fake-storage.js';
-import { field, setValue, toggle } from '../helpers/clock-dom.js';
+import { field, isShown, setValue, toggle } from '../helpers/clock-dom.js';
+import {
+  anyButton, button, createRealClock, openClockPage, pageText, savedSettings as saved, storageWith,
+} from '../helpers/clock-page.js';
 
-/** A real clock the test moves by hand; the page's ticks come from fake timers. */
-function fakeRealClock(date) {
-  let t = date.getTime();
-  return {
-    now: () => t,
-    /** Time passes and the page's timers fire as usual. */
-    advance: (ms) => { t += ms; vi.advanceTimersByTime(ms); },
-    /** Time passes with no timers firing, like a sleeping or throttled tab. */
-    jump: (ms) => { t += ms; },
-  };
-}
-
-const pageText = () => document.getElementById('clockApp').textContent.replace(/\s+/g, ' ');
 /** Just the clock's stage (heading, Readouts, the line under them), without the top bar or the panels. */
 const displayText = () => document.querySelector('#clockApp .clock-stage').textContent.replace(/\s+/g, ' ').trim();
 /** The line under the Readouts in Off-Hours. */
@@ -35,23 +25,6 @@ const headingText = () => document.querySelector('#clockApp h1').textContent.rep
 /** Each Readout's text, value then caption ("43:00 until end"), in layout order. */
 const readoutTexts = () => [...document.querySelectorAll('#clockApp .clock-readout__face')]
   .map((face) => face.textContent.replace(/\s+/g, ' ').trim());
-/** A control by its accessible name (its aria-label, else its text). */
-const control = (name) => [...document.querySelectorAll('#clockApp button')]
-  .find((b) => (b.getAttribute('aria-label') ?? b.textContent.replace(/\s+/g, ' ').trim()) === name && !b.closest('[hidden]'));
-
-/** Fake device storage already holding `settings` (as the page would have saved them). */
-const storageWith = (settings) => createFakeStorage({ [SETTINGS_KEY]: JSON.stringify(settings) });
-/** What the page has saved to `storage`. */
-const saved = (storage) => JSON.parse(storage.getItem(SETTINGS_KEY));
-
-/**
- * Start the page on a device that already chose HS (plus any other saved
- * `settings`), so the tests that aren't about the first visit skip the prompt.
- */
-const start = ({ settings = {}, ...options } = {}) =>
-  initClockApp({
-    storage: storageWith({ division: 'HS', ...settings }), tabStorage: createFakeStorage(), ...options,
-  });
 
 describe('School Clock page', () => {
   let app;
@@ -69,8 +42,8 @@ describe('School Clock page', () => {
 
   it('shows the Day Label and date, the current Period as the heading, and a Readout of time left', () => {
     // Tue 2026-10-27 is an All Day.
-    const real = fakeRealClock(new Date(2026, 9, 27, 10, 32, 0));
-    app = start({ realNow: real.now });
+    const real = createRealClock(new Date(2026, 9, 27, 10, 32, 0));
+    app = openClockPage({ clock: real });
 
     expect(dayText()).toBe('All Day · Tue, Oct 27');
     expect(headingText()).toBe('Period 3');
@@ -79,8 +52,8 @@ describe('School Clock page', () => {
   });
 
   it('has no plain time line duplicating a current-time Readout', () => {
-    const real = fakeRealClock(new Date(2026, 9, 27, 10, 32, 0));
-    app = start({ realNow: real.now });
+    const real = createRealClock(new Date(2026, 9, 27, 10, 32, 0));
+    app = openClockPage({ clock: real });
     expect(pageText()).not.toContain('10:32');
     document.querySelector('#clockApp .clock-readout__face').click();
     document.querySelector('#clockApp .clock-readout__face').click();
@@ -89,8 +62,8 @@ describe('School Clock page', () => {
   });
 
   it('ticks every second, recomputing from the clock rather than counting ticks', () => {
-    const real = fakeRealClock(new Date(2026, 9, 27, 10, 32, 0));
-    app = start({ realNow: real.now });
+    const real = createRealClock(new Date(2026, 9, 27, 10, 32, 0));
+    app = openClockPage({ clock: real });
 
     real.advance(1000);
     expect(pageText()).toContain('42:59 until end');
@@ -102,8 +75,8 @@ describe('School Clock page', () => {
   });
 
   it('counts down a Passing Period and says what is up next', () => {
-    const real = fakeRealClock(new Date(2026, 9, 27, 10, 27, 20));
-    app = start({ realNow: real.now });
+    const real = createRealClock(new Date(2026, 9, 27, 10, 27, 20));
+    app = openClockPage({ clock: real });
 
     expect(headingText()).toBe('Passing Period');
     expect(readoutTexts()).toEqual(['2:40 until Period 3']);
@@ -111,8 +84,8 @@ describe('School Clock page', () => {
   });
 
   it('says when the current Segment ends under the Readouts, with Show period end time on', () => {
-    const real = fakeRealClock(new Date(2026, 9, 27, 13, 0, 0));
-    app = start({ realNow: real.now, settings: { showPeriodEnd: true } });
+    const real = createRealClock(new Date(2026, 9, 27, 13, 0, 0));
+    app = openClockPage({ clock: real, settings: { showPeriodEnd: true } });
 
     expect(headingText()).toBe('Lunch');
     expect(displayText()).toContain('Ends 1:30 PM');
@@ -125,24 +98,24 @@ describe('School Clock page', () => {
   });
 
   it('counts up from the start of a Passing Period when the Readout is tapped', () => {
-    const real = fakeRealClock(new Date(2026, 9, 27, 10, 27, 20));
-    app = start({ realNow: real.now });
+    const real = createRealClock(new Date(2026, 9, 27, 10, 27, 20));
+    app = openClockPage({ clock: real });
 
     document.querySelector('#clockApp .clock-readout__face').click();
     expect(readoutTexts()).toEqual(['2:20 since start']);
   });
 
   it('names the Period coming up in a Passing Period by its Period Label', () => {
-    const real = fakeRealClock(new Date(2026, 9, 27, 10, 27, 20));
-    app = start({ realNow: real.now, settings: { periodLabels: { 'Period 3': 'AP CSA' } } });
+    const real = createRealClock(new Date(2026, 9, 27, 10, 27, 20));
+    app = openClockPage({ clock: real, settings: { periodLabels: { 'Period 3': 'AP CSA' } } });
 
     expect(readoutTexts()).toEqual(['2:40 until Period 3 · AP CSA']);
     expect(displayText()).toContain('Up next Period 3 · AP CSA 10:30 AM');
   });
 
   it('says it is after school, for how long, and when the Next School Day starts', () => {
-    const real = fakeRealClock(new Date(2026, 9, 27, 16, 0, 0));
-    app = start({ realNow: real.now });
+    const real = createRealClock(new Date(2026, 9, 27, 16, 0, 0));
+    app = openClockPage({ clock: real });
 
     expect(dayText()).toBe('All Day · Tue, Oct 27');
     expect(headingText()).toBe('After school');
@@ -154,15 +127,15 @@ describe('School Clock page', () => {
     const barHeading = () => document.querySelector('#clockApp .clock-bar__heading')?.textContent;
 
     it('after school, in the Day Bar heading, not again under the Readouts', () => {
-      const real = fakeRealClock(new Date(2026, 9, 27, 16, 0, 0));
-      app = start({ realNow: real.now });
+      const real = createRealClock(new Date(2026, 9, 27, 16, 0, 0));
+      app = openClockPage({ clock: real });
       expect(barHeading()).toBe('Next School Day · Wed, Oct 28 · Even Day');
       expect(lineLeftToBar()).toBe(true);
     });
 
     it('on a day off, in the Day Bar heading, not again under the Readouts', () => {
-      const real = fakeRealClock(new Date(2026, 10, 25, 10, 0, 0));
-      app = start({ realNow: real.now });
+      const real = createRealClock(new Date(2026, 10, 25, 10, 0, 0));
+      app = openClockPage({ clock: real });
       expect(barHeading()).toBe('Next School Day · Mon, Nov 30 · All Day');
       expect(lineLeftToBar()).toBe(true);
     });
@@ -170,8 +143,8 @@ describe('School Clock page', () => {
     it("in the countdown bar's heading on just this Segment, after school and on a day off", () => {
       for (const date of [new Date(2026, 9, 27, 16, 0, 0), new Date(2026, 10, 25, 10, 0, 0)]) {
         app?.destroy();
-        const real = fakeRealClock(date);
-        app = start({ realNow: real.now, settings: { dayStrip: false } });
+        const real = createRealClock(date);
+        app = openClockPage({ clock: real, settings: { dayStrip: false } });
         expect(document.querySelector('#clockApp .clock-bar--segment')).not.toBeNull();
         expect(barHeading()).toMatch(/^Next School Day · /);
         expect(lineLeftToBar()).toBe(true);
@@ -179,8 +152,8 @@ describe('School Clock page', () => {
     });
 
     it('under the Readouts while a timer hides the bar, and steps aside again once it is gone', () => {
-      const real = fakeRealClock(new Date(2026, 9, 27, 16, 0, 0));
-      app = start({ realNow: real.now, settings: { timerEndsAt: new Date(2026, 9, 27, 16, 1, 0).getTime() } });
+      const real = createRealClock(new Date(2026, 9, 27, 16, 0, 0));
+      app = openClockPage({ clock: real, settings: { timerEndsAt: new Date(2026, 9, 27, 16, 1, 0).getTime() } });
       expect(barHeading()).toBeUndefined();
       expect(offHoursLine()).toBe('Next: Wed, Oct 28 · Even Day');
       expect(lineLeftToBar()).toBe(false);
@@ -192,8 +165,8 @@ describe('School Clock page', () => {
     it('under the Readouts in Experience Week, Summer and on an unknown date, where there is no bar', () => {
       for (const date of [new Date(2027, 0, 20, 10, 0, 0), new Date(2027, 4, 28, 10, 0, 0), new Date(2030, 0, 1, 9, 0, 0)]) {
         app?.destroy();
-        const real = fakeRealClock(date);
-        app = start({ realNow: real.now });
+        const real = createRealClock(date);
+        app = openClockPage({ clock: real });
         expect(barHeading()).toBeUndefined();
         expect(offHoursLine()).not.toBe('');
         expect(lineLeftToBar()).toBe(false);
@@ -202,8 +175,8 @@ describe('School Clock page', () => {
   });
 
   it('says it is before school, and when the first Segment starts', () => {
-    const real = fakeRealClock(new Date(2026, 9, 27, 8, 0, 0));
-    app = start({ realNow: real.now });
+    const real = createRealClock(new Date(2026, 9, 27, 8, 0, 0));
+    app = openClockPage({ clock: real });
 
     expect(headingText()).toBe('Before school');
     expect(displayText()).toContain('Up next Period 1 8:30 AM');
@@ -211,8 +184,8 @@ describe('School Clock page', () => {
   });
 
   it('labels a weekend, and says when school is back', () => {
-    const real = fakeRealClock(new Date(2026, 9, 31, 10, 0, 0));
-    app = start({ realNow: real.now });
+    const real = createRealClock(new Date(2026, 9, 31, 10, 0, 0));
+    app = openClockPage({ clock: real });
     expect(headingText()).toBe('Weekend');
     expect(dayText()).toBe('Sat, Oct 31');
     expect(offHoursLine()).toBe('Back Mon, Nov 2 · All Day');
@@ -221,8 +194,8 @@ describe('School Clock page', () => {
   it('on a day off, names it, counts down to the Next School Day, and can count since school ended', () => {
     // Wed 11/25/26, Thanksgiving Break. School ended Thu 11/19 at 3:10 PM
     // (Fri 11/20 was In-Service); it's back Mon 11/30 at 8:30 AM.
-    const real = fakeRealClock(new Date(2026, 10, 25, 10, 0, 0));
-    app = start({ realNow: real.now });
+    const real = createRealClock(new Date(2026, 10, 25, 10, 0, 0));
+    app = openClockPage({ clock: real });
 
     expect(headingText()).toBe('Thanksgiving Break');
     expect(dayText()).toBe('Wed, Nov 25');
@@ -233,8 +206,8 @@ describe('School Clock page', () => {
   });
 
   it('before school, a Readout can count since the last School Day ended', () => {
-    const real = fakeRealClock(new Date(2026, 9, 27, 8, 0, 0));
-    app = start({ realNow: real.now });
+    const real = createRealClock(new Date(2026, 9, 27, 8, 0, 0));
+    app = openClockPage({ clock: real });
     document.querySelector('#clockApp .clock-readout__face').click();
     // Since Mon 10/26 at 3:10 PM.
     expect(readoutTexts()).toEqual(['16:50:00 since school ended']);
@@ -242,8 +215,8 @@ describe('School Clock page', () => {
 
   it('names HS Experience Week and points past it', () => {
     // Wed 1/20/27; HS is back Mon 1/25/27.
-    const real = fakeRealClock(new Date(2027, 0, 20, 10, 0, 0));
-    app = start({ realNow: real.now });
+    const real = createRealClock(new Date(2027, 0, 20, 10, 0, 0));
+    app = openClockPage({ clock: real });
     expect(headingText()).toBe('HS Experience Week');
     expect(dayText()).toBe('Wed, Jan 20');
     expect(offHoursLine()).toBe("It's Experience Week · back Mon, Jan 25");
@@ -252,8 +225,8 @@ describe('School Clock page', () => {
   describe('Summer', () => {
     it('counts the days of Summer, with no countdown until next year is known', () => {
       // Fri 5/28/27, the day after the last School Day.
-      const real = fakeRealClock(new Date(2027, 4, 28, 10, 0, 0));
-      app = start({ realNow: real.now });
+      const real = createRealClock(new Date(2027, 4, 28, 10, 0, 0));
+      app = openClockPage({ clock: real });
 
       expect(headingText()).toBe('Day 2 of Summer');
       expect(dayText()).toBe('Fri, May 28');
@@ -262,8 +235,8 @@ describe('School Clock page', () => {
     });
 
     it('is a plain clock with no next year: the Readout shows the time, never a dash', () => {
-      const real = fakeRealClock(new Date(2027, 4, 28, 10, 0, 0));
-      app = start({ realNow: real.now });
+      const real = createRealClock(new Date(2027, 4, 28, 10, 0, 0));
+      app = openClockPage({ clock: real });
       expect(readoutTexts()).toEqual(['10:00:00 AM']);
       expect(pageText()).not.toContain('—');
     });
@@ -279,8 +252,8 @@ describe('School Clock page', () => {
         weekdayDefaults: { 1: 'all', 2: 'all', 3: 'all', 4: 'all', 5: 'all' },
         calendarExceptions: [],
       };
-      const real = fakeRealClock(new Date(2027, 4, 28, 10, 0, 0));
-      app = start({ realNow: real.now, schoolYears: [...SCHOOL_YEARS, nextYear] });
+      const real = createRealClock(new Date(2027, 4, 28, 10, 0, 0));
+      app = openClockPage({ clock: real, schoolYears: [...SCHOOL_YEARS, nextYear] });
 
       expect(headingText()).toBe('Day 2 of Summer');
       expect(readoutTexts()).toEqual(['79d 22h until Mon, Aug 16']);
@@ -289,20 +262,20 @@ describe('School Clock page', () => {
   });
 
   it('just tells the time on a date outside every School Year, and says why', () => {
-    const real = fakeRealClock(new Date(2030, 0, 1, 9, 0, 0));
-    app = start({ realNow: real.now });
+    const real = createRealClock(new Date(2030, 0, 1, 9, 0, 0));
+    app = openClockPage({ clock: real });
     expect(headingText()).toBe('Tue, Jan 1, 2030');
     expect(readoutTexts()).toEqual(['9:00:00 AM']);
     expect(displayText()).toContain('No school calendar for this date yet');
     // Nothing to cycle or arrange: the time is all there is.
-    expect(control('Readouts')).toBeUndefined();
+    expect(button('Readouts')).toBeUndefined();
     expect(document.querySelector('#clockApp button.clock-readout__face')).toBeNull();
   });
 
   describe('simulated time', () => {
     it('starts at ?at=, shows a banner with the spoofed time, and ticks from there', () => {
-      const real = fakeRealClock(new Date(2026, 9, 28, 20, 0, 0));
-      app = start({ realNow: real.now, search: '?at=2026-10-27T10:32' });
+      const real = createRealClock(new Date(2026, 9, 28, 20, 0, 0));
+      app = openClockPage({ clock: real, search: '?at=2026-10-27T10:32' });
 
       const banner = () => document.querySelector('#clockApp .clock-banner').textContent.trim();
       expect(banner()).toBe('Simulated time · Tue, Oct 27, 10:32:00 AM · this tab only');
@@ -315,8 +288,8 @@ describe('School Clock page', () => {
     });
 
     it('advances at &speed= times real time', () => {
-      const real = fakeRealClock(new Date(2026, 9, 28, 20, 0, 0));
-      app = start({ realNow: real.now, search: '?at=2026-10-27T10:32&speed=60' });
+      const real = createRealClock(new Date(2026, 9, 28, 20, 0, 0));
+      app = openClockPage({ clock: real, search: '?at=2026-10-27T10:32&speed=60' });
 
       real.advance(3000);
       expect(pageText()).toContain('10:35:00 AM · this tab only');
@@ -324,8 +297,8 @@ describe('School Clock page', () => {
     });
 
     it('ignores an invalid ?at= and shows real time with no banner', () => {
-      const real = fakeRealClock(new Date(2026, 9, 27, 10, 32, 0));
-      app = start({ realNow: real.now, search: '?at=whenever&speed=60' });
+      const real = createRealClock(new Date(2026, 9, 27, 10, 32, 0));
+      app = openClockPage({ clock: real, search: '?at=whenever&speed=60' });
 
       expect(pageText()).not.toContain('Simulated time');
       expect(pageText()).toContain('43:00 until end');
@@ -335,9 +308,9 @@ describe('School Clock page', () => {
   });
 
   it('stops ticking when destroyed, and a second init replaces the first', () => {
-    const real = fakeRealClock(new Date(2026, 9, 27, 10, 32, 0));
-    const first = start({ realNow: real.now });
-    app = start({ realNow: real.now });
+    const real = createRealClock(new Date(2026, 9, 27, 10, 32, 0));
+    const first = openClockPage({ clock: real });
+    app = openClockPage({ clock: real });
     first.destroy();
     expect(vi.getTimerCount()).toBe(1);
     app.destroy();
@@ -397,8 +370,8 @@ describe('School Clock page', () => {
         ],
       };
       // Wed 10/28/26, HS Even Day: Period 6 13:45–15:10 is the last Segment.
-      const real = fakeRealClock(new Date(2026, 9, 28, 13, 40, 0));
-      app = start({ realNow: real.now, settings });
+      const real = createRealClock(new Date(2026, 9, 28, 13, 40, 0));
+      app = openClockPage({ clock: real, settings });
 
       expect(pageText()).toContain('Next rings today');
       expect(ringLines()).toEqual([
@@ -411,8 +384,8 @@ describe('School Clock page', () => {
     });
 
     it('drops a ring once its moment has passed, and drops the list when nothing is left', () => {
-      const real = fakeRealClock(new Date(2026, 9, 27, 15, 9, 59));
-      app = start({ realNow: real.now });
+      const real = createRealClock(new Date(2026, 9, 27, 15, 9, 59));
+      app = openClockPage({ clock: real });
       expect(ringLines()).toEqual(['3:10 PM · Bell · Period 7 ends · School bell (softer)']);
 
       real.advance(1000); // 3:10:00, the ring's own moment
@@ -436,8 +409,8 @@ describe('School Clock page', () => {
         timerEndsAt: new Date(2026, 9, 27, 10, 8, 0).getTime(),
         timerSound: 'beep',
       };
-      const real = fakeRealClock(new Date(2026, 9, 27, 10, 0, 0));
-      app = start({ realNow: real.now, settings });
+      const real = createRealClock(new Date(2026, 9, 27, 10, 0, 0));
+      app = openClockPage({ clock: real, settings });
 
       expect(ringLines().slice(0, 5)).toEqual([
         '10:05 AM · Clock Alarm · Exit tickets, every School Day · Chime',
@@ -458,10 +431,10 @@ describe('School Clock page', () => {
       const settingsSaves = (setItem) => setItem.mock.calls.filter(([k]) => k === SETTINGS_KEY).length;
 
       it('is turned off, and saved that way, once it rings in real time', () => {
-        const real = fakeRealClock(new Date(2026, 9, 27, 10, 59, 58));
+        const real = createRealClock(new Date(2026, 9, 27, 10, 59, 58));
         const storage = storageWith({ division: 'HS', ...onceAt('11:00') });
         const setItem = vi.spyOn(storage, 'setItem');
-        app = initClockApp({ realNow: real.now, storage });
+        app = openClockPage({ clock: real, storage });
 
         real.advance(1000);
         expect(settingsSaves(setItem)).toBe(0);
@@ -474,10 +447,10 @@ describe('School Clock page', () => {
       });
 
       it('is not turned off when it rings in simulated time', () => {
-        const real = fakeRealClock(new Date(2026, 9, 1, 12, 0, 0));
+        const real = createRealClock(new Date(2026, 9, 1, 12, 0, 0));
         const storage = storageWith({ division: 'HS', ...onceAt('11:00') });
         const setItem = vi.spyOn(storage, 'setItem');
-        app = initClockApp({ realNow: real.now, search: '?at=2026-10-27T10:59:58', storage });
+        app = openClockPage({ clock: real, search: '?at=2026-10-27T10:59:58', storage });
         expect(ringLines()).toEqual(['11:00 AM · Clock Alarm · once · Chime']);
 
         real.advance(5000);
@@ -489,24 +462,22 @@ describe('School Clock page', () => {
   });
 
   describe('saved device settings', () => {
-    const button = (name) => [...document.querySelectorAll('#clockApp button')].find((b) => b.textContent.trim() === name);
     /** The Division chosen in the Settings drawer ('MS' or 'HS'). */
     const chosenDivision = () => document.querySelector('#clockApp input[type="radio"]:checked')?.value;
     const chooseDivision = (name) => field(name).click();
     const labelInput = (period) => field(period);
     const use24HourBox = () => field('24-hour time');
-    const isShown = (node) => !node.closest('[hidden]');
 
     // Wed 10/28/26 is an Even Day: at 10:30 HS is in Chapel, MS in Period 4.
-    const evenDay = () => fakeRealClock(new Date(2026, 9, 28, 10, 30, 0));
+    const evenDay = () => createRealClock(new Date(2026, 9, 28, 10, 30, 0));
 
     describe('the first visit', () => {
       it('asks for the Division and shows no Periods until it is chosen', () => {
         const real = evenDay();
-        app = initClockApp({ realNow: real.now, storage: createFakeStorage() });
+        app = openClockPage({ clock: real, storage: createFakeStorage() });
 
-        expect(isShown(button('Middle School'))).toBe(true);
-        expect(control('Settings')).toBeUndefined();
+        expect(isShown(anyButton('Middle School'))).toBe(true);
+        expect(button('Settings')).toBeUndefined();
         expect(readoutTexts()).toEqual(['10:30:00 AM']);
         real.advance(1000);
         expect(readoutTexts()).toEqual(['10:30:01 AM']);
@@ -514,19 +485,19 @@ describe('School Clock page', () => {
 
       it('saves the chosen Division and follows its Bell Schedules', () => {
         const storage = createFakeStorage();
-        app = initClockApp({ realNow: evenDay().now, storage });
+        app = openClockPage({ clock: evenDay(), storage });
 
-        button('Middle School').click();
+        anyButton('Middle School').click();
 
-        expect(isShown(button('Middle School'))).toBe(false);
+        expect(isShown(anyButton('Middle School'))).toBe(false);
         expect(headingText()).toBe('Period 4');
         expect(chosenDivision()).toBe('MS');
         expect(saved(storage).division).toBe('MS');
       });
 
       it('is not asked again once a Division is saved', () => {
-        app = start({ realNow: evenDay().now });
-        expect(isShown(button('Middle School'))).toBe(false);
+        app = openClockPage({ clock: evenDay() });
+        expect(isShown(anyButton('Middle School'))).toBe(false);
         expect(headingText()).toBe('Chapel');
       });
 
@@ -534,14 +505,14 @@ describe('School Clock page', () => {
         ['corrupt', '{not json'],
         ['the wrong shape', '"HS"'],
       ])('treats %s saved data as a first visit, without throwing', (_, raw) => {
-        app = initClockApp({ realNow: evenDay().now, storage: createFakeStorage({ [SETTINGS_KEY]: raw }) });
-        expect(isShown(button('High School'))).toBe(true);
+        app = openClockPage({ clock: evenDay(), storage: createFakeStorage({ [SETTINGS_KEY]: raw }) });
+        expect(isShown(anyButton('High School'))).toBe(true);
       });
     });
 
     it('switches Division in one step, saved, and follows that Division', () => {
       const storage = storageWith({ division: 'HS' });
-      app = initClockApp({ realNow: evenDay().now, storage });
+      app = openClockPage({ clock: evenDay(), storage });
       expect(displayText()).toContain('Chapel');
 
       chooseDivision('Middle School');
@@ -553,9 +524,9 @@ describe('School Clock page', () => {
     });
 
     it('shows the current Division on a chip at the end of the top bar, which opens Settings at the Division', () => {
-      const real = fakeRealClock(new Date(2026, 9, 27, 10, 32, 0));
-      app = start({ realNow: real.now });
-      const chip = control('Division: HS, switch Division');
+      const real = createRealClock(new Date(2026, 9, 27, 10, 32, 0));
+      app = openClockPage({ clock: real });
+      const chip = button('Division: HS, switch Division');
       // "HS" shows; the rest is for screen readers.
       expect(chip.textContent).toBe('Division: HS, switch Division');
       expect([...chip.querySelectorAll('.visually-hidden')].map((n) => n.textContent)).toEqual(['Division: ', ', switch Division']);
@@ -565,13 +536,13 @@ describe('School Clock page', () => {
       expect(isShown(field('High School'))).toBe(true);
       expect(document.activeElement).toBe(field('High School'));
       chooseDivision('Middle School');
-      expect(control('Division: MS, switch Division')).toBeDefined();
+      expect(button('Division: MS, switch Division')).toBeDefined();
     });
 
     it("follows the Division's Calendar Exceptions (HS Experience Week, MS All Day)", () => {
       // Wed 1/20/27.
-      const real = fakeRealClock(new Date(2027, 0, 20, 10, 32, 0));
-      app = start({ realNow: real.now, settings: { division: 'MS' } });
+      const real = createRealClock(new Date(2027, 0, 20, 10, 32, 0));
+      app = openClockPage({ clock: real, settings: { division: 'MS' } });
       expect(dayText()).toBe('All Day · Wed, Jan 20');
       expect(headingText()).toBe('Period 3');
 
@@ -588,8 +559,8 @@ describe('School Clock page', () => {
 
       it('shows a saved label on the current Period, its Bells and its Alarms', () => {
         // Tue 10/27/26 10:32, All Day Period 3.
-        const real = fakeRealClock(new Date(2026, 9, 27, 10, 32, 0));
-        app = start({ realNow: real.now, settings: { periodLabels: { 'Period 3': 'AP CSA' }, alarms: [walk] } });
+        const real = createRealClock(new Date(2026, 9, 27, 10, 32, 0));
+        app = openClockPage({ clock: real, settings: { periodLabels: { 'Period 3': 'AP CSA' }, alarms: [walk] } });
 
         expect(headingText()).toBe('Period 3 · AP CSA');
         const text = pageText();
@@ -601,7 +572,7 @@ describe('School Clock page', () => {
       it('shows a label typed in at once, in "up next" too, and saves it', () => {
         const storage = storageWith({ division: 'HS' });
         // Tue 10/27/26 10:27, the Passing Period before Period 3.
-        app = initClockApp({ realNow: fakeRealClock(new Date(2026, 9, 27, 10, 27, 0)).now, storage });
+        app = openClockPage({ clock: createRealClock(new Date(2026, 9, 27, 10, 27, 0)), storage });
 
         setValue('Period 3', 'AP CSA');
 
@@ -610,8 +581,8 @@ describe('School Clock page', () => {
       });
 
       it('keeps the label inputs (and so the typing) across ticks', () => {
-        const real = fakeRealClock(new Date(2026, 9, 27, 10, 27, 0));
-        app = start({ realNow: real.now });
+        const real = createRealClock(new Date(2026, 9, 27, 10, 27, 0));
+        app = openClockPage({ clock: real });
         const input = labelInput('Seminar');
         real.advance(3000);
         expect(labelInput('Seminar')).toBe(input);
@@ -622,7 +593,7 @@ describe('School Clock page', () => {
       it('is off by default, and turning it on shows every clock time in 24-hour form, saved', () => {
         const storage = storageWith({ division: 'HS' });
         // Tue 10/27/26 13:45, All Day Period 6 (13:35–14:20).
-        app = initClockApp({ realNow: fakeRealClock(new Date(2026, 9, 27, 13, 45, 0)).now, storage });
+        app = openClockPage({ clock: createRealClock(new Date(2026, 9, 27, 13, 45, 0)), storage });
         expect(use24HourBox().checked).toBe(false);
         const face = document.querySelector('#clockApp .clock-readout__face');
         face.click();
@@ -638,29 +609,29 @@ describe('School Clock page', () => {
 
       it('shows up next in 24-hour form when saved on, leaving durations alone', () => {
         // Tue 10/27/26 8:00, before school.
-        const real = fakeRealClock(new Date(2026, 9, 27, 8, 0, 0));
-        app = start({ realNow: real.now, settings: { use24Hour: true } });
+        const real = createRealClock(new Date(2026, 9, 27, 8, 0, 0));
+        app = openClockPage({ clock: real, settings: { use24Hour: true } });
         expect(use24HourBox().checked).toBe(true);
         expect(displayText()).toContain('Up next Period 1 08:30');
         expect(readoutTexts()).toEqual(['30:00 until school starts']);
       });
 
       it('shows the next rings in 24-hour form', () => {
-        const real = fakeRealClock(new Date(2026, 9, 27, 15, 9, 0));
-        app = start({ realNow: real.now, settings: { use24Hour: true } });
+        const real = createRealClock(new Date(2026, 9, 27, 15, 9, 0));
+        app = openClockPage({ clock: real, settings: { use24Hour: true } });
         expect(pageText()).toContain('15:10 · Bell · Period 7 ends · School bell (softer)');
       });
     });
 
     it('uses saved Bells and their sound', () => {
-      const real = fakeRealClock(new Date(2026, 9, 27, 15, 9, 0));
-      app = start({ realNow: real.now, settings: { bells: { on: true, sound: 'chime' } } });
+      const real = createRealClock(new Date(2026, 9, 27, 15, 9, 0));
+      app = openClockPage({ clock: real, settings: { bells: { on: true, sound: 'chime' } } });
       expect(pageText()).toContain('3:10 PM · Bell · Period 7 ends · Chime');
     });
 
     it('never listens for other tabs changing storage', () => {
       const listen = vi.spyOn(window, 'addEventListener');
-      app = start({ realNow: evenDay().now });
+      app = openClockPage({ clock: evenDay() });
       expect(listen.mock.calls.map(([type]) => type)).not.toContain('storage');
       listen.mockRestore();
     });
@@ -672,13 +643,13 @@ describe('School Clock page', () => {
     const tapReadout = (i) => faces()[i].click();
     const removeButtons = () => [...document.querySelectorAll('#clockApp button')]
       .filter((b) => b.textContent.replace(/\s+/g, ' ').trim().startsWith('Remove Readout') && !b.closest('[hidden]'));
-    const addButton = () => control('Add Readout');
-    const readoutsControl = () => control('Readouts') ?? control('Done');
+    const addButton = () => button('Add Readout');
+    const readoutsControl = () => button('Readouts') ?? button('Done');
     const editNote = () => document.querySelector('#clockApp .clock-edit-note');
     const isEditing = () => readoutsControl().getAttribute('aria-pressed') === 'true';
     const pressKey = (key) => document.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
     // Tue 10/27/26 10:32, All Day Period 3 (10:30–11:15).
-    const inPeriod3 = () => fakeRealClock(new Date(2026, 9, 27, 10, 32, 0));
+    const inPeriod3 = () => createRealClock(new Date(2026, 9, 27, 10, 32, 0));
 
     /** One device: shared localStorage (settings + last used layout), one sessionStorage per tab. */
     function device() {
@@ -686,14 +657,14 @@ describe('School Clock page', () => {
       return {
         storage,
         newTab: () => ({ tabStorage: createFakeStorage(), open(realNow) {
-          app = initClockApp({ realNow, storage, tabStorage: this.tabStorage });
+          app = openClockPage({ realNow, storage, tabStorage: this.tabStorage });
           return this;
         } }),
       };
     }
 
     it('cycles a Readout on each tap: time left, time since it started, current time, and back', () => {
-      app = start({ realNow: inPeriod3().now });
+      app = openClockPage({ clock: inPeriod3() });
       expect(readouts()).toEqual(['43:00 until end']);
       tapReadout(0);
       expect(readouts()).toEqual(['2:00 since start']);
@@ -704,14 +675,14 @@ describe('School Clock page', () => {
     });
 
     it('each Readout is a button, so a tap, a click or Enter cycles it', () => {
-      app = start({ realNow: inPeriod3().now });
+      app = openClockPage({ clock: inPeriod3() });
       expect(faces()[0].tagName).toBe('BUTTON');
       expect(faces()[0].type).toBe('button');
     });
 
     it('keeps focus on a Readout as it cycles and ticks', () => {
       const real = inPeriod3();
-      app = start({ realNow: real.now });
+      app = openClockPage({ clock: real });
       faces()[0].focus();
       tapReadout(0);
       real.advance(1000);
@@ -719,7 +690,7 @@ describe('School Clock page', () => {
     });
 
     it('splits the value from its caption, and sets letters small for the size rule', () => {
-      app = start({ realNow: inPeriod3().now });
+      app = openClockPage({ clock: inPeriod3() });
       tapReadout(0);
       tapReadout(0);
       const value = document.querySelector('#clockApp .clock-readout--big .clock-readout__value');
@@ -733,7 +704,7 @@ describe('School Clock page', () => {
 
     describe('edit mode (adding and removing)', () => {
       it('is off at first: no Remove or Add buttons until the Readouts control is pressed', () => {
-        app = start({ realNow: inPeriod3().now });
+        app = openClockPage({ clock: inPeriod3() });
         expect(isEditing()).toBe(false);
         expect(readoutsControl().textContent.trim()).toBe('Readouts');
         expect(addButton()).toBeUndefined();
@@ -754,7 +725,7 @@ describe('School Clock page', () => {
       });
 
       it('adds Readouts in the modes not shown yet, up to three, then the Add slot goes', () => {
-        app = start({ realNow: inPeriod3().now });
+        app = openClockPage({ clock: inPeriod3() });
         readoutsControl().click();
         addButton().click();
         expect(readouts()).toEqual(['43:00 until end', '2:00 since start']);
@@ -764,14 +735,14 @@ describe('School Clock page', () => {
       });
 
       it('moves focus to a newly added Readout', () => {
-        app = start({ realNow: inPeriod3().now });
+        app = openClockPage({ clock: inPeriod3() });
         readoutsControl().click();
         addButton().click();
         expect(document.activeElement).toBe(faces()[1]);
       });
 
       it('marks the first Readout as the big one and puts the rest beside or below it', () => {
-        app = start({ realNow: inPeriod3().now });
+        app = openClockPage({ clock: inPeriod3() });
         readoutsControl().click();
         addButton().click();
         const shown = document.querySelectorAll('#clockApp .clock-readout');
@@ -782,7 +753,7 @@ describe('School Clock page', () => {
       });
 
       it('names each Remove button by the Readout it removes', () => {
-        app = start({ realNow: inPeriod3().now });
+        app = openClockPage({ clock: inPeriod3() });
         readoutsControl().click();
         addButton().click();
         expect(removeButtons().map((b) => b.textContent.replace(/\s+/g, ' ').trim()))
@@ -790,7 +761,7 @@ describe('School Clock page', () => {
       });
 
       it('removes Readouts down to one (removing the big one promotes the next), moving focus on', () => {
-        app = start({ realNow: inPeriod3().now });
+        app = openClockPage({ clock: inPeriod3() });
         readoutsControl().click();
         addButton().click();
         addButton().click();
@@ -808,7 +779,7 @@ describe('School Clock page', () => {
       });
 
       it('moves focus to the last Remove button when the last Readout is removed', () => {
-        app = start({ realNow: inPeriod3().now });
+        app = openClockPage({ clock: inPeriod3() });
         readoutsControl().click();
         addButton().click();
         addButton().click();
@@ -817,7 +788,7 @@ describe('School Clock page', () => {
       });
 
       it('still cycles a Readout on tap while editing', () => {
-        app = start({ realNow: inPeriod3().now });
+        app = openClockPage({ clock: inPeriod3() });
         readoutsControl().click();
         tapReadout(0);
         expect(readouts()).toEqual(['2:00 since start']);
@@ -825,7 +796,7 @@ describe('School Clock page', () => {
       });
 
       it('Escape leaves edit mode and returns focus to the Readouts control', () => {
-        app = start({ realNow: inPeriod3().now });
+        app = openClockPage({ clock: inPeriod3() });
         readoutsControl().click();
         addButton().focus();
         pressKey('Escape');
@@ -836,7 +807,7 @@ describe('School Clock page', () => {
       });
 
       it('ignores other keys', () => {
-        app = start({ realNow: inPeriod3().now });
+        app = openClockPage({ clock: inPeriod3() });
         readoutsControl().click();
         pressKey('Enter');
         expect(isEditing()).toBe(true);
@@ -852,7 +823,7 @@ describe('School Clock page', () => {
       });
 
       it('stops listening for Escape once destroyed', () => {
-        app = start({ realNow: inPeriod3().now });
+        app = openClockPage({ clock: inPeriod3() });
         readoutsControl().click();
         const control = readoutsControl();
         app.destroy();
@@ -864,7 +835,7 @@ describe('School Clock page', () => {
 
     it('keeps ticking each Readout', () => {
       const real = inPeriod3();
-      app = start({ realNow: real.now });
+      app = openClockPage({ clock: real });
       readoutsControl().click();
       addButton().click();
       real.advance(1000);
@@ -873,8 +844,8 @@ describe('School Clock page', () => {
 
     it('keeps its place in the cycle as school ends', () => {
       // Period 7 is 14:25–15:10.
-      const real = fakeRealClock(new Date(2026, 9, 27, 15, 9, 58));
-      app = start({ realNow: real.now });
+      const real = createRealClock(new Date(2026, 9, 27, 15, 9, 58));
+      app = openClockPage({ clock: real });
       readoutsControl().click();
       addButton().click();
       expect(readouts()).toEqual(['0:02 until end', '44:58 since start']);
@@ -883,18 +854,18 @@ describe('School Clock page', () => {
     });
 
     it('starts in the default for the moment: since school ended, after school', () => {
-      app = start({ realNow: fakeRealClock(new Date(2026, 9, 27, 16, 0, 0)).now });
+      app = openClockPage({ clock: createRealClock(new Date(2026, 9, 27, 16, 0, 0)) });
       expect(readouts()).toEqual(['50:00 since school ended']);
     });
 
     it('shows just the time, with nothing to arrange, before a Division is chosen or on a date outside every School Year', () => {
-      app = initClockApp({ realNow: inPeriod3().now, storage: createFakeStorage(), tabStorage: createFakeStorage() });
+      app = openClockPage({ clock: inPeriod3(), storage: createFakeStorage(), tabStorage: createFakeStorage() });
       expect(readouts()).toEqual(['10:32:00 AM']);
-      expect(control('Readouts')).toBeUndefined();
+      expect(button('Readouts')).toBeUndefined();
       app.destroy();
-      app = start({ realNow: fakeRealClock(new Date(2030, 0, 1, 9, 0, 0)).now });
+      app = openClockPage({ clock: createRealClock(new Date(2030, 0, 1, 9, 0, 0)) });
       expect(readouts()).toEqual(['9:00:00 AM']);
-      expect(control('Readouts')).toBeUndefined();
+      expect(button('Readouts')).toBeUndefined();
     });
 
     it('keeps a layout per tab: two tabs differ, reloads restore their own, and a new tab starts from the last changed', () => {
@@ -943,7 +914,7 @@ describe('School Clock page', () => {
       const { storage } = device();
       const real = inPeriod3();
       const tabStorage = createFakeStorage();
-      app = initClockApp({ realNow: real.now, storage, tabStorage });
+      app = openClockPage({ clock: real, storage, tabStorage });
       // Another tab (sharing this device's localStorage) saves a different layout.
       storage.setItem('school-clock-layout-v1', JSON.stringify({ readouts: [{ mode: 'clock' }] }));
       real.advance(1000);

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { fullMatrix, describeFailure, classify, KNOWN_FAILURES, parseFullArgs, fullRunFailed } from '../../scripts/clock-check-matrix.js';
+import { fullMatrix, describeFailure, classify, KNOWN_FAILURES, parseFullArgs, fullRunFailed, ringGapAt } from '../../scripts/clock-check-matrix.js';
 
 /** One string per config, so configs (and renders) compare by value. */
 const keyOf = ({ layout, editing, timer, soundOn }) => `${layout}|${editing}|${timer}|${soundOn}`;
@@ -107,6 +107,16 @@ describe('classify', () => {
 describe('KNOWN_FAILURES', () => {
   it('are each owned by a ticket', () => {
     for (const known of KNOWN_FAILURES) expect(known.ticket).toEqual(expect.any(Number));
+  });
+});
+
+describe('ringGapAt', () => {
+  it('asks only for no overlap at 480 x 320 (ticket 60, accepted)', () => {
+    expect(ringGapAt('480x320')).toBe(0);
+  });
+
+  it("leaves every other size to ring-fit's gap", () => {
+    expect(ringGapAt('1920x1080')).toBeUndefined();
   });
 });
 
