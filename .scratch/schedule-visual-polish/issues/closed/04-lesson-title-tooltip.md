@@ -4,7 +4,7 @@
 
 **Blocked by:** 02 (Short dates). Ordering note: edits the same schedule pages/date files as 02, serialized to avoid merge conflicts.
 
-**Status:** ready-for-agent
+**Status:** closed
 
-- [ ] Tooltip is the full title on both pages
-- [ ] It replaces any other tooltip that button had
+- [x] Tooltip is the full title on both pages
+- [x] It replaces any other tooltip that button had

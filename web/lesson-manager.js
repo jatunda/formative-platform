@@ -66,6 +66,8 @@ export function createLessonCluster({
 
   const mainBtn = document.createElement("button");
   mainBtn.textContent = title;
+  // A long title is cut off with … in the row; hovering shows all of it.
+  mainBtn.title = title;
   mainBtn.className = "schedule-action-btn lesson-main-btn";
   mainBtn.onclick = onClick;
 
