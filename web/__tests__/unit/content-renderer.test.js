@@ -230,6 +230,42 @@ describe('spoiler reveal on tap and keyboard', () => {
     expect(spoiler.classList.contains('spoiler-revealed')).toBe(false);
   });
 
+  it('a tap on a spoiler in an option label only toggles the spoiler, not the option', () => {
+    const label = document.createElement('label');
+    const radio = document.createElement('input');
+    radio.type = 'radio';
+    const text = document.createElement('span');
+    text.innerHTML = processInlineCode('Pick ||me||');
+    label.append(radio, text);
+    document.body.appendChild(label);
+
+    const spoiler = label.querySelector('.spoiler');
+    const event = new MouseEvent('click', { bubbles: true, cancelable: true });
+    spoiler.dispatchEvent(event);
+
+    expect(spoiler.classList.contains('spoiler-revealed')).toBe(true);
+    // jsdom doesn't pass a tap on a tabindex span to the label's radio, but
+    // Chromium does unless the click's default action is cancelled.
+    expect(event.defaultPrevented).toBe(true);
+    expect(radio.checked).toBe(false);
+  });
+
+  it('a tap on a spoiler in a collapsible title only toggles the spoiler, not the section', () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    renderContent({
+      title: 'T',
+      blocks: [{ type: 'question', content: [{ type: 'collapsible', title: 'Hint: ||x||', content: [{ type: 'text', value: 'body' }] }] }]
+    }, container);
+    const details = container.querySelector('details');
+
+    const spoiler = details.querySelector('summary .spoiler');
+    spoiler.click();
+
+    expect(spoiler.classList.contains('spoiler-revealed')).toBe(true);
+    expect(details.open).toBe(false);
+  });
+
   it('installing twice still toggles once per tap', () => {
     installSpoilerToggle(document);
     const spoiler = renderSpoiler();

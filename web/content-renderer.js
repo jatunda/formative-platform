@@ -192,8 +192,11 @@ function installSpoilerToggle(doc) {
 		const onLink = target.closest('a') !== null;
 		// A link inside a revealed spoiler works as normal.
 		if (onLink && spoiler.classList.contains('spoiler-revealed')) return;
-		// A tap on a link inside a hidden spoiler reveals it rather than following the link.
-		if (onLink) event.preventDefault();
+		// A tap on a link inside a hidden spoiler reveals it rather than
+		// following the link; one in a Question option's <label> or a
+		// collapsible's <summary> doesn't also pick the option or toggle the
+		// section.
+		if (onLink || spoiler.closest('label, summary')) event.preventDefault();
 		toggleSpoiler(spoiler);
 	});
 
