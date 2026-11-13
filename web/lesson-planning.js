@@ -16,7 +16,7 @@ import {
   setClassDateOffset
 } from './date-utils.js';
 import { showNotification } from './notification-utils.js';
-import { createDateOffsetControl, createStyledButton } from './ui-components.js';
+import { createDateOffsetControl, createStyledButton, createIconButton } from './ui-components.js';
 import {
   getFullSchedule
 } from './database-utils.js';
@@ -36,6 +36,20 @@ import { renderTeacherNav } from './teacher-nav.js';
 // The size is not remembered: a page reload puts every Class back to this.
 const PLANNING_WINDOW_SIZE = 3;
 const PLANNING_WINDOW_STEP = 3;
+
+/**
+ * Per-Class pane UI state: the Planning Window's size and whether the pane is
+ * collapsed to its header. Not persisted - a page reload starts every Class
+ * expanded at PLANNING_WINDOW_SIZE.
+ * @typedef {{ windowSize: number, collapsed: boolean }} PaneUiState
+ */
+/** @type {PaneUiState} */
+const DEFAULT_PANE_UI_STATE = { windowSize: PLANNING_WINDOW_SIZE, collapsed: false };
+
+// Each Class's latest pane UI state, so the all-classes Bulk Offset Shift's
+// re-render of every pane keeps it. Cleared on a fresh load.
+/** @type {Map<string, PaneUiState>} */
+const paneUiStates = new Map();
 
 initializeDatabase(db);
 
@@ -96,14 +110,20 @@ export async function applyBulkShift(delta) {
       delta > 0 ? `Delayed all classes ${days}.` : `Skipped all classes ahead ${days}.`,
       'success'
     );
-    await loadAndRenderAllPanes();
+    await loadAndRenderAllPanes({ keepUiState: true });
   } catch (error) {
     console.error('Failed to shift all classes:', error);
     showNotification('Failed to shift classes. Please try again.', 'error');
   }
 }
 
-export async function loadAndRenderAllPanes() {
+/**
+ * Render every Class's pane. A fresh load starts each pane expanded at the
+ * default window size; `keepUiState` keeps each pane's current size and
+ * collapse state instead (used by the Bulk Offset Shift).
+ */
+export async function loadAndRenderAllPanes({ keepUiState = false } = {}) {
+  if (!keepUiState) paneUiStates.clear();
   const container = document.getElementById('classPanesContainer');
 
   try {
@@ -126,7 +146,7 @@ export async function loadAndRenderAllPanes() {
       pane.className = 'lesson-planning-pane';
       container.appendChild(pane);
 
-      return renderClassPane(classId, data.name, pane);
+      return renderClassPane(classId, data.name, pane, paneUiStates.get(classId));
     });
 
     await Promise.all(renders);
@@ -145,10 +165,13 @@ export async function loadAndRenderAllPanes() {
  * functionality (drag-and-drop, lesson actions, Insert/Delete Day). Changing
  * the Class's Date Offset shifts which Day Indices the window shows, so a
  * reload re-renders the whole pane, not just the table.
- * `windowSize` is how many Day Indices the window shows; the pane's own
- * re-renders (and its resize buttons) pass it along so it survives them.
+ * `uiState` holds the window size and collapse state; the pane's own
+ * re-renders (and its resize/collapse buttons) pass it along so it survives
+ * them. Collapsed, the pane shows only its header's chevron and name.
  */
-export async function renderClassPane(classId, className, containerEl, windowSize = PLANNING_WINDOW_SIZE) {
+export async function renderClassPane(classId, className, containerEl, uiState = DEFAULT_PANE_UI_STATE) {
+  paneUiStates.set(classId, uiState);
+  const { windowSize } = uiState;
   const schedule = await getFullSchedule(classId);
   const dayIndexes = Object.keys(schedule).map(Number);
   const maxDayIndex = dayIndexes.length > 0 ? Math.max(...dayIndexes) : 0;
@@ -164,8 +187,12 @@ export async function renderClassPane(classId, className, containerEl, windowSiz
   const lessonHashesInWindow = windowIndexes.flatMap(idx => schedule[idx] || []);
   await getLessonTitles(lessonHashesInWindow);
 
-  const renderAtSize = (size) => renderClassPane(classId, className, containerEl, size);
-  const onReload = () => renderAtSize(windowSize);
+  // Read through paneUiStates, not the uiState captured above, so a collapse
+  // toggled in place since this render is kept by the next one.
+  const rerender = (/** @type {Partial<PaneUiState>} */ change = {}) =>
+    renderClassPane(classId, className, containerEl, { ...paneUiStates.get(classId), ...change });
+  const renderAtSize = (/** @type {number} */ size) => rerender({ windowSize: size });
+  const onReload = () => rerender();
   const ctx = {
     classId,
     onReload,
@@ -176,11 +203,17 @@ export async function renderClassPane(classId, className, containerEl, windowSiz
   const header = document.createElement('div');
   header.className = 'lesson-planning-pane-header';
 
+  const chevron = createIconButton('', `Show or hide ${className}`, () => {
+    const current = /** @type {PaneUiState} */ (paneUiStates.get(classId));
+    setCollapsed(!current.collapsed);
+  });
+  header.appendChild(chevron);
+
   const heading = document.createElement('h2');
   heading.textContent = className;
   header.appendChild(heading);
 
-  header.appendChild(createDateOffsetControl({
+  const offsetControl = createDateOffsetControl({
     label: 'Offset:',
     currentOffset,
     onShift: async (delta) => {
@@ -197,7 +230,8 @@ export async function renderClassPane(classId, className, containerEl, windowSiz
     // No computeTodayDayIndex or onGoToToday: the Planning Window already
     // starts at today by definition, so neither would add anything (and the
     // pane header is too narrow for them).
-  }));
+  });
+  header.appendChild(offsetControl);
 
   const table = document.createElement('table');
   table.className = 'schedule-table';
@@ -234,6 +268,15 @@ export async function renderClassPane(classId, className, containerEl, windowSiz
   shrinkBtn.disabled = windowSize <= PLANNING_WINDOW_SIZE;
   resizeControls.appendChild(shrinkBtn);
   resizeControls.appendChild(createStyledButton('+3 days', () => renderAtSize(windowSize + PLANNING_WINDOW_STEP)));
+
+  // Collapsing toggles in place (no refetch) and records the new state.
+  const setCollapsed = (/** @type {boolean} */ collapsed) => {
+    paneUiStates.set(classId, { .../** @type {PaneUiState} */ (paneUiStates.get(classId)), collapsed });
+    chevron.textContent = collapsed ? '▸' : '▾';
+    chevron.setAttribute('aria-expanded', String(!collapsed));
+    for (const el of [offsetControl, tableWrapper, resizeControls]) el.hidden = collapsed;
+  };
+  setCollapsed(uiState.collapsed);
 
   containerEl.innerHTML = '';
   containerEl.appendChild(header);
