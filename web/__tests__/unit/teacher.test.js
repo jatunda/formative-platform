@@ -7,7 +7,6 @@ import {
   getSavedScrollPosition,
   saveScrollPosition,
   loadClasses,
-  getDateForDayIndex,
   applyDateOffset,
   showScheduleError,
   renderScheduleTable,
@@ -39,10 +38,6 @@ vi.mock('../../date-utils.js', () => ({
   // it from constants.js - needs to be here for that chain to resolve.
   DEFAULT_CLASS_START_DATE: '2024-08-19',
   getDateForDayIndex: vi.fn(async (dayIndex, classId) => `date-for-${classId}-${dayIndex}`),
-  getDayDateLabels: vi.fn(async (dayIndex, classId) => ({
-    full: `full-date-for-${classId}-${dayIndex}`,
-    short: `short-date-for-${classId}-${dayIndex}`,
-  })),
   getTodayDayIndex: vi.fn(async () => 10),
   getClassDateOffset: vi.fn(async () => 5),
   setClassDateOffset: vi.fn(async () => {}),
@@ -80,21 +75,15 @@ vi.mock('../../schedule-day-view.js', () => ({
     tr.dataset.dayIndex = dayIndex;
     return tr;
   }),
-  createInsertDayRow: vi.fn((dayIndex) => {
-    const tr = document.createElement('tr');
-    tr.className = 'insert-day-row';
-    tr.dataset.beforeDayIndex = dayIndex;
-    return tr;
-  }),
   createEndButtonsContainer: vi.fn(() => document.createElement('div')),
-  createDateCell: vi.fn(({ full, short }) => {
+  createDateCell: vi.fn((dateLabel) => {
     const td = document.createElement('td');
-    td.dataset.full = full;
-    td.dataset.short = short;
+    td.textContent = dateLabel;
     return td;
   }),
   makeInsertDayHandler: vi.fn(() => vi.fn()),
   makeDeleteDayHandler: vi.fn(() => vi.fn()),
+  addInsertDayPlus: vi.fn(),
   getLessonTitles: (...args) => mockGetLessonTitles(...args),
 }));
 
@@ -210,13 +199,6 @@ describe('teacher', () => {
     });
   });
 
-  describe('getDateForDayIndex', () => {
-    it('forwards to the shared date-utils implementation with the given Class', async () => {
-      const result = await getDateForDayIndex(5, 'csa');
-      expect(result).toBe('date-for-csa-5');
-    });
-  });
-
   describe('applyDateOffset', () => {
     it('persists the new offset and reloads the schedule', async () => {
       scheduleFixture();
@@ -261,20 +243,53 @@ describe('teacher', () => {
       const tbody = document.querySelector('#scheduleTable tbody');
       const dayRows = [...tbody.querySelectorAll('.day-row')].map((r) => r.dataset.dayIndex);
       expect(dayRows).toEqual(['0', '1', '2']);
-      // One insert-day row before each day (the trailing "add a day" row is
-      // a distinct row built by createFinalRow, not another insert-day row)
-      expect(tbody.querySelectorAll('.insert-day-row')).toHaveLength(3);
-      expect(tbody.children).toHaveLength(7); // 3 insert + 3 day + 1 final
+      expect(tbody.children).toHaveLength(4); // 3 days + 1 final, no Insert Day rows
     });
 
-    it("gives each day row both of that Day Index's date labels", async () => {
+    it('gives each day row the Insert Day handler, so each gets a "+" on the line above it', async () => {
+      scheduleFixture();
+      const { createDayRow, makeInsertDayHandler } = await import('../../schedule-day-view.js');
+
+      await renderScheduleTable({ 0: [], 1: [] }, 'csa');
+
+      const onInsertDay = makeInsertDayHandler.mock.results.at(-1).value;
+      expect(createDayRow.mock.calls.map((c) => c[4].onInsertDay)).toEqual([onInsertDay, onInsertDay]);
+    });
+
+    it('tells each day row the last stored Day Index, so every day up to it gets a "+"', async () => {
+      scheduleFixture();
+      const { createDayRow } = await import('../../schedule-day-view.js');
+
+      await renderScheduleTable({ 0: ['a'], 2: ['b'] }, 'csa');
+
+      expect(createDayRow.mock.calls.map((c) => c[4].lastDayIndex)).toEqual([2, 2, 2]);
+    });
+
+    it('an empty Schedule has no last stored day, so its day 0 gets no "+"', async () => {
+      scheduleFixture();
+      const { createDayRow } = await import('../../schedule-day-view.js');
+
+      await renderScheduleTable({}, 'csa');
+
+      expect(createDayRow.mock.calls.at(-1)[4].lastDayIndex).toBe(-1);
+    });
+
+    it('puts no "+" below the last day: the add-day row adds a day after it (ticket 13)', async () => {
+      scheduleFixture();
+      const { addInsertDayPlus } = await import('../../schedule-day-view.js');
+
+      await renderScheduleTable({ 0: ['a'], 1: ['b'] }, 'csa');
+
+      expect(addInsertDayPlus).not.toHaveBeenCalled();
+    });
+
+    it("gives each day row that Day Index's date label", async () => {
       scheduleFixture();
       const { createDayRow } = await import('../../schedule-day-view.js');
 
       await renderScheduleTable({ 0: [], 1: [] }, 'csa');
 
-      expect(createDayRow).toHaveBeenCalledWith(1, [], 10,
-        { full: 'full-date-for-csa-1', short: 'short-date-for-csa-1' }, expect.anything());
+      expect(createDayRow).toHaveBeenCalledWith(1, [], 10, 'date-for-csa-1', expect.anything());
     });
 
     it('preloads lesson titles for every Lesson across the whole Schedule', async () => {
@@ -310,8 +325,7 @@ describe('teacher', () => {
 
       const cells = row.querySelectorAll('td');
       expect(cells[0].textContent).toBe('7');
-      expect(cells[1].dataset.full).toBe('full-date-for-csa-7');
-      expect(cells[1].dataset.short).toBe('short-date-for-csa-7');
+      expect(cells[1].textContent).toBe('date-for-csa-7');
       expect(cells[2].className).toBe('lessons-cell');
     });
   });

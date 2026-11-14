@@ -53,7 +53,7 @@ export const TAP_EXCEPTIONS = [
     selector: '.schedule-icon-btn',
     minWidth: 40,
     maxViewportWidth: 600,
-    reason: '➕ New Lesson and 🔗 Link Lesson: 40px wide on a phone so a one-Lesson day fits 375px (ticket 02).',
+    reason: 'New Lesson (+) and Link Lesson: 40px wide on a phone so a one-Lesson day fits 375px (ticket 02).',
   },
 ];
 
@@ -63,6 +63,22 @@ export const TAP_EXCEPTIONS = [
  * exceptions list of the selectors it matches.
  */
 
+/** A measurement rounded to the nearest half pixel. @param {number} n */
+const round = (n) => Math.round(n * 2) / 2;
+
+/**
+ * One phrase for every item that fails `check` (Full Schedule shows hundreds
+ * of days), naming the first problem, or null when none do.
+ * @template T
+ * @param {T[]} items @param {(item: T) => string | null} check
+ * @param {string} failing - What the failing items are, e.g. "day rows don't line up"
+ * @returns {string | null}
+ */
+function summarize(items, check, failing) {
+  const problems = items.map(check).filter((why) => why !== null);
+  return problems.length ? `${problems.length} of ${items.length} ${failing}, first ${problems[0]}` : null;
+}
+
 /**
  * Why a tap target is too small on a touch screen `viewportWidth` wide, or
  * null when it's big enough. Sizes round to the nearest half pixel first.
@@ -70,7 +86,6 @@ export const TAP_EXCEPTIONS = [
  * @returns {string | null}
  */
 export function tapTargetProblem(target, viewportWidth, exceptions = TAP_EXCEPTIONS) {
-  const round = (/** @type {number} */ n) => Math.round(n * 2) / 2;
   const [width, height] = [round(target.width), round(target.height)];
   const allowed = target.exceptions
     .map((i) => exceptions[i])
@@ -81,13 +96,81 @@ export function tapTargetProblem(target, viewportWidth, exceptions = TAP_EXCEPTI
 }
 
 /**
+ * @typedef {{ name: string, top: number, bottom: number }} Cell
+ * @typedef {{ label: string, cells: Cell[] }} DayRow
+ * One day row as measured: each cell's top and bottom edge (its border box,
+ * in px from the top of the page), in cell order.
+ */
+
+/**
+ * Why a day row's cells don't form straight lines (ticket 09: every cell of
+ * a day row shares one top and one bottom), or null when they do. Edges
+ * round to the nearest half pixel first.
+ * @param {DayRow} row @returns {string | null}
+ */
+export function rowMisalignment(row) {
+  for (const [edge, verb] of /** @type {const} */ ([['top', 'start'], ['bottom', 'end']])) {
+    const at = row.cells.map((c) => round(c[edge]));
+    if (new Set(at).size > 1) {
+      return `${row.label}: cells ${verb} at different heights (${row.cells.map((c, i) => `${c.name} ${at[i]}`).join(', ')})`;
+    }
+  }
+  return null;
+}
+
+/**
+ * One phrase for every day row that doesn't line up, naming the first, or
+ * null when they all do.
+ * @param {DayRow[]} rows @returns {string | null}
+ */
+function misalignedRows(rows) {
+  return summarize(rows, rowMisalignment, "day rows don't line up");
+}
+
+/**
+ * @typedef {{ label: string, x: number, y: number, gutterLeft: number, gutterRight: number, line: number }} InsertPlus
+ * One Insert Day "+" as measured: its glyph's centre (x, y), the left gutter
+ * it belongs in (from the pane's inner left edge to the table's left edge)
+ * and the y of the line between days it sits on.
+ */
+
+/**
+ * Why an Insert Day "+" isn't in the left gutter, centred on the line
+ * between two days (ticket 10), or null when it is. Positions round to the
+ * nearest half pixel first; a pixel off the line is still on it.
+ * @param {InsertPlus} p @returns {string | null}
+ */
+export function insertPlusMisplacement(p) {
+  const [x, y] = [round(p.x), round(p.y)];
+  if (x < p.gutterLeft || x > p.gutterRight) {
+    return `Insert Day "+" ${p.label} is at x ${x}, outside the gutter (${round(p.gutterLeft)} to ${round(p.gutterRight)})`;
+  }
+  const off = Math.abs(y - round(p.line));
+  return off > 1 ? `Insert Day "+" ${p.label} is ${off}px off its line` : null;
+}
+
+/**
+ * One phrase for every misplaced Insert Day "+", naming the first, or for
+ * day rows with none at all; null when they're all in place.
+ * @param {InsertPlus[]} pluses @param {DayRow[]} rows @returns {string | null}
+ */
+function misplacedPluses(pluses, rows) {
+  if (rows.length && !pluses.length) return `no Insert Day "+" beside the ${rows.length} day rows`;
+  return summarize(pluses, insertPlusMisplacement, 'Insert Day "+"s are misplaced');
+}
+
+/**
  * @typedef {{ name: string, lessonsPerDay: number, contentWidth: number, paneWidth: number }} ShortTable
  * A schedule table with no day over one Lesson: how wide its content is and
  * how wide its pane is.
- * @typedef {{ scrollWidth: number, shortTables: ShortTable[], targets: Target[] | null,
- *   coarse: boolean, touch: boolean, viewportWidth: number, errors: string[], violations: string[] }} Checked
+ * @typedef {{ scrollWidth: number, shortTables: ShortTable[], targets: Target[] | null, rows: DayRow[], pluses: InsertPlus[],
+ *   strayPluses: string[], coarse: boolean, touch: boolean, viewportWidth: number, errors: string[],
+ *   violations: string[] }} Checked
  * One render as measured: `scrollWidth` is the document's; `targets` is null
- * where tap targets aren't checked (a mouse size).
+ * where tap targets aren't checked (a mouse size); `rows` are the day rows
+ * of every schedule table shown, and `pluses` their Insert Day "+"s;
+ * `strayPluses` labels the "+"s past the last stored day, where inserting
+ * would only add an empty day, which isn't stored (ticket 13).
  */
 
 /**
@@ -102,6 +185,9 @@ export function describeFailure(r) {
       .filter((t) => t.contentWidth > t.paneWidth)
       .map((t) => `${t.name}: days of at most ${t.lessonsPerDay} Lesson(s) are ${t.contentWidth}px wide in a ${t.paneWidth}px pane`),
     ...(r.targets ?? []).map((t) => tapTargetProblem(t, r.viewportWidth)),
+    misalignedRows(r.rows),
+    misplacedPluses(r.pluses, r.rows),
+    ...r.strayPluses.map((label) => `Insert Day "+" ${label} is past the last stored day`),
     ...r.errors,
     ...r.violations,
   ].filter((why) => typeof why === 'string');
@@ -125,30 +211,19 @@ export function describeFailure(r) {
  */
 export const KNOWN_FAILURES = [
   {
-    failure: 'tap target "+ Insert Day Here',
-    touch: true,
-    note: 'The Insert Day Here buttons between days are about 22px tall on touch screens. Making them 44px makes every gap between days twice as tall: a design call for Eric.',
-  },
-  {
-    failure: 'tap target "Delete day ',
-    touch: true,
-    maxWidth: 600,
-    note: 'The 🗑 Delete Day button is about 29px wide on a phone; a wider one would squeeze the Lessons column (ticket 02).',
-  },
-  {
     failure: 'color-contrast: 1 node(s)',
     pages: ['planning'],
-    note: 'The red Logout button (white on #e53e3e, 4.1:1; 4.5:1 is the minimum).',
+    note: 'The red Logout button (white on #e53e3e, 4.1:1; 4.5:1 is the minimum): accepted by Eric.',
   },
   {
     failure: 'color-contrast: 2 node(s)',
     pages: ['full-short', 'full-busy'],
-    note: 'The red Logout button (4.1:1) and the green Go to Today button (white on #28a745, 3.1:1).',
+    note: 'The red Logout button (4.1:1) and the green Go to Today button (white on #28a745, 3.1:1): accepted by Eric.',
   },
-  { failure: 'empty-table-header:', note: 'The day actions column (🗑) has an empty header cell.' },
-  { failure: 'html-has-lang:', note: 'lesson-planning.html and teacher.html have no <html lang>.' },
-  { failure: 'landmark-one-main:', note: 'The pages have no <main> landmark.' },
-  { failure: 'region:', note: 'No <main> or other landmark, so axe counts all content as outside one.' },
+  {
+    failure: 'empty-table-header:',
+    note: 'The day actions column (Delete Day) has an empty header cell: accepted by Eric (a header word would widen the column for no gain).',
+  },
 ];
 
 /**

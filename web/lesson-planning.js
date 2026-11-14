@@ -10,7 +10,7 @@ import {
 import { db } from './firebase-config.js';
 import { initializeDatabase } from './database-handle.js';
 import {
-  getDayDateLabels,
+  getDateForDayIndex,
   getTodayDayIndex,
   getClassDateOffset,
   setClassDateOffset
@@ -23,7 +23,7 @@ import {
 import { showErrorState } from './error-ui-utils.js';
 import {
   createDayRow,
-  createInsertDayRow,
+  addInsertDayPlus,
   makeInsertDayHandler,
   makeDeleteDayHandler,
   getLessonTitles
@@ -173,7 +173,8 @@ export async function renderClassPane(classId, className, containerEl, uiState =
   const { windowSize } = uiState;
   const schedule = await getFullSchedule(classId);
   const dayIndexes = Object.keys(schedule).map(Number);
-  const maxDayIndex = dayIndexes.length > 0 ? Math.max(...dayIndexes) : 0;
+  // The last stored Day Index (-1 for an empty Schedule).
+  const lastDayIndex = dayIndexes.length > 0 ? Math.max(...dayIndexes) : -1;
   const currentOffset = await getClassDateOffset(classId);
   const todayDayIndex = await getTodayDayIndex(classId);
 
@@ -192,12 +193,17 @@ export async function renderClassPane(classId, className, containerEl, uiState =
     renderClassPane(classId, className, containerEl, { ...paneUiStates.get(classId), ...change });
   const renderAtSize = (/** @type {number} */ size) => rerender({ windowSize: size });
   const onReload = () => rerender();
+  const onInsertDay = makeInsertDayHandler(classId, lastDayIndex, onReload);
+  // onInsertDay gives each day row up to the last stored day an Insert Day
+  // "+" on the line above it. Past that day, inserting would only add an
+  // empty day, which isn't stored, so there is no "+" (ticket 13).
   const ctx = {
     classId,
     onReload,
-    onDeleteDay: makeDeleteDayHandler(classId, onReload)
+    onDeleteDay: makeDeleteDayHandler(classId, onReload),
+    onInsertDay,
+    lastDayIndex
   };
-  const onInsertDay = makeInsertDayHandler(classId, maxDayIndex, onReload);
 
   const header = document.createElement('div');
   header.className = 'lesson-planning-pane-header';
@@ -244,19 +250,19 @@ export async function renderClassPane(classId, className, containerEl, uiState =
 
   const tbody = document.createElement('tbody');
 
+  const dayRows = [];
   for (const dayIndex of windowIndexes) {
-    tbody.appendChild(createInsertDayRow(dayIndex, onInsertDay));
-
     const lessons = schedule[dayIndex] || [];
-    const dateLabels = await getDayDateLabels(dayIndex, classId);
-    const dayRow = await createDayRow(dayIndex, lessons, todayDayIndex, dateLabels, ctx);
-    tbody.appendChild(dayRow);
+    const dateLabel = await getDateForDayIndex(dayIndex, classId);
+    dayRows.push(await createDayRow(dayIndex, lessons, todayDayIndex, dateLabel, ctx));
   }
+  tbody.append(...dayRows);
 
-  // Insert point after the window too, matching the full scheduling table's
-  // N+1 insert-points-for-N-days pattern.
+  // One more "+" below the window's last day, when a stored day follows it.
   const afterWindowIndex = windowIndexes[windowIndexes.length - 1] + 1;
-  tbody.appendChild(createInsertDayRow(afterWindowIndex, onInsertDay));
+  if (afterWindowIndex <= lastDayIndex) {
+    addInsertDayPlus(dayRows[dayRows.length - 1], afterWindowIndex, onInsertDay, 'below');
+  }
 
   table.appendChild(tbody);
 

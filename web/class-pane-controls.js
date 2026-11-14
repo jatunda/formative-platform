@@ -2,12 +2,12 @@
  * Class Pane Controls
  *
  * The Lesson Planning page's per-Class pane controls: the collapse chevron
- * and the ↗ Full Schedule link in the pane header, and the Planning Window
+ * and the open-in-new Full Schedule link in the pane header, and the Planning Window
  * resize buttons under the table. lesson-planning.js's renderClassPane wires
  * them to the pane's state; each factory here only builds its DOM.
  */
 
-import { createIconButton, createStyledButton } from './ui-components.js';
+import { createIconButton, createStyledButton, teacherIcon } from './ui-components.js';
 import { fullScheduleTodayHref } from './teacher-nav.js';
 
 // Number of upcoming Day Indices shown per Class in each pane's Planning
@@ -53,7 +53,8 @@ export function createCollapseChevron(className, onToggle) {
 }
 
 /**
- * The ↗ link from a pane header to that Class's Full Schedule at today.
+ * The open-in-new link from a pane header to that Class's Full Schedule at
+ * today, in a new tab so the Lesson Planning page stays put.
  * @param {string} classId
  * @param {string} className
  * @returns {HTMLAnchorElement}
@@ -62,7 +63,9 @@ export function createFullScheduleLink(classId, className) {
   const link = document.createElement('a');
   link.className = 'full-schedule-link';
   link.href = fullScheduleTodayHref(classId);
-  link.textContent = '↗';
+  link.target = '_blank';
+  link.rel = 'noopener';
+  link.appendChild(teacherIcon('openInNew'));
   link.title = 'Full schedule';
   link.setAttribute('aria-label', `Full schedule for ${className}`);
   return link;

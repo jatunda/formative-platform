@@ -11,7 +11,12 @@ import {
   createDateOffsetControl,
   getShiftAmount,
   withWorkingIndicator,
+  savingSpinner,
+  teacherIcon,
+  popupHost,
+  textIcon,
 } from '../../ui-components.js';
+import { lineIcon } from '../../line-icons.js';
 
 describe('ui-components', () => {
   let popup;
@@ -53,6 +58,70 @@ describe('ui-components', () => {
       const onClick = vi.fn();
       createIconButton('🔗', 'Link Lesson', onClick).click();
       expect(onClick).toHaveBeenCalledTimes(1);
+    });
+
+    it('can show a flat line icon instead of text', () => {
+      const icon = lineIcon('link', 'line-icon');
+      const button = createIconButton(icon, 'Link Lesson', vi.fn());
+
+      expect(button.firstChild).toBe(icon);
+      expect(button.textContent).toBe('');
+      expect(button.getAttribute('aria-label')).toBe('Link Lesson');
+    });
+
+    it('shows the saving spinner in place of its icon while a slow change saves', async () => {
+      vi.useFakeTimers();
+      try {
+        const icon = lineIcon('link', 'line-icon');
+        let finish;
+        const button = createIconButton(icon, 'Link Lesson', () => new Promise((r) => { finish = r; }));
+
+        const done = button.onclick();
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(button.querySelector('svg').getAttribute('class')).toBe('line-icon line-icon-spin');
+
+        finish();
+        await done;
+        expect(button.firstChild).toBe(icon);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
+  describe('textIcon', () => {
+    it('is the glyph as text in an icon-sized span', () => {
+      const plus = textIcon('+');
+      expect(plus.tagName).toBe('SPAN');
+      expect(plus.className).toBe('text-icon');
+      expect(plus.textContent).toBe('+');
+    });
+  });
+
+  describe('savingSpinner', () => {
+    it('is the flat spinner icon with the spinning class, a fresh element each time', () => {
+      const spinner = savingSpinner();
+      expect(spinner.getAttribute('class')).toBe('line-icon line-icon-spin');
+      expect(spinner.innerHTML).toBe(lineIcon('spinner', 'x').innerHTML);
+      expect(savingSpinner()).not.toBe(spinner);
+    });
+  });
+
+  describe('teacherIcon', () => {
+    it("is the named line icon in the teacher pages' line-icon style", () => {
+      const icon = teacherIcon('trash');
+      expect(icon.getAttribute('class')).toBe('line-icon');
+      expect(icon.innerHTML).toBe(lineIcon('trash', 'x').innerHTML);
+    });
+  });
+
+  describe('popupHost', () => {
+    it("is the page's <main> when it has one, else <body>", () => {
+      expect(popupHost()).toBe(document.body);
+      const main = document.createElement('main');
+      document.body.appendChild(main);
+      expect(popupHost()).toBe(main);
+      main.remove();
     });
   });
 
@@ -100,12 +169,15 @@ describe('ui-components', () => {
   });
 
   describe('createInsertDayButton', () => {
-    it('should create button with correct text', () => {
-      const insertFn = vi.fn();
-      const button = createInsertDayButton(5, insertFn);
-      
-      expect(button.textContent).toBe('+ Insert Day Here');
-      expect(button.className).toBe('schedule-action-btn insert-day-btn');
+    it('is a small text "+" whose tooltip and accessible name are "Insert day here"', () => {
+      const button = createInsertDayButton(5, vi.fn());
+
+      expect(button.className).toBe('insert-day-btn');
+      expect(button.title).toBe('Insert day here');
+      expect(button.getAttribute('aria-label')).toBe('Insert day here');
+      const plus = button.firstElementChild;
+      expect(plus.className).toBe('text-icon');
+      expect(button.textContent).toBe('+');
     });
 
     it('should call insertFunction with dayIndex when clicked', () => {
@@ -365,6 +437,22 @@ describe('ui-components', () => {
 
       expect(btn.disabled).toBe(false);
       expect(btn.textContent).toBe('Do Thing');
+    });
+
+    it('can show an element as the working label, then puts the original contents back', async () => {
+      const icon = lineIcon('trash', 'line-icon');
+      btn.replaceChildren(icon);
+      let resolveOnClick;
+      const onClick = vi.fn(() => new Promise((resolve) => { resolveOnClick = resolve; }));
+      const wrapped = withWorkingIndicator(btn, onClick, { workingLabel: savingSpinner });
+
+      const promise = wrapped();
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(btn.querySelector('svg').getAttribute('class')).toBe('line-icon line-icon-spin');
+
+      resolveOnClick();
+      await promise;
+      expect([...btn.childNodes]).toEqual([icon]);
     });
 
     it('passes through arguments and the resolved value', async () => {

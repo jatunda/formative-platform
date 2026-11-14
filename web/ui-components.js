@@ -1,25 +1,70 @@
 // UI Component Helper Functions
 
+import { lineIcon } from './line-icons.js';
+
+/**
+ * The small spinning circle a schedule button shows while its change saves,
+ * drawn in the button's colour at the size of the icon it replaces.
+ * @returns {SVGSVGElement}
+ */
+export function savingSpinner() {
+  return lineIcon('spinner', 'line-icon line-icon-spin');
+}
+
+/**
+ * A line icon in the teacher pages' .line-icon style (the clock's wrapper is
+ * clock/icons.js).
+ * @param {Parameters<typeof lineIcon>[0]} name
+ * @returns {SVGSVGElement}
+ */
+export function teacherIcon(name) {
+  return lineIcon(name, 'line-icon');
+}
+
+/**
+ * Where a pop-up that isn't a dialog (a menu, a toast) mounts: inside the
+ * page's <main> when it has one, so it sits in a landmark, else <body>.
+ * @returns {HTMLElement}
+ */
+export function popupHost() {
+  return document.querySelector('main') ?? document.body;
+}
+
+/**
+ * A text glyph (e.g. "+") in a box the size of a line icon, so an icon
+ * button showing text matches its line-icon neighbours. Text, not an icon or
+ * emoji, so it looks the same in every browser and font.
+ * @param {string} glyph
+ * @returns {HTMLSpanElement}
+ */
+export function textIcon(glyph) {
+  const span = document.createElement('span');
+  span.className = 'text-icon';
+  span.textContent = glyph;
+  return span;
+}
+
 /**
  * Wrap a button's click handler so that if the resulting work takes longer
  * than `delayMs`, the button disables itself and shows `workingLabel` until
  * it settles - so a slow auto-save operation (e.g. inserting a day) doesn't
  * look like the click did nothing. Fast operations (the common case) never
  * show anything, since the timer is cleared before it fires.
- * @param {HTMLButtonElement} btn - The button whose own text/disabled state gets restored
+ * @param {HTMLButtonElement} btn - The button whose own contents/disabled state get restored
  * @param {(...args: any[]) => any} onClick - The original click handler (sync or async)
- * @param {{delayMs?: number, workingLabel?: string}} [options]
+ * @param {{delayMs?: number, workingLabel?: string | (() => Node)}} [options]
+ *   workingLabel is text, or a factory for an element such as savingSpinner
  * @returns {(...args: any[]) => Promise<any>}
  */
 export function withWorkingIndicator(btn, onClick, { delayMs = 1000, workingLabel = "Working…" } = {}) {
   return async (...args) => {
-    const originalText = btn.textContent;
+    const originalContents = [...btn.childNodes];
     const originalDisabled = btn.disabled;
     let showed = false;
     const timer = setTimeout(() => {
       showed = true;
       btn.disabled = true;
-      btn.textContent = workingLabel;
+      btn.replaceChildren(typeof workingLabel === "string" ? workingLabel : workingLabel());
     }, delayMs);
 
     try {
@@ -27,7 +72,7 @@ export function withWorkingIndicator(btn, onClick, { delayMs = 1000, workingLabe
     } finally {
       clearTimeout(timer);
       if (showed) {
-        btn.textContent = originalText;
+        btn.replaceChildren(...originalContents);
         btn.disabled = originalDisabled;
       }
     }
@@ -52,20 +97,20 @@ export function createStyledButton(text, onClick) {
  * Create a compact icon-only button; `label` names the action as both its
  * tooltip and its accessible label, since the icon alone says nothing to a
  * screen reader.
- * @param {string} icon - The icon (emoji) shown on the button
+ * @param {string | Node} icon - The icon shown on the button: a glyph, or a line icon element
  * @param {string} label - What the button does, e.g. "New Lesson"
  * @param {() => any} onClick - The click handler function
  * @returns {HTMLButtonElement} The created button element
  */
 export function createIconButton(icon, label, onClick) {
   const btn = document.createElement("button");
-  btn.textContent = icon;
+  btn.append(icon);
   btn.title = label;
   btn.setAttribute("aria-label", label);
   btn.className = "schedule-icon-btn";
-  // An hourglass, not the default "Working…" text, so a slow click doesn't
+  // A spinner, not the default "Working…" text, so a slow click doesn't
   // stretch the compact button and shove the row around.
-  btn.onclick = withWorkingIndicator(btn, onClick, { workingLabel: "⏳" });
+  btn.onclick = withWorkingIndicator(btn, onClick, { workingLabel: savingSpinner });
   return btn;
 }
 
@@ -99,16 +144,19 @@ export function createArrowButton(direction, isDisabled, onClick) {
 }
 
 /**
- * Create an "Insert Day Here" button
+ * Create an Insert Day button: a small text "+" (the schedule pages place it
+ * in the gutter beside the line between two days).
  * @param {number} dayIndex - The day index where the new day should be inserted
  * @param {(dayIndex: number) => void} insertFunction - Function to insert the day
  * @returns {HTMLButtonElement} The created button element
  */
 export function createInsertDayButton(dayIndex, insertFunction) {
   const btn = document.createElement("button");
-  btn.textContent = "+ Insert Day Here";
-  btn.className = "schedule-action-btn insert-day-btn";
-  btn.onclick = withWorkingIndicator(btn, () => insertFunction(dayIndex));
+  btn.append(textIcon("+"));
+  btn.title = "Insert day here";
+  btn.setAttribute("aria-label", "Insert day here");
+  btn.className = "insert-day-btn";
+  btn.onclick = withWorkingIndicator(btn, () => insertFunction(dayIndex), { workingLabel: savingSpinner });
   return btn;
 }
 

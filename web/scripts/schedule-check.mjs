@@ -15,6 +15,14 @@
 // - the page doesn't scroll sideways (document scrollWidth <= the viewport's width);
 // - a schedule table whose days each have at most one Lesson fits its pane
 //   without scrolling sideways (ticket 02: a short day fits a portrait phone);
+// - every day row's cells (Day Index, Date, Lessons, Delete Day) share one
+//   top and one bottom edge, so the row's borders form straight lines
+//   (ticket 09); report.json also records each day row's height;
+// - every Insert Day "+" sits in the table's left gutter, centred on the line
+//   between days it belongs to (ticket 10), and none sits past the last
+//   stored day, where it would only add an empty day (ticket 13);
+// - axe also runs with the lesson actions menu and the Link Lesson popup
+//   open (POPUPS), so a pop-up outside the page's landmarks is caught;
 // - on touch sizes, every control in the schedule rows is at least 44px tall
 //   and 44px wide, except the narrower widths TAP_EXCEPTIONS accepts, each
 //   with its reason.
@@ -45,6 +53,12 @@ const FAKE_FIREBASE = readFileSync(resolve(webDir, 'scripts/schedule-check-fireb
 /** Mid-morning on the fixture's day, in the school's time zone. */
 const NOW = new Date(`${TODAY}T10:00:00-08:00`);
 const TIMEZONE = 'America/Los_Angeles';
+
+/** The pop-ups axe also checks while open: what to click to open one, and what shows. */
+const POPUPS = [
+  { name: 'the lesson actions menu', open: '.action-menu-btn', shows: '[role="menu"]' },
+  { name: 'the Link Lesson popup', open: '[aria-label="Link Lesson"]', shows: '.lesson-popup' },
+];
 
 let opts;
 try {
@@ -139,16 +153,17 @@ async function checkPage(page, url, size) {
   await page.waitForTimeout(300);
   const measured = await page.evaluate(([exceptionSelectors, touch]) => {
     const tables = [...document.querySelectorAll('.schedule-table, #scheduleTable')].filter((t) => t.getClientRects().length);
+    /** A schedule table's name in reports: its pane's heading, or Full Schedule's Class. @param {Element} table */
+    const tableName = (table) => table.closest('.lesson-planning-pane')?.querySelector('h2')?.textContent
+      ?? /** @type {HTMLSelectElement | null} */ (document.getElementById('classSelect'))?.selectedOptions[0]?.textContent ?? 'schedule';
     const shortTables = tables.flatMap((table) => {
       const rows = [...table.querySelectorAll('tbody tr')];
       const lessonsPerDay = Math.max(0, ...rows.map((row) => row.querySelectorAll('.lesson-cluster').length));
       if (lessonsPerDay > 1) return [];
       // The pane scrolls sideways when the table is wider than it.
       const pane = /** @type {HTMLElement} */ (table.parentElement);
-      const heading = table.closest('.lesson-planning-pane')?.querySelector('h2')?.textContent
-        ?? /** @type {HTMLSelectElement | null} */ (document.getElementById('classSelect'))?.selectedOptions[0]?.textContent ?? 'schedule';
       const contentWidth = Math.max(pane.scrollWidth, Math.ceil(table.getBoundingClientRect().width));
-      return [{ name: heading, lessonsPerDay, contentWidth, paneWidth: pane.clientWidth }];
+      return [{ name: tableName(table), lessonsPerDay, contentWidth, paneWidth: pane.clientWidth }];
     });
     const controls = 'button, a[href], input, select, textarea, [role="button"], [tabindex]:not([tabindex="-1"])';
     const targets = touch ? tables.flatMap((table) => [...table.querySelectorAll(`tbody :is(${controls})`)])
@@ -163,14 +178,93 @@ async function checkPage(page, url, size) {
           exceptions: exceptionSelectors.flatMap((selector, i) => el.matches(selector) ? [i] : []),
         };
       }) : null;
+    /** A day row's name in reports: its table's name and its Day Index. @param {Element} table @param {Element} tr */
+    const rowLabel = (table, tr) => `${tableName(table)} day ${tr.querySelector('.day-index-cell')?.firstChild?.textContent}`;
+    // Day rows: rows with a Day Index cell (Full Schedule's last row, the next day to add, counts).
+    const cellNames = { 'day-index-cell': 'Day Index', 'date-cell': 'Date', 'lessons-cell': 'Lessons', 'day-actions-cell': 'Delete Day' };
+    const rows = tables.flatMap((table) => [...table.querySelectorAll('tbody tr')]
+      .filter((tr) => tr.querySelector(':scope > .day-index-cell') && tr.getClientRects().length)
+      .map((tr) => {
+        const cells = [...tr.children].map((td) => {
+          const box = td.getBoundingClientRect();
+          const name = Object.entries(cellNames).find(([cls]) => td.classList.contains(cls))?.[1] ?? td.className;
+          return { name, top: box.top + scrollY, bottom: box.bottom + scrollY };
+        });
+        const lessons = tr.querySelectorAll('.lesson-cluster').length;
+        const box = tr.getBoundingClientRect();
+        return { label: `${rowLabel(table, tr)} (${lessons} Lesson${lessons === 1 ? '' : 's'})`, lessons, height: box.height, cells };
+      }));
+    // Insert Day "+"s: each glyph's centre, its gutter and the line it belongs on.
+    const pluses = tables.flatMap((table) => [...table.querySelectorAll('.insert-day-btn')]
+      .filter((btn) => btn.getClientRects().length)
+      .map((btn) => {
+        const glyph = /** @type {Element} */ (btn.querySelector('.text-icon') ?? btn).getBoundingClientRect();
+        const tr = /** @type {HTMLTableRowElement} */ (btn.closest('tr'));
+        const row = tr.getBoundingClientRect();
+        const pane = /** @type {HTMLElement} */ (table.parentElement);
+        const below = btn.classList.contains('insert-day-below');
+        return {
+          label: `${below ? 'below' : 'above'} ${rowLabel(table, tr)}`,
+          x: glyph.left + glyph.width / 2 + scrollX,
+          y: glyph.top + glyph.height / 2 + scrollY,
+          gutterLeft: pane.getBoundingClientRect().left + pane.clientLeft + scrollX,
+          gutterRight: table.getBoundingClientRect().left + scrollX,
+          line: (below ? row.bottom : row.top) + scrollY,
+        };
+      }));
+    // "+"s past the last stored day (ticket 13). The fixtures store no day
+    // after a Planning Window, so on every table the last day row with a
+    // Lesson is the last stored day; a "+" inserts at its row (above) or the
+    // row after (below), which must not be past that day.
+    const strayPluses = tables.flatMap((table) => {
+      const dayRows = [...table.querySelectorAll('tbody tr')];
+      const lastStored = dayRows.map((tr) => Boolean(tr.querySelector('.lesson-cluster'))).lastIndexOf(true);
+      return dayRows.flatMap((tr, i) => [...tr.querySelectorAll('.insert-day-btn')]
+        .filter((btn) => i + (btn.classList.contains('insert-day-below') ? 1 : 0) > lastStored)
+        .map((btn) => `${btn.classList.contains('insert-day-below') ? 'below' : 'above'} ${rowLabel(table, tr)}`));
+    });
     return {
+      pluses,
+      strayPluses,
       scrollWidth: document.documentElement.scrollWidth,
       shortTables,
       targets,
+      rows,
       coarse: matchMedia('(pointer: coarse)').matches,
     };
   }, /** @type {[string[], boolean]} */ ([TAP_EXCEPTIONS.map((e) => e.selector), size.touch]));
-  const violations = await axeViolations(page);
+  const pageViolations = await axeViolations(page);
+  const violations = [...pageViolations, ...await popupViolations(page, pageViolations)];
   const checked = { ...measured, touch: size.touch, viewportWidth: size.width, errors, violations };
   return { failures: describeFailure(checked), ...checked };
+}
+
+/**
+ * axe's findings with each of POPUPS open in turn (a pop-up mounted outside
+ * the page's landmarks fails axe's "region" rule) that the page without it
+ * didn't already have; each is closed again after.
+ * @param {import('playwright').Page} page @param {string[]} pageViolations
+ * @returns {Promise<string[]>}
+ */
+async function popupViolations(page, pageViolations) {
+  const found = [];
+  for (const { name, open, shows } of POPUPS) {
+    const opener = page.locator(open).first();
+    if (!await opener.count()) continue;
+    // Scroll first and let it settle: a scroll closes the ⋮ menu (it is placed against its button).
+    await opener.scrollIntoViewIfNeeded();
+    await page.waitForTimeout(300);
+    await opener.click();
+    const shown = await page.locator(shows).first().waitFor({ timeout: 3000 }).then(() => true, () => false);
+    if (!shown) {
+      found.push(`${name} never opened`);
+      continue;
+    }
+    const added = (await axeViolations(page)).filter((v) => !pageViolations.includes(v));
+    found.push(...added.map((v) => `with ${name} open, ${v}`));
+    await page.keyboard.press('Escape');
+    await page.locator(shows).first().waitFor({ state: 'detached', timeout: 3000 })
+      .catch(() => found.push(`${name} didn't close on Escape`));
+  }
+  return found;
 }

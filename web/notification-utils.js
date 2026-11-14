@@ -1,6 +1,8 @@
 // Notification Utility Functions
 // Provides a consistent notification system across the application.
 
+import { popupHost } from './ui-components.js';
+
 /**
  * Show a notification message to the user
  * @param {string} message - The message to display
@@ -41,7 +43,7 @@ export function showNotification(message, type = "info") {
     notification.style.border = '1px solid #bee5eb';
   }
   
-  document.body.appendChild(notification);
+  popupHost().appendChild(notification);
   
   // Auto-remove after 3 seconds
   setTimeout(() => {

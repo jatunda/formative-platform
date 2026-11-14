@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { expectConsoleErrors } from '../helpers/quiet-console.js';
+import { lineIcon } from '../../line-icons.js';
 import {
   initializeBulkShiftControl,
   applyBulkShift,
@@ -27,7 +28,7 @@ vi.mock('https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js', () => 
 }));
 
 vi.mock('../../date-utils.js', () => ({
-  getDayDateLabels: vi.fn(async (dayIndex) => ({ full: `date-for-${dayIndex}`, short: `short-${dayIndex}` })),
+  getDateForDayIndex: vi.fn(async (dayIndex) => `date-for-${dayIndex}`),
   getTodayDayIndex: vi.fn(async () => 10),
   getClassDateOffset: vi.fn(async (classId) => ({ csa: 5, csp: 2 })[classId] ?? 0),
   setClassDateOffset: vi.fn(async () => {}),
@@ -57,11 +58,8 @@ vi.mock('../../schedule-day-view.js', () => ({
     tr.dataset.dayIndex = dayIndex;
     return tr;
   }),
-  createInsertDayRow: vi.fn((dayIndex) => {
-    const tr = document.createElement('tr');
-    tr.className = 'insert-day-row';
-    tr.dataset.beforeDayIndex = dayIndex;
-    return tr;
+  addInsertDayPlus: vi.fn((dayRow, insertAt, onInsert, edge) => {
+    dayRow.dataset.plusBelow = `${insertAt}:${edge}`;
   }),
   makeInsertDayHandler: vi.fn(() => vi.fn()),
   makeDeleteDayHandler: vi.fn(() => vi.fn()),
@@ -95,6 +93,7 @@ vi.mock('../../ui-components.js', () => ({
     btn.onclick = onClick;
     return btn;
   },
+  teacherIcon: (name) => lineIcon(name, 'line-icon'),
 }));
 
 const dayIndicesShown = (containerEl) =>
@@ -407,18 +406,31 @@ describe('lesson-planning', () => {
     describe('Full schedule link', () => {
       const scheduleLink = (containerEl) => containerEl.querySelector('.lesson-planning-pane-header a');
 
-      it("sits right after the Class name and opens that Class's Full Schedule at today, in the same tab", async () => {
+      it("sits right after the Class name and opens that Class's Full Schedule at today, in a new tab", async () => {
         mockGetFullSchedule.mockResolvedValue({});
         const containerEl = document.createElement('div');
         await renderClassPane('csa', 'CS A', containerEl);
 
         const link = scheduleLink(containerEl);
         expect(containerEl.querySelector('h2').nextElementSibling).toBe(link);
-        expect(link.textContent).toBe('↗');
         expect(link.getAttribute('href')).toBe('teacher.html?class=csa&scroll=today');
-        expect(link.target).toBe('');
+        expect(link.target).toBe('_blank');
+        expect(link.rel).toBe('noopener');
         expect(link.title).toBe('Full schedule');
         expect(link.getAttribute('aria-label')).toBe('Full schedule for CS A');
+      });
+
+      it('shows a flat open-in-new icon instead of a text arrow', async () => {
+        mockGetFullSchedule.mockResolvedValue({});
+        const containerEl = document.createElement('div');
+        await renderClassPane('csa', 'CS A', containerEl);
+
+        const link = scheduleLink(containerEl);
+        expect(link.textContent).toBe('');
+        const svg = link.querySelector('svg');
+        expect(svg.getAttribute('class')).toBe('line-icon');
+        expect(svg.getAttribute('aria-hidden')).toBe('true');
+        expect(svg.innerHTML).toBe(lineIcon('openInNew', 'line-icon').innerHTML);
       });
 
       it('stays visible when the Class is collapsed', async () => {
@@ -432,17 +444,41 @@ describe('lesson-planning', () => {
       });
     });
 
-    it('brackets the window with an insert-day row before and after', async () => {
-      mockGetFullSchedule.mockResolvedValue({});
+    it('has no Insert Day rows: each day gets the insert handler and the last stored Day Index, for its "+" above', async () => {
+      mockGetFullSchedule.mockResolvedValue({ 11: ['a'] });
+      const { createDayRow, makeInsertDayHandler } = await import('../../schedule-day-view.js');
+      const containerEl = document.createElement('div');
+
+      await renderClassPane('csa', 'CS A', containerEl);
+
+      const onInsertDay = makeInsertDayHandler.mock.results.at(-1).value;
+      const rows = [...containerEl.querySelectorAll('tbody > tr')];
+      expect(rows.map((r) => r.className)).toEqual(['day-row', 'day-row', 'day-row']);
+      expect(createDayRow.mock.calls.map((c) => c[4].onInsertDay)).toEqual([onInsertDay, onInsertDay, onInsertDay]);
+      expect(createDayRow.mock.calls.map((c) => c[4].lastDayIndex)).toEqual([11, 11, 11]);
+    });
+
+    it('puts a "+" below the last day in the window when a stored day comes after it', async () => {
+      mockGetFullSchedule.mockResolvedValue({ 20: ['later'] });
+      const { makeInsertDayHandler, addInsertDayPlus } = await import('../../schedule-day-view.js');
       const containerEl = document.createElement('div');
 
       await renderClassPane('csa', 'CS A', containerEl);
 
       const rows = [...containerEl.querySelectorAll('tbody > tr')];
-      expect(rows[0].className).toBe('insert-day-row');
-      expect(rows[0].dataset.beforeDayIndex).toBe('10');
-      expect(rows.at(-1).className).toBe('insert-day-row');
-      expect(rows.at(-1).dataset.beforeDayIndex).toBe('13');
+      expect(addInsertDayPlus).toHaveBeenCalledTimes(1);
+      expect(rows.at(-1).dataset.plusBelow).toBe('13:below');
+      expect(addInsertDayPlus.mock.calls[0][2]).toBe(makeInsertDayHandler.mock.results.at(-1).value);
+    });
+
+    it('puts no "+" below the window when no stored day comes after it: that would only add an empty day (ticket 13)', async () => {
+      mockGetFullSchedule.mockResolvedValue({ 12: ['last'] });
+      const { addInsertDayPlus } = await import('../../schedule-day-view.js');
+      const containerEl = document.createElement('div');
+
+      await renderClassPane('csa', 'CS A', containerEl);
+
+      expect(addInsertDayPlus).not.toHaveBeenCalled();
     });
 
     it('only preloads lesson titles for hashes inside the Planning Window', async () => {

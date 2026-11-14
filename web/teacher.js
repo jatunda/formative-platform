@@ -10,13 +10,11 @@ import {
 import { db } from './firebase-config.js';
 import { initializeDatabase } from './database-handle.js';
 import {
-  getDateForDayIndex as sharedGetDateForDayIndex,
-  getDayDateLabels,
+  getDateForDayIndex,
   getTodayDayIndex,
   getClassDateOffset,
   setClassDateOffset
 } from './date-utils.js';
-import { DEFAULT_CLASS_START_DATE } from './constants.js';
 import { showNotification } from './notification-utils.js';
 import {
   createDateOffsetControl
@@ -27,7 +25,6 @@ import {
 import {
   createDayRow,
   createDateCell,
-  createInsertDayRow,
   createEndButtonsContainer,
   makeInsertDayHandler,
   makeDeleteDayHandler,
@@ -126,11 +123,6 @@ export async function loadClasses(classSelectEl) {
       editorLink.href = `editor.html?fromClass=${urlClassId}`;
     }
   }
-}
-
-// Use the shared date calculation function
-export async function getDateForDayIndex(dayIndex, classId = currentClassId, classStartDate = DEFAULT_CLASS_START_DATE) {
-  return await sharedGetDateForDayIndex(dayIndex, classId, classStartDate);
 }
 
 export async function applyDateOffset(newOffset, classId = currentClassId) {
@@ -303,7 +295,7 @@ export async function createFinalRow(nextIndex, ctx) {
   addRow.appendChild(tdDay);
 
   // Date column
-  addRow.appendChild(createDateCell(await getDayDateLabels(nextIndex, ctx.classId)));
+  addRow.appendChild(createDateCell(await getDateForDayIndex(nextIndex, ctx.classId)));
 
   // Lessons column with just the New Lesson / Link Lesson buttons
   const tdLessons = document.createElement("td");
@@ -322,7 +314,9 @@ export async function renderScheduleTable(schedule, classId = currentClassId) {
   const scheduleTableBody = document.querySelector("#scheduleTable tbody");
   scheduleTableBody.innerHTML = "";
   const dayIndexes = Object.keys(schedule).map(Number).sort((a, b) => a - b);
-  const maxDayIndex = dayIndexes.length > 0 ? Math.max(...dayIndexes) : 0;
+  // The last stored Day Index (-1 for an empty Schedule, which still shows day 0).
+  const lastDayIndex = dayIndexes.length > 0 ? Math.max(...dayIndexes) : -1;
+  const maxDayIndex = Math.max(lastDayIndex, 0);
 
   // Get today's day index for highlighting
   let todayDayIndex;
@@ -340,24 +334,26 @@ export async function renderScheduleTable(schedule, classId = currentClassId) {
   }
   await getLessonTitles(allLessonHashes);
 
+  // onInsertDay gives each stored day's row an Insert Day "+" on the line
+  // above it. There is none below the last day: an empty day there isn't
+  // stored, so the add-day row's New Lesson / Link Lesson buttons add a day
+  // after the last one, and only once it holds a Lesson (ticket 13).
   const ctx = {
     classId,
     onReload: loadFullSchedule,
-    onDeleteDay: makeDeleteDayHandler(classId, loadFullSchedule)
+    onDeleteDay: makeDeleteDayHandler(classId, loadFullSchedule),
+    onInsertDay: makeInsertDayHandler(classId, lastDayIndex, loadFullSchedule),
+    lastDayIndex
   };
-  const onInsertDay = makeInsertDayHandler(classId, maxDayIndex, loadFullSchedule);
 
   // Render all days
+  const dayRows = [];
   for (let dayIndex = 0; dayIndex <= maxDayIndex; dayIndex++) {
-    // Insert row before each day
-    scheduleTableBody.appendChild(createInsertDayRow(dayIndex, onInsertDay));
-
-    // Day row
     const lessons = schedule[dayIndex] || [];
-    const dateLabels = await getDayDateLabels(dayIndex, classId);
-    const dayRow = await createDayRow(dayIndex, lessons, todayDayIndex, dateLabels, ctx);
-    scheduleTableBody.appendChild(dayRow);
+    const dateLabel = await getDateForDayIndex(dayIndex, classId);
+    dayRows.push(await createDayRow(dayIndex, lessons, todayDayIndex, dateLabel, ctx));
   }
+  scheduleTableBody.append(...dayRows);
 
   // Final row for adding a new day
   const nextIndex = maxDayIndex + 1;

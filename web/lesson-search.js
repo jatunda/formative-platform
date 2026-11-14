@@ -107,6 +107,9 @@ export function showLessonSearchPopup({ onSelect }) {
       // Create popup
       const popup = document.createElement("div");
       popup.className = "lesson-popup";
+      popup.setAttribute("role", "dialog");
+      popup.setAttribute("aria-modal", "true");
+      popup.setAttribute("aria-label", "Search lessons");
 
       const box = document.createElement("div");
       box.className = "lesson-popup-box";

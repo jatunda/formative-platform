@@ -11,6 +11,9 @@ import { DEFAULT_LESSON_TITLE, UNTITLED_LESSON } from './constants.js';
 import {
   createIconButton,
   createInsertDayButton,
+  savingSpinner,
+  teacherIcon,
+  textIcon,
   withWorkingIndicator
 } from './ui-components.js';
 import { createLessonClusterWithDB } from './lesson-manager.js';
@@ -98,19 +101,18 @@ export function makeInsertDayHandler(classId, maxDayIndex, onReload) {
 }
 
 /**
- * Create a row with an "Insert Day Here" button.
- * @param {number} dayIndex - The day index to insert before
- * @param {(dayIndex: number) => void} onInsert - Callback function when insert is clicked
- * @returns {HTMLTableRowElement}
+ * Add an Insert Day "+" to a day row: it sits in the left gutter beside the
+ * row's Day Index cell, centred on the line above (or below) the day, and
+ * inserts a day at `insertAt`.
+ * @param {HTMLTableRowElement} dayRow - A row from createDayRow
+ * @param {number} insertAt - The Day Index the new day takes
+ * @param {(dayIndex: number) => void} onInsert
+ * @param {"above" | "below"} [edge="above"] - Which of the row's lines it sits on
  */
-export function createInsertDayRow(dayIndex, onInsert) {
-  const insertRow = document.createElement("tr");
-  const insertTd = document.createElement("td");
-  insertTd.colSpan = 4;
-  insertTd.className = "insert-day-cell";
-  insertTd.appendChild(createInsertDayButton(dayIndex, onInsert));
-  insertRow.appendChild(insertTd);
-  return insertRow;
+export function addInsertDayPlus(dayRow, insertAt, onInsert, edge = "above") {
+  const btn = createInsertDayButton(insertAt, onInsert);
+  btn.classList.add(`insert-day-${edge}`);
+  /** @type {HTMLTableCellElement} */ (dayRow.querySelector(".day-index-cell")).appendChild(btn);
 }
 
 /**
@@ -124,10 +126,11 @@ export function createActionsCell(dayIndex, onDeleteDay) {
   tdActions.className = "day-actions-cell";
 
   const deleteButton = document.createElement("button");
-  deleteButton.textContent = "🗑️";
+  deleteButton.appendChild(teacherIcon("trash"));
   deleteButton.className = "delete-day-btn";
   deleteButton.title = `Delete day ${dayIndex}`;
-  deleteButton.onclick = withWorkingIndicator(deleteButton, () => onDeleteDay(dayIndex));
+  deleteButton.onclick = withWorkingIndicator(deleteButton, () => onDeleteDay(dayIndex),
+    { workingLabel: savingSpinner });
   tdActions.appendChild(deleteButton);
 
   return tdActions;
@@ -145,7 +148,7 @@ async function appendLessonToDay(lessonId, dayIndex, ctx) {
 }
 
 /**
- * Create the side-by-side New Lesson (➕) / Link Lesson (🔗) icon buttons
+ * Create the side-by-side New Lesson (text "+") / Link Lesson (link icon) buttons
  * that follow a day's last Lesson.
  * @param {number} dayIndex
  * @param {{classId: string, onReload: () => void}} ctx
@@ -155,12 +158,12 @@ export function createEndButtonsContainer(dayIndex, ctx) {
   const container = document.createElement("div");
   container.className = "lessons-end-buttons";
 
-  const newBtn = createIconButton("➕", "New Lesson", async () => {
+  const newBtn = createIconButton(textIcon("+"), "New Lesson", async () => {
     const lessonId = await lessonStore().create({ title: DEFAULT_LESSON_TITLE });
     await appendLessonToDay(lessonId, dayIndex, ctx);
   });
 
-  const linkBtn = createIconButton("🔗", "Link Lesson", () => {
+  const linkBtn = createIconButton(teacherIcon("link"), "Link Lesson", () => {
     showLessonSearchPopup({
       onSelect: (lessonId) => appendLessonToDay(lessonId, dayIndex, ctx)
     });
@@ -172,21 +175,14 @@ export function createEndButtonsContainer(dayIndex, ctx) {
 }
 
 /**
- * Create a day row's Date cell. It holds both labels; the stylesheet shows
- * `short` ("Mon 11/2") on narrow screens and `full` everywhere else.
- * @param {{full: string, short: string}} dateLabels
+ * Create a day row's Date cell, e.g. "Mon 11/2".
+ * @param {string} dateLabel - From getDateForDayIndex
  * @returns {HTMLTableCellElement}
  */
-export function createDateCell(dateLabels) {
+export function createDateCell(dateLabel) {
   const tdDate = document.createElement("td");
   tdDate.className = "date-cell";
-  const full = document.createElement("span");
-  full.className = "date-full";
-  full.textContent = dateLabels.full;
-  const short = document.createElement("span");
-  short.className = "date-short";
-  short.textContent = dateLabels.short;
-  tdDate.append(full, short);
+  tdDate.textContent = dateLabel;
   return tdDate;
 }
 
@@ -224,11 +220,16 @@ export function setupLessonDropHandlers(tdLessons, toDayIndex, ctx) {
  * @param {number} dayIndex
  * @param {string[]} lessons - Lesson hashes for this day
  * @param {number|undefined} todayDayIndex - Today's Day Index, for highlighting
- * @param {{full: string, short: string}} dateLabels - This Day Index's calendar date (see getDayDateLabels)
- * @param {{classId: string, onReload: () => void, onDeleteDay: (dayIndex: number) => void}} ctx
+ * @param {string} dateLabel - This Day Index's calendar date (see getDateForDayIndex)
+ * @param {{classId: string, onReload: () => void, onDeleteDay: (dayIndex: number) => void,
+ *   onInsertDay?: (dayIndex: number) => void, lastDayIndex?: number}} ctx - With
+ *   onInsertDay, a day on or before `lastDayIndex` (the last stored Day Index)
+ *   gets an Insert Day "+" on the line above it (see addInsertDayPlus). Past it,
+ *   inserting would only add an empty day, which the database doesn't store, so
+ *   there is no "+" (ticket 13); the add-day row adds days there instead.
  * @returns {Promise<HTMLTableRowElement>}
  */
-export async function createDayRow(dayIndex, lessons, todayDayIndex, dateLabels, ctx) {
+export async function createDayRow(dayIndex, lessons, todayDayIndex, dateLabel, ctx) {
   const tr = document.createElement("tr");
 
   if (todayDayIndex !== undefined && dayIndex === todayDayIndex) {
@@ -240,7 +241,7 @@ export async function createDayRow(dayIndex, lessons, todayDayIndex, dateLabels,
   tdDay.textContent = dayIndex;
   tr.appendChild(tdDay);
 
-  tr.appendChild(createDateCell(dateLabels));
+  tr.appendChild(createDateCell(dateLabel));
 
   const tdLessons = document.createElement("td");
   tdLessons.className = "lessons-cell";
@@ -264,6 +265,7 @@ export async function createDayRow(dayIndex, lessons, todayDayIndex, dateLabels,
 
   tr.appendChild(tdLessons);
   tr.appendChild(createActionsCell(dayIndex, ctx.onDeleteDay));
+  if (ctx.onInsertDay && dayIndex <= (ctx.lastDayIndex ?? -1)) addInsertDayPlus(tr, dayIndex, ctx.onInsertDay);
 
   return tr;
 }

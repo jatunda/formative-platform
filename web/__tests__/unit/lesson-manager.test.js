@@ -87,6 +87,22 @@ describe('lesson-manager', () => {
       expect(el.querySelector('.lesson-main-btn').textContent).toBe(DEFAULT_LESSON_TITLE);
     });
 
+    it('shows the full title as the title button\'s only tooltip, so a title cut off with … can be read', () => {
+      const long = 'A very long Lesson title that the schedule row cuts off with an ellipsis';
+      const el = cluster({ lessonTitle: long });
+      const btn = el.querySelector('.lesson-main-btn');
+      expect(btn.title).toBe(long);
+      // No ancestor in the cluster carries a competing tooltip.
+      for (let node = btn.parentElement; node; node = node.parentElement) {
+        expect(node.hasAttribute('title')).toBe(false);
+      }
+    });
+
+    it('uses the default title as the tooltip when the Lesson has none', () => {
+      const el = cluster({ lessonTitle: '' });
+      expect(el.querySelector('.lesson-main-btn').title).toBe(DEFAULT_LESSON_TITLE);
+    });
+
     it('opens the Lesson on a title click', () => {
       const onClick = vi.fn();
       cluster({ onClick }).querySelector('.lesson-main-btn').click();
@@ -131,6 +147,30 @@ describe('lesson-manager', () => {
       menuItem(label).click();
       await flush();
       expect(fn).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('saving a slow move', () => {
+    it("shows the spinner in the ⋮ button until the move saves, then the ⋮ again", async () => {
+      vi.useFakeTimers();
+      try {
+        let finish;
+        const el = cluster({ onMoveRight: () => new Promise((r) => { finish = r; }) });
+        const menuBtn = el.querySelector('[aria-haspopup="menu"]');
+        const glyph = menuBtn.textContent;
+        openMenu(el);
+        menuItem('Move right').click();
+
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(menuBtn.querySelector('svg').getAttribute('class')).toBe('line-icon line-icon-spin');
+
+        finish();
+        await vi.advanceTimersByTimeAsync(0);
+        expect(menuBtn.querySelector('svg')).toBeNull();
+        expect(menuBtn.textContent).toBe(glyph);
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 

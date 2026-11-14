@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
-  PAGES, SIZES, TAP_EXCEPTIONS, KNOWN_FAILURES, tapTargetProblem, describeFailure, classify, parseArgs,
+  PAGES, SIZES, TAP_EXCEPTIONS, KNOWN_FAILURES, tapTargetProblem, rowMisalignment, insertPlusMisplacement, describeFailure, classify, parseArgs,
 } from '../../scripts/schedule-check-matrix.js';
 import { buildFixtureDb, todayIndex, TODAY, DATE_OFFSET, SCHEDULES, LONG_TITLE } from '../../scripts/schedule-check-fixtures.js';
 import { getBusinessDaysBetween, createLocalDate, DEFAULT_CLASS_START_DATE } from '../../business-days.js';
@@ -41,11 +41,57 @@ describe('tapTargetProblem', () => {
   });
 });
 
+/** A day row whose cells span `edges` ([top, bottom] each), in cell order. */
+const dayRow = (...edges) => ({
+  label: 'P1 day 12 (1 Lesson)',
+  cells: edges.map(([top, bottom], i) => ({ name: ['Day Index', 'Date', 'Lessons', 'Delete Day'][i], top, bottom })),
+});
+
+describe('rowMisalignment', () => {
+  it('passes a row whose cells share one top and one bottom', () => {
+    expect(rowMisalignment(dayRow([10, 60], [10, 60], [10, 60], [10, 60]))).toBeNull();
+  });
+
+  it('rounds to the half pixel, so subpixel layout noise still lines up', () => {
+    expect(rowMisalignment(dayRow([10, 60], [10.1, 59.9], [10, 60.2], [10, 60]))).toBeNull();
+  });
+
+  it('names the cells that end at a different height', () => {
+    expect(rowMisalignment(dayRow([10, 60], [10, 60], [10, 52], [10, 60])))
+      .toBe('P1 day 12 (1 Lesson): cells end at different heights (Day Index 60, Date 60, Lessons 52, Delete Day 60)');
+  });
+
+  it('names the cells that start at a different height', () => {
+    expect(rowMisalignment(dayRow([10, 60], [14, 60], [10, 60], [10, 60])))
+      .toBe('P1 day 12 (1 Lesson): cells start at different heights (Day Index 10, Date 14, Lessons 10, Delete Day 10)');
+  });
+});
+
+/** An Insert Day "+" whose glyph centre is at (x, y), in a gutter from 0 to 20, on the line at y = 100. */
+const plus = (x, y) => ({ label: 'P1 above day 12', x, y, gutterLeft: 0, gutterRight: 20, line: 100 });
+
+describe('insertPlusMisplacement (ticket 10)', () => {
+  it('passes a "+" centred in the gutter and on its line, to the half pixel', () => {
+    expect(insertPlusMisplacement(plus(10, 100))).toBeNull();
+    expect(insertPlusMisplacement(plus(10, 100.2))).toBeNull();
+  });
+
+  it('fails a "+" outside the gutter, beside it or over the table', () => {
+    expect(insertPlusMisplacement(plus(-3, 100))).toBe('Insert Day "+" P1 above day 12 is at x -3, outside the gutter (0 to 20)');
+    expect(insertPlusMisplacement(plus(30, 100))).toMatch(/at x 30, outside the gutter/);
+  });
+
+  it('fails a "+" more than a pixel off the line between days', () => {
+    expect(insertPlusMisplacement(plus(10, 104))).toBe('Insert Day "+" P1 above day 12 is 4px off its line');
+    expect(insertPlusMisplacement(plus(10, 101))).toBeNull();
+  });
+});
+
 /** A clean render, with `change` applied. */
 const checked = (change = {}) => ({
   scrollWidth: 375, viewportWidth: 375, touch: true, coarse: true,
   shortTables: [{ name: 'P1', lessonsPerDay: 1, contentWidth: 359, paneWidth: 359 }],
-  targets: [target(44, 44)], errors: [], violations: [], ...change,
+  targets: [target(44, 44)], rows: [dayRow([0, 50], [0, 50])], pluses: [plus(10, 100)], strayPluses: [], errors: [], violations: [], ...change,
 });
 
 describe('describeFailure', () => {
@@ -60,6 +106,29 @@ describe('describeFailure', () => {
   it('reports a short day wider than its pane (ticket 02)', () => {
     const shortTables = [{ name: 'P1', lessonsPerDay: 1, contentWidth: 600, paneWidth: 359 }];
     expect(describeFailure(checked({ shortTables }))).toEqual(['P1: days of at most 1 Lesson(s) are 600px wide in a 359px pane']);
+  });
+
+  it('reports day rows whose cells do not line up in one line, naming the first (ticket 09)', () => {
+    const rows = [dayRow([0, 50], [0, 50]), dayRow([0, 50], [0, 40]), dayRow([0, 50], [4, 50])];
+    expect(describeFailure(checked({ rows }))).toEqual([
+      "2 of 3 day rows don't line up, first P1 day 12 (1 Lesson): cells end at different heights (Day Index 50, Date 40)",
+    ]);
+  });
+
+  it('reports misplaced Insert Day "+"s, naming the first (ticket 10)', () => {
+    const pluses = [plus(10, 100), plus(30, 100), plus(10, 90)];
+    expect(describeFailure(checked({ pluses }))).toEqual([
+      '2 of 3 Insert Day "+"s are misplaced, first Insert Day "+" P1 above day 12 is at x 30, outside the gutter (0 to 20)',
+    ]);
+  });
+
+  it('reports day rows with no Insert Day "+" at all', () => {
+    expect(describeFailure(checked({ pluses: [] }))).toEqual(['no Insert Day "+" beside the 1 day rows']);
+  });
+
+  it('reports an Insert Day "+" past the last stored day, where it would only add an empty day (ticket 13)', () => {
+    expect(describeFailure(checked({ strayPluses: ['below P1 day 12'] })))
+      .toEqual(['Insert Day "+" below P1 day 12 is past the last stored day']);
   });
 
   it('reports a browser whose pointer does not match the size', () => {

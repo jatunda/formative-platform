@@ -7,7 +7,11 @@ import {
   getLessonTitles,
   createEndButtonsContainer,
   createDateCell,
+  createActionsCell,
+  createDayRow,
+  addInsertDayPlus,
 } from '../../schedule-day-view.js';
+import { lineIcon } from '../../line-icons.js';
 import { initializeDatabase } from '../../database-handle.js';
 import { DEFAULT_LESSON_TITLE, UNTITLED_LESSON } from '../../constants.js';
 import { setupDragHandlers } from '../../drag-drop-utils.js';
@@ -26,10 +30,11 @@ vi.mock('https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js', () => 
       val: () => value,
     });
   },
+  // A test can hold a write open by having mockSet return a pending promise.
   set: (ref, value) => {
-    mockSet(ref.path, value);
+    const pending = mockSet(ref.path, value);
     mockData[ref.path] = value;
-    return Promise.resolve();
+    return pending ?? Promise.resolve();
   },
   // The Lesson store writes through multi-path updates (realtime-store.js)
   update: (ref, updates) => {
@@ -124,8 +129,19 @@ describe('schedule-day-view', () => {
       const container = createEndButtonsContainer(2, { classId: 'class1', onReload });
       const buttons = [...container.querySelectorAll('button')];
 
-      expect(buttons.map(b => b.textContent)).toEqual(['➕', '🔗']);
       expect(buttons.map(b => b.title)).toEqual(['New Lesson', 'Link Lesson']);
+    });
+
+    it('New Lesson is a plain-text "+" in an icon-sized box; Link Lesson is the flat link icon', () => {
+      const container = createEndButtonsContainer(2, { classId: 'class1', onReload });
+
+      const plus = byLabel(container, 'New Lesson').firstElementChild;
+      expect(plus.tagName).toBe('SPAN');
+      expect(plus.className).toBe('text-icon');
+      expect(plus.textContent).toBe('+');
+      const link = byLabel(container, 'Link Lesson');
+      expect(link.textContent).toBe('');
+      expect(link.querySelector('svg').outerHTML).toBe(lineIcon('link', 'line-icon').outerHTML);
     });
 
     it('New Lesson creates an Empty Lesson and adds it to the end of that Day Index', async () => {
@@ -138,6 +154,30 @@ describe('schedule-day-view', () => {
       expect(newId).toMatch(/^[0-9a-f]{32}$/);
       expect(mockData[`content/${newId}`]).toEqual({ title: DEFAULT_LESSON_TITLE });
       expect(onReload).toHaveBeenCalled();
+    });
+
+    it('New Lesson shows the saving spinner while a slow save runs, then its "+" again', async () => {
+      vi.useFakeTimers();
+      try {
+        const container = createEndButtonsContainer(2, { classId: 'class1', onReload });
+        const newBtn = byLabel(container, 'New Lesson');
+        const plus = newBtn.firstElementChild;
+        let release;
+        mockSet.mockImplementationOnce(() => new Promise((r) => { release = r; }));
+
+        const done = newBtn.onclick();
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(newBtn.querySelector('svg').getAttribute('class')).toBe('line-icon line-icon-spin');
+        expect(newBtn.textContent).toBe('');
+
+        release();
+        await done;
+        expect([...newBtn.childNodes]).toEqual([plus]);
+        expect(newBtn.textContent).toBe('+');
+        expect(newBtn.disabled).toBe(false);
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it('Link Lesson adds the Lesson picked in the search popup to the end of that Day Index', async () => {
@@ -161,12 +201,100 @@ describe('schedule-day-view', () => {
     });
   });
 
-  describe('createDateCell', () => {
-    it('holds both the full date (wide screens) and the short one (narrow screens)', () => {
-      const cell = createDateCell({ full: '11/2/2026 (Monday)', short: 'Mon 11/2' });
+  describe('createActionsCell', () => {
+    it('Delete Day is the flat trash icon, its tooltip naming the day', () => {
+      const button = createActionsCell(3, vi.fn()).querySelector('button');
 
-      expect(cell.querySelector('.date-full').textContent).toBe('11/2/2026 (Monday)');
-      expect(cell.querySelector('.date-short').textContent).toBe('Mon 11/2');
+      expect(button.className).toBe('delete-day-btn');
+      expect(button.title).toBe('Delete day 3');
+      expect(button.textContent).toBe('');
+      expect(button.querySelector('svg').outerHTML).toBe(lineIcon('trash', 'line-icon').outerHTML);
+    });
+
+    it('shows the saving spinner, not words, while a slow delete saves', async () => {
+      vi.useFakeTimers();
+      try {
+        let finish;
+        const button = createActionsCell(3, () => new Promise((r) => { finish = r; })).querySelector('button');
+
+        const done = button.onclick();
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(button.querySelector('svg').getAttribute('class')).toBe('line-icon line-icon-spin');
+
+        finish();
+        await done;
+        expect(button.querySelector('svg').getAttribute('class')).toBe('line-icon');
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
+  describe('Insert Day "+"', () => {
+    const plusesOf = (row) => [...row.querySelectorAll('button[aria-label="Insert day here"]')];
+    const ctxWith = (onInsertDay, lastDayIndex = 9) => ({ classId: 'class1', onReload, onDeleteDay: vi.fn(), onInsertDay, lastDayIndex });
+
+    it('a day row has one "+" in its Day Index cell, on the line above it, inserting a day at that Day Index', async () => {
+      const onInsertDay = vi.fn();
+      const row = await createDayRow(4, [], undefined, 'Mon 11/2', ctxWith(onInsertDay));
+
+      const [plus] = plusesOf(row);
+      expect(plusesOf(row)).toHaveLength(1);
+      expect(plus.parentElement.className).toBe('day-index-cell');
+      expect(plus.classList.contains('insert-day-above')).toBe(true);
+      await plus.onclick();
+      expect(onInsertDay).toHaveBeenCalledWith(4);
+    });
+
+    it('the Day Index cell still reads as just the number before the "+"', async () => {
+      const row = await createDayRow(4, [], undefined, 'Mon 11/2', ctxWith(vi.fn()));
+
+      expect(row.querySelector('.day-index-cell').firstChild.textContent).toBe('4');
+    });
+
+    it('a day row built without an insert handler has no "+"', async () => {
+      const row = await createDayRow(4, [], undefined, 'Mon 11/2', { classId: 'class1', onReload, onDeleteDay: vi.fn() });
+
+      expect(plusesOf(row)).toHaveLength(0);
+    });
+
+    it('a day on or before the last stored day keeps its "+"', async () => {
+      const row = await createDayRow(4, ['a'], undefined, 'Mon 11/2', ctxWith(vi.fn(), 4));
+
+      expect(plusesOf(row)).toHaveLength(1);
+    });
+
+    it('a day past the last stored day has no "+": inserting there would only add an empty day, which is not stored', async () => {
+      const row = await createDayRow(5, [], undefined, 'Mon 11/2', ctxWith(vi.fn(), 4));
+
+      expect(plusesOf(row)).toHaveLength(0);
+    });
+
+    it('with an insert handler but no last stored day (an empty Schedule), a day row has no "+"', async () => {
+      const row = await createDayRow(0, [], undefined, 'Mon 11/2', { classId: 'class1', onReload, onDeleteDay: vi.fn(), onInsertDay: vi.fn() });
+
+      expect(plusesOf(row)).toHaveLength(0);
+    });
+
+    it('addInsertDayPlus can put a second "+" on the line below a day', async () => {
+      const onInsertDay = vi.fn();
+      const row = await createDayRow(4, [], undefined, 'Mon 11/2', ctxWith(onInsertDay));
+
+      addInsertDayPlus(row, 5, onInsertDay, 'below');
+
+      const below = plusesOf(row)[1];
+      expect(below.classList.contains('insert-day-below')).toBe(true);
+      await below.onclick();
+      expect(onInsertDay).toHaveBeenCalledWith(5);
+    });
+  });
+
+  describe('createDateCell', () => {
+    it('shows the short date as its only text', () => {
+      const cell = createDateCell('Mon 11/2');
+
+      expect(cell.className).toBe('date-cell');
+      expect(cell.textContent).toBe('Mon 11/2');
     });
   });
 

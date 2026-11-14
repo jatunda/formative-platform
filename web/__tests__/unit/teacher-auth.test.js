@@ -164,6 +164,20 @@ describe('TeacherAuth', () => {
       expect(auth.isSessionValid()).toBe(true);
     });
 
+    it('shows the password prompt as a labelled modal dialog', async () => {
+      const promise = auth.authenticate();
+
+      await vi.waitFor(() => expect(document.getElementById('teacherPasswordInput')).toBeTruthy());
+      const dialog = document.querySelector('[role="dialog"]');
+      expect(dialog.getAttribute('aria-modal')).toBe('true');
+      expect(document.getElementById(dialog.getAttribute('aria-labelledby')).textContent)
+        .toBe('Teacher Authentication');
+      expect(dialog.contains(document.getElementById('teacherPasswordInput'))).toBe(true);
+
+      document.getElementById('cancelBtn').click();
+      await promise;
+    });
+
     it('resolves false without alerting when the wrong password is entered', async () => {
       auth.passwordHash = await sha256Hex('correct-horse');
       const promise = auth.authenticate();

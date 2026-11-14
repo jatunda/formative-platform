@@ -172,4 +172,18 @@ describe('createMenuButton (⋮ action menu)', () => {
       spy.mockRestore();
     });
   });
+
+  describe('where the menu mounts (it must sit in a landmark for axe "region")', () => {
+    it('mounts inside <main> when the page has one', () => {
+      const main = document.createElement('main');
+      document.body.appendChild(main);
+      anchor.click();
+      expect(menu().parentElement).toBe(main);
+    });
+
+    it('mounts on <body> on a page without <main>', () => {
+      anchor.click();
+      expect(menu().parentElement).toBe(document.body);
+    });
+  });
 });

@@ -103,27 +103,10 @@ export async function getTodayDayIndex(classId, classStartDate = DEFAULT_CLASS_S
  * @param {number} dayIndex - The day index
  * @param {string} classId - The class ID
  * @param {string} [classStartDate=DEFAULT_CLASS_START_DATE] - The class start date in YYYY-MM-DD format
- * @returns {Promise<string>} The formatted date string with weekday (e.g., "1/15/2025 (Wednesday)")
+ * @returns {Promise<string>} The short date label a Schedule row shows (e.g., "Wed 1/15")
  */
 export async function getDateForDayIndex(dayIndex, classId, classStartDate = DEFAULT_CLASS_START_DATE) {
-  return (await getDayDateLabels(dayIndex, classId, classStartDate)).full;
-}
-
-/**
- * Both date labels a Schedule row shows for a day index: `full` for wide
- * screens (e.g. "11/2/2026 (Monday)") and `short` for narrow ones ("Mon 11/2").
- * @param {number} dayIndex - The day index
- * @param {string} classId - The class ID
- * @param {string} [classStartDate=DEFAULT_CLASS_START_DATE] - The class start date in YYYY-MM-DD format
- * @returns {Promise<{full: string, short: string}>}
- */
-export async function getDayDateLabels(dayIndex, classId, classStartDate = DEFAULT_CLASS_START_DATE) {
-  const date = await getDateObjectForDayIndex(dayIndex, classId, classStartDate);
-  const longWeekday = date.toLocaleDateString(undefined, { weekday: "long" });
-  return {
-    full: `${date.toLocaleDateString()} (${longWeekday})`,
-    short: shortDateLabel(date)
-  };
+  return shortDateLabel(await getDateObjectForDayIndex(dayIndex, classId, classStartDate));
 }
 
 /**
